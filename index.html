@@ -8,6 +8,59 @@
 </head>
 <body>
 
+  <!-- ══ NAV BAR ═══════════════════════════════════════════════════════════════ -->
+  <nav id="app-nav" class="app-nav">
+    <div class="nav-logo" dir="ltr">36–0</div>
+    <div class="nav-actions">
+      <button class="nav-btn" id="nav-leaderboard">לוח שיאים</button>
+      <button class="nav-btn" id="nav-achievements">הישגים</button>
+      <div class="nav-user" id="nav-user" style="display:none">
+        <img class="nav-avatar" id="nav-avatar" src="" alt="" style="display:none">
+        <span class="nav-username" id="nav-username"></span>
+        <button class="nav-btn nav-btn-sm" id="nav-logout">יציאה</button>
+      </div>
+      <button class="nav-btn nav-btn-primary" id="nav-login">התחבר</button>
+    </div>
+  </nav>
+
+  <!-- ══ AUTH MODAL ════════════════════════════════════════════════════════════ -->
+  <div id="auth-modal" class="modal-overlay" style="display:none">
+    <div class="modal-box">
+      <button class="modal-close" id="auth-modal-close">✕</button>
+      <div class="modal-title">כניסה / הרשמה</div>
+      <button class="auth-google-btn" id="auth-google-btn">
+        <span>G</span> כניסה עם Google
+      </button>
+      <div class="auth-divider">או</div>
+      <div class="auth-tabs">
+        <button class="auth-tab selected" data-tab="login">כניסה</button>
+        <button class="auth-tab" data-tab="register">הרשמה</button>
+      </div>
+      <div id="auth-login-form">
+        <input class="auth-input" type="email" id="auth-email" placeholder="אימייל" dir="ltr">
+        <input class="auth-input" type="password" id="auth-password" placeholder="סיסמה" dir="ltr">
+        <button class="btn-primary btn-full" id="auth-submit-login">כניסה</button>
+      </div>
+      <div id="auth-register-form" style="display:none">
+        <input class="auth-input" type="email" id="auth-reg-email" placeholder="אימייל" dir="ltr">
+        <input class="auth-input" type="password" id="auth-reg-password" placeholder="סיסמה (6+ תווים)" dir="ltr">
+        <button class="btn-primary btn-full" id="auth-submit-register">הרשמה</button>
+      </div>
+      <div class="auth-error" id="auth-error" style="display:none"></div>
+    </div>
+  </div>
+
+  <!-- ══ USERNAME MODAL ════════════════════════════════════════════════════════ -->
+  <div id="username-modal" class="modal-overlay" style="display:none">
+    <div class="modal-box">
+      <div class="modal-title">בחר שם משתמש</div>
+      <div class="modal-sub">השם יוצג ב-Leaderboard</div>
+      <input class="auth-input" type="text" id="username-input" placeholder="שם משתמש" maxlength="20">
+      <button class="btn-primary btn-full" id="username-submit">שמור</button>
+      <div class="auth-error" id="username-error" style="display:none"></div>
+    </div>
+  </div>
+
   <!-- ══ WELCOME ══════════════════════════════════════════════════════════════ -->
   <div id="screen-welcome" class="screen">
     <div class="welcome-inner">
@@ -364,6 +417,21 @@
     </div>
   </div>
 
+  <!-- ══ ACHIEVEMENT TOAST ══════════════════════════════════════════════════════ -->
+  <div id="achievement-toast" class="achievement-toast" style="display:none">
+    <div class="toast-icon" id="toast-icon">🏆</div>
+    <div class="toast-text">
+      <div class="toast-label">הישג חדש!</div>
+      <div class="toast-name" id="toast-name"></div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/config.js"></script>
+  <script src="js/supabase-client.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/achievements.js"></script>
+  <script src="js/leaderboard.js"></script>
   <script src="js/data.js"></script>
   <script src="js/game.js"></script>
 </body>
