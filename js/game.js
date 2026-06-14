@@ -1261,6 +1261,7 @@ function animateResults(ovr) {
     document.getElementById('tier-box').classList.add('visible');
     window._lastResult = { wins, draws, losses, gfTotal, gaTotal, matches, ovr, inTopSix };
     window._lastTier   = tier;
+    setupSaveSection();
   }, 1600);
 
   // Build detailed stats after animations settle
@@ -1471,6 +1472,96 @@ function restartGame() {
   const moveBtn = document.getElementById('btn-move-player');
   if (moveBtn) { moveBtn.style.display = 'none'; moveBtn.classList.remove('move-active'); moveBtn.textContent = '⇄ הזז שחקן'; }
   showScreen('setup');
+}
+
+// ─── Leaderboard integration ───────────────────────────────────────────────────
+async function submitResult() {
+  const user = getCurrentUser();
+  if (!user) return;
+  const { data: { session } } = await _supabase.auth.getSession();
+  if (!session) return;
+
+  const r = window._lastResult;
+  const t = window._lastTier;
+  if (!r || !t) return;
+
+  const isPublic = document.getElementById('share-squad-checkbox')?.checked ?? false;
+
+  const payload = {
+    ovr:       r.ovr,
+    wins:      r.wins,
+    draws:     r.draws,
+    losses:    r.losses,
+    points:    r.wins * 3 + r.draws,
+    gf:        r.gfTotal,
+    ga:        r.gaTotal,
+    formation: FORMATIONS[state.formationId]?.label ?? state.formationId,
+    tier:      t.name,
+    settings: {
+      difficulty:      state.difficulty,
+      era_min:         state.eraMin,
+      era_max:         state.eraMax,
+      peak_mode:       state.peakMode,
+      ratings_visible: state.showRatings,
+    },
+    players: state.picks.flatMap((pick, i) => {
+      if (!pick) return [];
+      return [{
+        teamId: pick.squad.teamId,
+        season: pick.squad.season,
+        name:   pick.player.name,
+        pos:    state.slots[i].pos,
+        ovr:    playerOVR(pick.player),
+        slotId: state.slots[i].id,
+      }];
+    }),
+    matches:   r.matches.map(m => ({ gf: m.gf, ga: m.ga, venue: m.home ? 'home' : 'away' })),
+    is_public: isPublic,
+  };
+
+  try {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/submit-result`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`,
+        'apikey': SUPABASE_ANON_KEY,
+      },
+      body: JSON.stringify(payload),
+    });
+    const json = await res.json();
+    if (json.new_achievements?.length) await showAchievementToasts(json.new_achievements);
+  } catch (err) {
+    console.error('Failed to submit result:', err);
+  }
+}
+
+function setupSaveSection() {
+  const user        = getCurrentUser();
+  const saveSection = document.getElementById('save-result-section');
+  const loginPrompt = document.getElementById('save-login-prompt');
+  if (!saveSection || !loginPrompt) return;
+
+  if (user) {
+    saveSection.style.display = 'flex';
+    loginPrompt.style.display = 'none';
+  } else {
+    saveSection.style.display = 'none';
+    loginPrompt.style.display = 'flex';
+    document.getElementById('save-login-btn').onclick = () => {
+      document.getElementById('auth-modal').style.display = 'flex';
+    };
+  }
+
+  const saveBtn = document.getElementById('btn-save-result');
+  saveBtn.disabled = false;
+  saveBtn.textContent = 'שמור ב-Leaderboard';
+  saveBtn.onclick = async () => {
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'שומר...';
+    await submitResult();
+    saveBtn.textContent = '✓ נשמר!';
+  };
 }
 
 // ─── Init ──────────────────────────────────────────────────────────────────────
