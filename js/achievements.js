@@ -19,6 +19,14 @@ function showSingleToast(ach) {
   });
 }
 
+function getRarity(pct) {
+  if (pct < 1)  return { label: 'אגדי',  color: '#f59e0b' };
+  if (pct < 5)  return { label: 'נדיר',  color: '#a855f7' };
+  if (pct < 15) return { label: 'קשה',   color: '#3b82f6' };
+  if (pct < 40) return { label: 'בינוני',color: '#22c55e' };
+  return               { label: 'קל',    color: '#6b7280' };
+}
+
 async function showAchievements() {
   document.querySelectorAll('.screen').forEach(s => s.style.display = 'none');
   const screen = document.getElementById('screen-achievements');
@@ -31,20 +39,21 @@ async function showAchievements() {
     document.getElementById('screen-welcome').style.display = 'flex';
   };
 
-  const { data: allAchs } = await _supabase
-    .from('achievements')
-    .select('*')
-    .order('is_hidden', { ascending: true });
-
-  let unlockedMap = {};
   const user = getCurrentUser();
-  if (user) {
-    const { data: unlocked } = await _supabase
-      .from('user_achievements')
-      .select('achievement_key, unlocked_at')
-      .eq('user_id', user.id);
-    (unlocked ?? []).forEach(u => { unlockedMap[u.achievement_key] = u.unlocked_at; });
-  }
+
+  const [{ data: allAchs }, { data: statsRows }, unlockedRows] = await Promise.all([
+    _supabase.from('achievements').select('*').order('is_hidden', { ascending: true }),
+    _supabase.rpc('get_achievement_stats'),
+    user
+      ? _supabase.from('user_achievements').select('achievement_key, unlocked_at').eq('user_id', user.id)
+      : Promise.resolve({ data: [] }),
+  ]);
+
+  const statsMap = {};
+  (statsRows ?? []).forEach(r => { statsMap[r.key] = r; });
+
+  const unlockedMap = {};
+  (unlockedRows.data ?? []).forEach(u => { unlockedMap[u.achievement_key] = u.unlocked_at; });
 
   grid.innerHTML = '';
 
@@ -58,6 +67,14 @@ async function showAchievements() {
   (allAchs ?? []).forEach(ach => {
     const isUnlocked        = !!unlockedMap[ach.key];
     const isHiddenAndLocked = ach.is_hidden && !isUnlocked;
+
+    const s           = statsMap[ach.key];
+    const totalUsers  = Number(s?.total_users ?? 0);
+    const unlockCount = Number(s?.unlock_count ?? 0);
+    const pct         = totalUsers > 0 ? (unlockCount / totalUsers) * 100 : 0;
+    const rarity      = getRarity(pct);
+    const pctLabel    = totalUsers > 0 ? `${pct.toFixed(1)}%` : '—';
+
     const card = document.createElement('div');
     card.className = `ach-card ${isUnlocked ? 'ach-unlocked' : 'ach-locked'}`;
     card.innerHTML = `
@@ -66,6 +83,13 @@ async function showAchievements() {
         <div class="ach-name">${isHiddenAndLocked ? '???' : ach.name_he}</div>
         <div class="ach-desc">${isHiddenAndLocked ? '' : ach.desc_he}</div>
         ${isUnlocked ? `<div class="ach-date">${new Date(unlockedMap[ach.key]).toLocaleDateString('he-IL')}</div>` : ''}
+        <div class="ach-rarity-row">
+          <span class="ach-rarity-tag" style="color:${rarity.color};border-color:${rarity.color}40">${rarity.label}</span>
+          <div class="ach-bar-wrap">
+            <div class="ach-bar-fill" style="width:${Math.min(pct,100).toFixed(1)}%;background:${rarity.color}"></div>
+          </div>
+          <span class="ach-pct">${pctLabel}</span>
+        </div>
       </div>
     `;
     grid.appendChild(card);
