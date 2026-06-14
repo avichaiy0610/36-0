@@ -1261,6 +1261,12 @@ function animateResults(ovr) {
     document.getElementById('tier-box').classList.add('visible');
     window._lastResult = { wins, draws, losses, gfTotal, gaTotal, matches, ovr, inTopSix };
     window._lastTier   = tier;
+    const diffMapR = { easy: 'קל', normal: 'רגיל', hard: 'קשה' };
+    const modeParts = [diffMapR[state.difficulty] ?? state.difficulty];
+    if (state.peakMode) modeParts.push('⚡ מצב שיא');
+    if (!state.showRatings) modeParts.push('🙈 דירוגים מוסתרים');
+    const modeInfoEl = document.getElementById('res-mode-info');
+    if (modeInfoEl) modeInfoEl.textContent = modeParts.join(' · ');
     setupSaveSection();
   }, 1600);
 
@@ -1304,6 +1310,14 @@ function populateShareCard() {
 
   document.getElementById('sc-p-formation').textContent = formation;
   document.getElementById('sc-p-ovr').textContent = `OVR ${r.ovr}`;
+  const modeParts = [];
+  const diffMap = { easy: 'קל', normal: 'רגיל', hard: 'קשה' };
+  modeParts.push(diffMap[state.difficulty] ?? state.difficulty);
+  if (state.peakMode) modeParts.push('⚡ שיא');
+  if (!state.showRatings) modeParts.push('🙈 סמוי');
+  const modeEl = document.getElementById('sc-p-mode');
+  modeEl.textContent = modeParts.join(' · ');
+  modeEl.style.display = 'inline-block';
   document.getElementById('sc-w').textContent = r.wins;
   document.getElementById('sc-d').textContent = r.draws;
   document.getElementById('sc-l').textContent = r.losses;

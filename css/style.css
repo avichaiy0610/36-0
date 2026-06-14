@@ -48,6 +48,7 @@ body {
   padding: 0 !important;
   overflow: hidden !important;
   align-items: stretch !important;
+  top: 48px !important;
 }
 
 /* ── Welcome ──────────────────────────────────────────────────────────────── */
@@ -1257,6 +1258,10 @@ body {
   padding: 10px 14px; background: #1a1a2e; border-radius: 8px;
   color: #ccc; font-size: 0.85rem; margin-bottom: 12px;
 }
+
+/* ── Mode info (results + share card) ───────────────────────────────────── */
+.res-mode-info { font-size: 0.75rem; color: #888; margin-top: 6px; }
+.mode-pill { background: #2a2a4e !important; color: #aaa !important; font-size: 0.7rem !important; }
 
 /* ── Page Screens (achievements, leaderboard) ────────────────────────────── */
 .screen-page { display: flex; flex-direction: column; min-height: 100vh; background: #0d0d1a; }
