@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>36–0 | ליגת העל</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+  <!-- ══ WELCOME ══════════════════════════════════════════════════════════════ -->
+  <div id="screen-welcome" class="screen">
+    <div class="welcome-inner">
+      <div class="logo-wrap">
+        <div class="logo"><span dir="ltr">36–0</span></div>
+        <div class="logo-sub">ליגת העל הישראלית</div>
+      </div>
+      <p class="welcome-tagline">בנה את הרכב החלומות בליגת העל בכל הזמנים</p>
+      <p class="welcome-sub">
+        בכל סיבוב מוגרלת קבוצה מכל הדורות — בחר שחקן לכל עמדה.<br>
+        11 שחקנים, 36 משחקים — האם תצליח <span dir="ltr">36–0</span>?
+      </p>
+      <button id="btn-start" class="btn-primary">שחק עכשיו ⚽</button>
+    </div>
+  </div>
+
+  <!-- ══ SETUP ════════════════════════════════════════════════════════════════ -->
+  <div id="screen-setup" class="screen">
+    <div class="setup-inner">
+      <div class="setup-header">
+        <div class="setup-logo"><span dir="ltr">36–0</span></div>
+        <div class="setup-subtitle">ליגת העל הישראלית</div>
+      </div>
+
+      <section class="setup-section">
+        <div class="setup-label">מערך</div>
+        <div id="formation-grid" class="formation-grid"></div>
+      </section>
+
+      <section class="setup-section">
+        <div class="setup-label">קושי</div>
+        <div class="option-row" id="diff-row">
+          <button class="opt-btn" data-val="easy">
+            <div class="opt-title">קל</div>
+            <div class="opt-sub">3 החלפות זמינות</div>
+          </button>
+          <button class="opt-btn selected" data-val="normal">
+            <div class="opt-title">רגיל</div>
+            <div class="opt-sub">החלפה אחת זמינה</div>
+          </button>
+          <button class="opt-btn" data-val="hard">
+            <div class="opt-title">קשה</div>
+            <div class="opt-sub">ללא החלפות</div>
+          </button>
+        </div>
+      </section>
+
+      <section class="setup-section">
+        <div class="setup-label">דירוגי שחקנים</div>
+        <div class="option-row" id="ratings-row">
+          <button class="opt-btn selected" data-val="on">
+            <div class="opt-title">גלויים</div>
+            <div class="opt-sub">דירוגי OVR מוצגים</div>
+          </button>
+          <button class="opt-btn" data-val="off">
+            <div class="opt-title">מוסתרים</div>
+            <div class="opt-sub">מצב עיוור — רק ידע</div>
+          </button>
+        </div>
+      </section>
+
+      <section class="setup-section">
+        <div class="setup-label">מצב דראפט</div>
+        <div class="option-row" id="draftmode-row">
+          <button class="opt-btn selected" data-val="squad-first">
+            <div class="opt-title">סגל קודם</div>
+            <div class="opt-sub">הגרל סגל, אז בחר שחקן</div>
+          </button>
+          <button class="opt-btn" data-val="pos-first">
+            <div class="opt-title">עמדה קודם</div>
+            <div class="opt-sub">בחר עמדה, אז הגרל סגל</div>
+          </button>
+        </div>
+      </section>
+
+      <section class="setup-section">
+        <div class="setup-label">מצב שיא ⚡</div>
+        <div class="option-row" id="peakmode-row">
+          <button class="opt-btn" data-val="on">
+            <div class="opt-title">פעיל</div>
+            <div class="opt-sub">כל שחקן נמצא בשיא הקריירה</div>
+          </button>
+          <button class="opt-btn selected" data-val="off">
+            <div class="opt-title">כבוי</div>
+            <div class="opt-sub">דירוג אמיתי לפי עונה</div>
+          </button>
+        </div>
+      </section>
+
+      <section class="setup-section">
+        <div class="setup-label">עידן</div>
+        <div class="era-presets" id="era-presets">
+          <button class="era-btn selected" data-era="all">כל הזמנים</button>
+          <button class="era-btn" data-era="2000s">2003+</button>
+          <button class="era-btn" data-era="2010s">2010s+</button>
+          <button class="era-btn" data-era="modern">מודרני (2016+)</button>
+        </div>
+        <div class="era-slider-wrap" dir="rtl">
+          <div class="era-track"><div class="era-fill" id="era-fill"></div></div>
+          <input type="range" id="era-min-r" class="era-thumb" min="1999" max="2024" value="1999">
+          <input type="range" id="era-max-r" class="era-thumb" min="1999" max="2024" value="2024">
+        </div>
+        <div class="era-info-row" dir="rtl">
+          <span id="era-lbl-min" class="era-lbl-edge"></span>
+          <span id="era-lbl-count" class="era-lbl-mid"></span>
+          <span id="era-lbl-max" class="era-lbl-edge"></span>
+        </div>
+        <p class="era-note">רק עונות בטווח זה ייגרלו במשחק</p>
+      </section>
+
+      <button id="btn-start-draft" class="btn-primary btn-full">התחל דראפט ←</button>
+    </div>
+  </div>
+
+  <!-- ══ DRAFT ══════════════════════════════════════════════════════════════════ -->
+  <div id="screen-draft" class="screen screen-split">
+
+    <div class="side-panel" id="side-panel">
+      <div class="squad-card" id="squad-card">
+        <div class="squad-card-header" id="squad-card-header">
+          <span class="card-badge" id="card-badge">⚽</span>
+          <div class="card-text">
+            <div class="card-team" id="card-team-name">מגריל...</div>
+            <div class="card-season" id="card-season" dir="ltr"></div>
+          </div>
+        </div>
+        <div class="reroll-row">
+          <button class="btn-reroll-small" id="btn-reroll-team">
+            🔄 החלף קבוצה
+            <span class="reroll-badge" id="team-reroll-count">1</span>
+          </button>
+          <button class="btn-reroll-small" id="btn-reroll-season">
+            📅 החלף עונה
+            <span class="reroll-badge" id="season-reroll-count">1</span>
+          </button>
+        </div>
+      </div>
+      <div id="peak-mode-banner" class="peak-mode-banner" style="display:none">⚡ מצב שיא פעיל</div>
+      <button id="btn-move-player" class="btn-move-player" style="display:none">⇄ הזז שחקן</button>
+      <div class="pick-hint" id="pick-hint">ממתין להגרלה...</div>
+      <div id="players-list"></div>
+      <button id="btn-draft-restart" class="btn-draft-restart">↩ התחל מחדש</button>
+    </div>
+
+    <div class="pitch-panel">
+      <div class="progress-bar-wrap">
+        <div class="progress-top-row">
+          <div class="progress-text" id="progress-text">שחקן 1 מתוך 11</div>
+          <div class="draft-ovr-display" id="draft-ovr-display" style="display:none">
+            דירוג כולל: <span id="draft-ovr-val">—</span>
+          </div>
+        </div>
+        <div class="progress-bar-bg">
+          <div class="progress-bar-fill" id="progress-fill"></div>
+        </div>
+        <div id="draft-ovr-lines" style="display:none"></div>
+      </div>
+      <div class="pitch-container">
+        <div class="pitch" id="draft-pitch">
+          <div id="pitch-slots"></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ══ RESULTS ════════════════════════════════════════════════════════════════ -->
+  <div id="screen-results" class="screen screen-split">
+
+    <!-- RIGHT: Stats panel (scrollable) -->
+    <div class="side-panel results-side">
+
+      <!-- Tier (revealed after animation) -->
+      <div class="tier-box" id="tier-box">
+        <div class="tier-name" id="res-tier">—</div>
+        <div class="tier-sub" id="res-tier-sub"></div>
+      </div>
+
+      <!-- OVR Card (revealed with stats section) -->
+      <div class="ovr-card">
+        <div class="ovr-total-row">
+          <span class="ovr-total-label">דירוג כולל</span>
+          <span class="ovr-total-val" id="res-ovr-total">—</span>
+        </div>
+        <div id="ovr-lines"></div>
+      </div>
+
+      <!-- W / D / L -->
+      <div class="record-display">
+        <div class="rec-box wins">
+          <div class="rec-num" id="res-wins" dir="ltr">0</div>
+          <div class="rec-label">ניצחונות</div>
+        </div>
+        <div class="rec-box draws">
+          <div class="rec-num" id="res-draws" dir="ltr">0</div>
+          <div class="rec-label">תיקו</div>
+        </div>
+        <div class="rec-box losses">
+          <div class="rec-num" id="res-losses" dir="ltr">0</div>
+          <div class="rec-label">הפסדים</div>
+        </div>
+      </div>
+
+      <!-- Points / GF / GA -->
+      <div class="record-display record-sm">
+        <div class="rec-box">
+          <div class="rec-num-sm" id="res-points" dir="ltr">—</div>
+          <div class="rec-label">נקודות</div>
+        </div>
+        <div class="rec-box">
+          <div class="rec-num-sm" id="res-gf" dir="ltr">—</div>
+          <div class="rec-label">שערים שנכבשו</div>
+        </div>
+        <div class="rec-box">
+          <div class="rec-num-sm" id="res-ga" dir="ltr">—</div>
+          <div class="rec-label">ספיגות</div>
+        </div>
+      </div>
+
+      <!-- 36 match rows -->
+      <div class="matches-grid" id="matches-grid"></div>
+
+      <!-- Everything below fades in after 2.2s -->
+      <div id="res-stats-section" class="res-stats-section">
+
+        <!-- Season Awards -->
+        <div class="section-label">מצטייני העונה</div>
+        <div class="awards-grid">
+          <div class="award-card">
+            <div class="award-icon">⚽</div>
+            <div class="award-title">מלך השערים</div>
+            <div class="award-winner" id="aw-boot-name">—</div>
+            <div class="award-stat" id="aw-boot-stat"></div>
+          </div>
+          <div class="award-card">
+            <div class="award-icon">🎯</div>
+            <div class="award-title">מלך הבישולים</div>
+            <div class="award-winner" id="aw-assist-name">—</div>
+            <div class="award-stat" id="aw-assist-stat"></div>
+          </div>
+          <div class="award-card">
+            <div class="award-icon">🧤</div>
+            <div class="award-title">כפפת הזהב</div>
+            <div class="award-winner" id="aw-glove-name">—</div>
+            <div class="award-stat" id="aw-glove-stat"></div>
+          </div>
+          <div class="award-card">
+            <div class="award-icon">🏅</div>
+            <div class="award-title">שחקן העונה</div>
+            <div class="award-winner" id="aw-pots-name">—</div>
+            <div class="award-stat" id="aw-pots-stat"></div>
+          </div>
+        </div>
+
+        <!-- Player Stats Table -->
+        <div class="section-label">סטטיסטיקות שחקנים</div>
+        <div class="stats-table">
+          <div class="stats-row stats-head">
+            <span class="st-pos-badge" style="opacity:0;width:32px">·</span>
+            <span class="st-name-head">שחקן</span>
+            <span class="st-num-head">שע</span>
+            <span class="st-num-head">ביש</span>
+            <span class="st-num-head">נקי</span>
+          </div>
+          <div id="player-stats-body"></div>
+        </div>
+
+        <!-- Season Highlights -->
+        <div class="section-label">נתוני העונה</div>
+        <div class="highlights-row">
+          <div class="highlight-box">
+            <div class="hl-val" id="hl-streak">—</div>
+            <div class="hl-label">רצף ניצחונות</div>
+          </div>
+          <div class="highlight-box">
+            <div class="hl-val" id="hl-cs">—</div>
+            <div class="hl-label">שערים נקיים</div>
+          </div>
+          <div class="highlight-box hl-wide">
+            <div class="hl-val hl-small" id="hl-bigwin">—</div>
+            <div class="hl-label">הניצחון הגדול</div>
+          </div>
+        </div>
+
+        <!-- League Table -->
+        <details class="league-details">
+          <summary class="league-summary">טבלת ליגה סופית</summary>
+          <div class="lt-head">
+            <span class="lt-pos">#</span>
+            <span class="lt-name">קבוצה</span>
+            <span class="lt-pts">נק׳</span>
+          </div>
+          <div id="league-table"></div>
+        </details>
+
+      </div><!-- /res-stats-section -->
+
+      <div class="results-actions">
+        <button class="btn-primary" id="btn-share">שתף תוצאה</button>
+        <button class="btn-secondary" id="btn-restart">משחק חדש</button>
+      </div>
+
+    </div>
+
+    <!-- LEFT: Final Pitch -->
+    <div class="pitch-panel">
+      <div class="pitch-container">
+        <div class="pitch">
+          <div id="results-pitch-slots"></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ══ SHARE MODAL ═════════════════════════════════════════════════════════ -->
+  <div id="share-modal" class="share-overlay" style="display:none">
+    <div class="share-box">
+      <div class="share-card" id="share-card-el" dir="rtl">
+        <div class="sc-header">
+          <div class="sc-logo" dir="ltr">36–0</div>
+          <div class="sc-sub">ליגת העל הישראלית</div>
+        </div>
+        <div class="sc-pills">
+          <span class="sc-pill formation-pill" id="sc-p-formation"></span>
+          <span class="sc-pill ovr-pill" id="sc-p-ovr"></span>
+        </div>
+        <div class="sc-wdl" dir="ltr">
+          <div class="sc-wdl-block wins"><span class="sc-big-num" id="sc-w">0</span><span class="sc-lbl">נ׳</span></div>
+          <span class="sc-dash">–</span>
+          <div class="sc-wdl-block draws"><span class="sc-big-num" id="sc-d">0</span><span class="sc-lbl">ת׳</span></div>
+          <span class="sc-dash">–</span>
+          <div class="sc-wdl-block losses"><span class="sc-big-num" id="sc-l">0</span><span class="sc-lbl">ה׳</span></div>
+        </div>
+        <div class="sc-pts-line">
+          <span id="sc-pts-text"></span>
+          <span class="sc-dot">·</span>
+          <span class="sc-tier-name" id="sc-tier-text"></span>
+        </div>
+        <div class="sc-divider"></div>
+        <div class="sc-lineup" id="sc-lineup"></div>
+        <div class="sc-divider"></div>
+        <div class="sc-awards" id="sc-share-awards"></div>
+        <div class="sc-emoji" id="sc-emoji" dir="ltr"></div>
+        <div class="sc-footer">36-0.app</div>
+      </div>
+      <div class="share-btns-row">
+        <button class="sh-btn sh-wa" id="sh-wa">📱 WhatsApp</button>
+        <button class="sh-btn sh-x" id="sh-x">𝕏</button>
+        <button class="sh-btn sh-copy" id="sh-copy">🔗 העתק</button>
+      </div>
+      <button class="sh-save" id="sh-save">⬇ שמור תמונה</button>
+      <button class="sh-close" id="sh-close">סגור</button>
+    </div>
+  </div>
+
+  <script src="js/data.js"></script>
+  <script src="js/game.js"></script>
+</body>
+</html>

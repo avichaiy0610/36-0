@@ -1,0 +1,188 @@
+{
+  "maccabi-tlv": {
+    "name": "מכבי תל אביב",
+    "primaryColor": "#FFD700",
+    "secondaryColor": "#003087",
+    "badge": "🟡🔵"
+  },
+  "maccabi-haifa": {
+    "name": "מכבי חיפה",
+    "primaryColor": "#005C28",
+    "secondaryColor": "#FFFFFF",
+    "badge": "🟢⚪"
+  },
+  "hapoel-beersheba": {
+    "name": "הפועל באר שבע",
+    "primaryColor": "#8B0000",
+    "secondaryColor": "#FFFFFF",
+    "badge": "🔴⚪"
+  },
+  "beitar-jerusalem": {
+    "name": "בית\"ר ירושלים",
+    "primaryColor": "#1A1A1A",
+    "secondaryColor": "#FFD700",
+    "badge": "⚫🟡"
+  },
+  "ms-ashdod": {
+    "name": "מ.ס. אשדוד",
+    "primaryColor": "#F0B800",
+    "secondaryColor": "#CC0000",
+    "badge": "🟡🔴"
+  },
+  "maccabi-pt": {
+    "name": "מכבי פתח תקווה",
+    "primaryColor": "#003087",
+    "secondaryColor": "#FFFFFF",
+    "badge": "🔵⚪"
+  },
+  "hapoel-jerusalem": {
+    "name": "הפועל ירושלים",
+    "primaryColor": "#CC0000",
+    "secondaryColor": "#1A1A1A",
+    "badge": "🔴⚫"
+  },
+  "maccabi-netanya": {
+    "name": "מכבי נתניה",
+    "primaryColor": "#FFD700",
+    "secondaryColor": "#1A1A1A",
+    "badge": "🟡⚫"
+  },
+  "hapoel-haifa": {
+    "name": "הפועל חיפה",
+    "primaryColor": "#CC0000",
+    "secondaryColor": "#FFFFFF",
+    "badge": "🔴⚪"
+  },
+  "bnei-sakhnin": {
+    "name": "בני סכנין",
+    "primaryColor": "#CC0000",
+    "secondaryColor": "#FFFFFF",
+    "badge": "🔴⚪"
+  },
+  "ironi-ks": {
+    "name": "עירוני קריית שמונה",
+    "primaryColor": "#003087",
+    "secondaryColor": "#FFFFFF",
+    "badge": "🔵⚪"
+  },
+  "ironi-tiberias": {
+    "name": "עירוני טבריה",
+    "primaryColor": "#003087",
+    "secondaryColor": "#FFFFFF",
+    "badge": "🔵⚪"
+  },
+  "maccabi-bnei-raina": {
+    "name": "מכבי בני ריינה",
+    "primaryColor": "#003087",
+    "secondaryColor": "#FFD700",
+    "badge": "🔵🟡"
+  },
+  "hapoel-hadera": {
+    "name": "הפועל חדרה",
+    "primaryColor": "#CC0000",
+    "secondaryColor": "#FFFFFF",
+    "badge": "🔴⚪"
+  },
+  "hapoel-tlv": {
+    "name": "הפועל תל אביב",
+    "primaryColor": "#CC0000",
+    "secondaryColor": "#FFFFFF",
+    "badge": "🔴⚪"
+  },
+  "hapoel-pt": {
+    "name": "הפועל פתח תקווה",
+    "primaryColor": "#003087",
+    "secondaryColor": "#FFFFFF",
+    "badge": "🔵⚪"
+  },
+  "bnei-yehuda": {
+    "name": "בני יהודה תל אביב",
+    "primaryColor": "#FF6B00",
+    "secondaryColor": "#1A1A1A",
+    "badge": "🟠⚫"
+  },
+  "hapoel-rishonim": {
+    "name": "הפועל ראשון לציון",
+    "primaryColor": "#FF6B00",
+    "secondaryColor": "#FFFFFF",
+    "badge": "🟠⚪"
+  },
+  "hapoel-kfar-saba": {
+    "name": "הפועל כפר סבא",
+    "primaryColor": "#005C28",
+    "secondaryColor": "#FFFFFF",
+    "badge": "🟢⚪"
+  },
+  "hapoel-raanana": {
+    "name": "הפועל רעננה",
+    "primaryColor": "#CC0000",
+    "secondaryColor": "#1A1A1A",
+    "badge": "🔴⚫"
+  },
+  "hapoel-rg": {
+    "name": "הפועל רמת גן",
+    "primaryColor": "#CC0000",
+    "secondaryColor": "#1A1A1A",
+    "badge": "🔴⚫"
+  },
+  "hapoel-galil": {
+    "name": "הפועל נוף הגליל",
+    "primaryColor": "#003087",
+    "secondaryColor": "#CC0000",
+    "badge": "🔵🔴"
+  },
+  "hapoel-aco": {
+    "name": "הפועל עכו",
+    "primaryColor": "#003087",
+    "secondaryColor": "#FFFFFF",
+    "badge": "🔵⚪"
+  },
+  "hakoah-rg": {
+    "name": "הכח עמידר רמת גן",
+    "primaryColor": "#7B2D8B",
+    "secondaryColor": "#FFFFFF",
+    "badge": "🟣⚪"
+  },
+  "maccabi-herzliya": {
+    "name": "מכבי הרצליה",
+    "primaryColor": "#FFD700",
+    "secondaryColor": "#003087",
+    "badge": "🟡🔵"
+  },
+  "maccabi-ahi-naz": {
+    "name": "מכבי אחי נצרת",
+    "primaryColor": "#005C28",
+    "secondaryColor": "#FFFFFF",
+    "badge": "🟢⚪"
+  },
+  "maccabi-kg": {
+    "name": "מכבי קריית גת",
+    "primaryColor": "#003087",
+    "secondaryColor": "#FFD700",
+    "badge": "🔵🟡"
+  },
+  "hapoel-ashkelon": {
+    "name": "הפועל אשקלון",
+    "primaryColor": "#003087",
+    "secondaryColor": "#FFFFFF",
+    "badge": "🔵⚪"
+  },
+  "hapoel-rhs": {
+    "name": "הפועל רמת השרון",
+    "primaryColor": "#003087",
+    "secondaryColor": "#FFFFFF",
+    "badge": "🔵⚪"
+  },
+  "hapoel-holon": {
+    "name": "הפועל צפרירים חולון",
+    "primaryColor": "#003087",
+    "secondaryColor": "#FFFFFF",
+    "badge": "🔵⚪"
+  },
+  "sakhnina-ns": {
+    "name": "סקציה נס ציונה",
+    "primaryColor": "#FF6B00",
+    "secondaryColor": "#1A1A1A",
+    "badge": "🟠⚫"
+  }
+}
