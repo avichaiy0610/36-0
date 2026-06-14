@@ -1257,3 +1257,69 @@ body {
   padding: 10px 14px; background: #1a1a2e; border-radius: 8px;
   color: #ccc; font-size: 0.85rem; margin-bottom: 12px;
 }
+
+/* ── Page Screens (achievements, leaderboard) ────────────────────────────── */
+.screen-page { display: flex; flex-direction: column; min-height: 100vh; background: #0d0d1a; }
+.page-inner  { max-width: 600px; margin: 0 auto; padding: 24px 16px; width: 100%; box-sizing: border-box; }
+.page-header { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; direction: rtl; }
+.page-title  { font-size: 1.4rem; font-weight: 700; color: #fff; margin: 0; flex: 1; text-align: center; }
+.back-btn    { background: none; border: 1px solid #444; color: #aaa; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.85rem; font-family: inherit; }
+.page-loading { color: #666; text-align: center; padding: 40px; }
+.page-note   { color: #aaa; text-align: center; font-size: 0.9rem; margin-bottom: 20px; }
+
+/* ── Achievements Grid ───────────────────────────────────────────────────── */
+.achievements-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; direction: rtl; }
+.ach-card {
+  border-radius: 10px; padding: 16px 12px;
+  display: flex; align-items: flex-start; gap: 12px; border: 1px solid #333;
+}
+.ach-unlocked { background: #1a2a1a; border-color: #4CAF50; }
+.ach-locked   { background: #141425; opacity: 0.6; }
+.ach-icon  { font-size: 1.8rem; flex-shrink: 0; }
+.ach-info  { display: flex; flex-direction: column; gap: 2px; }
+.ach-name  { font-size: 0.9rem; font-weight: 700; color: #fff; }
+.ach-desc  { font-size: 0.75rem; color: #aaa; line-height: 1.3; }
+.ach-date  { font-size: 0.7rem; color: #4CAF50; margin-top: 4px; }
+
+/* ── Leaderboard ─────────────────────────────────────────────────────────── */
+.lb-inner { max-width: 700px; }
+.lb-tabs { display: flex; gap: 6px; margin-bottom: 12px; direction: rtl; }
+.lb-tab {
+  flex: 1; padding: 8px; background: transparent; border: 1px solid #444;
+  color: #aaa; border-radius: 8px; cursor: pointer; font-family: inherit; font-size: 0.9rem;
+}
+.lb-tab.selected { background: #4CAF50; border-color: #4CAF50; color: #fff; font-weight: 700; }
+.lb-filters { display: flex; gap: 6px; margin-bottom: 16px; direction: rtl; }
+.lb-filter {
+  padding: 4px 14px; background: transparent; border: 1px solid #333;
+  color: #888; border-radius: 20px; cursor: pointer; font-family: inherit; font-size: 0.8rem;
+}
+.lb-filter.selected { border-color: #4CAF50; color: #4CAF50; }
+.lb-table { display: flex; flex-direction: column; gap: 6px; direction: rtl; }
+.lb-row {
+  display: grid;
+  grid-template-columns: 32px 1fr auto auto 64px;
+  align-items: center; gap: 8px;
+  background: #141425; border: 1px solid #222; border-radius: 8px; padding: 10px 12px;
+}
+.lb-rank      { font-weight: 900; color: #666; font-size: 0.95rem; text-align: center; }
+.lb-rank-top  { color: #f1c40f; }
+.lb-name      { font-size: 0.9rem; color: #fff; font-weight: 600; }
+.lb-stat      { font-size: 0.9rem; color: #4CAF50; font-weight: 700; }
+.lb-sub       { font-size: 0.75rem; color: #666; }
+.lb-view-btn  {
+  padding: 4px 8px; background: transparent; border: 1px solid #444;
+  color: #aaa; border-radius: 6px; cursor: pointer; font-size: 0.75rem; font-family: inherit;
+}
+.lb-view-btn:hover { border-color: #4CAF50; color: #4CAF50; }
+
+/* ── Squad Modal ─────────────────────────────────────────────────────────── */
+.squad-modal-box   { max-width: 400px; }
+.squad-player-list { display: flex; flex-direction: column; gap: 6px; direction: rtl; margin-top: 12px; }
+.squad-player-item {
+  display: grid; grid-template-columns: 48px 1fr 40px; gap: 8px;
+  align-items: center; background: #13132a; border-radius: 6px; padding: 6px 10px;
+}
+.sq-pos  { font-size: 0.7rem; font-weight: 700; color: #4CAF50; }
+.sq-name { font-size: 0.85rem; color: #fff; }
+.sq-ovr  { font-size: 0.8rem; color: #f1c40f; font-weight: 700; text-align: left; }

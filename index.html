@@ -438,6 +438,46 @@
     </div>
   </div>
 
+  <!-- ══ ACHIEVEMENTS SCREEN ════════════════════════════════════════════════════ -->
+  <div id="screen-achievements" class="screen screen-page" style="display:none">
+    <div class="page-inner">
+      <div class="page-header">
+        <button class="back-btn" id="achievements-back">→ חזרה</button>
+        <h2 class="page-title">הישגים</h2>
+      </div>
+      <div id="achievements-grid" class="achievements-grid"></div>
+    </div>
+  </div>
+
+  <!-- ══ LEADERBOARD SCREEN ════════════════════════════════════════════════════ -->
+  <div id="screen-leaderboard" class="screen screen-page" style="display:none">
+    <div class="page-inner lb-inner">
+      <div class="page-header">
+        <button class="back-btn" id="leaderboard-back">→ חזרה</button>
+        <h2 class="page-title">לוח שיאים</h2>
+      </div>
+      <div class="lb-tabs">
+        <button class="lb-tab selected" data-tab="ovr">🏅 OVR</button>
+        <button class="lb-tab" data-tab="points">⚽ נקודות</button>
+      </div>
+      <div class="lb-filters">
+        <button class="lb-filter selected" data-period="all">כל הזמנים</button>
+        <button class="lb-filter" data-period="month">החודש</button>
+        <button class="lb-filter" data-period="week">השבוע</button>
+      </div>
+      <div id="leaderboard-table" class="lb-table"></div>
+    </div>
+  </div>
+
+  <!-- ══ SQUAD VIEW MODAL ═══════════════════════════════════════════════════════ -->
+  <div id="squad-modal" class="modal-overlay" style="display:none">
+    <div class="modal-box squad-modal-box">
+      <button class="modal-close" id="squad-modal-close">✕</button>
+      <div class="modal-title" id="squad-modal-title">הרכב</div>
+      <div id="squad-modal-pitch"></div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="js/config.js"></script>
   <script src="js/supabase-client.js"></script>
