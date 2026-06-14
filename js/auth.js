@@ -5,12 +5,13 @@ async function initAuth() {
   if (session?.user) await onSignIn(session.user);
   else showLoginButton();
 
-  _supabase.auth.onAuthStateChange(async (event, session) => {
+  const { data: { subscription: authSubscription } } = _supabase.auth.onAuthStateChange(async (event, session) => {
     if (event === 'SIGNED_IN' && session?.user) await onSignIn(session.user);
     if (event === 'SIGNED_OUT') onSignOut();
   });
 
   document.getElementById('nav-login').addEventListener('click', () => {
+    document.getElementById('auth-error').style.display = 'none';
     document.getElementById('auth-modal').style.display = 'flex';
   });
   document.getElementById('auth-modal-close').addEventListener('click', () => {
@@ -55,8 +56,8 @@ async function initAuth() {
   });
 
   document.getElementById('username-submit').addEventListener('click', saveUsername);
-  document.getElementById('nav-leaderboard').addEventListener('click', showLeaderboard);
-  document.getElementById('nav-achievements').addEventListener('click', showAchievements);
+  document.getElementById('nav-leaderboard').addEventListener('click', () => typeof showLeaderboard === 'function' && showLeaderboard());
+  document.getElementById('nav-achievements').addEventListener('click', () => typeof showAchievements === 'function' && showAchievements());
 }
 
 async function onSignIn(user) {
@@ -64,6 +65,7 @@ async function onSignIn(user) {
   const { data: profile } = await _supabase
     .from('profiles').select('username, avatar_url').eq('id', user.id).single();
   if (!profile?.username) {
+    document.getElementById('auth-modal').style.display = 'none';
     document.getElementById('username-modal').style.display = 'flex';
   } else {
     updateNavUser(profile.username, profile.avatar_url);
@@ -89,6 +91,7 @@ function updateNavUser(username, avatarUrl) {
 }
 
 async function saveUsername() {
+  if (!currentUser) return;
   const username = document.getElementById('username-input').value.trim();
   const errEl    = document.getElementById('username-error');
   if (username.length < 2) {
