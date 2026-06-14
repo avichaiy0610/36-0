@@ -8,6 +8,16 @@ const corsHeaders = {
 const HIGHEST_TIER = '36–0 🏆';
 const CHAMPION_TIERS = ['36–0 🏆', '33–0 🏆', 'בלתי מנוצחים ✨', 'אלופים בפאחר 🥇', 'אלופים 🏆'];
 const ALL_FORMATIONS = ['4-3-3', '4-4-2', '4-2-3-1', '3-5-2', '5-3-2'];
+const ALL_CLUB_IDS = [
+  'beitar-jerusalem', 'bnei-sakhnin', 'bnei-yehuda', 'hakoah-rg',
+  'hapoel-aco', 'hapoel-ashkelon', 'hapoel-beersheba', 'hapoel-galil',
+  'hapoel-hadera', 'hapoel-haifa', 'hapoel-holon', 'hapoel-jerusalem',
+  'hapoel-kfar-saba', 'hapoel-pt', 'hapoel-raanana', 'hapoel-rg',
+  'hapoel-rhs', 'hapoel-rishonim', 'hapoel-tlv', 'ironi-ks',
+  'ironi-tiberias', 'maccabi-ahi-naz', 'maccabi-bnei-raina', 'maccabi-haifa',
+  'maccabi-herzliya', 'maccabi-kg', 'maccabi-netanya', 'maccabi-pt',
+  'maccabi-tlv', 'ms-ashdod', 'sakhnina-ns',
+];
 
 interface MatchResult { gf: number; ga: number; venue: string; }
 interface Settings {
@@ -28,7 +38,6 @@ interface Payload {
   settings: Settings;
   players: Player[];
   matches: MatchResult[];
-  all_club_ids: string[];
   is_public: boolean;
 }
 
@@ -48,10 +57,9 @@ function computeAchievements(
   usedClubs: string[],
 ): string[] {
   const earned: string[] = [];
-  const allTeams = p.players.map(pl => pl.teamId);
-  const uniqueTeams = [...new Set(allTeams)];
+  const uniqueTeams = [...new Set(p.players.map(pl => pl.teamId))];
   const seasonYears = p.players.map(pl => parseInt((pl.season ?? '').split('/')[0]));
-  const maxMatchGf = Math.max(...p.matches.map(m => m.gf));
+  const maxMatchGf = p.matches.reduce((max, m) => Math.max(max, m.gf), 0);
 
   if (p.wins === 36)                                                              earned.push('perfect_season');
   if (p.losses === 0)                                                             earned.push('unbeaten_season');
@@ -65,10 +73,12 @@ function computeAchievements(
   if (uniqueTeams.length === 1)                                                   earned.push('mono_club');
   if (p.tier === HIGHEST_TIER)                                                    earned.push('tier_legend');
   if (p.wins === 36 && p.settings.peak_mode)                                     earned.push('peak_master');
-  if (gamesPlayed >= 10)                                                          earned.push('games_10');
-  if (gamesPlayed >= 50)                                                          earned.push('games_50');
-  if (ALL_FORMATIONS.every(f => usedFormations.includes(f)))                     earned.push('all_formations');
-  if (p.all_club_ids?.length && p.all_club_ids.every(c => usedClubs.includes(c))) earned.push('all_clubs');
+  if (gamesPlayed + 1 >= 10)                                                      earned.push('games_10');
+  if (gamesPlayed + 1 >= 50)                                                      earned.push('games_50');
+  const allFormationsUsed = [...new Set([...usedFormations, p.formation])];
+  if (ALL_FORMATIONS.every(f => allFormationsUsed.includes(f)))                  earned.push('all_formations');
+  const allClubsUsed = [...new Set([...usedClubs, ...p.players.map(pl => pl.teamId)])];
+  if (ALL_CLUB_IDS.every(c => allClubsUsed.includes(c)))                        earned.push('all_clubs');
   if (p.wins === 36 && p.settings.difficulty === 'hard' && p.settings.ratings_visible === false) earned.push('secret_perfect_hard');
   if (maxMatchGf >= 10)                                                            earned.push('secret_big_score');
   if (p.wins === 36 && p.settings.peak_mode && p.settings.ratings_visible === false) earned.push('secret_peak_blind');
@@ -97,13 +107,38 @@ Deno.serve(async (req) => {
     const { data: { user }, error: userError } = await userClient.auth.getUser();
     if (userError || !user) return new Response('Unauthorized', { status: 401, headers: corsHeaders });
 
-    const payload: Payload = await req.json();
+    let payload: Payload;
+    try {
+      payload = await req.json();
+    } catch {
+      return new Response(JSON.stringify({ error: 'Invalid JSON' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const validationError = validate(payload);
     if (validationError) {
       return new Response(JSON.stringify({ error: validationError }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+
+    // Query history BEFORE insert so counts reflect prior games only
+    const { data: pastResults } = await supabase
+      .from('game_results')
+      .select('formation')
+      .eq('user_id', user.id);
+
+    const { data: pastSquads } = await supabase
+      .from('squads')
+      .select('players')
+      .eq('user_id', user.id);
+
+    const gamesPlayed = pastResults?.length ?? 0;
+    const usedFormations = (pastResults ?? []).map((r: { formation: string }) => r.formation);
+    const usedClubs = (pastSquads ?? []).flatMap(
+      (s: { players: Player[] }) => s.players.map(p => p.teamId)
+    );
 
     const { data: result, error: resultError } = await supabase
       .from('game_results')
@@ -121,28 +156,13 @@ Deno.serve(async (req) => {
       .single();
     if (resultError) throw resultError;
 
-    await supabase.from('squads').insert({
+    const { error: squadError } = await supabase.from('squads').insert({
       result_id: result.id,
       user_id: user.id,
       players: payload.players,
       is_public: payload.is_public ?? false,
     });
-
-    const { data: pastResults } = await supabase
-      .from('game_results')
-      .select('formation')
-      .eq('user_id', user.id);
-
-    const { data: pastSquads } = await supabase
-      .from('squads')
-      .select('players')
-      .eq('user_id', user.id);
-
-    const gamesPlayed = pastResults?.length ?? 0;
-    const usedFormations = [...new Set((pastResults ?? []).map((r: any) => r.formation))];
-    const usedClubs = [...new Set(
-      (pastSquads ?? []).flatMap((s: any) => (s.players as Player[]).map(p => p.teamId))
-    )];
+    if (squadError) throw squadError;
 
     const earned = computeAchievements(payload, gamesPlayed, usedFormations, usedClubs);
 
@@ -151,13 +171,14 @@ Deno.serve(async (req) => {
       .select('achievement_key')
       .eq('user_id', user.id);
 
-    const alreadyHas = new Set((existing ?? []).map((r: any) => r.achievement_key));
+    const alreadyHas = new Set((existing ?? []).map((r: { achievement_key: string }) => r.achievement_key));
     const newAchievements = earned.filter(k => !alreadyHas.has(k));
 
     if (newAchievements.length > 0) {
-      await supabase.from('user_achievements').insert(
+      const { error: achError } = await supabase.from('user_achievements').insert(
         newAchievements.map(key => ({ user_id: user.id, achievement_key: key, result_id: result.id }))
       );
+      if (achError) console.error('Achievement insert failed:', achError);
     }
 
     return new Response(
