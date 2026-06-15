@@ -827,7 +827,7 @@ function assignPlayer(slotIdx, player) {
   const moveBtn = document.getElementById('btn-move-player');
   if (moveBtn) moveBtn.style.display = '';
   updateDraftOVR();
-  if (state.currentRound >= state.slots.length) setTimeout(showResults, 500);
+  if (state.currentRound >= state.slots.length) setTimeout(() => showPreseason(teamOVR()), 500);
   else setTimeout(startRound, 400);
 }
 
@@ -1171,6 +1171,71 @@ function getTier(wins, draws, losses, rank, n, totalGames) {
 }
 
 // ─── Results screen ────────────────────────────────────────────────────────────
+function calcPreseasonOdds(ovr, simCount = 300) {
+  let ranks = [], totalPts = 0;
+  for (let i = 0; i < simCount; i++) {
+    const { matches, inTopSix, champOpponents, relegOpponents } = generateMatches(ovr);
+    const w = matches.filter(m => m.outcome === 'W').length;
+    const d = matches.filter(m => m.outcome === 'D').length;
+    const l = matches.filter(m => m.outcome === 'L').length;
+    const table = generateLeagueTable(w, d, l, inTopSix, champOpponents, relegOpponents);
+    ranks.push(table.findIndex(t => t.us) + 1);
+    totalPts += w * 3 + d;
+  }
+  ranks.sort((a, b) => a - b);
+  const pct = n => Math.round(n / simCount * 1000) / 10;
+  return {
+    projectedFinish: ranks[Math.floor(simCount / 2)],
+    expectedPoints:  Math.round(totalPts / simCount),
+    winLeague: pct(ranks.filter(r => r === 1).length),
+    topFour:   pct(ranks.filter(r => r <= 4).length),
+    topSix:    pct(ranks.filter(r => r <= 6).length),
+    relegation: pct(ranks.filter(r => r >= 12).length),
+  };
+}
+
+function showPreseason(ovr) {
+  buildPitchInContainer('preseason-pitch-slots');
+  showScreen('preseason');
+
+  const signinPrompt = document.getElementById('pre-signin-prompt');
+  if (signinPrompt) {
+    signinPrompt.style.display = getCurrentUser() ? 'none' : 'flex';
+    document.getElementById('pre-signin-btn').onclick = () => {
+      document.getElementById('auth-modal').style.display = 'flex';
+    };
+  }
+
+  document.getElementById('btn-simulate').onclick = showResults;
+
+  setTimeout(() => {
+    const odds = calcPreseasonOdds(ovr);
+    document.getElementById('pre-finish').textContent = `מקום ${odds.projectedFinish}`;
+    document.getElementById('pre-pts').textContent    = odds.expectedPoints;
+
+    const bars = [
+      { label: 'ניצחון בליגה', pct: odds.winLeague,  color: '#f59e0b' },
+      { label: 'Top 4',        pct: odds.topFour,     color: '#22c55e' },
+      { label: 'Top 6',        pct: odds.topSix,      color: '#3b82f6' },
+      { label: 'סכנת הורדה',   pct: odds.relegation,  color: '#ef4444' },
+    ];
+    const barsEl = document.getElementById('pre-bars');
+    barsEl.innerHTML = '';
+    bars.forEach(b => {
+      const row = document.createElement('div');
+      row.className = 'pre-bar-row';
+      row.innerHTML = `
+        <span class="pre-bar-label">${b.label}</span>
+        <div class="pre-bar-wrap">
+          <div class="pre-bar-fill" style="width:${Math.min(b.pct,100)}%;background:${b.color}"></div>
+        </div>
+        <span class="pre-bar-pct" style="color:${b.color}">${b.pct}%</span>
+      `;
+      barsEl.appendChild(row);
+    });
+  }, 50);
+}
+
 function showResults() {
   buildResultsPitch();
   const ovr = teamOVR();
@@ -1178,8 +1243,9 @@ function showResults() {
   setTimeout(() => animateResults(ovr), 400);
 }
 
-function buildResultsPitch() {
-  const container = document.getElementById('results-pitch-slots');
+function buildPitchInContainer(containerId) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
   container.innerHTML = '';
   state.slots.forEach((slot, idx) => {
     const pick = state.picks[idx];
@@ -1206,6 +1272,8 @@ function buildResultsPitch() {
     container.appendChild(token);
   });
 }
+
+function buildResultsPitch() { buildPitchInContainer('results-pitch-slots'); }
 
 function animateResults(ovr) {
   const { matches, inTopSix, champOpponents, relegOpponents } = generateMatches(ovr);

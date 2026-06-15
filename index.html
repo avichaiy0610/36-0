@@ -227,6 +227,60 @@
 
   </div>
 
+  <!-- ══ PRE-SEASON ═══════════════════════════════════════════════════════════ -->
+  <div id="screen-preseason" class="screen screen-split">
+
+    <!-- LEFT: Pitch -->
+    <div class="pitch-panel">
+      <div class="pitch-container">
+        <div class="pitch">
+          <div id="preseason-pitch-slots"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: Odds panel -->
+    <div class="side-panel results-side pre-side">
+      <div class="pre-header">
+        <div class="pre-trophy">🏆</div>
+        <div class="pre-title">הרכב מוכן!</div>
+        <div class="pre-sub">הנה מה שהמומחים אומרים על ה-XI שלך. סמלץ את העונה ונסה את הבלתי אפשרי.</div>
+      </div>
+
+      <div class="pre-odds-card">
+        <div class="pre-odds-header">
+          <span class="pre-odds-label">סיכויים לפני עונה</span>
+          <span class="pre-odds-note">מבוסס על 300 סימולציות</span>
+        </div>
+        <div class="pre-odds-main">
+          <div class="pre-odds-col">
+            <div class="pre-odds-key">צפי לסיום</div>
+            <div class="pre-odds-val" id="pre-finish">—</div>
+          </div>
+          <div class="pre-odds-col">
+            <div class="pre-odds-key">נקודות צפויות</div>
+            <div class="pre-odds-val pre-odds-pts" id="pre-pts">—</div>
+          </div>
+        </div>
+        <div class="pre-bars" id="pre-bars">
+          <div class="page-loading" style="font-size:0.8rem">מחשב...</div>
+        </div>
+      </div>
+
+      <div id="pre-signin-prompt" class="pre-signin-prompt" style="display:none">
+        <div class="pre-signin-icon">🏆</div>
+        <div class="pre-signin-content">
+          <div class="pre-signin-title">אל תאבד את הרצון הזה</div>
+          <div class="pre-signin-sub">התחבר כדי לשמור תוצאות ולהופיע ב-Leaderboard</div>
+        </div>
+        <button class="nav-btn nav-btn-primary" id="pre-signin-btn">התחבר</button>
+      </div>
+
+      <button class="btn-primary btn-simulate" id="btn-simulate">▶ סמלץ עונה</button>
+    </div>
+
+  </div>
+
   <!-- ══ RESULTS ════════════════════════════════════════════════════════════════ -->
   <div id="screen-results" class="screen screen-split">
 
