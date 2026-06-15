@@ -1208,6 +1208,7 @@ function showPreseason(ovr) {
 
   document.getElementById('btn-simulate').onclick = showResults;
 
+
   setTimeout(() => {
     const odds = calcPreseasonOdds(ovr);
     document.getElementById('pre-finish').textContent = `מקום ${odds.projectedFinish}`;
