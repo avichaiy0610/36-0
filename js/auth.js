@@ -22,7 +22,7 @@ async function initAuth() {
   document.getElementById('auth-google-btn').addEventListener('click', () => {
     _supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: window.location.origin + window.location.pathname },
+      options: { redirectTo: window.location.origin + '/index.html' },
     });
   });
 
@@ -47,11 +47,12 @@ async function initAuth() {
   document.getElementById('auth-submit-register').addEventListener('click', async () => {
     const email    = document.getElementById('auth-reg-email').value.trim();
     const password = document.getElementById('auth-reg-password').value;
-    const { error } = await _supabase.auth.signUp({ email, password });
+    const { data, error } = await _supabase.auth.signUp({ email, password });
     if (error) showAuthError(error.message);
-    else {
+    else if (data.session) {
       document.getElementById('auth-modal').style.display = 'none';
-      alert('בדוק את האימייל שלך לאישור ההרשמה');
+    } else {
+      showAuthError('נשלח אימייל אישור — בדוק את תיבת הדואר שלך');
     }
   });
 
