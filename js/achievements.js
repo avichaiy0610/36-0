@@ -28,15 +28,12 @@ function getRarity(pct) {
 }
 
 async function showAchievements() {
-  document.querySelectorAll('.screen').forEach(s => s.style.display = 'none');
-  const screen = document.getElementById('screen-achievements');
-  screen.style.display = 'flex';
+  showScreen('achievements');
   const grid = document.getElementById('achievements-grid');
   grid.innerHTML = '<div class="page-loading">טוען...</div>';
 
   document.getElementById('achievements-back').onclick = () => {
-    screen.style.display = 'none';
-    document.getElementById('screen-welcome').style.display = 'flex';
+    showScreen('welcome');
   };
 
   const user = getCurrentUser();

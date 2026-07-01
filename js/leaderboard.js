@@ -2,13 +2,10 @@ let lbTab    = 'ovr';
 let lbPeriod = 'all';
 
 async function showLeaderboard() {
-  document.querySelectorAll('.screen').forEach(s => s.style.display = 'none');
-  const screen = document.getElementById('screen-leaderboard');
-  screen.style.display = 'flex';
+  showScreen('leaderboard');
 
   document.getElementById('leaderboard-back').onclick = () => {
-    screen.style.display = 'none';
-    document.getElementById('screen-welcome').style.display = 'flex';
+    showScreen('welcome');
   };
 
   document.querySelectorAll('.lb-tab').forEach(tab => {
