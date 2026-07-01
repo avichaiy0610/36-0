@@ -170,22 +170,22 @@ const ASSIST_W = {
   CB:0.5, RB:2, LB:2, GK:0,
 };
 
-// ─── Simulation opponents (OVR = avg top-11 from latest available season) ──────
-const IL_TEAMS_SIM = [
-  { name:'מכבי חיפה',         ovr: 84 },
-  { name:'הפועל באר שבע',     ovr: 82 },
-  { name:'מכבי תל אביב',      ovr: 83 },
-  { name:'בית״ר ירושלים',     ovr: 80 },
-  { name:'הפועל תל אביב',     ovr: 76 },
-  { name:'מכבי נתניה',        ovr: 76 },
-  { name:'עירוני קרית שמונה', ovr: 75 },
-  { name:'בני יהודה',         ovr: 72 },
-  { name:'הפועל חיפה',        ovr: 76 },
-  { name:'הפועל ירושלים',     ovr: 76 },
-  { name:'מ.ס. אשדוד',        ovr: 77 },
-  { name:'מכבי פתח תקווה',    ovr: 76 },
-  { name:'הפועל חדרה',        ovr: 74 },
-];
+// ─── Simulation opponents: computed from the latest season in the data ─────────
+// The 13 strongest clubs of the newest season, each rated by its top-11 average,
+// so the sim league always matches the current data (2025/26 today).
+const IL_TEAMS_SIM = (() => {
+  const latest = Math.max(...SQUADS.map(s => parseInt(s.season)));
+  return SQUADS.filter(s => parseInt(s.season) === latest)
+    .map(s => {
+      const top = [...s.players].sort((a, b) => b.ovr - a.ovr).slice(0, 11);
+      return {
+        name: (TEAMS[s.teamId] ?? { name: s.teamId }).name,
+        ovr: Math.round(top.reduce((sum, p) => sum + p.ovr, 0) / top.length),
+      };
+    })
+    .sort((a, b) => b.ovr - a.ovr)
+    .slice(0, 13);
+})();
 
 // ─── Era helpers ──────────────────────────────────────────────────────────────
 function parseSeasonYear(s) { return parseInt(s.split('/')[0]); }
@@ -968,11 +968,15 @@ function updateProgress() {
 function setHint(text) { document.getElementById('pick-hint').textContent = text; }
 
 // ─── Simulation ────────────────────────────────────────────────────────────────
+// Win-probability gain per OVR point of difference. Shared by every formula so
+// the match sim, the bracket split and the final table stay consistent.
+const WINP_SLOPE = 0.028;
+
 function simulateMatch(myOvr, opp, homeOverride = null) {
   const diff  = myOvr - opp.ovr;
   const home  = homeOverride !== null ? homeOverride : Math.random() > 0.5;
   const bonus = home ? 2 : 0;
-  const winP  = Math.max(0.08, Math.min(0.92, 0.47 + (diff + bonus) * 0.018));
+  const winP  = Math.max(0.08, Math.min(0.92, 0.47 + (diff + bonus) * WINP_SLOPE));
   const drawP = Math.max(0.05, 0.22 - Math.abs(diff) * 0.005);
   const r = Math.random();
   const outcome = r < winP ? 'W' : r < winP + drawP ? 'D' : 'L';
@@ -995,9 +999,9 @@ function generateMatches(ovr) {
   const avgOppOvr = Math.round(IL_TEAMS_SIM.reduce((s, t) => s + t.ovr, 0) / IL_TEAMS_SIM.length);
   const simTeamPts = IL_TEAMS_SIM.map(t => {
     const diff  = t.ovr - avgOppOvr;
-    const winP  = Math.max(0.1, Math.min(0.8, 0.47 + diff * 0.018));
+    const winP  = Math.max(0.1, Math.min(0.85, 0.47 + diff * WINP_SLOPE));
     const drawP = Math.max(0.05, 0.22 - Math.abs(diff) * 0.005);
-    const pts   = Math.max(5, Math.round((winP * 3 + drawP) * 26 + rand(-8, 8)));
+    const pts   = Math.max(5, Math.round((winP * 3 + drawP) * 26 + rand(-5, 5)));
     return { ...t, pts };
   });
 
@@ -1074,10 +1078,13 @@ function calcHighlights(matches) {
 // ─── League table generator ────────────────────────────────────────────────────
 function generateLeagueTable(wins, draws, losses, inTopSix, champOpponents, relegOpponents) {
   const fakeRow = (opp, totalGames) => {
-    const winP = Math.max(0.1, Math.min(0.8, 0.47 + (opp.ovr - 78) * 0.018));
-    const base = Math.round(winP * totalGames);
-    const w = Math.max(3, rand(base - 4, base + 4));
-    const d = rand(3, 9);
+    // Extrapolate the opponent's simulated regular-season points to the full
+    // season so the final table stays consistent with the bracket split.
+    const regPts = opp.pts ??
+      Math.round((Math.max(0.1, Math.min(0.85, 0.47 + (opp.ovr - 78) * WINP_SLOPE)) * 3 + 0.15) * 26);
+    const estPts = Math.max(3, Math.round(regPts * totalGames / 26) + rand(-3, 3));
+    const d = rand(3, 8);
+    const w = Math.max(0, Math.min(totalGames - d, Math.round((estPts - d) / 3)));
     const l = Math.max(0, totalGames - w - d);
     return { name: opp.name, w, d, l, gf: w*2+d+rand(0,10), ga: l*2+d+rand(0,8), us: false };
   };
@@ -1700,6 +1707,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-share').addEventListener('click', openShareModal);
   document.getElementById('btn-restart').addEventListener('click', restartGame);
   document.getElementById('btn-draft-restart').addEventListener('click', restartGame);
+  document.getElementById('btn-preseason-restart')?.addEventListener('click', restartGame);
   document.getElementById('btn-move-player').addEventListener('click', toggleMoveMode);
 
   // Era preset buttons

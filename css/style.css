@@ -662,6 +662,9 @@ body {
     -webkit-overflow-scrolling: touch;
   }
 
+  /* Draft screen: pitch (your team) on top, player picking below — like 38-0 */
+  #screen-draft .pitch-panel { order: -1; }
+
   /* ── Side panel: full width, auto height, no height cap ── */
   .side-panel {
     width: 100% !important;
