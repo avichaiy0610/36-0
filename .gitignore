@@ -1,0 +1,12 @@
+# Local data pipeline working files — not part of the deployed site
+*.csv
+*.py
+*.txt
+*.log
+scraped_squads.json
+squads_review.json
+hebrew_names_cache.json
+low_peak_players.json
+clubs.json
+.vscode/
+supabase/.temp/
