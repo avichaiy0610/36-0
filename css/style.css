@@ -316,6 +316,9 @@ body {
   border-radius: 3px;
   white-space: nowrap;
   letter-spacing: 0.3px;
+  max-width: 78px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* filled token */
@@ -698,7 +701,7 @@ body {
     height: 30px !important;
   }
   .slot-pos-label { font-size: 6px !important; }
-  .slot-name-label { font-size: 7px !important; max-width: 38px !important; }
+  .slot-name-label { font-size: 7px !important; max-width: 64px !important; }
 
   /* ── Setup screen ── */
   .formation-grid { grid-template-columns: repeat(2, 1fr); }
@@ -1304,7 +1307,7 @@ body {
 }
 
 /* ── Page Screens (achievements, leaderboard) ────────────────────────────── */
-.screen-page { display: flex; flex-direction: column; min-height: 100vh; background: #0d0d1a; }
+.screen-page { flex-direction: column; min-height: 100vh; background: #0d0d1a; }
 .page-inner  { max-width: 600px; margin: 0 auto; padding: 24px 16px; width: 100%; box-sizing: border-box; }
 .page-header { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; direction: rtl; }
 .page-title  { font-size: 1.4rem; font-weight: 700; color: #fff; margin: 0; flex: 1; text-align: center; }

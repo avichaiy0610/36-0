@@ -188,7 +188,7 @@ const IL_TEAMS_SIM = [
 ];
 
 // ─── Era helpers ──────────────────────────────────────────────────────────────
-function parseSeasonYear(s) { return parseInt(s.split('–')[0]); }
+function parseSeasonYear(s) { return parseInt(s.split('/')[0]); }
 function yearToSeason(y) { return `${y}/${String(y + 1).slice(-2).padStart(2, '0')}`; }
 const ALL_SEASON_YEARS = (() => {
   const s = new Set(SQUADS.map(sq => parseSeasonYear(sq.season)));
@@ -222,13 +222,30 @@ function getTeam(teamId) {
   return TEAMS[teamId] || { name:'?', primaryColor:'#333', secondaryColor:'#fff', badge:'⚽' };
 }
 
+// Short display name. With 3+ words the last two are a compound family name
+// (e.g. "טל בן חיים" → "בן חיים"), otherwise just the last word.
+function playerShortName(name) {
+  const w = name.trim().split(/\s+/);
+  return w.length >= 3 ? w.slice(-2).join(' ') : w.at(-1);
+}
+
 function emptySlotIndices() {
   return state.slots.map((_,i) => i).filter(i => !state.picks[i]);
 }
 
-function compatibleEmptySlots(playerPos) {
-  const pos = normalizePos(playerPos);
-  return emptySlotIndices().filter(i => (COMPAT[state.slots[i].pos] ?? [state.slots[i].pos]).includes(pos));
+// All positions a player can play (primary + secondary), normalized, primary first
+function playerPositions(player) {
+  const all = [normalizePos(player.position), ...(player.altPos ?? []).map(normalizePos)];
+  return [...new Set(all)];
+}
+
+function playerFitsSlot(player, slotPos) {
+  const compat = COMPAT[slotPos] ?? [slotPos];
+  return playerPositions(player).some(p => compat.includes(p));
+}
+
+function compatibleEmptySlots(player) {
+  return emptySlotIndices().filter(i => playerFitsSlot(player, state.slots[i].pos));
 }
 
 function teamOVR() {
@@ -238,7 +255,8 @@ function teamOVR() {
     const slot = state.slots[i];
     const w = POS_WEIGHT[slot.pos] ?? 1;
     const ovr = playerOVR(pick.player);
-    const inPos = (COMPAT[slot.pos] ?? []).slice(0, 2).includes(normalizePos(pick.player.position));
+    const pp = playerPositions(pick.player);
+    const inPos = (COMPAT[slot.pos] ?? []).slice(0, 2).includes(pp[0]) || pp.includes(slot.pos);
     total += (inPos ? ovr : Math.round(ovr * 0.93)) * w;
     weight += w;
   });
@@ -359,7 +377,7 @@ function updateEraUI() {
   const minPct = (minV - YEAR_MIN) / range * 100;
   const maxPct = (maxV - YEAR_MIN) / range * 100;
   const fill = document.getElementById('era-fill');
-  if (fill) { fill.style.left = (100 - maxPct) + '%'; fill.style.width = (maxPct - minPct) + '%'; }
+  if (fill) { fill.style.left = minPct + '%'; fill.style.width = (maxPct - minPct) + '%'; }
   const count = ALL_SEASON_YEARS.filter(y => y >= minV && y <= maxV).length;
   const countEl = document.getElementById('era-lbl-count');
   if (countEl) countEl.textContent = `${count} עונות`;
@@ -481,9 +499,9 @@ function fillToken(idx, player, squad) {
   token.style.setProperty('--ts', team.secondaryColor);
   token.innerHTML = `
     <div class="slot-circle filled-circle">
-      <span class="slot-player-short">${player.name.split(' ').at(-1)}</span>
+      <span class="slot-player-short">${playerShortName(player.name)}</span>
     </div>
-    <div class="slot-name-label">${state.slots[idx]?.label ?? ''}</div>
+    <div class="slot-name-label">${player.name}</div>
   `;
 }
 
@@ -502,8 +520,8 @@ function clearAllHighlights() {
 }
 
 // ─── Move mode ─────────────────────────────────────────────────────────────────
+// Move mode only touches pitch tokens, so it stays usable during the roulette animation
 function toggleMoveMode() {
-  if (state.isAnimating) return;
   state.moveMode = !state.moveMode;
   state.movingFromIdx = null;
   if (state.moveMode) {
@@ -527,50 +545,60 @@ function updateMoveButton() {
   btn.textContent = state.moveMode ? '✕ בטל הזזה' : '⇄ הזז שחקן';
 }
 
+// Restore the default hint (and pos-first slot highlights) after a move ends
+function restoreAfterMove() {
+  if (state.awaitingSlotPick) {
+    emptySlotIndices().forEach(i => setTokenHighlight(i, 'compat'));
+    setHint('בחר עמדה במגרש');
+  } else if (state.moveMode) {
+    setHint('בחר שחקן נוסף להזזה, או לחץ ⇄ לסיום');
+  } else {
+    setHint(state.currentSquad ? 'בחר שחקן מהרשימה' : 'ממתין להגרלה...');
+  }
+}
+
+// Highlight the source token and every slot the player at fromIdx can move to
+function highlightMoveTargets(fromIdx) {
+  setTokenHighlight(fromIdx, 'selected');
+  const movingPlayer = state.picks[fromIdx].player;
+  const srcSlotPos = state.slots[fromIdx].pos;
+  state.slots.forEach((sl, i) => {
+    if (i === fromIdx) return;
+    if (!playerFitsSlot(movingPlayer, sl.pos)) return;
+    if (state.picks[i]) {
+      if (playerFitsSlot(state.picks[i].player, srcSlotPos)) setTokenHighlight(i, 'compat');
+    } else {
+      setTokenHighlight(i, 'compat');
+    }
+  });
+}
+
 function handleMoveClick(slotIdx) {
   if (state.movingFromIdx === null) {
     if (!state.picks[slotIdx]) { setHint('בחר שחקן קיים להזזה'); return; }
     state.movingFromIdx = slotIdx;
+    state.selectedPlayer = null;
     clearAllHighlights();
-    setTokenHighlight(slotIdx, 'selected');
-    const playerPos  = normalizePos(state.picks[slotIdx].player.position);
-    const srcSlotPos = state.slots[slotIdx].pos;
-    state.slots.forEach((sl, i) => {
-      if (i === slotIdx) return;
-      const tgtCompat = COMPAT[sl.pos] ?? [sl.pos];
-      if (!tgtCompat.includes(playerPos)) return;
-      if (state.picks[i]) {
-        const otherPos  = normalizePos(state.picks[i].player.position);
-        const srcCompat = COMPAT[srcSlotPos] ?? [srcSlotPos];
-        if (srcCompat.includes(otherPos)) setTokenHighlight(i, 'compat');
-      } else {
-        setTokenHighlight(i, 'compat');
-      }
-    });
-    setHint('בחר עמדה יעד — לחץ שוב על השחקן לביטול');
+    highlightMoveTargets(slotIdx);
+    setHint('בחר עמדה מוארת — לחץ שוב על השחקן לביטול');
   } else {
     const fromIdx = state.movingFromIdx;
     state.movingFromIdx = null;
     if (slotIdx === fromIdx) {
       clearAllHighlights();
-      setHint('בחר שחקן שברצונך להזיז');
+      restoreAfterMove();
       return;
     }
-    const playerPos = normalizePos(state.picks[fromIdx].player.position);
-    const tgtCompat = COMPAT[state.slots[slotIdx].pos] ?? [state.slots[slotIdx].pos];
-    if (!tgtCompat.includes(playerPos)) {
+    const validTarget = playerFitsSlot(state.picks[fromIdx].player, state.slots[slotIdx].pos);
+    const validSwap = !state.picks[slotIdx] ||
+      playerFitsSlot(state.picks[slotIdx].player, state.slots[fromIdx].pos);
+    if (!validTarget || !validSwap) {
+      if (state.picks[slotIdx]) { handleMoveClick(slotIdx); return; } // switch selection to the clicked player
       clearAllHighlights();
       setHint('⚠ שחקן זה לא יכול לשחק בעמדה זו — בחר מחדש');
       return;
     }
     if (state.picks[slotIdx]) {
-      const otherPos  = normalizePos(state.picks[slotIdx].player.position);
-      const srcCompat = COMPAT[state.slots[fromIdx].pos] ?? [state.slots[fromIdx].pos];
-      if (!srcCompat.includes(otherPos)) {
-        clearAllHighlights();
-        setHint('⚠ לא ניתן להחליף — שחקן אינו מתאים לעמדה המקורית');
-        return;
-      }
       [state.picks[fromIdx], state.picks[slotIdx]] = [state.picks[slotIdx], state.picks[fromIdx]];
     } else {
       state.picks[slotIdx] = state.picks[fromIdx];
@@ -580,11 +608,12 @@ function handleMoveClick(slotIdx) {
     clearAllHighlights();
     updateDraftOVR();
     // Re-render the player list so freed/filled slots are reflected in availability
-    if (state.currentSquad) {
+    // (skip mid-animation — the roulette's onDone re-renders anyway)
+    if (state.currentSquad && !state.isAnimating) {
       const filterSlot = state.draftMode === 'pos-first' ? state.selectedSlotIdx : null;
       renderSquadPlayers(state.currentSquad, filterSlot);
     }
-    setHint('בחר שחקן נוסף להזזה, או לחץ ⇄ לסיום');
+    restoreAfterMove();
   }
 }
 
@@ -600,9 +629,9 @@ function refreshAllTokens() {
       token.style.setProperty('--ts', team.secondaryColor);
       token.innerHTML = `
         <div class="slot-circle filled-circle">
-          <span class="slot-player-short">${player.name.split(' ').at(-1)}</span>
+          <span class="slot-player-short">${playerShortName(player.name)}</span>
         </div>
-        <div class="slot-name-label">${slot.label}</div>
+        <div class="slot-name-label">${player.name}</div>
       `;
     } else {
       token.className = 'slot-token empty';
@@ -637,6 +666,12 @@ function pickNextSquad() {
 function startRound() {
   state.selectedPlayer = null; state.selectedSlotIdx = null;
   clearAllHighlights();
+  // A move started while the previous pick was settling — keep it alive
+  if (state.movingFromIdx !== null && state.picks[state.movingFromIdx]) {
+    highlightMoveTargets(state.movingFromIdx);
+  } else {
+    state.movingFromIdx = null;
+  }
   updateProgress(); updateRerollButtons();
 
   if (state.draftMode === 'pos-first') {
@@ -707,11 +742,8 @@ function renderSquadPlayers(squad, filterSlotIdx = null) {
   // Check if any player in this squad can fill a remaining slot
   const anyAvailable = players.some(player => {
     if (state.usedPlayerKeys.has(player.name)) return false;
-    if (filterSlotIdx !== null) {
-      const slotCompat = COMPAT[state.slots[filterSlotIdx].pos] ?? [state.slots[filterSlotIdx].pos];
-      if (!slotCompat.includes(normalizePos(player.position))) return false;
-    }
-    return compatibleEmptySlots(player.position).length > 0;
+    if (filterSlotIdx !== null && !playerFitsSlot(player, state.slots[filterSlotIdx].pos)) return false;
+    return compatibleEmptySlots(player).length > 0;
   });
 
   // Auto-reroll if no one fits — counts as free (don't spend a reroll)
@@ -730,22 +762,18 @@ function renderSquadPlayers(squad, filterSlotIdx = null) {
   }
 
   players.forEach(player => {
-    if (filterSlotIdx !== null) {
-      const slotCompat = COMPAT[state.slots[filterSlotIdx].pos] ?? [state.slots[filterSlotIdx].pos];
-      if (!slotCompat.includes(normalizePos(player.position))) return;
-    }
+    if (filterSlotIdx !== null && !playerFitsSlot(player, state.slots[filterSlotIdx].pos)) return;
     const isUsed    = state.usedPlayerKeys.has(player.name);
-    const hasSlot   = compatibleEmptySlots(player.position).length > 0;
+    const hasSlot   = compatibleEmptySlots(player).length > 0;
     const unavailable = isUsed || !hasSlot;
 
     const card = document.createElement('div');
     card.className = 'player-card' + (unavailable ? ' card-unavailable' : '');
-    card.dataset.pos = player.position;
+    card.dataset.pos = playerPositions(player).join(',');
     const dispOVR = playerOVR(player);
     const peakTag = state.peakMode && player.peak_ovr && player.peak_ovr > player.ovr ? '⚡' : '';
     const ovrHTML = state.showRatings ? `<span class="pc-ovr" dir="ltr">${peakTag}${dispOVR}</span>` : '';
-    const normPos = normalizePos(player.position);
-    const fits = [...(PLAYER_FITS[normPos] ?? [normPos])];
+    const fits = [...new Set(playerPositions(player).flatMap(p => [...(PLAYER_FITS[p] ?? [p])]))];
     const posLabel = fits.map(p => POS_HE[p] ?? p).join(' | ');
     const posShort = fits.join(' | ');
     card.innerHTML = `
@@ -762,16 +790,17 @@ function renderSquadPlayers(squad, filterSlotIdx = null) {
 function handlePlayerClick(player, cardEl) {
   if (state.isAnimating) return;
   if (state.moveMode) {
-    state.moveMode = false; state.movingFromIdx = null;
+    state.moveMode = false;
     clearAllHighlights(); updateMoveButton();
   }
+  state.movingFromIdx = null; // clicking a list player cancels a pending move
   if (state.selectedPlayer === player) {
     state.selectedPlayer = null; state.selectedSlotIdx = null;
     clearAllHighlights(); setHint('בחר שחקן מהרשימה'); return;
   }
   state.selectedPlayer = player; state.selectedSlotIdx = null;
   clearAllHighlights(); cardEl.classList.add('card-selected');
-  const compatSlots = compatibleEmptySlots(player.position);
+  const compatSlots = compatibleEmptySlots(player);
   if (compatSlots.length === 0) { setHint('⚠ אין עמדות ריקות מתאימות'); return; }
   compatSlots.forEach(i => setTokenHighlight(i, 'compat'));
   if (compatSlots.length === 1) { assignPlayer(compatSlots[0], player); return; }
@@ -779,9 +808,13 @@ function handlePlayerClick(player, cardEl) {
 }
 
 function handleSlotClick(slotIdx) {
+  // A move in progress, move mode, or a click on a placed player → move flow.
+  // Clicking a placed player directly highlights the slots he can move to.
+  if (state.moveMode || state.movingFromIdx !== null || state.picks[slotIdx]) {
+    handleMoveClick(slotIdx);
+    return;
+  }
   if (state.isAnimating) return;
-  if (state.moveMode) { handleMoveClick(slotIdx); return; }
-  if (state.picks[slotIdx]) return;
 
   if (state.draftMode === 'pos-first' && state.awaitingSlotPick) {
     state.awaitingSlotPick = false; state.selectedSlotIdx = slotIdx;
@@ -796,8 +829,7 @@ function handleSlotClick(slotIdx) {
   }
 
   if (state.selectedPlayer) {
-    const compat = COMPAT[state.slots[slotIdx].pos] ?? [];
-    if (compat.includes(state.selectedPlayer.position)) {
+    if (playerFitsSlot(state.selectedPlayer, state.slots[slotIdx].pos)) {
       assignPlayer(slotIdx, state.selectedPlayer);
     } else {
       setHint('⚠ שחקן זה לא יכול לשחק בעמדה זו');
@@ -807,12 +839,21 @@ function handleSlotClick(slotIdx) {
     return;
   }
 
+  // Second click on the same slot deselects it
+  if (state.selectedSlotIdx === slotIdx) {
+    state.selectedSlotIdx = null;
+    clearAllHighlights();
+    setHint('בחר שחקן מהרשימה');
+    return;
+  }
+
   state.selectedSlotIdx = slotIdx; clearAllHighlights();
   setTokenHighlight(slotIdx, 'selected');
   const compat = COMPAT[state.slots[slotIdx].pos] ?? [state.slots[slotIdx].pos];
   document.querySelectorAll('.player-card').forEach(card => {
     if (card.classList.contains('card-unavailable')) return;
-    card.classList.add(compat.includes(card.dataset.pos) ? 'card-compat' : 'card-incompat');
+    const fits = card.dataset.pos.split(',').some(p => compat.includes(p));
+    card.classList.add(fits ? 'card-compat' : 'card-incompat');
   });
   setHint(`בחר שחקן עבור: ${state.slots[slotIdx].label}`);
 }
@@ -1101,7 +1142,7 @@ function buildAwards(ps) {
   const pots      = [...ps].sort((a,b) => (b.goals+b.assists) - (a.goals+a.assists))[0];
 
   const s = (nameId, statId, p, stat) => {
-    setEl(nameId, p ? p.name.split(' ').at(-1) : '—');
+    setEl(nameId, p ? playerShortName(p.name) : '—');
     setEl(statId, stat ?? '');
   };
   s('aw-boot-name',   'aw-boot-stat',   byGoals[0],   byGoals[0]   ? `${byGoals[0].goals} שערים`      : '');
@@ -1120,7 +1161,7 @@ function buildPlayerStatsTable(ps) {
     row.className = 'stats-row';
     row.innerHTML = `
       <span class="st-pos-badge ${type}">${p.slotPos}</span>
-      <span class="st-name">${p.name.split(' ').at(-1)}</span>
+      <span class="st-name">${playerShortName(p.name)}</span>
       <span class="st-num ${p.goals  > 0 ? 'green'  : ''}">${p.goals  > 0 ? p.goals  : '·'}</span>
       <span class="st-num ${p.assists> 0 ? 'yellow' : ''}">${p.assists> 0 ? p.assists: '·'}</span>
       <span class="st-num ${p.cs     > 0 ? 'cyan'   : ''}">${p.cs     > 0 ? p.cs     : '·'}</span>
@@ -1260,9 +1301,9 @@ function buildPitchInContainer(containerId) {
       token.style.setProperty('--ts', team.secondaryColor);
       token.innerHTML = `
         <div class="slot-circle filled-circle">
-          <span class="slot-player-short">${pick.player.name.split(' ').at(-1)}</span>
+          <span class="slot-player-short">${playerShortName(pick.player.name)}</span>
         </div>
-        <div class="slot-name-label">${slot.label}</div>
+        <div class="slot-name-label">${pick.player.name}</div>
       `;
     } else {
       token.innerHTML = `
@@ -1405,7 +1446,7 @@ function populateShareCard() {
     const colors = { atk: '#f97316', mid: '#22c55e', def: '#3b82f6', gk: '#eab308' };
     const c = colors[type] || '#888';
     const ovr = playerOVR(pick.player);
-    const lastName = pick.player.name.split(' ').at(-1);
+    const lastName = playerShortName(pick.player.name);
     const row = document.createElement('div');
     row.className = 'sc-player-row';
     row.innerHTML = `
@@ -1423,8 +1464,8 @@ function populateShareCard() {
     const ps = window._lastPlayerStats;
     const top = [...ps].sort((a, b) => b.goals - a.goals)[0];
     const pots = [...ps].sort((a, b) => (b.goals + b.assists) - (a.goals + a.assists))[0];
-    if (top) awardsEl.innerHTML += `<div class="sc-award-line">⚽ <b>מלך השערים:</b> ${top.name.split(' ').at(-1)} (${top.goals} שע׳)</div>`;
-    if (pots) awardsEl.innerHTML += `<div class="sc-award-line">🏅 <b>שחקן העונה:</b> ${pots.name.split(' ').at(-1)} (${pots.goals}+${pots.assists})</div>`;
+    if (top) awardsEl.innerHTML += `<div class="sc-award-line">⚽ <b>מלך השערים:</b> ${toplayerShortName(p.name)} (${top.goals} שע׳)</div>`;
+    if (pots) awardsEl.innerHTML += `<div class="sc-award-line">🏅 <b>שחקן העונה:</b> ${playerShortName(pots.name)} (${pots.goals}+${pots.assists})</div>`;
   }
 
   // Match emoji grid
