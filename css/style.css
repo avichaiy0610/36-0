@@ -653,6 +653,8 @@ body {
     min-height: 100vh;
     align-items: stretch !important;
     padding: 0 !important;
+    /* in relative flow the fixed 48px nav no longer offsets us — compensate */
+    margin-top: 48px;
   }
   /* Non-split screens stay fixed but need touch-scroll inside them */
   .screen:not(.screen-split) {
