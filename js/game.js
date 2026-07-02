@@ -1394,7 +1394,6 @@ function buildLeagueTable(table) {
 function getTier(wins, draws, losses, rank, n, totalGames) {
   const pts = wins * 3 + draws;
   if (losses===0 && draws===0 && totalGames===36) return { id:'perfect36', name:'36–0 🏆',   sub:'הבלתי אפשרי הפך למציאות',         color:'#FFD700' };
-  if (losses===0 && draws===0 && totalGames===33) return { id:'perfect33', name:'33–0 🏆',   sub:'עונה מושלמת בפלייאוף התחתון',     color:'#FFD700' };
   if (losses===0)              return { id:'unbeaten',  name:'בלתי מנוצחים ✨',    sub:'עונה שלמה ללא תבוסה',              color:'#C8A800' };
   if (rank === 1 && pts >= 90) return { id:'champ-gap', name:'אלופים בפער 🥇',     sub:'שיא הליגה — תיתכן שושלת',          color:'#FFD700' };
   if (rank === 1)              return { id:'champ',     name:'אלופים 🏆',           sub:'זוכי ליגת העל',                   color:'#d4af37' };

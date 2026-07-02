@@ -730,20 +730,6 @@ const TEXT_CATALOG = [
   "def": "הבלתי אפשרי הפך למציאות"
  },
  {
-  "key": "tier-perfect33-name",
-  "screen": "דרגות סיום (טירים)",
-  "label": "טיר \"33–0 🏆\" — שם",
-  "selector": "virtual",
-  "def": "33–0 🏆"
- },
- {
-  "key": "tier-perfect33-sub",
-  "screen": "דרגות סיום (טירים)",
-  "label": "טיר \"33–0 🏆\" — משפט",
-  "selector": "virtual",
-  "def": "עונה מושלמת בפלייאוף התחתון"
- },
- {
   "key": "tier-unbeaten-name",
   "screen": "דרגות סיום (טירים)",
   "label": "טיר \"בלתי מנוצחים ✨\" — שם",

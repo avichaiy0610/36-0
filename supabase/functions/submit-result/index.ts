@@ -6,7 +6,7 @@ const corsHeaders = {
 };
 
 const HIGHEST_TIER = '36–0 🏆';
-const CHAMPION_TIERS = ['36–0 🏆', '33–0 🏆', 'בלתי מנוצחים ✨', 'אלופים בפאחר 🥇', 'אלופים 🏆'];
+const CHAMPION_TIERS = ['36–0 🏆', 'בלתי מנוצחים ✨', 'אלופים בפער 🥇', 'אלופים 🏆'];
 const ALL_FORMATIONS = ['4-3-3', '4-4-2', '4-2-3-1', '3-5-2', '5-3-2'];
 const GAME_MILESTONES: [number, string][] = [
   [1, 'games_1'], [10, 'games_10'], [50, 'games_50'],

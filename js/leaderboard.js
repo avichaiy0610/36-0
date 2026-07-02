@@ -1,5 +1,6 @@
 let lbTab    = 'ovr';
 let lbPeriod = 'all';
+let lbMode   = 'all';   // all | season | peak
 
 async function showLeaderboard() {
   showScreen('leaderboard');
@@ -26,6 +27,15 @@ async function showLeaderboard() {
     });
   });
 
+  document.querySelectorAll('.lb-mode').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.lb-mode').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      lbMode = btn.dataset.mode;
+      loadLeaderboard();
+    });
+  });
+
   document.getElementById('squad-modal-close').onclick = () => {
     document.getElementById('squad-modal').style.display = 'none';
   };
@@ -40,15 +50,21 @@ async function loadLeaderboard() {
   const orderCol = lbTab === 'ovr' ? 'ovr' : 'points';
   let query = _supabase
     .from('game_results')
-    .select('id, ovr, wins, draws, losses, points, gf, ga, formation, tier, created_at, profiles(username, avatar_url)')
+    .select('id, ovr, wins, draws, losses, points, gf, ga, formation, tier, settings, created_at, profiles(username, avatar_url)')
     .order(orderCol, { ascending: false })
     .limit(100);
 
-  if (lbPeriod === 'week') {
+  if (lbPeriod === 'today') {
+    const midnight = new Date(); midnight.setHours(0, 0, 0, 0);
+    query = query.gte('created_at', midnight.toISOString());
+  } else if (lbPeriod === 'week') {
     query = query.gte('created_at', new Date(Date.now() - 7 * 86400000).toISOString());
   } else if (lbPeriod === 'month') {
     query = query.gte('created_at', new Date(Date.now() - 30 * 86400000).toISOString());
   }
+
+  if (lbMode === 'peak')   query = query.eq('settings->>peak_mode', 'true');
+  if (lbMode === 'season') query = query.neq('settings->>peak_mode', 'true');
 
   const { data: rows, error } = await query;
   if (error || !rows?.length) {
@@ -67,10 +83,13 @@ async function loadLeaderboard() {
   best.forEach((row, i) => {
     const rank     = i + 1;
     const username = row.profiles?.username ?? 'אנונימי';
-    const mainStat = lbTab === 'ovr' ? `OVR ${row.ovr}` : `${row.points} נק׳`;
-    const subStat  = lbTab === 'ovr'
-      ? `${row.wins}נ ${row.draws}ת ${row.losses}ה`
-      : `OVR ${row.ovr} · ${row.formation}`;
+    const isPeak   = row.settings?.peak_mode === true;
+    const mainStat = (lbTab === 'ovr' ? `OVR ${row.ovr}` : `${row.points} נק׳`) + (isPeak ? ' ⚡' : '');
+    // both tabs show the full picture: the other stat, formation, record, date
+    const other    = lbTab === 'ovr' ? `${row.points} נק׳` : `OVR ${row.ovr}`;
+    const record   = `${row.wins}נ ${row.draws}ת ${row.losses}ה`;
+    const date     = new Date(row.created_at).toLocaleDateString('he-IL', { day: 'numeric', month: 'numeric', year: '2-digit' });
+    const subStat  = `${other} · ${row.formation} · ${record} · ${date}`;
 
     const tr = document.createElement('div');
     tr.className = 'lb-row';

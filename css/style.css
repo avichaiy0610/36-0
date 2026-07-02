@@ -633,6 +633,36 @@ body {
 
 .results-actions { display: flex; flex-direction: column; gap: 8px; }
 
+/* ── Desktop draft pitch: compact + readable (38-0 style) ──────────────── */
+@media (min-width: 701px) {
+  #screen-draft .pitch-container,
+  #screen-preseason .pitch-container,
+  #screen-results .pitch-container {
+    display: flex;
+    justify-content: center;
+  }
+  #screen-draft .pitch,
+  #screen-preseason .pitch,
+  #screen-results .pitch {
+    position: relative;
+    inset: auto;
+    width: min(640px, 100%);
+    height: calc(100% - 20px);
+    margin: 10px auto;
+    border-radius: 12px;
+    border: 1px solid #ffffff14;
+  }
+  .slot-circle { width: 52px; height: 52px; }
+  .slot-pos-label { font-size: 10px; }
+  .slot-player-short { font-size: 11px; max-width: 46px; }
+  .slot-name-label {
+    font-size: 10px;
+    padding: 2px 7px;
+    max-width: 110px;
+    background: #000000b0;
+  }
+}
+
 /* ── Responsive ───────────────────────────────────────────────────────────── */
 @media (max-width: 700px) {
   /* Allow page scroll on mobile — desktop uses overflow:hidden to prevent
@@ -1359,11 +1389,11 @@ body {
 }
 .lb-tab.selected { background: #4CAF50; border-color: #4CAF50; color: #fff; font-weight: 700; }
 .lb-filters { display: flex; gap: 6px; margin-bottom: 16px; direction: rtl; }
-.lb-filter {
+.lb-filter, .lb-mode {
   padding: 4px 14px; background: transparent; border: 1px solid #333;
   color: #888; border-radius: 20px; cursor: pointer; font-family: inherit; font-size: 0.8rem;
 }
-.lb-filter.selected { border-color: #4CAF50; color: #4CAF50; }
+.lb-filter.selected, .lb-mode.selected { border-color: #4CAF50; color: #4CAF50; }
 .lb-table { display: flex; flex-direction: column; gap: 6px; direction: rtl; }
 .lb-row {
   display: grid;
