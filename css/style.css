@@ -307,7 +307,7 @@ body {
   justify-content: center;
   transition: border-color .2s, background .2s, box-shadow .2s;
 }
-.slot-pos-label   { font-size: 8px; font-weight: 800; color: #ffffffaa; letter-spacing: 0.5px; }
+.slot-pos-label   { font-size: 8px; font-weight: 700; color: #ffffffaa; }
 .slot-name-label  {
   font-size: 7px;
   color: #fff;
@@ -315,7 +315,7 @@ body {
   padding: 1px 5px;
   border-radius: 3px;
   white-space: nowrap;
-  letter-spacing: 0.3px;
+  font-weight: 700;
   max-width: 78px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -328,7 +328,7 @@ body {
   box-shadow: 0 2px 10px #00000066;
 }
 .slot-player-short {
-  font-size: 8px; font-weight: 800; color: var(--tx, #fff);
+  font-size: 8px; font-weight: 700; color: var(--tx, #fff);
   max-width: 36px; overflow: hidden;
   white-space: nowrap; text-overflow: ellipsis;
 }
@@ -635,6 +635,16 @@ body {
 
 /* ── Desktop draft pitch: compact + readable (38-0 style) ──────────────── */
 @media (min-width: 701px) {
+  /* stadium ambience behind the compact pitch so the sides don't feel empty */
+  #screen-draft .pitch-panel,
+  #screen-preseason .pitch-panel,
+  #screen-results .pitch-panel {
+    background:
+      radial-gradient(ellipse 75% 60% at 50% 40%, #1e4a1bcc 0%, #16341455 45%, transparent 72%),
+      radial-gradient(ellipse 100% 45% at 50% 110%, #1a3a12dd 0%, transparent 65%),
+      repeating-linear-gradient(90deg, transparent 0 90px, #ffffff05 90px 92px),
+      linear-gradient(180deg, #0d1117 0%, #0f1a0e 60%, #0d1117 100%);
+  }
   #screen-draft .pitch-container,
   #screen-preseason .pitch-container,
   #screen-results .pitch-container {
@@ -651,6 +661,7 @@ body {
     margin: 10px auto;
     border-radius: 12px;
     border: 1px solid #ffffff14;
+    box-shadow: 0 0 80px #1e4a1a66, 0 8px 40px #00000088;
   }
   .slot-circle { width: 52px; height: 52px; }
   .slot-pos-label { font-size: 10px; }
