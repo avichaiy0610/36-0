@@ -8,6 +8,15 @@ const corsHeaders = {
 const HIGHEST_TIER = '36–0 🏆';
 const CHAMPION_TIERS = ['36–0 🏆', '33–0 🏆', 'בלתי מנוצחים ✨', 'אלופים בפאחר 🥇', 'אלופים 🏆'];
 const ALL_FORMATIONS = ['4-3-3', '4-4-2', '4-2-3-1', '3-5-2', '5-3-2'];
+const GAME_MILESTONES: [number, string][] = [
+  [1, 'games_1'], [10, 'games_10'], [50, 'games_50'],
+  [100, 'games_100'], [250, 'games_250'], [500, 'games_500'], [1000, 'games_1000'],
+];
+// clubs whose primary kit color is red (the circle color on the pitch)
+const RED_CLUB_IDS = [
+  'bnei-sakhnin', 'hapoel-beersheba', 'hapoel-hadera', 'hapoel-haifa',
+  'hapoel-jerusalem', 'hapoel-raanana', 'hapoel-rg', 'hapoel-tlv',
+];
 const ALL_CLUB_IDS = [
   'beitar-jerusalem', 'bnei-sakhnin', 'bnei-yehuda', 'hakoah-rg',
   'hapoel-aco', 'hapoel-ashkelon', 'hapoel-beersheba', 'hapoel-galil',
@@ -42,10 +51,12 @@ interface Payload {
 }
 
 function validate(p: Payload): string | null {
-  if (p.wins + p.draws + p.losses !== 36) return 'total games must equal 36';
+  // 36 games = championship playoff season, 33 = relegation playoff season
+  const total = p.wins + p.draws + p.losses;
+  if (total !== 36 && total !== 33) return 'total games must equal 33 or 36';
   if (p.points !== p.wins * 3 + p.draws) return 'points mismatch';
   if (p.ovr < 0 || p.ovr > 99) return 'ovr out of range';
-  if (!Array.isArray(p.matches) || p.matches.length !== 36) return 'matches must have 36 entries';
+  if (!Array.isArray(p.matches) || p.matches.length !== total) return 'matches count mismatch';
   if (!Array.isArray(p.players) || p.players.length !== 11) return 'squad must have 11 players';
   return null;
 }
@@ -61,20 +72,27 @@ function computeAchievements(
   const seasonYears = p.players.map(pl => parseInt((pl.season ?? '').split('/')[0]));
   const maxMatchGf = p.matches.reduce((max, m) => Math.max(max, m.gf), 0);
 
+  const fullEra = p.settings.era_min <= 1999 && p.settings.era_max >= 2025;
+  const redCount = p.players.filter(pl => RED_CLUB_IDS.includes(pl.teamId)).length;
+
   if (p.wins === 36)                                                              earned.push('perfect_season');
   if (p.losses === 0)                                                             earned.push('unbeaten_season');
   if (p.ovr >= 88)                                                                earned.push('ovr_88');
   if (p.ovr >= 90)                                                                earned.push('ovr_90');
-  if (p.ga === 0)                                                                 earned.push('clean_season');
+  if (p.ga <= 15)                                                                 earned.push('clean_season');
   if (p.gf >= 100)                                                                earned.push('century');
+  if (p.points >= 100)                                                            earned.push('record_breaker');
   if (CHAMPION_TIERS.includes(p.tier) && p.settings.difficulty === 'hard')       earned.push('hard_win');
   if (CHAMPION_TIERS.includes(p.tier) && p.settings.ratings_visible === false)   earned.push('blind_win');
-  if (seasonYears.every(y => !isNaN(y) && y >= 1990 && y < 2000))               earned.push('era_90s');
+  if (seasonYears.every(y => !isNaN(y) && y >= 1990 && y < 2000) && fullEra)    earned.push('era_90s');
   if (uniqueTeams.length === 1)                                                   earned.push('mono_club');
-  if (p.tier === HIGHEST_TIER)                                                    earned.push('tier_legend');
+  if (p.tier === HIGHEST_TIER && p.settings.difficulty === 'hard')              earned.push('tier_legend');
   if (p.wins === 36 && p.settings.peak_mode)                                     earned.push('peak_master');
-  if (gamesPlayed + 1 >= 10)                                                      earned.push('games_10');
-  if (gamesPlayed + 1 >= 50)                                                      earned.push('games_50');
+  if (p.players.filter(pl => pl.ovr >= 93).length >= 4)                          earned.push('legendary_team');
+  if (redCount === 11)                                                            earned.push('red_alert');
+  for (const [n, key] of GAME_MILESTONES) {
+    if (gamesPlayed >= n) earned.push(key);
+  }
   const allFormationsUsed = [...new Set([...usedFormations, p.formation])];
   if (ALL_FORMATIONS.every(f => allFormationsUsed.includes(f)))                  earned.push('all_formations');
   const allClubsUsed = [...new Set([...usedClubs, ...p.players.map(pl => pl.teamId)])];
@@ -134,7 +152,14 @@ Deno.serve(async (req) => {
       .select('players')
       .eq('user_id', user.id);
 
-    const gamesPlayed = pastResults?.length ?? 0;
+    // finished-seasons counter (incremented by the client on every completed
+    // season, saved or not); falls back to saved-games count
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('games_played')
+      .eq('id', user.id)
+      .single();
+    const gamesPlayed = Math.max(profile?.games_played ?? 0, pastResults?.length ?? 0);
     const usedFormations = (pastResults ?? []).map((r: { formation: string }) => r.formation);
     const usedClubs = (pastSquads ?? []).flatMap(
       (s: { players: Player[] }) => s.players.map(p => p.teamId)

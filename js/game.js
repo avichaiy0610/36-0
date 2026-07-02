@@ -1530,6 +1530,11 @@ function animateResults(ovr) {
       playerStats: simulatePlayerStats(g.matches),
     };
     saveSeasonState(season);
+    // count every finished season (for the games_N achievements) — once per
+    // season: restored seasons skip this block
+    if (typeof getCurrentUser === 'function' && getCurrentUser()) {
+      _supabase.rpc('increment_games_played').then(() => {}, () => {});
+    }
   }
   const { matches, inTopSix, leagueTable, playerStats } = season;
   ovr = season.ovr;
