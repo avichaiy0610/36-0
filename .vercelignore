@@ -1,6 +1,7 @@
 # Deploy only the static site — data files, scripts and logs stay out of production
 *
 !index.html
+!admin.html
 !css
 !css/**
 !js

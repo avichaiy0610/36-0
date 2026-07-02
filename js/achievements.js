@@ -42,7 +42,7 @@ async function showAchievements() {
     _supabase.from('achievements').select('*').order('is_hidden', { ascending: true }),
     _supabase.rpc('get_achievement_stats'),
     user
-      ? _supabase.from('user_achievements').select('achievement_key, unlocked_at').eq('user_id', user.id)
+      ? _supabase.from('user_achievements').select('achievement_key, unlocked_at, times_earned').eq('user_id', user.id)
       : Promise.resolve({ data: [] }),
   ]);
 
@@ -50,7 +50,9 @@ async function showAchievements() {
   (statsRows ?? []).forEach(r => { statsMap[r.key] = r; });
 
   const unlockedMap = {};
-  (unlockedRows.data ?? []).forEach(u => { unlockedMap[u.achievement_key] = u.unlocked_at; });
+  (unlockedRows.data ?? []).forEach(u => {
+    unlockedMap[u.achievement_key] = { at: u.unlocked_at, times: u.times_earned ?? 1 };
+  });
 
   grid.innerHTML = '';
 
@@ -77,9 +79,11 @@ async function showAchievements() {
     card.innerHTML = `
       <div class="ach-icon">${isHiddenAndLocked ? '❓' : ach.icon}</div>
       <div class="ach-info">
-        <div class="ach-name">${isHiddenAndLocked ? '???' : ach.name_he}</div>
+        <div class="ach-name">${isHiddenAndLocked ? '???' : ach.name_he}
+          ${isUnlocked ? `<span class="ach-count">×${unlockedMap[ach.key].times}</span>` : ''}
+        </div>
         <div class="ach-desc">${isHiddenAndLocked ? '' : ach.desc_he}</div>
-        ${isUnlocked ? `<div class="ach-date">${new Date(unlockedMap[ach.key]).toLocaleDateString('he-IL')}</div>` : ''}
+        ${isUnlocked ? `<div class="ach-date">${new Date(unlockedMap[ach.key].at).toLocaleDateString('he-IL')}</div>` : ''}
         <div class="ach-rarity-row">
           <span class="ach-rarity-tag" style="color:${rarity.color};border-color:${rarity.color}40">${rarity.label}</span>
           <div class="ach-bar-wrap">

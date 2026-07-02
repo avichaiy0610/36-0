@@ -843,8 +843,8 @@ body {
 
 .st-name      { flex: 1; font-size: 12px; font-weight: 600; }
 .st-name-head { flex: 1; font-size: 9px; color: var(--dim); letter-spacing: 1px; }
-.st-num       { font-size: 12px; font-weight: 700; width: 24px; text-align: center; color: var(--dim); flex-shrink: 0; }
-.st-num-head  { font-size: 9px; color: var(--dim); width: 24px; text-align: center; flex-shrink: 0; }
+.st-num       { font-size: 12px; font-weight: 700; width: 42px; text-align: center; color: var(--dim); flex-shrink: 0; }
+.st-num-head  { font-size: 9px; color: var(--dim); width: 42px; text-align: center; flex-shrink: 0; }
 .st-num.green  { color: #4CAF50; }
 .st-num.yellow { color: #FFD700; }
 .st-num.cyan   { color: #22d3ee; }
@@ -1334,6 +1334,11 @@ body {
 .ach-name  { font-size: 0.9rem; font-weight: 700; color: #fff; }
 .ach-desc  { font-size: 0.75rem; color: #aaa; line-height: 1.3; }
 .ach-date  { font-size: 0.7rem; color: #4CAF50; margin-top: 4px; }
+.ach-count {
+  font-size: 0.72rem; font-weight: 800; color: var(--accent);
+  background: #ffd70015; border: 1px solid #ffd70040;
+  border-radius: 8px; padding: 0 6px; margin-right: 6px;
+}
 .ach-rarity-row { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
 .ach-rarity-tag {
   font-size: 0.65rem; font-weight: 700; padding: 1px 6px;

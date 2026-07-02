@@ -1341,7 +1341,7 @@ function buildAwards(ps) {
   s('aw-boot-name',   'aw-boot-stat',   byGoals[0],   byGoals[0]   ? `${byGoals[0].goals} שערים`      : '');
   s('aw-assist-name', 'aw-assist-stat', byAssists[0], byAssists[0] ? `${byAssists[0].assists} בישולים` : '');
   s('aw-glove-name',  'aw-glove-stat',  gk,           gk           ? `${gk.cs} שערים נקיים`           : '');
-  s('aw-pots-name',   'aw-pots-stat',   pots,         pots         ? `${pots.goals} שע + ${pots.assists} ביש` : '');
+  s('aw-pots-name',   'aw-pots-stat',   pots,         pots         ? `${pots.goals} שערים + ${pots.assists} בישולים` : '');
 }
 
 function buildPlayerStatsTable(ps) {
@@ -1616,6 +1616,10 @@ function openShareModal() {
   if (!r) return;
   populateShareCard();
   document.getElementById('share-modal').style.display = 'flex';
+  // Pre-render the share image now, so the share buttons act instantly.
+  // iOS only allows navigator.share() close to the tap — rendering the image
+  // during the tap took too long and Safari rejected the share.
+  getShareBlob().catch(() => {});
 }
 
 function closeShareModal() {
@@ -1756,9 +1760,18 @@ async function shareWithImage(platform) {
 
     // Try native Web Share API (supported on mobile — shares image + text together)
     if (platform !== 'save' && navigator.share && navigator.canShare?.({ files: [file] })) {
-      await navigator.share({ files: [file], text });
-      if (btn) { btn.textContent = '✓ שותף!'; setTimeout(() => btn.textContent = orig, 2000); }
-      return;
+      try {
+        await navigator.share({ files: [file], text });
+        if (btn) { btn.textContent = '✓ שותף!'; setTimeout(() => btn.textContent = orig, 2000); }
+        return;
+      } catch (e) {
+        if (e?.name === 'AbortError') { // user closed the share sheet — not an error
+          if (btn) btn.textContent = orig;
+          return;
+        }
+        // NotAllowedError etc. (e.g. iOS gesture expired) — fall through to the
+        // download/URL fallback below instead of failing silently
+      }
     }
 
     // Platform-specific fallback (download image + open share URL)

@@ -173,12 +173,22 @@ Deno.serve(async (req) => {
 
     const alreadyHas = new Set((existing ?? []).map((r: { achievement_key: string }) => r.achievement_key));
     const newAchievements = earned.filter(k => !alreadyHas.has(k));
+    const repeatedAchievements = earned.filter(k => alreadyHas.has(k));
 
     if (newAchievements.length > 0) {
       const { error: achError } = await supabase.from('user_achievements').insert(
         newAchievements.map(key => ({ user_id: user.id, achievement_key: key, result_id: result.id }))
       );
       if (achError) console.error('Achievement insert failed:', achError);
+    }
+
+    // Conditions met again on this run — bump their repeat counters
+    if (repeatedAchievements.length > 0) {
+      const { error: incError } = await supabase.rpc('increment_achievements', {
+        p_user_id: user.id,
+        p_keys: repeatedAchievements,
+      });
+      if (incError) console.error('Achievement increment failed:', incError);
     }
 
     return new Response(
