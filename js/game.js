@@ -222,11 +222,19 @@ function getTeam(teamId) {
   return TEAMS[teamId] || { name:'?', primaryColor:'#333', secondaryColor:'#fff', badge:'⚽' };
 }
 
-// Short display name. With 3+ words the last two are a compound family name
-// (e.g. "טל בן חיים" → "בן חיים"), otherwise just the last word.
+// Short display name: everything after the first word is the family name
+// (e.g. "טל בן חיים" → "בן חיים").
 function playerShortName(name) {
   const w = name.trim().split(/\s+/);
-  return w.length >= 3 ? w.slice(-2).join(' ') : w.at(-1);
+  return w.length > 1 ? w.slice(1).join(' ') : w[0];
+}
+
+// Readable text color for a given background hex (dark text on light colors)
+function textColorFor(hex) {
+  const h = (hex || '').replace('#', '');
+  if (h.length < 6) return '#fff';
+  const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16);
+  return (0.299 * r + 0.587 * g + 0.114 * b) > 150 ? '#111' : '#fff';
 }
 
 function emptySlotIndices() {
@@ -464,6 +472,104 @@ function beginDraft() {
   startRound();
 }
 
+// ─── Draft persistence: survives refresh, cleared only by the reset buttons ────
+const DRAFT_SAVE_KEY = '36-0-draft';
+
+function saveDraftState() {
+  if (!state.slots.length) return;
+  try {
+    localStorage.setItem(DRAFT_SAVE_KEY, JSON.stringify({
+      v: 1,
+      formationId: state.formationId,
+      difficulty: state.difficulty,
+      showRatings: state.showRatings,
+      draftMode: state.draftMode,
+      peakMode: state.peakMode,
+      eraMin: state.eraMin,
+      eraMax: state.eraMax,
+      currentRound: state.currentRound,
+      teamRerollsLeft: state.teamRerollsLeft,
+      seasonRerollsLeft: state.seasonRerollsLeft,
+      awaitingSlotPick: state.awaitingSlotPick,
+      selectedSlotIdx: state.selectedSlotIdx,
+      usedSquadIds: [...state.usedSquadIds],
+      usedPlayerKeys: [...state.usedPlayerKeys],
+      currentSquadId: state.currentSquad?.id ?? null,
+      picks: state.picks.map(p => p ? { squadId: p.squad.id, name: p.player.name } : null),
+    }));
+  } catch (e) { /* storage blocked/full — persistence is best-effort */ }
+}
+
+function clearDraftState() {
+  try { localStorage.removeItem(DRAFT_SAVE_KEY); } catch (e) {}
+}
+
+// Returns true if a saved draft was found and the UI was rebuilt from it
+function restoreDraftState() {
+  let d;
+  try { d = JSON.parse(localStorage.getItem(DRAFT_SAVE_KEY)); } catch (e) { return false; }
+  if (!d || d.v !== 1 || !FORMATIONS[d.formationId]) return false;
+  const slots = FORMATIONS[d.formationId].slots;
+  if (!Array.isArray(d.picks) || d.picks.length !== slots.length) return false;
+
+  const bySquadId = new Map(SQUADS.map(s => [s.id, s]));
+  const picks = d.picks.map(p => {
+    if (!p) return null;
+    const squad = bySquadId.get(p.squadId);
+    const player = squad?.players.find(x => x.name === p.name);
+    return squad && player ? { player, squad } : null;
+  });
+  // a referenced squad/player no longer exists (data updated since the save)
+  if (d.picks.some((p, i) => p && !picks[i])) return false;
+
+  Object.assign(state, {
+    formationId: d.formationId, slots, picks,
+    difficulty: d.difficulty, showRatings: d.showRatings,
+    draftMode: d.draftMode, peakMode: d.peakMode,
+    eraMin: d.eraMin, eraMax: d.eraMax,
+    currentRound: d.currentRound,
+    teamRerollsLeft: d.teamRerollsLeft, seasonRerollsLeft: d.seasonRerollsLeft,
+    usedSquadIds: new Set(d.usedSquadIds), usedPlayerKeys: new Set(d.usedPlayerKeys),
+    currentSquad: bySquadId.get(d.currentSquadId) ?? null,
+    selectedPlayer: null, selectedSlotIdx: null,
+    isAnimating: false, awaitingSlotPick: false,
+    moveMode: false, movingFromIdx: null,
+  });
+
+  const banner = document.getElementById('peak-mode-banner');
+  if (banner) banner.style.display = state.peakMode ? 'block' : 'none';
+  const moveBtn = document.getElementById('btn-move-player');
+  if (moveBtn) moveBtn.style.display = picks.some(Boolean) ? '' : 'none';
+
+  buildPitch('pitch-slots', true);
+  refreshAllTokens();
+  updateProgress(); updateRerollButtons(); updateDraftOVR();
+
+  // Draft finished — resume at the preseason screen
+  if (state.currentRound >= slots.length) {
+    showPreseason(teamOVR());
+    return true;
+  }
+
+  showScreen('draft');
+  if (state.draftMode === 'pos-first' && state.currentSquad &&
+      d.selectedSlotIdx != null && !state.picks[d.selectedSlotIdx]) {
+    // mid pos-first round: slot already chosen, squad already drawn
+    state.selectedSlotIdx = d.selectedSlotIdx;
+    setTokenHighlight(d.selectedSlotIdx, 'selected');
+    showSquadCardData(state.currentSquad);
+    renderSquadPlayers(state.currentSquad, d.selectedSlotIdx);
+    setHint(`בחר שחקן עבור: ${slots[d.selectedSlotIdx].label}`);
+  } else if (state.draftMode !== 'pos-first' && state.currentSquad) {
+    showSquadCardData(state.currentSquad);
+    renderSquadPlayers(state.currentSquad);
+    setHint('בחר שחקן מהרשימה');
+  } else {
+    startRound();
+  }
+  return true;
+}
+
 // ─── Pitch builder ─────────────────────────────────────────────────────────────
 function buildPitch(containerId, clickable) {
   const container = document.getElementById(containerId);
@@ -497,6 +603,7 @@ function fillToken(idx, player, squad) {
   token.className = 'slot-token filled';
   token.style.setProperty('--tc', team.primaryColor);
   token.style.setProperty('--ts', team.secondaryColor);
+  token.style.setProperty('--tx', textColorFor(team.primaryColor));
   token.innerHTML = `
     <div class="slot-circle filled-circle">
       <span class="slot-player-short">${playerShortName(player.name)}</span>
@@ -607,6 +714,7 @@ function handleMoveClick(slotIdx) {
     refreshAllTokens();
     clearAllHighlights();
     updateDraftOVR();
+    saveDraftState();
     // Re-render the player list so freed/filled slots are reflected in availability
     // (skip mid-animation — the roulette's onDone re-renders anyway)
     if (state.currentSquad && !state.isAnimating) {
@@ -627,6 +735,7 @@ function refreshAllTokens() {
       token.className = 'slot-token filled';
       token.style.setProperty('--tc', team.primaryColor);
       token.style.setProperty('--ts', team.secondaryColor);
+      token.style.setProperty('--tx', textColorFor(team.primaryColor));
       token.innerHTML = `
         <div class="slot-circle filled-circle">
           <span class="slot-player-short">${playerShortName(player.name)}</span>
@@ -694,6 +803,7 @@ function startRound() {
       setHint('בחר שחקן מהרשימה');
     });
   }
+  saveDraftState();
 }
 
 function animateRoulette(finalSquad, onDone) {
@@ -726,9 +836,14 @@ function animateRoulette(finalSquad, onDone) {
 
 function showSquadCardData(squad) {
   const team = getTeam(squad.teamId);
+  const tx = textColorFor(team.primaryColor);
   document.getElementById('card-badge').textContent = team.badge;
-  document.getElementById('card-team-name').textContent = team.name;
-  document.getElementById('card-season').textContent = squad.season;
+  const nameEl = document.getElementById('card-team-name');
+  nameEl.textContent = team.name;
+  nameEl.style.color = tx;
+  const seasonEl = document.getElementById('card-season');
+  seasonEl.textContent = squad.season;
+  seasonEl.style.color = tx === '#111' ? '#000000b0' : '#ffffffaa';
   document.getElementById('squad-card-header').style.background =
     `linear-gradient(135deg, ${team.primaryColor} 0%, #1a1a2e 100%)`;
 }
@@ -752,6 +867,7 @@ function renderSquadPlayers(squad, filterSlotIdx = null) {
     setTimeout(() => {
       const newSquad = pickNextSquad();
       state.currentSquad = newSquad;
+      saveDraftState();
       animateRoulette(newSquad, () => {
         renderSquadPlayers(newSquad, filterSlotIdx);
         if (filterSlotIdx !== null) setHint(`בחר שחקן עבור: ${state.slots[filterSlotIdx].label}`);
@@ -821,6 +937,7 @@ function handleSlotClick(slotIdx) {
     clearAllHighlights(); setTokenHighlight(slotIdx, 'selected');
     const squad = pickNextSquad();
     state.currentSquad = squad; updateRerollButtons();
+    saveDraftState();
     animateRoulette(squad, () => {
       renderSquadPlayers(squad, slotIdx);
       setHint(`בחר שחקן עבור: ${state.slots[slotIdx].label}`);
@@ -865,6 +982,7 @@ function assignPlayer(slotIdx, player) {
   clearAllHighlights();
   state.selectedPlayer = null; state.selectedSlotIdx = null;
   state.currentRound++;
+  saveDraftState();
   const moveBtn = document.getElementById('btn-move-player');
   if (moveBtn) moveBtn.style.display = '';
   updateDraftOVR();
@@ -924,6 +1042,7 @@ function rerollTeam() {
   if (pool.length === 0) pool = SQUADS.filter(sq => sq.teamId !== currentTeamId);
   const newSquad = pool[rand(0, pool.length - 1)];
   state.usedSquadIds.add(newSquad.id); state.currentSquad = newSquad;
+  saveDraftState();
 
   const filterSlot = state.draftMode === 'pos-first' ? state.selectedSlotIdx : null;
   animateRoulette(newSquad, () => {
@@ -942,6 +1061,7 @@ function rerollSeason() {
   state.seasonRerollsLeft--; updateRerollButtons();
   const newSquad = sameTeam[rand(0, sameTeam.length - 1)];
   state.usedSquadIds.add(newSquad.id); state.currentSquad = newSquad;
+  saveDraftState();
 
   const filterSlot = state.draftMode === 'pos-first' ? state.selectedSlotIdx : null;
   animateRoulette(newSquad, () => {
@@ -1306,6 +1426,7 @@ function buildPitchInContainer(containerId) {
       const team = getTeam(pick.squad.teamId);
       token.style.setProperty('--tc', team.primaryColor);
       token.style.setProperty('--ts', team.secondaryColor);
+      token.style.setProperty('--tx', textColorFor(team.primaryColor));
       token.innerHTML = `
         <div class="slot-circle filled-circle">
           <span class="slot-player-short">${playerShortName(pick.player.name)}</span>
@@ -1600,6 +1721,7 @@ function restartGame() {
     isAnimating:false, awaitingSlotPick:false,
   });
   window._lastResult = null; window._lastTier = null; window._lastPlayerStats = null;
+  clearDraftState();
   const moveBtn = document.getElementById('btn-move-player');
   if (moveBtn) { moveBtn.style.display = 'none'; moveBtn.classList.remove('move-active'); moveBtn.textContent = '⇄ הזז שחקן'; }
   showScreen('setup');
@@ -1697,7 +1819,8 @@ function setupSaveSection() {
 
 // ─── Init ──────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
-  showScreen('welcome');
+  // Resume a saved draft if one exists; otherwise start at the welcome screen
+  if (!restoreDraftState()) showScreen('welcome');
   initEraSlider();
 
   document.getElementById('btn-start').addEventListener('click', startGame);
