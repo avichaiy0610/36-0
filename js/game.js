@@ -312,6 +312,8 @@ function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   const el = document.getElementById('screen-' + id);
   if (el) { el.classList.add('active'); el.scrollTop = 0; }
+  // pitches built while their screen was hidden couldn't be measured
+  requestAnimationFrame(() => fitShortNames());
 }
 
 // ─── Welcome ───────────────────────────────────────────────────────────────────
@@ -504,6 +506,24 @@ function clearDraftState() {
   try { localStorage.removeItem(DRAFT_SAVE_KEY); } catch (e) {}
 }
 
+// Attach the simulated season to the saved draft, so a refresh replays the
+// exact same result instead of allowing a fresh simulation.
+function saveSeasonState(season) {
+  try {
+    const raw = localStorage.getItem(DRAFT_SAVE_KEY);
+    if (!raw) return;
+    const d = JSON.parse(raw);
+    d.season = {
+      ovr: season.ovr,
+      matches: season.matches,
+      inTopSix: season.inTopSix,
+      leagueTable: season.leagueTable,
+      playerStats: season.playerStats.map(({ squad, ...rest }) => rest),
+    };
+    localStorage.setItem(DRAFT_SAVE_KEY, JSON.stringify(d));
+  } catch (e) {}
+}
+
 // Returns true if a saved draft was found and the UI was rebuilt from it
 function restoreDraftState() {
   let d;
@@ -545,9 +565,14 @@ function restoreDraftState() {
   refreshAllTokens();
   updateProgress(); updateRerollButtons(); updateDraftOVR();
 
-  // Draft finished — resume at the preseason screen
+  // Draft finished — resume at the results (same season, no re-roll) or preseason
   if (state.currentRound >= slots.length) {
-    showPreseason(teamOVR());
+    if (d.season) {
+      window._restoredSeason = d.season;
+      showResults();
+    } else {
+      showPreseason(teamOVR());
+    }
     return true;
   }
 
@@ -610,6 +635,26 @@ function fillToken(idx, player, squad) {
     </div>
     <div class="slot-name-label">${player.name}</div>
   `;
+  fitShortNames(token);
+}
+
+// Shrink token short-names until they fit their circle (nothing gets cut to
+// "אבוק…"); re-run on resize/orientation change so the size always matches.
+function fitShortNames(root = document) {
+  root.querySelectorAll('.slot-circle').forEach(circle => {
+    const span = circle.querySelector('.slot-player-short');
+    if (!span) return;
+    const max = circle.clientWidth - 6;
+    if (max <= 0) return; // hidden screen — fitted again when shown
+    span.style.maxWidth = 'none';
+    span.style.fontSize = '';
+    let size = parseFloat(getComputedStyle(span).fontSize) || 8;
+    while (size > 4.5 && span.scrollWidth > max) {
+      size -= 0.5;
+      span.style.fontSize = size + 'px';
+    }
+    if (span.scrollWidth > max) span.style.maxWidth = max + 'px';
+  });
 }
 
 function setTokenHighlight(idx, type) {
@@ -752,6 +797,7 @@ function refreshAllTokens() {
       `;
     }
   });
+  fitShortNames();
 }
 
 // ─── Draft: Round management ───────────────────────────────────────────────────
@@ -1090,7 +1136,7 @@ function setHint(text) { document.getElementById('pick-hint').textContent = text
 // ─── Simulation ────────────────────────────────────────────────────────────────
 // Win-probability gain per OVR point of difference. Shared by every formula so
 // the match sim, the bracket split and the final table stay consistent.
-const WINP_SLOPE = 0.028;
+const WINP_SLOPE = 0.031;
 
 function simulateMatch(myOvr, opp, homeOverride = null) {
   const diff  = myOvr - opp.ovr;
@@ -1121,7 +1167,7 @@ function generateMatches(ovr) {
     const diff  = t.ovr - avgOppOvr;
     const winP  = Math.max(0.1, Math.min(0.85, 0.47 + diff * WINP_SLOPE));
     const drawP = Math.max(0.05, 0.22 - Math.abs(diff) * 0.005);
-    const pts   = Math.max(5, Math.round((winP * 3 + drawP) * 26 + rand(-5, 5)));
+    const pts   = Math.max(5, Math.round((winP * 3 + drawP) * 26 + rand(-4, 4)));
     return { ...t, pts };
   });
 
@@ -1224,6 +1270,26 @@ function generateLeagueTable(wins, draws, losses, inTopSix, champOpponents, rele
     ...(!inTopSix ? [playerRow] : []),
     ...relegOpponents.map(opp => fakeRow(opp, 33)),
   ]);
+
+  // No cross-bracket paradoxes: every championship-bracket row must show more
+  // points than every bottom-bracket row (only fake rows are adjusted — the
+  // player's own record is never touched).
+  const playerPts = playerRow.w * 3 + playerRow.d;
+  const resort = rows => rows.sort((a, b) => b.pts - a.pts || b.w - a.w);
+  if (!inTopSix) {
+    champRows.forEach(r => {
+      if (r.pts <= playerPts) { r.pts = playerPts + rand(1, 3); r.w = Math.ceil((r.pts - r.d) / 3); }
+    });
+    resort(champRows);
+  }
+  const minChamp = Math.min(...champRows.map(r => r.pts));
+  relegRows.forEach(r => {
+    if (!r.us && r.pts >= minChamp) {
+      r.pts = Math.max(3, minChamp - rand(1, 3));
+      r.w = Math.max(0, Math.ceil((r.pts - r.d) / 3));
+    }
+  });
+  resort(relegRows);
 
   // Combine: champ bracket always occupies positions 1–6, releg 7–14
   return [...champRows, ...relegRows];
@@ -1441,12 +1507,32 @@ function buildPitchInContainer(containerId) {
     }
     container.appendChild(token);
   });
+  fitShortNames(container);
 }
 
 function buildResultsPitch() { buildPitchInContainer('results-pitch-slots'); }
 
 function animateResults(ovr) {
-  const { matches, inTopSix, champOpponents, relegOpponents } = generateMatches(ovr);
+  // Reuse a season restored from storage; otherwise simulate once and persist,
+  // so refreshing cannot re-roll a different outcome for the same squad.
+  let season = window._restoredSeason ?? null;
+  window._restoredSeason = null;
+  if (!season) {
+    const g = generateMatches(ovr);
+    let w = 0, d = 0;
+    g.matches.forEach(m => { if (m.outcome === 'W') w++; else if (m.outcome === 'D') d++; });
+    const l = g.matches.length - w - d;
+    season = {
+      ovr,
+      matches: g.matches,
+      inTopSix: g.inTopSix,
+      leagueTable: generateLeagueTable(w, d, l, g.inTopSix, g.champOpponents, g.relegOpponents),
+      playerStats: simulatePlayerStats(g.matches),
+    };
+    saveSeasonState(season);
+  }
+  const { matches, inTopSix, leagueTable, playerStats } = season;
+  ovr = season.ovr;
   const totalGames = matches.length;
   const grid = document.getElementById('matches-grid');
   grid.innerHTML = '';
@@ -1489,7 +1575,6 @@ function animateResults(ovr) {
     setEl('res-ga', gaTotal);
   }, 1200);
 
-  const leagueTable = generateLeagueTable(wins, draws, losses, inTopSix, champOpponents, relegOpponents);
   const myRank = leagueTable.findIndex(t => t.us) + 1;
 
   setTimeout(() => {
@@ -1511,7 +1596,7 @@ function animateResults(ovr) {
   // Build detailed stats after animations settle
   setTimeout(() => {
     buildOVRCard(ovr);
-    const ps = simulatePlayerStats(matches);
+    const ps = playerStats;
     window._lastPlayerStats = ps;
     buildAwards(ps);
     buildPlayerStatsTable(ps);
@@ -1822,6 +1907,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Resume a saved draft if one exists; otherwise start at the welcome screen
   if (!restoreDraftState()) showScreen('welcome');
   initEraSlider();
+  window.addEventListener('resize', () => fitShortNames());
 
   document.getElementById('btn-start').addEventListener('click', startGame);
   document.getElementById('btn-start-draft').addEventListener('click', beginDraft);
