@@ -1,5 +1,5 @@
 // Catalog of every editable UI text: where it lives and its default value.
-// Used by admin.html; generated once, safe to edit by hand.
+// selector "virtual" = dynamic text looked up by code (siteText), not DOM.
 const TEXT_CATALOG = [
  {
   "key": "nav-logo",
@@ -118,7 +118,7 @@ const TEXT_CATALOG = [
   "screen": "מסך פתיחה",
   "label": "משפט משני",
   "selector": ".welcome-sub",
-  "def": "בכל סיבוב מוגרלת קבוצה מכל הדורות — בחר שחקן לכל עמדה. 11 שחקנים, 36 משחקים — האם תצליח 36–0 ?"
+  "def": "בכל סיבוב מוגרלת קבוצה מכל הדורות — בחר שחקן לכל עמדה.\n11 שחקנים, 36 משחקים — האם תצליח 36–0?"
  },
  {
   "key": "btn-start",
@@ -714,5 +714,194 @@ const TEXT_CATALOG = [
   "label": "כפתור חזרה (לוח שיאים)",
   "selector": "#leaderboard-back",
   "def": "→ חזרה"
+ },
+ {
+  "key": "tier-perfect36-name",
+  "screen": "דרגות סיום (טירים)",
+  "label": "טיר \"36–0 🏆\" — שם",
+  "selector": "virtual",
+  "def": "36–0 🏆"
+ },
+ {
+  "key": "tier-perfect36-sub",
+  "screen": "דרגות סיום (טירים)",
+  "label": "טיר \"36–0 🏆\" — משפט",
+  "selector": "virtual",
+  "def": "הבלתי אפשרי הפך למציאות"
+ },
+ {
+  "key": "tier-perfect33-name",
+  "screen": "דרגות סיום (טירים)",
+  "label": "טיר \"33–0 🏆\" — שם",
+  "selector": "virtual",
+  "def": "33–0 🏆"
+ },
+ {
+  "key": "tier-perfect33-sub",
+  "screen": "דרגות סיום (טירים)",
+  "label": "טיר \"33–0 🏆\" — משפט",
+  "selector": "virtual",
+  "def": "עונה מושלמת בפלייאוף התחתון"
+ },
+ {
+  "key": "tier-unbeaten-name",
+  "screen": "דרגות סיום (טירים)",
+  "label": "טיר \"בלתי מנוצחים ✨\" — שם",
+  "selector": "virtual",
+  "def": "בלתי מנוצחים ✨"
+ },
+ {
+  "key": "tier-unbeaten-sub",
+  "screen": "דרגות סיום (טירים)",
+  "label": "טיר \"בלתי מנוצחים ✨\" — משפט",
+  "selector": "virtual",
+  "def": "עונה שלמה ללא תבוסה"
+ },
+ {
+  "key": "tier-champ-gap-name",
+  "screen": "דרגות סיום (טירים)",
+  "label": "טיר \"אלופים בפער 🥇\" — שם",
+  "selector": "virtual",
+  "def": "אלופים בפער 🥇"
+ },
+ {
+  "key": "tier-champ-gap-sub",
+  "screen": "דרגות סיום (טירים)",
+  "label": "טיר \"אלופים בפער 🥇\" — משפט",
+  "selector": "virtual",
+  "def": "שיא הליגה — תיתכן שושלת"
+ },
+ {
+  "key": "tier-champ-name",
+  "screen": "דרגות סיום (טירים)",
+  "label": "טיר \"אלופים 🏆\" — שם",
+  "selector": "virtual",
+  "def": "אלופים 🏆"
+ },
+ {
+  "key": "tier-champ-sub",
+  "screen": "דרגות סיום (טירים)",
+  "label": "טיר \"אלופים 🏆\" — משפט",
+  "selector": "virtual",
+  "def": "זוכי ליגת העל"
+ },
+ {
+  "key": "tier-runner-up-name",
+  "screen": "דרגות סיום (טירים)",
+  "label": "טיר \"מקום שני 🥈\" — שם",
+  "selector": "virtual",
+  "def": "מקום שני 🥈"
+ },
+ {
+  "key": "tier-runner-up-sub",
+  "screen": "דרגות סיום (טירים)",
+  "label": "טיר \"מקום שני 🥈\" — משפט",
+  "selector": "virtual",
+  "def": "עונה מבריקה — עד כמה היה קרוב?"
+ },
+ {
+  "key": "tier-third-name",
+  "screen": "דרגות סיום (טירים)",
+  "label": "טיר \"מקום שלישי 🥉\" — שם",
+  "selector": "virtual",
+  "def": "מקום שלישי 🥉"
+ },
+ {
+  "key": "tier-third-sub",
+  "screen": "דרגות סיום (טירים)",
+  "label": "טיר \"מקום שלישי 🥉\" — משפט",
+  "selector": "virtual",
+  "def": "פלייאוף האליפות — הישג ראוי"
+ },
+ {
+  "key": "tier-top6-name",
+  "screen": "דרגות סיום (טירים)",
+  "label": "טיר \"שישייה עליונה\" — שם",
+  "selector": "virtual",
+  "def": "שישייה עליונה"
+ },
+ {
+  "key": "tier-top6-sub",
+  "screen": "דרגות סיום (טירים)",
+  "label": "טיר \"שישייה עליונה\" — משפט",
+  "selector": "virtual",
+  "def": "פלייאוף האליפות"
+ },
+ {
+  "key": "tier-bottom-name",
+  "screen": "דרגות סיום (טירים)",
+  "label": "טיר \"פלייאוף תחתון\" — שם",
+  "selector": "virtual",
+  "def": "פלייאוף תחתון"
+ },
+ {
+  "key": "tier-bottom-sub",
+  "screen": "דרגות סיום (טירים)",
+  "label": "טיר \"פלייאוף תחתון\" — משפט",
+  "selector": "virtual",
+  "def": "פלייאוף ההישרדות"
+ },
+ {
+  "key": "tier-survivor-name",
+  "screen": "דרגות סיום (טירים)",
+  "label": "טיר \"שורדים בליגה ⚠\" — שם",
+  "selector": "virtual",
+  "def": "שורדים בליגה ⚠"
+ },
+ {
+  "key": "tier-survivor-sub",
+  "screen": "דרגות סיום (טירים)",
+  "label": "טיר \"שורדים בליגה ⚠\" — משפט",
+  "selector": "virtual",
+  "def": "מאבק הישרדות — ניצחון בשניות"
+ },
+ {
+  "key": "tier-relegated-name",
+  "screen": "דרגות סיום (טירים)",
+  "label": "טיר \"ירידת ליגה ⬇\" — שם",
+  "selector": "virtual",
+  "def": "ירידת ליגה ⬇"
+ },
+ {
+  "key": "tier-relegated-sub",
+  "screen": "דרגות סיום (טירים)",
+  "label": "טיר \"ירידת ליגה ⬇\" — משפט",
+  "selector": "virtual",
+  "def": "ירידה לליגה הלאומית"
+ },
+ {
+  "key": "label-diff-easy",
+  "screen": "תוויות מצב (בתיבת הדרגה)",
+  "label": "רמת קושי קל",
+  "selector": "virtual",
+  "def": "קל"
+ },
+ {
+  "key": "label-diff-normal",
+  "screen": "תוויות מצב (בתיבת הדרגה)",
+  "label": "רמת קושי רגיל",
+  "selector": "virtual",
+  "def": "רגיל"
+ },
+ {
+  "key": "label-diff-hard",
+  "screen": "תוויות מצב (בתיבת הדרגה)",
+  "label": "רמת קושי קשה",
+  "selector": "virtual",
+  "def": "קשה"
+ },
+ {
+  "key": "label-peak-mode",
+  "screen": "תוויות מצב (בתיבת הדרגה)",
+  "label": "תווית מצב שיא",
+  "selector": "virtual",
+  "def": "⚡ מצב שיא"
+ },
+ {
+  "key": "label-hidden-ratings",
+  "screen": "תוויות מצב (בתיבת הדרגה)",
+  "label": "תווית דירוגים מוסתרים",
+  "selector": "virtual",
+  "def": "🙈 דירוגים מוסתרים"
  }
 ];

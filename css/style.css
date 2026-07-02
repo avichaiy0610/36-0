@@ -24,7 +24,7 @@ body {
   height: 100%;
   background: var(--bg);
   color: var(--text);
-  font-family: 'Segoe UI', 'Arial Hebrew', Arial, sans-serif;
+  font-family: Arial, 'Arial Hebrew', 'Segoe UI', sans-serif;
   direction: rtl;
   overflow: hidden;
   -webkit-text-size-adjust: 100%;
@@ -1076,7 +1076,7 @@ body {
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 16px 14px;
-  font-family: 'Segoe UI', 'Arial Hebrew', Arial, sans-serif;
+  font-family: Arial, 'Arial Hebrew', 'Segoe UI', sans-serif;
 }
 .sc-header { text-align: center; margin-bottom: 8px; }
 .sc-logo {

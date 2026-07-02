@@ -1389,19 +1389,29 @@ function buildLeagueTable(table) {
 }
 
 // ─── Tier ─────────────────────────────────────────────────────────────────────
+// tier.name is canonical (achievements on the server match it) — the DISPLAYED
+// name/sub go through tierDisplay(), which allows admin overrides per tier id.
 function getTier(wins, draws, losses, rank, n, totalGames) {
   const pts = wins * 3 + draws;
-  if (losses===0 && draws===0 && totalGames===36) return { name:'36–0 🏆',            sub:'הבלתי אפשרי הפך למציאות',         color:'#FFD700' };
-  if (losses===0 && draws===0 && totalGames===33) return { name:'33–0 🏆',            sub:'עונה מושלמת בפלייאוף התחתון',     color:'#FFD700' };
-  if (losses===0)              return { name:'בלתי מנוצחים ✨',    sub:'עונה שלמה ללא תבוסה',              color:'#C8A800' };
-  if (rank === 1 && pts >= 90) return { name:'אלופים בפער 🥇',     sub:'שיא הליגה — תיתכן שושלת',          color:'#FFD700' };
-  if (rank === 1)              return { name:'אלופים 🏆',           sub:'זוכי ליגת העל',                   color:'#d4af37' };
-  if (rank === 2)              return { name:'מקום שני 🥈',         sub:'עונה מבריקה — עד כמה היה קרוב?',  color:'#C0C0C0' };
-  if (rank === 3)              return { name:'מקום שלישי 🥉',       sub:'פלייאוף האליפות — הישג ראוי',     color:'#cd7f32' };
-  if (rank <= 6)               return { name:'שישייה עליונה',       sub:'פלייאוף האליפות',                 color:'#4CAF50' };
-  if (rank <= n - 3)           return { name:'פלייאוף תחתון',       sub:'פלייאוף ההישרדות',               color:'#2196F3' };
-  if (rank <= n - 1)           return { name:'שורדים בליגה ⚠',     sub:'מאבק הישרדות — ניצחון בשניות',    color:'#FF9800' };
-  return                              { name:'ירידת ליגה ⬇',        sub:'ירידה לליגה הלאומית',             color:'#F44336' };
+  if (losses===0 && draws===0 && totalGames===36) return { id:'perfect36', name:'36–0 🏆',   sub:'הבלתי אפשרי הפך למציאות',         color:'#FFD700' };
+  if (losses===0 && draws===0 && totalGames===33) return { id:'perfect33', name:'33–0 🏆',   sub:'עונה מושלמת בפלייאוף התחתון',     color:'#FFD700' };
+  if (losses===0)              return { id:'unbeaten',  name:'בלתי מנוצחים ✨',    sub:'עונה שלמה ללא תבוסה',              color:'#C8A800' };
+  if (rank === 1 && pts >= 90) return { id:'champ-gap', name:'אלופים בפער 🥇',     sub:'שיא הליגה — תיתכן שושלת',          color:'#FFD700' };
+  if (rank === 1)              return { id:'champ',     name:'אלופים 🏆',           sub:'זוכי ליגת העל',                   color:'#d4af37' };
+  if (rank === 2)              return { id:'runner-up', name:'מקום שני 🥈',         sub:'עונה מבריקה — עד כמה היה קרוב?',  color:'#C0C0C0' };
+  if (rank === 3)              return { id:'third',     name:'מקום שלישי 🥉',       sub:'פלייאוף האליפות — הישג ראוי',     color:'#cd7f32' };
+  if (rank <= 6)               return { id:'top6',      name:'שישייה עליונה',       sub:'פלייאוף האליפות',                 color:'#4CAF50' };
+  if (rank <= n - 3)           return { id:'bottom',    name:'פלייאוף תחתון',       sub:'פלייאוף ההישרדות',               color:'#2196F3' };
+  if (rank <= n - 1)           return { id:'survivor',  name:'שורדים בליגה ⚠',     sub:'מאבק הישרדות — ניצחון בשניות',    color:'#FF9800' };
+  return                              { id:'relegated', name:'ירידת ליגה ⬇',        sub:'ירידה לליגה הלאומית',             color:'#F44336' };
+}
+
+function tierDisplay(tier) {
+  const st = typeof siteText === 'function' ? siteText : () => undefined;
+  return {
+    name: st('tier-' + tier.id + '-name', tier.name) ?? tier.name,
+    sub:  st('tier-' + tier.id + '-sub', tier.sub) ?? tier.sub,
+  };
 }
 
 // ─── Results screen ────────────────────────────────────────────────────────────
@@ -1565,7 +1575,7 @@ function animateResults(ovr) {
     row.innerHTML = `
       <span class="mr-badge ${rc}">${rl}</span>
       <span class="mr-opponent">${m.opponent} <span class="mr-venue">${m.home?'(ב)':'(ח)'}</span></span>
-      <span class="mr-score" dir="ltr">${m.gf}–${m.ga}</span>
+      <span class="mr-score" dir="ltr">${m.gf}-${m.ga}</span>
     `;
     grid.appendChild(row);
   });
@@ -1584,15 +1594,20 @@ function animateResults(ovr) {
 
   setTimeout(() => {
     const tier = getTier(wins, draws, losses, myRank, leagueTable.length, totalGames);
-    setEl('res-tier', tier.name, tier.color);
-    setEl('res-tier-sub', tier.sub);
+    const td = tierDisplay(tier);
+    setEl('res-tier', td.name, tier.color);
+    setEl('res-tier-sub', td.sub);
     document.getElementById('tier-box').classList.add('visible');
     window._lastResult = { wins, draws, losses, gfTotal, gaTotal, matches, ovr, inTopSix };
     window._lastTier   = tier;
-    const diffMapR = { easy: 'קל', normal: 'רגיל', hard: 'קשה' };
+    const diffMapR = {
+      easy:   siteText('label-diff-easy', 'קל'),
+      normal: siteText('label-diff-normal', 'רגיל'),
+      hard:   siteText('label-diff-hard', 'קשה'),
+    };
     const modeParts = [diffMapR[state.difficulty] ?? state.difficulty];
-    if (state.peakMode) modeParts.push('⚡ מצב שיא');
-    if (!state.showRatings) modeParts.push('🙈 דירוגים מוסתרים');
+    if (state.peakMode) modeParts.push(siteText('label-peak-mode', '⚡ מצב שיא'));
+    if (!state.showRatings) modeParts.push(siteText('label-hidden-ratings', '🙈 דירוגים מוסתרים'));
     const modeInfoEl = document.getElementById('res-mode-info');
     if (modeInfoEl) modeInfoEl.textContent = modeParts.join(' · ');
     setupSaveSection();
@@ -1608,7 +1623,12 @@ function animateResults(ovr) {
     const hi = calcHighlights(matches);
     setEl('hl-streak', hi.maxStreak);
     setEl('hl-cs', hi.cs);
-    setEl('hl-bigwin', hi.bigWin ? `${hi.bigWin.gf}–${hi.bigWin.ga} נגד ${hi.bigWin.opponent}` : '—');
+    const bigwinEl = document.getElementById('hl-bigwin');
+    if (bigwinEl) {
+      bigwinEl.innerHTML = hi.bigWin
+        ? `<span dir="ltr">${hi.bigWin.gf}-${hi.bigWin.ga}</span> נגד ${hi.bigWin.opponent}`
+        : '—';
+    }
     buildLeagueTable(leagueTable);
     const sec = document.getElementById('res-stats-section');
     if (sec) sec.classList.add('visible');
@@ -1655,7 +1675,7 @@ function populateShareCard() {
   document.getElementById('sc-l').textContent = r.losses;
   document.getElementById('sc-pts-text').textContent = `${pts} נקודות`;
   const tierEl = document.getElementById('sc-tier-text');
-  tierEl.textContent = t.name;
+  tierEl.textContent = tierDisplay(t).name;
   tierEl.style.color = t.color;
 
   // Player lineup (2-column grid)
@@ -1705,8 +1725,8 @@ function generateShareText() {
   return [
     `🇮🇱 36–0 | ליגת העל`,
     `מערך: ${formation} | דירוג: ${r.ovr}`,
-    `${r.wins}נ–${r.draws}ת–${r.losses}ה | ${pts} נקודות`,
-    t.name,
+    `${r.wins}נ-${r.draws}ת-${r.losses}ה | ${pts} נקודות`,
+    tierDisplay(t).name,
     grid,
     `36-0.app`,
   ].join('\n');
