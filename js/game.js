@@ -1705,7 +1705,7 @@ function populateShareCard() {
     const ps = window._lastPlayerStats;
     const top = [...ps].sort((a, b) => b.goals - a.goals)[0];
     const pots = [...ps].sort((a, b) => (b.goals + b.assists) - (a.goals + a.assists))[0];
-    if (top) awardsEl.innerHTML += `<div class="sc-award-line">⚽ <b>מלך השערים:</b> ${toplayerShortName(p.name)} (${top.goals} שע׳)</div>`;
+    if (top) awardsEl.innerHTML += `<div class="sc-award-line">⚽ <b>מלך השערים:</b> ${playerShortName(top.name)} (${top.goals} שע׳)</div>`;
     if (pots) awardsEl.innerHTML += `<div class="sc-award-line">🏅 <b>שחקן העונה:</b> ${playerShortName(pots.name)} (${pots.goals}+${pots.assists})</div>`;
   }
 
