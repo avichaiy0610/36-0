@@ -1,5 +1,6 @@
 /* ── Reset & Base ─────────────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+button, input, textarea, select { font-family: inherit; }
 
 :root {
   --bg:       #0d1117;
@@ -24,7 +25,7 @@ body {
   height: 100%;
   background: var(--bg);
   color: var(--text);
-  font-family: Arial, 'Arial Hebrew', 'Segoe UI', sans-serif;
+  font-family: 'Heebo', Arial, 'Arial Hebrew', sans-serif;
   direction: rtl;
   overflow: hidden;
   -webkit-text-size-adjust: 100%;
@@ -1117,7 +1118,7 @@ body {
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 16px 14px;
-  font-family: Arial, 'Arial Hebrew', 'Segoe UI', sans-serif;
+  font-family: 'Heebo', Arial, 'Arial Hebrew', sans-serif;
 }
 .sc-header { text-align: center; margin-bottom: 8px; }
 .sc-logo {
