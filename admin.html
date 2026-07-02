@@ -4,110 +4,136 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="robots" content="noindex, nofollow">
-  <title>36-0 · ניהול</title>
+  <title>36-0 · ניהול טקסטים</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { background: #0d1117; color: #e6edf3; font-family: 'Segoe UI', Arial, sans-serif; direction: rtl; padding: 24px 16px 60px; }
-    .wrap { max-width: 860px; margin: 0 auto; }
+    body { background: #0d1117; color: #e6edf3; font-family: 'Segoe UI', Arial, sans-serif; direction: rtl; padding: 24px 16px 80px; }
+    .wrap { max-width: 780px; margin: 0 auto; }
     h1 { font-size: 22px; margin-bottom: 4px; color: #FFD700; }
     .sub { color: #8b949e; font-size: 13px; margin-bottom: 20px; }
-    .note { background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 14px; margin-bottom: 16px; font-size: 13px; color: #8b949e; line-height: 1.6; }
-    .row { display: grid; grid-template-columns: 130px 1fr 1fr 70px; gap: 8px; margin-bottom: 8px; align-items: start; }
-    .row input, .row textarea { width: 100%; background: #21262d; border: 1px solid #30363d; color: #e6edf3; border-radius: 8px; padding: 8px; font-family: inherit; font-size: 13px; }
-    .row textarea { resize: vertical; min-height: 36px; }
-    .head { font-size: 11px; color: #8b949e; letter-spacing: 1px; }
-    button { background: #FFD700; color: #000; border: none; border-radius: 8px; padding: 9px 18px; font-weight: 700; cursor: pointer; font-family: inherit; }
-    button.ghost { background: #21262d; color: #e6edf3; border: 1px solid #30363d; }
-    button.danger { background: #3d1418; color: #f85149; border: 1px solid #f8514940; }
-    .toolbar { display: flex; gap: 8px; margin: 16px 0; }
-    #status { font-size: 13px; margin-top: 12px; min-height: 18px; }
+    h2 { font-size: 15px; color: #FFD700; margin: 26px 0 10px; border-bottom: 1px solid #30363d; padding-bottom: 6px; }
+    .item { display: grid; grid-template-columns: 210px 1fr 34px; gap: 10px; align-items: center; margin-bottom: 7px; }
+    .item label { font-size: 12.5px; color: #8b949e; }
+    .item input { width: 100%; background: #21262d; border: 1px solid #30363d; color: #e6edf3; border-radius: 8px; padding: 8px 10px; font-family: inherit; font-size: 14px; }
+    .item input.changed { border-color: #FFD700; }
+    .item input.overridden { border-color: #4CAF50; }
+    .reset { background: none; border: none; color: #8b949e; cursor: pointer; font-size: 15px; }
+    .reset:hover { color: #f85149; }
+    #savebar { position: fixed; bottom: 0; left: 0; right: 0; background: #161b22; border-top: 1px solid #30363d; padding: 12px 16px; display: flex; gap: 12px; align-items: center; justify-content: center; }
+    #savebar button { background: #FFD700; color: #000; border: none; border-radius: 8px; padding: 10px 28px; font-weight: 700; cursor: pointer; font-size: 15px; font-family: inherit; }
+    #status { font-size: 13px; min-height: 18px; }
     #status.ok { color: #4CAF50; } #status.err { color: #f85149; }
     #login-box { text-align: center; padding: 60px 0; }
-    a { color: #58a6ff; }
+    #login-box button { background: #FFD700; color: #000; border: none; border-radius: 8px; padding: 10px 24px; font-weight: 700; cursor: pointer; font-family: inherit; }
+    .legend { font-size: 12px; color: #8b949e; margin-bottom: 6px; }
+    .legend b.g { color: #4CAF50; } .legend b.y { color: #FFD700; }
+    @media (max-width: 600px) { .item { grid-template-columns: 1fr; gap: 3px; } .item .reset { justify-self: start; } }
   </style>
 </head>
 <body>
 <div class="wrap">
   <h1>⚙️ ניהול טקסטים — 36-0</h1>
-  <div class="sub">שינויים כאן מוחלים על האתר לכל הגולשים אחרי רענון. הכתיבה מוגנת ב-RLS — רק חשבון המנהל יכול לשמור.</div>
+  <div class="sub">כל טקסט באתר מופיע כאן עם הערך הנוכחי שלו. ערוך ולחץ שמור — השינוי חל על כל הגולשים אחרי רענון. הכתיבה מוגנת ב-RLS: רק חשבון המנהל יכול לשמור.</div>
 
   <div id="login-box">
-    <p style="margin-bottom:16px">צריך להתחבר עם חשבון המנהל</p>
+    <p style="margin-bottom:16px">צריך להתחבר עם חשבון המנהל (ההתחברות נעשית באתר הרגיל)</p>
     <button onclick="location.href='index.html'">לך לאתר והתחבר שם ←</button>
   </div>
 
   <div id="editor" style="display:none">
-    <div class="note">
-      כל שורה: <b>key</b> — מזהה חופשי שלך; <b>selector</b> — סלקטור CSS של האלמנט באתר
-      (למשל <code dir="ltr">#btn-start</code> לכפתור "שחק עכשיו", <code dir="ltr">.welcome-tagline</code> לכותרת,
-      <code dir="ltr">.era-note</code> להערת העידן); <b>טקסט</b> — מה שיוצג.
-      אפשר למצוא סלקטור בקלות: קליק ימני על אלמנט באתר → Inspect → העתק id/class.
-    </div>
-    <div class="row head"><span>key</span><span>selector</span><span>טקסט</span><span></span></div>
-    <div id="rows"></div>
-    <div class="toolbar">
-      <button class="ghost" id="btn-add">+ שורה חדשה</button>
-      <button id="btn-save">💾 שמור הכול</button>
-    </div>
-    <div id="status"></div>
+    <div class="legend">מסגרת <b class="y">צהובה</b> = שינוי שלא נשמר · מסגרת <b class="g">ירוקה</b> = טקסט שכבר דרסת בעבר · 🗑 מחזיר לברירת המחדל</div>
+    <div id="groups"></div>
   </div>
+</div>
+<div id="savebar" style="display:none">
+  <button id="btn-save">💾 שמור שינויים</button>
+  <span id="status"></span>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js"></script>
 <script src="js/supabase-client.js"></script>
+<script src="js/text-catalog.js"></script>
 <script>
-const rowsEl = document.getElementById('rows');
 const statusEl = document.getElementById('status');
-
-function addRow(r = { key: '', selector: '', value: '' }) {
-  const div = document.createElement('div');
-  div.className = 'row';
-  div.innerHTML = `
-    <input class="f-key" value="${r.key.replace(/"/g, '&quot;')}" placeholder="welcome-title">
-    <input class="f-sel" dir="ltr" value="${r.selector.replace(/"/g, '&quot;')}" placeholder="#btn-start">
-    <textarea class="f-val" placeholder="הטקסט שיוצג">${r.value}</textarea>
-    <button class="danger" title="מחק">🗑</button>
-  `;
-  div.querySelector('.danger').onclick = async () => {
-    if (r.key) {
-      const { error } = await _supabase.from('site_texts').delete().eq('key', r.key);
-      if (error) { setStatus('מחיקה נכשלה: ' + error.message, false); return; }
-    }
-    div.remove();
-    setStatus('נמחק ✓', true);
-  };
-  rowsEl.appendChild(div);
-}
+let overrides = {};   // key -> value currently stored in site_texts
 
 function setStatus(msg, ok) {
   statusEl.textContent = msg;
   statusEl.className = ok ? 'ok' : 'err';
 }
 
+function render() {
+  const groups = document.getElementById('groups');
+  groups.innerHTML = '';
+  const byScreen = {};
+  TEXT_CATALOG.forEach(e => (byScreen[e.screen] = byScreen[e.screen] || []).push(e));
+  for (const [screen, items] of Object.entries(byScreen)) {
+    const h = document.createElement('h2');
+    h.textContent = screen;
+    groups.appendChild(h);
+    items.forEach(e => {
+      const div = document.createElement('div');
+      div.className = 'item';
+      const overridden = e.key in overrides;
+      div.innerHTML = `
+        <label>${e.label}</label>
+        <input data-key="${e.key}" value="">
+        <button class="reset" title="חזרה לברירת המחדל">🗑</button>
+      `;
+      const inp = div.querySelector('input');
+      inp.value = overridden ? overrides[e.key] : e.def;
+      if (overridden) inp.classList.add('overridden');
+      inp.addEventListener('input', () => {
+        inp.classList.toggle('changed', inp.value !== (overridden ? overrides[e.key] : e.def));
+      });
+      div.querySelector('.reset').onclick = async () => {
+        if (e.key in overrides) {
+          const { error } = await _supabase.from('site_texts').delete().eq('key', e.key);
+          if (error) { setStatus('מחיקה נכשלה: ' + error.message, false); return; }
+          delete overrides[e.key];
+          setStatus('הוחזר לברירת מחדל ✓', true);
+        }
+        inp.value = e.def;
+        inp.classList.remove('changed', 'overridden');
+      };
+      groups.appendChild(div);
+    });
+  }
+}
+
 async function saveAll() {
-  const rows = [...rowsEl.querySelectorAll('.row')].map(div => ({
-    key: div.querySelector('.f-key').value.trim(),
-    selector: div.querySelector('.f-sel').value.trim(),
-    value: div.querySelector('.f-val').value,
-    updated_at: new Date().toISOString(),
-  })).filter(r => r.key && r.selector);
-  if (!rows.length) { setStatus('אין שורות תקינות לשמירה', false); return; }
-  const { error } = await _supabase.from('site_texts').upsert(rows);
-  if (error) setStatus('שמירה נכשלה: ' + error.message + ' (אם זו שגיאת RLS — אתה לא מחובר עם חשבון המנהל)', false);
-  else setStatus('נשמר ✓ — רענן את האתר כדי לראות', true);
+  const ups = [];
+  document.querySelectorAll('#groups input[data-key]').forEach(inp => {
+    const key = inp.dataset.key;
+    const e = TEXT_CATALOG.find(x => x.key === key);
+    const stored = key in overrides ? overrides[key] : null;
+    const val = inp.value;
+    if (val === (stored ?? e.def)) return;           // unchanged
+    if (val === e.def && stored === null) return;    // still default
+    ups.push({ key, selector: e.selector, value: val, updated_at: new Date().toISOString() });
+  });
+  if (!ups.length) { setStatus('אין שינויים לשמירה', true); return; }
+  const { error } = await _supabase.from('site_texts').upsert(ups);
+  if (error) {
+    setStatus('שמירה נכשלה: ' + error.message + (error.code === '42501' ? ' — אתה לא מחובר עם חשבון המנהל' : ''), false);
+    return;
+  }
+  ups.forEach(u => { overrides[u.key] = u.value; });
+  render();
+  setStatus('נשמרו ' + ups.length + ' שינויים ✓ — רענן את האתר כדי לראות', true);
 }
 
 async function init() {
   const { data: { session } } = await _supabase.auth.getSession();
-  if (!session) return; // stay on login box
+  if (!session) return;
   document.getElementById('login-box').style.display = 'none';
   document.getElementById('editor').style.display = 'block';
-  const { data, error } = await _supabase.from('site_texts').select('*').order('key');
-  if (error) { setStatus('טעינת הטבלה נכשלה: ' + error.message + ' — ודא שהרצת את המיגרציה', false); }
-  (data ?? []).forEach(addRow);
-  if (!data?.length) addRow();
-  document.getElementById('btn-add').onclick = () => addRow();
+  document.getElementById('savebar').style.display = 'flex';
+  const { data, error } = await _supabase.from('site_texts').select('key, value');
+  if (error) setStatus('טעינה נכשלה: ' + error.message, false);
+  (data ?? []).forEach(r => { overrides[r.key] = r.value; });
+  render();
   document.getElementById('btn-save').onclick = saveAll;
 }
 init();
