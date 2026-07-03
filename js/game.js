@@ -312,6 +312,9 @@ function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   const el = document.getElementById('screen-' + id);
   if (el) { el.classList.add('active'); el.scrollTop = 0; }
+  // on mobile the screens scroll as page flow, so reset the window too
+  // (otherwise the results screen opens scrolled to the bottom)
+  window.scrollTo(0, 0);
   // pitches built while their screen was hidden couldn't be measured
   requestAnimationFrame(() => fitShortNames());
 }
@@ -468,6 +471,9 @@ function beginDraft() {
   if (banner) banner.style.display = state.peakMode ? 'block' : 'none';
   const ovrDisp = document.getElementById('draft-ovr-display');
   if (ovrDisp) ovrDisp.style.display = 'none';
+  // clear any leftover strength bars from a previous draft
+  const ovrLines = document.getElementById('draft-ovr-lines');
+  if (ovrLines) { ovrLines.innerHTML = ''; ovrLines.style.display = 'none'; }
 
   buildPitch('pitch-slots', true);
   showScreen('draft');
@@ -935,7 +941,9 @@ function renderSquadPlayers(squad, filterSlotIdx = null) {
     const dispOVR = playerOVR(player);
     const peakTag = state.peakMode && player.peak_ovr && player.peak_ovr > player.ovr ? '⚡' : '';
     const ovrHTML = state.showRatings ? `<span class="pc-ovr" dir="ltr">${peakTag}${dispOVR}</span>` : '';
-    const fits = [...new Set(playerPositions(player).flatMap(p => [...(PLAYER_FITS[p] ?? [p])]))];
+    // Show the player's OWN positions (primary + secondaries from the data),
+    // not every slot he could be squeezed into via the compatibility rules.
+    const fits = playerPositions(player);
     const posLabel = fits.map(p => POS_HE[p] ?? p).join(' | ');
     const posShort = fits.join(' | ');
     card.innerHTML = `
@@ -1079,6 +1087,8 @@ function rerollTeam() {
 
   const currentTeamId = state.currentSquad?.teamId;
   const currentSeason = state.currentSquad?.season;
+  // A player selected from the OLD squad must not carry over to the new one
+  cancelPendingSelection();
   const era = getEraFilteredSquads();
 
   let pool = era.filter(sq => sq.teamId !== currentTeamId && sq.season === currentSeason && !state.usedSquadIds.has(sq.id));
@@ -1104,6 +1114,8 @@ function rerollSeason() {
   const sameTeam = era.filter(sq => sq.teamId === currentTeamId && sq.id !== state.currentSquad?.id);
   if (sameTeam.length === 0) { setHint('⚠ אין עונות נוספות לקבוצה זו בטווח הנבחר'); return; }
 
+  // A player selected from the OLD season must not carry over to the new one
+  cancelPendingSelection();
   state.seasonRerollsLeft--; updateRerollButtons();
   const newSquad = sameTeam[rand(0, sameTeam.length - 1)];
   state.usedSquadIds.add(newSquad.id); state.currentSquad = newSquad;
@@ -1114,6 +1126,16 @@ function rerollSeason() {
     renderSquadPlayers(newSquad, filterSlot);
     setHint(filterSlot !== null ? `בחר שחקן עבור: ${state.slots[filterSlot].label}` : 'בחר שחקן מהרשימה');
   });
+}
+
+// Drop a half-made pick (player selected but not yet placed) and clear its UI —
+// used before a reroll so a player from the old squad can't be assigned to the new one.
+function cancelPendingSelection() {
+  if (state.moveMode) { state.moveMode = false; updateMoveButton(); }
+  state.selectedPlayer = null;
+  state.movingFromIdx = null;
+  if (state.draftMode !== 'pos-first') state.selectedSlotIdx = null;
+  clearAllHighlights();
 }
 
 function updateRerollButtons() {
@@ -1732,11 +1754,11 @@ function renderSeasonStory(r) {
   const callouts = [];
   if (byGoals && byGoals.goals > 0) {
     callouts.push(fillTemplate(st('story-scorer-tmpl', '⚽ {name} הוביל את המתקפה עם {goals} שערים — פשוט לא הפסיק לכבוש.'),
-      { name: playerShortName(byGoals.name), goals: byGoals.goals }));
+      { name: byGoals.name, goals: byGoals.goals }));
   }
   if (byAssists && byAssists.assists > 0 && byAssists.name !== byGoals?.name) {
     callouts.push(fillTemplate(st('story-assist-tmpl', '🎯 {name} חילק את המשחק עם {assists} בישולים.'),
-      { name: playerShortName(byAssists.name), assists: byAssists.assists }));
+      { name: byAssists.name, assists: byAssists.assists }));
   }
   const coEl = document.getElementById('res-narrative-callouts');
   coEl.innerHTML = '';

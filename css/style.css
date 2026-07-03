@@ -703,10 +703,16 @@ body {
 }
 
 /* ── Responsive ───────────────────────────────────────────────────────────── */
+/* Narrow landscape phones/tablets keep the side-by-side layout but the fixed
+   340px panel + pitch overflow — shrink the panel so everything fits width. */
+@media (min-width: 701px) and (max-width: 950px) {
+  .side-panel { width: 280px; }
+}
+
 @media (max-width: 700px) {
   /* Allow page scroll on mobile — desktop uses overflow:hidden to prevent
      the viewport from bouncing, but mobile needs the full-page scroll */
-  html, body { overflow: visible; height: auto; min-height: 100%; }
+  html, body { overflow-x: hidden; overflow-y: visible; height: auto; min-height: 100%; }
 
   /* ── Base touch targets ── */
   button { min-height: 44px; }
@@ -762,21 +768,23 @@ body {
     overflow: visible !important;
   }
   /* pitch-container normally uses flex:1 which collapses when unstacked;
-     give it an explicit height on mobile instead */
+     give it an explicit PORTRAIT height on mobile (taller than wide) so the
+     formation isn't vertically squished */
   .pitch-container {
     flex: none !important;
     width: 100% !important;
-    height: 75vw !important;
-    min-height: 200px !important;
+    height: 132vw !important;
+    max-height: 560px !important;
+    min-height: 380px !important;
   }
 
-  /* Smaller pitch slot tokens on mobile */
+  /* Pitch slot tokens on mobile */
   .slot-circle {
-    width: 30px !important;
-    height: 30px !important;
+    width: 34px !important;
+    height: 34px !important;
   }
-  .slot-pos-label { font-size: 6px !important; }
-  .slot-name-label { font-size: 7px !important; max-width: 64px !important; }
+  .slot-pos-label { font-size: 7px !important; }
+  .slot-name-label { font-size: 8px !important; max-width: 72px !important; }
 
   /* ── Setup screen ── */
   .formation-grid { grid-template-columns: repeat(2, 1fr); }
