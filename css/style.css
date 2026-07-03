@@ -59,6 +59,17 @@ body {
 }
 .welcome-inner { text-align: center; max-width: 420px; }
 
+.site-disclaimer {
+  max-width: 620px;
+  margin: 40px auto 0;
+  padding: 16px 20px 0;
+  border-top: 1px solid var(--border);
+  text-align: center;
+}
+.site-disclaimer p { font-size: 11px; line-height: 1.7; color: #5a6472; margin-bottom: 8px; }
+.site-disclaimer a { color: var(--dim); text-decoration: underline; }
+.site-disclaimer a:hover { color: var(--accent); }
+
 .logo {
   font-size: clamp(72px, 16vw, 130px);
   font-weight: 900;

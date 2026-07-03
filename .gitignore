@@ -10,3 +10,6 @@ low_peak_players.json
 clubs.json
 .vscode/
 supabase/.temp/
+
+# DB backups (local only)
+backups/

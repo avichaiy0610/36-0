@@ -1,5 +1,13 @@
 let lbTab    = 'ovr';
 let lbPeriod = 'all';
+
+// Escape user-controlled strings before inserting into innerHTML (usernames and
+// stored squad data are attacker-controllable — prevents stored XSS).
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+  ));
+}
 let lbMode   = 'all';   // all | season | peak
 
 async function showLeaderboard() {
@@ -95,10 +103,10 @@ async function loadLeaderboard() {
     tr.className = 'lb-row';
     tr.innerHTML = `
       <span class="lb-rank ${rank <= 3 ? 'lb-rank-top' : ''}">${rank}</span>
-      <span class="lb-name">${username}</span>
-      <span class="lb-stat">${mainStat}</span>
-      <span class="lb-sub">${subStat}</span>
-      <button class="lb-view-btn" data-id="${row.id}" data-user="${username}">הרכב</button>
+      <span class="lb-name">${esc(username)}</span>
+      <span class="lb-stat">${esc(mainStat)}</span>
+      <span class="lb-sub">${esc(subStat)}</span>
+      <button class="lb-view-btn" data-id="${esc(row.id)}" data-user="${esc(username)}">הרכב</button>
     `;
     tr.querySelector('.lb-view-btn').addEventListener('click', e => {
       openSquadModal(e.target.dataset.id, e.target.dataset.user);
@@ -127,9 +135,9 @@ async function openSquadModal(resultId, username) {
       const item = document.createElement('div');
       item.className = 'squad-player-item';
       item.innerHTML = `
-        <span class="sq-pos">${p.pos}</span>
-        <span class="sq-name">${p.name}</span>
-        <span class="sq-ovr">${p.ovr}</span>
+        <span class="sq-pos">${esc(p.pos)}</span>
+        <span class="sq-name">${esc(p.name)}</span>
+        <span class="sq-ovr">${esc(p.ovr)}</span>
       `;
       list.appendChild(item);
     });

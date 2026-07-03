@@ -95,8 +95,13 @@ async function saveUsername() {
   if (!currentUser) return;
   const username = document.getElementById('username-input').value.trim();
   const errEl    = document.getElementById('username-error');
-  if (username.length < 2) {
-    errEl.textContent = 'שם חייב להכיל לפחות 2 תווים';
+  if (username.length < 2 || username.length > 20) {
+    errEl.textContent = 'שם חייב להכיל בין 2 ל-20 תווים';
+    errEl.style.display = 'block';
+    return;
+  }
+  if (/[<>]/.test(username)) {
+    errEl.textContent = 'השם מכיל תווים לא חוקיים';
     errEl.style.display = 'block';
     return;
   }

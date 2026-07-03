@@ -4,6 +4,24 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>36–0 | ליגת העל</title>
+  <meta name="description" content="בנה את הרכב החלומות בליגת העל הישראלית בכל הזמנים. 11 שחקנים, 36 משחקים — האם תצליח לסיים עונה מושלמת 36-0?" />
+
+  <!-- Favicon (drop your logo at these paths in the project root) -->
+  <link rel="icon" type="image/png" href="/icon.png" />
+  <link rel="apple-touch-icon" href="/icon.png" />
+
+  <!-- Open Graph / social preview (WhatsApp, X, Facebook...) -->
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="36–0" />
+  <meta property="og:title" content="36–0 | ליגת העל הישראלית" />
+  <meta property="og:description" content="בנה את הרכב החלומות בליגת העל בכל הזמנים. האם תצליח 36-0?" />
+  <meta property="og:image" content="https://36-0.vercel.app/og-image.png" />
+  <meta property="og:url" content="https://36-0.vercel.app/" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="36–0 | ליגת העל הישראלית" />
+  <meta name="twitter:description" content="בנה את הרכב החלומות בליגת העל בכל הזמנים. האם תצליח 36-0?" />
+  <meta name="twitter:image" content="https://36-0.vercel.app/og-image.png" />
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;700;800;900&display=swap" rel="stylesheet">
@@ -78,6 +96,18 @@
       </p>
       <button id="btn-start" class="btn-primary">שחק עכשיו ⚽</button>
     </div>
+    <footer class="site-disclaimer">
+      <p>
+        36-0 הוא אתר מעריצים עצמאי ולא-מסחרי, בהשראת
+        <a href="https://38-0.app" target="_blank" rel="noopener">38-0</a>.
+        האתר אינו מסונף, ממומן, מאושר או קשור בכל דרך לליגת העל, להתאחדות לכדורגל,
+        למועדונים כלשהם או לספקי דירוגים.
+      </p>
+      <p>
+        שמות המועדונים, שמות השחקנים, הדירוגים והנתונים משמשים למטרות מידע ובידור בלבד.
+        אין שימוש בלוגואים, סמלים או תמונות רשמיים. כל הסימנים המסחריים והזכויות שמורים לבעליהם.
+      </p>
+    </footer>
   </div>
 
   <!-- ══ SETUP ════════════════════════════════════════════════════════════════ -->
@@ -549,6 +579,7 @@
   <script defer src="/_vercel/insights/script.js"></script>
   <script src="js/config.js"></script>
   <script src="js/supabase-client.js"></script>
+  <script src="js/errorlog.js"></script>
   <script src="js/texts.js"></script>
   <script src="js/auth.js"></script>
   <script src="js/achievements.js"></script>
