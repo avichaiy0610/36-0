@@ -614,6 +614,25 @@ body {
   flex-shrink: 0;
 }
 .mr-main { display: flex; align-items: center; gap: 8px; }
+
+/* Skip-reveal button */
+.btn-skip-matches {
+  align-self: flex-start;
+  margin-bottom: 8px;
+  padding: 6px 16px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--dim);
+  border-radius: 50px;
+  font-size: 12px; font-weight: 700; cursor: pointer;
+}
+.btn-skip-matches:hover { color: var(--accent); border-color: var(--accent2); }
+
+/* Placement popup */
+.placement-box { max-width: 340px; text-align: center; animation: cellPop .3s ease both; }
+.placement-tier { font-size: 30px; font-weight: 900; line-height: 1.1; margin-bottom: 6px; }
+.placement-sub  { font-size: 14px; color: var(--dim); margin-bottom: 12px; }
+.placement-rank { font-size: 15px; font-weight: 800; color: var(--text); margin-bottom: 18px; }
 .match-row.win  { border-color: #2a5c2a; }
 .match-row.draw { border-color: #5c4a00; }
 .match-row.loss { border-color: #5c1a1a; }

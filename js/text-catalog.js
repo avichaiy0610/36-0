@@ -1078,5 +1078,19 @@ const TEXT_CATALOG = [
   "label": "הערת מלך בישולים (עם {name} ו-{assists})",
   "selector": "virtual",
   "def": "🎯 {name} חילק את המשחק עם {assists} בישולים."
+ },
+ {
+  "key": "btn-skip",
+  "screen": "מסך תוצאות",
+  "label": "כפתור: דלג על חשיפת המשחקים",
+  "selector": "[data-txt=\"btn-skip\"]",
+  "def": "דלג ⏩"
+ },
+ {
+  "key": "placement-close",
+  "screen": "סיכום עונה (מסך תוצאות)",
+  "label": "כפתור סגירת פופ-אפ המקום",
+  "selector": "virtual",
+  "def": "לצפייה בתוצאות ←"
  }
 ];

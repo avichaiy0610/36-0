@@ -1554,6 +1554,7 @@ function animateResults(ovr) {
   // so refreshing cannot re-roll a different outcome for the same squad.
   let season = window._restoredSeason ?? null;
   window._restoredSeason = null;
+  const seasonWasRestored = !!season;  // refresh → skip the match-by-match suspense
   if (!season) {
     const g = generateMatches(ovr);
     let w = 0, d = 0;
@@ -1587,19 +1588,13 @@ function animateResults(ovr) {
     else losses++;
     gfTotal += m.gf; gaTotal += m.ga;
   });
+  const myRank = leagueTable.findIndex(t => t.us) + 1;
 
-  matches.forEach((m, idx) => {
-    if (idx === 26) {
-      const sep = document.createElement('div');
-      sep.className = 'playoff-separator';
-      sep.textContent = inTopSix ? '── 🏆 פלייאוף עליון ──' : '── פלייאוף תחתון ──';
-      grid.appendChild(sep);
-    }
+  function makeMatchRow(m) {
     const rc = m.outcome==='W' ? 'win' : m.outcome==='D' ? 'draw' : 'loss';
     const rl = m.outcome==='W' ? 'נ' : m.outcome==='D' ? 'ת' : 'ה';
     const row = document.createElement('div');
     row.className = `match-row ${rc}`;
-    row.style.animationDelay = `${idx * 30}ms`;
     const scorers = (m.scorers?.length)
       ? `<div class="mr-scorers">⚽ ${m.scorers.map(s => `${s.n} ${s.min}'`).join(' · ')}</div>`
       : '';
@@ -1611,22 +1606,20 @@ function animateResults(ovr) {
       </div>
       ${scorers}
     `;
-    grid.appendChild(row);
-  });
+    return row;
+  }
+  function separatorRow() {
+    const sep = document.createElement('div');
+    sep.className = 'playoff-separator';
+    sep.textContent = inTopSix ? '── 🏆 פלייאוף עליון ──' : '── פלייאוף תחתון ──';
+    return sep;
+  }
 
-  countUp('res-wins',   wins,   200);
-  countUp('res-draws',  draws,  600);
-  countUp('res-losses', losses, 1000);
+  // Fills the summary cards, stats and story once all matches are on screen.
+  function finalizeResults() {
+    setEl('res-wins', wins); setEl('res-draws', draws); setEl('res-losses', losses);
+    setEl('res-points', wins*3+draws); setEl('res-gf', gfTotal); setEl('res-ga', gaTotal);
 
-  setTimeout(() => {
-    setEl('res-points', wins*3+draws);
-    setEl('res-gf', gfTotal);
-    setEl('res-ga', gaTotal);
-  }, 1200);
-
-  const myRank = leagueTable.findIndex(t => t.us) + 1;
-
-  setTimeout(() => {
     const tier = getTier(wins, draws, losses, myRank, leagueTable.length, totalGames);
     const td = tierDisplay(tier);
     setEl('res-tier', td.name, tier.color);
@@ -1645,15 +1638,11 @@ function animateResults(ovr) {
     const modeInfoEl = document.getElementById('res-mode-info');
     if (modeInfoEl) modeInfoEl.textContent = modeParts.join(' · ');
     setupSaveSection();
-  }, 1600);
 
-  // Build detailed stats after animations settle
-  setTimeout(() => {
     buildOVRCard(ovr);
-    const ps = playerStats;
-    window._lastPlayerStats = ps;
-    buildAwards(ps);
-    buildPlayerStatsTable(ps);
+    window._lastPlayerStats = playerStats;
+    buildAwards(playerStats);
+    buildPlayerStatsTable(playerStats);
     const hi = calcHighlights(matches);
     setEl('hl-streak', hi.maxStreak);
     setEl('hl-cs', hi.cs);
@@ -1665,10 +1654,78 @@ function animateResults(ovr) {
     }
     buildLeagueTable(leagueTable);
     renderSeasonStory({ wins, draws, losses, gfTotal, gaTotal, ovr, myRank,
-                        projectedFinish: season.projectedFinish, ps, tier: getTier(wins, draws, losses, myRank, leagueTable.length, totalGames) });
+                        projectedFinish: season.projectedFinish, ps: playerStats, tier });
     const sec = document.getElementById('res-stats-section');
     if (sec) sec.classList.add('visible');
-  }, 2200);
+    return tier;
+  }
+
+  // ── Restored season (page refresh): render everything instantly, no suspense ──
+  if (seasonWasRestored) {
+    matches.forEach((m, idx) => {
+      if (idx === 26) grid.appendChild(separatorRow());
+      grid.appendChild(makeMatchRow(m));
+    });
+    finalizeResults();
+    return;
+  }
+
+  // ── Fresh simulation: reveal matches one by one with a running tally + skip ──
+  let rw = 0, rd = 0, rl = 0;
+  document.querySelectorAll('#res-wins,#res-draws,#res-losses').forEach(e => e.textContent = '0');
+  const skipBtn = document.getElementById('btn-skip-matches');
+  if (skipBtn) skipBtn.style.display = 'block';
+
+  let idx = 0, timer = null;
+  function revealOne() {
+    if (idx === 26) grid.appendChild(separatorRow());
+    const m = matches[idx];
+    grid.appendChild(makeMatchRow(m));
+    if (m.outcome === 'W') rw++; else if (m.outcome === 'D') rd++; else rl++;
+    setEl('res-wins', rw); setEl('res-draws', rd); setEl('res-losses', rl);
+    grid.scrollTop = grid.scrollHeight;
+    idx++;
+    if (idx < matches.length) timer = setTimeout(revealOne, 130);
+    else endReveal();
+  }
+  function endReveal() {
+    clearTimeout(timer);
+    // append any not-yet-shown matches (skip path)
+    for (; idx < matches.length; idx++) {
+      if (idx === 26) grid.appendChild(separatorRow());
+      grid.appendChild(makeMatchRow(matches[idx]));
+    }
+    if (skipBtn) skipBtn.style.display = 'none';
+    const tier = finalizeResults();
+    setTimeout(() => showPlacementPopup(tier, myRank), 400);
+  }
+  if (skipBtn) skipBtn.onclick = endReveal;
+  timer = setTimeout(revealOne, 200);
+}
+
+// Popup announcing where the season finished (shown after the reveal)
+function showPlacementPopup(tier, rank) {
+  const td = tierDisplay(tier);
+  let modal = document.getElementById('placement-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'placement-modal';
+    modal.className = 'modal-overlay';
+    modal.innerHTML = `
+      <div class="modal-box placement-box">
+        <div class="placement-tier" id="placement-tier"></div>
+        <div class="placement-sub" id="placement-sub"></div>
+        <div class="placement-rank" id="placement-rank"></div>
+        <button class="btn-primary btn-full" id="placement-close">${siteText('placement-close', 'לצפייה בתוצאות ←')}</button>
+      </div>`;
+    document.body.appendChild(modal);
+  }
+  const tEl = modal.querySelector('#placement-tier');
+  tEl.textContent = td.name; tEl.style.color = tier.color;
+  modal.querySelector('#placement-sub').textContent = td.sub;
+  modal.querySelector('#placement-rank').textContent = placeLabel(rank);
+  modal.querySelector('#placement-close').onclick = () => { modal.style.display = 'none'; };
+  modal.style.display = 'flex';
 }
 
 // ─── Season story: qualitative summary, projected-vs-actual, narrative recap ────
