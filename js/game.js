@@ -1213,14 +1213,19 @@ function simulatePlayerStats(matches) {
     .filter(Boolean);
 
   matches.forEach(m => {
+    m.scorers = [];  // record who scored (for the per-match results line)
     for (let g = 0; g < m.gf; g++) {
       const si = pickWeightedIdx(players.map(p => GOAL_W[p.slotPos] ?? 0));
-      if (si >= 0) players[si].goals++;
+      if (si >= 0) {
+        players[si].goals++;
+        m.scorers.push({ n: playerShortName(players[si].name), min: rand(1, 90) });
+      }
       if (Math.random() > 0.15) {
         const ai = pickWeightedIdx(players.map((p,i) => i === si ? 0 : ASSIST_W[p.slotPos] ?? 0));
         if (ai >= 0) players[ai].assists++;
       }
     }
+    m.scorers.sort((a, b) => a.min - b.min);
     if (m.ga === 0) {
       players.forEach(p => { if (['GK','CB','RB','LB'].includes(p.slotPos)) p.cs++; });
     }
@@ -1454,6 +1459,7 @@ function showPreseason(ovr) {
 
   setTimeout(() => {
     const odds = calcPreseasonOdds(ovr);
+    window._preseasonProjected = odds.projectedFinish;  // reused by the results story
     document.getElementById('pre-finish').textContent = `מקום ${odds.projectedFinish}`;
     document.getElementById('pre-pts').textContent    = odds.expectedPoints;
 
@@ -1537,6 +1543,7 @@ function animateResults(ovr) {
       inTopSix: g.inTopSix,
       leagueTable: generateLeagueTable(w, d, l, g.inTopSix, g.champOpponents, g.relegOpponents),
       playerStats: simulatePlayerStats(g.matches),
+      projectedFinish: window._preseasonProjected ?? calcPreseasonOdds(ovr).projectedFinish,
     };
     saveSeasonState(season);
     // count every finished season (for the games_N achievements) — once per
@@ -1571,10 +1578,16 @@ function animateResults(ovr) {
     const row = document.createElement('div');
     row.className = `match-row ${rc}`;
     row.style.animationDelay = `${idx * 30}ms`;
+    const scorers = (m.scorers?.length)
+      ? `<div class="mr-scorers">⚽ ${m.scorers.map(s => `${s.n} ${s.min}'`).join(' · ')}</div>`
+      : '';
     row.innerHTML = `
-      <span class="mr-badge ${rc}">${rl}</span>
-      <span class="mr-opponent">${m.opponent} <span class="mr-venue">${m.home?'(ב)':'(ח)'}</span></span>
-      <span class="mr-score" dir="ltr">${m.gf}-${m.ga}</span>
+      <div class="mr-main">
+        <span class="mr-badge ${rc}">${rl}</span>
+        <span class="mr-opponent">${m.opponent} <span class="mr-venue">${m.home?'(ב)':'(ח)'}</span></span>
+        <span class="mr-score" dir="ltr">${m.gf}-${m.ga}</span>
+      </div>
+      ${scorers}
     `;
     grid.appendChild(row);
   });
@@ -1629,9 +1642,110 @@ function animateResults(ovr) {
         : '—';
     }
     buildLeagueTable(leagueTable);
+    renderSeasonStory({ wins, draws, losses, gfTotal, gaTotal, ovr, myRank,
+                        projectedFinish: season.projectedFinish, ps, tier: getTier(wins, draws, losses, myRank, leagueTable.length, totalGames) });
     const sec = document.getElementById('res-stats-section');
     if (sec) sec.classList.add('visible');
   }, 2200);
+}
+
+// ─── Season story: qualitative summary, projected-vs-actual, narrative recap ────
+// Ordinal place in Hebrew, e.g. 1 → "מקום 1"
+function placeLabel(n) { return `מקום ${n}`; }
+
+// Map a group OVR to an editable qualitative tier label + color
+function qualTier(val) {
+  if (val >= 88) return { key: 'qual-elite',   def: 'מעולה',  color: '#22c55e' };
+  if (val >= 84) return { key: 'qual-strong',  def: 'חזק',    color: '#4ade80' };
+  if (val >= 80) return { key: 'qual-good',    def: 'טוב',    color: '#eab308' };
+  if (val >= 76) return { key: 'qual-average', def: 'בינוני', color: '#f59e0b' };
+  return              { key: 'qual-weak',    def: 'חלש',    color: '#ef4444' };
+}
+
+// Fill {placeholders} in an editable template string
+function fillTemplate(str, vars) {
+  return String(str).replace(/\{(\w+)\}/g, (_, k) => (k in vars ? vars[k] : '{' + k + '}'));
+}
+
+function renderSeasonStory(r) {
+  const st = typeof siteText === 'function' ? siteText : (_k, d) => d;
+
+  // 1) Projected vs actual
+  document.getElementById('res-finish').textContent    = placeLabel(r.myRank);
+  document.getElementById('res-projected').textContent = placeLabel(r.projectedFinish);
+  const vtile = document.getElementById('res-verdict-tile');
+  const vEl   = document.getElementById('res-verdict');
+  vtile.classList.remove('over', 'under', 'exact');
+  if (r.myRank < r.projectedFinish)      { vtile.classList.add('over');  vEl.textContent = st('verdict-over', 'מעל הציפיות 🔥'); }
+  else if (r.myRank > r.projectedFinish) { vtile.classList.add('under'); vEl.textContent = st('verdict-under', 'מתחת לציפיות'); }
+  else                                   { vtile.classList.add('exact'); vEl.textContent = st('verdict-exact', 'בדיוק כצפוי'); }
+
+  // 2) Qualitative strength chips
+  const cats = [
+    { key: 'qual-cat-atk', def: 'התקפה', pos: ATK_POS },
+    { key: 'qual-cat-mid', def: 'קישור', pos: MID_POS },
+    { key: 'qual-cat-def', def: 'הגנה',  pos: DEF_POS },
+    { key: 'qual-cat-gk',  def: 'שוער',  pos: ['GK'] },
+  ];
+  const rated = cats.map(c => ({ ...c, val: calcGroupOVR(c.pos) })).filter(c => c.val !== null);
+  const chipsEl = document.getElementById('res-qual-chips');
+  chipsEl.innerHTML = rated.map(c => {
+    const t = qualTier(c.val);
+    return `<div class="qual-chip"><span class="qc-cat">${st(c.key, c.def)}</span>`
+         + `<span class="qc-val" style="color:${t.color}">${st(t.key, t.def)}</span></div>`;
+  }).join('');
+  // one-line summary: strongest + weakest line
+  const best  = rated.reduce((a, b) => b.val > a.val ? b : a);
+  const worst = rated.reduce((a, b) => b.val < a.val ? b : a);
+  document.getElementById('res-qual-summary').textContent =
+    fillTemplate(st('qual-summary-tmpl', 'החוזק הגדול היה ה{best}, והחוליה החלשה — ה{worst}.'),
+      { best: st(best.key, best.def), worst: st(worst.key, worst.def) });
+
+  // 3) Narrative recap — template chosen by outcome
+  const pts = r.wins * 3 + r.draws;
+  const champ = r.myRank === 1;
+  const top6  = r.myRank <= 6;
+  let titleKey, bodyKey, titleDef, bodyDef;
+  if (r.wins === (r.wins + r.draws + r.losses)) { // perfect season
+    titleKey = 'story-perfect-title'; titleDef = 'מושלם. בלתי אפשרי הפך למציאות. 🏆';
+    bodyKey  = 'story-perfect-body';  bodyDef  = 'עונה בלי ולו נקודה אחת שאבדה. {wins} ניצחונות מתוך {wins}. אין על מה להתווכח — זו האלמותיות.';
+  } else if (champ) {
+    titleKey = 'story-champ-title'; titleDef = 'אלופים! 🏆';
+    bodyKey  = 'story-champ-body';  bodyDef  = 'הם המשיכו לדפוק בדלת, והפעם היא נפתחה. {pts} נקודות בקופה, {wins} ניצחונות, ואליפות שאף אחד לא יכול לקחת.';
+  } else if (top6) {
+    titleKey = 'story-top6-title'; titleDef = 'עונה גדולה 🥈';
+    bodyKey  = 'story-top6-body';  bodyDef  = 'מקום {rank} וכרטיס לפלייאוף האליפות. {pts} נקודות ועונה שכמעט נגעה בזהב — עד כמה זה היה קרוב?';
+  } else if (r.myRank <= 12) {
+    titleKey = 'story-mid-title'; titleDef = 'עונה של ביסוס';
+    bodyKey  = 'story-mid-body';  bodyDef  = 'מקום {rank}. לא הכל הלך חלק, אבל {wins} ניצחונות ו-{pts} נקודות מספרים על קבוצה עם אופי. יש על מה לבנות.';
+  } else {
+    titleKey = 'story-releg-title'; titleDef = 'עונה למחוק';
+    bodyKey  = 'story-releg-body';  bodyDef  = 'מקום {rank} וקרב הישרדות עד הסוף. {losses} הפסדים כואבים, אבל מכאן אפשר רק לעלות.';
+  }
+  const vars = { pts, wins: r.wins, draws: r.draws, losses: r.losses, rank: r.myRank, ovr: r.ovr };
+  document.getElementById('res-narrative-title').textContent = fillTemplate(st(titleKey, titleDef), vars);
+  document.getElementById('res-narrative-body').textContent  = fillTemplate(st(bodyKey, bodyDef), vars);
+
+  // player callouts: top scorer + top assister
+  const byGoals   = [...r.ps].sort((a, b) => b.goals - a.goals)[0];
+  const byAssists = [...r.ps].sort((a, b) => b.assists - a.assists)[0];
+  const callouts = [];
+  if (byGoals && byGoals.goals > 0) {
+    callouts.push(fillTemplate(st('story-scorer-tmpl', '⚽ {name} הוביל את המתקפה עם {goals} שערים — פשוט לא הפסיק לכבוש.'),
+      { name: playerShortName(byGoals.name), goals: byGoals.goals }));
+  }
+  if (byAssists && byAssists.assists > 0 && byAssists.name !== byGoals?.name) {
+    callouts.push(fillTemplate(st('story-assist-tmpl', '🎯 {name} חילק את המשחק עם {assists} בישולים.'),
+      { name: playerShortName(byAssists.name), assists: byAssists.assists }));
+  }
+  const coEl = document.getElementById('res-narrative-callouts');
+  coEl.innerHTML = '';
+  callouts.forEach(c => {
+    const div = document.createElement('div');
+    div.className = 'narrative-callout';
+    div.textContent = c;  // safe: no HTML injection from templates/data
+    coEl.appendChild(div);
+  });
 }
 
 // ─── Share modal ───────────────────────────────────────────────────────────────

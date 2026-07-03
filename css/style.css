@@ -603,8 +603,8 @@ body {
 
 .match-row {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  gap: 3px;
   padding: 7px 9px;
   border-radius: 6px;
   font-size: 12px;
@@ -613,6 +613,7 @@ body {
   animation: cellPop .2s ease both;
   flex-shrink: 0;
 }
+.mr-main { display: flex; align-items: center; gap: 8px; }
 .match-row.win  { border-color: #2a5c2a; }
 .match-row.draw { border-color: #5c4a00; }
 .match-row.loss { border-color: #5c1a1a; }
@@ -858,6 +859,50 @@ body {
   transition: opacity .5s, transform .5s;
 }
 .res-stats-section.visible { opacity: 1; transform: none; }
+
+/* ── Finished vs projected ─────────────────────────────────────────────────── */
+.proj-row { display: flex; gap: 8px; margin-bottom: 14px; }
+.proj-tile {
+  flex: 1; background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 10px; padding: 10px 6px; text-align: center;
+}
+.proj-lbl { font-size: 9px; letter-spacing: 1px; color: var(--dim); margin-bottom: 4px; }
+.proj-val { font-size: 20px; font-weight: 800; color: var(--text); }
+.proj-val.dim { color: var(--dim); }
+.proj-verdict { display: flex; align-items: center; justify-content: center; }
+.proj-verdict .proj-val { font-size: 13px; font-weight: 800; line-height: 1.2; }
+.proj-verdict.over  { border-color: #22c55e66; } .proj-verdict.over  .proj-val { color: #22c55e; }
+.proj-verdict.under { border-color: #ef444466; } .proj-verdict.under .proj-val { color: #ef4444; }
+.proj-verdict.exact { border-color: #eab30866; } .proj-verdict.exact .proj-val { color: #eab308; }
+
+/* ── Qualitative strength chips ────────────────────────────────────────────── */
+.qual-chips { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; margin-bottom: 8px; }
+.qual-chip {
+  display: flex; justify-content: space-between; align-items: center;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 8px; padding: 7px 10px; font-size: 12px;
+}
+.qual-chip .qc-cat { color: var(--dim); font-weight: 600; }
+.qual-chip .qc-val { font-weight: 800; }
+.qual-summary { font-size: 12px; color: var(--dim); line-height: 1.6; margin-bottom: 16px; text-align: center; }
+
+/* ── Narrative recap ───────────────────────────────────────────────────────── */
+.narrative-box {
+  background: linear-gradient(180deg, #161b22, #12161d);
+  border: 1px solid var(--border); border-radius: 12px;
+  padding: 16px; margin-bottom: 18px;
+}
+.narrative-title { font-size: 17px; font-weight: 900; color: var(--accent); margin-bottom: 8px; }
+.narrative-body { font-size: 13px; line-height: 1.7; color: var(--text); }
+.narrative-callouts { margin-top: 10px; display: flex; flex-direction: column; gap: 7px; }
+.narrative-callout {
+  font-size: 12px; line-height: 1.5; color: #cbd5e1;
+  border-right: 2px solid var(--accent2); padding-right: 9px;
+}
+.narrative-callout b { color: #fff; }
+
+/* ── Match scorers ─────────────────────────────────────────────────────────── */
+.mr-scorers { font-size: 10px; color: var(--dim); margin-top: 3px; line-height: 1.4; }
 
 /* ── Section label ────────────────────────────────────────────────────────── */
 .section-label {

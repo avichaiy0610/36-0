@@ -377,6 +377,32 @@
       <!-- Everything below fades in after 2.2s -->
       <div id="res-stats-section" class="res-stats-section">
 
+        <!-- Finished vs projected -->
+        <div class="proj-row">
+          <div class="proj-tile">
+            <div class="proj-lbl" data-txt="proj-finished">סיום בפועל</div>
+            <div class="proj-val" id="res-finish">—</div>
+          </div>
+          <div class="proj-tile">
+            <div class="proj-lbl" data-txt="proj-projected">צפי לפני העונה</div>
+            <div class="proj-val dim" id="res-projected">—</div>
+          </div>
+          <div class="proj-tile proj-verdict" id="res-verdict-tile">
+            <div class="proj-val" id="res-verdict">—</div>
+          </div>
+        </div>
+
+        <!-- Qualitative strength summary -->
+        <div class="qual-chips" id="res-qual-chips"></div>
+        <div class="qual-summary" id="res-qual-summary"></div>
+
+        <!-- Narrative season recap -->
+        <div class="narrative-box" id="res-narrative">
+          <div class="narrative-title" id="res-narrative-title"></div>
+          <div class="narrative-body" id="res-narrative-body"></div>
+          <div class="narrative-callouts" id="res-narrative-callouts"></div>
+        </div>
+
         <!-- Season Awards -->
         <div class="section-label" data-txt="sec-awards">מצטייני העונה</div>
         <div class="awards-grid">

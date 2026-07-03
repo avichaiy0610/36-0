@@ -889,5 +889,194 @@ const TEXT_CATALOG = [
   "label": "תווית דירוגים מוסתרים",
   "selector": "virtual",
   "def": "🙈 דירוגים מוסתרים"
+ },
+ {
+  "key": "proj-finished",
+  "screen": "סיכום עונה (מסך תוצאות)",
+  "label": "תווית: סיום בפועל",
+  "selector": "virtual",
+  "def": "סיום בפועל"
+ },
+ {
+  "key": "proj-projected",
+  "screen": "סיכום עונה (מסך תוצאות)",
+  "label": "תווית: צפי לפני העונה",
+  "selector": "virtual",
+  "def": "צפי לפני העונה"
+ },
+ {
+  "key": "verdict-over",
+  "screen": "סיכום עונה (מסך תוצאות)",
+  "label": "שיפוט: מעל הציפיות",
+  "selector": "virtual",
+  "def": "מעל הציפיות 🔥"
+ },
+ {
+  "key": "verdict-under",
+  "screen": "סיכום עונה (מסך תוצאות)",
+  "label": "שיפוט: מתחת לציפיות",
+  "selector": "virtual",
+  "def": "מתחת לציפיות"
+ },
+ {
+  "key": "verdict-exact",
+  "screen": "סיכום עונה (מסך תוצאות)",
+  "label": "שיפוט: בדיוק כצפוי",
+  "selector": "virtual",
+  "def": "בדיוק כצפוי"
+ },
+ {
+  "key": "qual-cat-atk",
+  "screen": "סיכום עונה (מסך תוצאות)",
+  "label": "קטגוריה: התקפה",
+  "selector": "virtual",
+  "def": "התקפה"
+ },
+ {
+  "key": "qual-cat-mid",
+  "screen": "סיכום עונה (מסך תוצאות)",
+  "label": "קטגוריה: קישור",
+  "selector": "virtual",
+  "def": "קישור"
+ },
+ {
+  "key": "qual-cat-def",
+  "screen": "סיכום עונה (מסך תוצאות)",
+  "label": "קטגוריה: הגנה",
+  "selector": "virtual",
+  "def": "הגנה"
+ },
+ {
+  "key": "qual-cat-gk",
+  "screen": "סיכום עונה (מסך תוצאות)",
+  "label": "קטגוריה: שוער",
+  "selector": "virtual",
+  "def": "שוער"
+ },
+ {
+  "key": "qual-elite",
+  "screen": "סיכום עונה (מסך תוצאות)",
+  "label": "דירוג איכות: מעולה",
+  "selector": "virtual",
+  "def": "מעולה"
+ },
+ {
+  "key": "qual-strong",
+  "screen": "סיכום עונה (מסך תוצאות)",
+  "label": "דירוג איכות: חזק",
+  "selector": "virtual",
+  "def": "חזק"
+ },
+ {
+  "key": "qual-good",
+  "screen": "סיכום עונה (מסך תוצאות)",
+  "label": "דירוג איכות: טוב",
+  "selector": "virtual",
+  "def": "טוב"
+ },
+ {
+  "key": "qual-average",
+  "screen": "סיכום עונה (מסך תוצאות)",
+  "label": "דירוג איכות: בינוני",
+  "selector": "virtual",
+  "def": "בינוני"
+ },
+ {
+  "key": "qual-weak",
+  "screen": "סיכום עונה (מסך תוצאות)",
+  "label": "דירוג איכות: חלש",
+  "selector": "virtual",
+  "def": "חלש"
+ },
+ {
+  "key": "qual-summary-tmpl",
+  "screen": "סיכום עונה (מסך תוצאות)",
+  "label": "משפט סיכום איכותי (עם {best} ו-{worst})",
+  "selector": "virtual",
+  "def": "החוזק הגדול היה ה{best}, והחוליה החלשה — ה{worst}."
+ },
+ {
+  "key": "story-perfect-title",
+  "screen": "סיכום עונה (מסך תוצאות)",
+  "label": "נרטיב עונה מושלמת — כותרת",
+  "selector": "virtual",
+  "def": "מושלם. בלתי אפשרי הפך למציאות. 🏆"
+ },
+ {
+  "key": "story-perfect-body",
+  "screen": "סיכום עונה (מסך תוצאות)",
+  "label": "נרטיב עונה מושלמת — טקסט",
+  "selector": "virtual",
+  "def": "עונה בלי ולו נקודה אחת שאבדה. {wins} ניצחונות מתוך {wins}. אין על מה להתווכח — זו האלמותיות."
+ },
+ {
+  "key": "story-champ-title",
+  "screen": "סיכום עונה (מסך תוצאות)",
+  "label": "נרטיב אלופים — כותרת",
+  "selector": "virtual",
+  "def": "אלופים! 🏆"
+ },
+ {
+  "key": "story-champ-body",
+  "screen": "סיכום עונה (מסך תוצאות)",
+  "label": "נרטיב אלופים — טקסט",
+  "selector": "virtual",
+  "def": "הם המשיכו לדפוק בדלת, והפעם היא נפתחה. {pts} נקודות בקופה, {wins} ניצחונות, ואליפות שאף אחד לא יכול לקחת."
+ },
+ {
+  "key": "story-top6-title",
+  "screen": "סיכום עונה (מסך תוצאות)",
+  "label": "נרטיב שישייה עליונה — כותרת",
+  "selector": "virtual",
+  "def": "עונה גדולה 🥈"
+ },
+ {
+  "key": "story-top6-body",
+  "screen": "סיכום עונה (מסך תוצאות)",
+  "label": "נרטיב שישייה עליונה — טקסט",
+  "selector": "virtual",
+  "def": "מקום {rank} וכרטיס לפלייאוף האליפות. {pts} נקודות ועונה שכמעט נגעה בזהב — עד כמה זה היה קרוב?"
+ },
+ {
+  "key": "story-mid-title",
+  "screen": "סיכום עונה (מסך תוצאות)",
+  "label": "נרטיב אמצע טבלה — כותרת",
+  "selector": "virtual",
+  "def": "עונה של ביסוס"
+ },
+ {
+  "key": "story-mid-body",
+  "screen": "סיכום עונה (מסך תוצאות)",
+  "label": "נרטיב אמצע טבלה — טקסט",
+  "selector": "virtual",
+  "def": "מקום {rank}. לא הכל הלך חלק, אבל {wins} ניצחונות ו-{pts} נקודות מספרים על קבוצה עם אופי. יש על מה לבנות."
+ },
+ {
+  "key": "story-releg-title",
+  "screen": "סיכום עונה (מסך תוצאות)",
+  "label": "נרטיב תחתית — כותרת",
+  "selector": "virtual",
+  "def": "עונה למחוק"
+ },
+ {
+  "key": "story-releg-body",
+  "screen": "סיכום עונה (מסך תוצאות)",
+  "label": "נרטיב תחתית — טקסט",
+  "selector": "virtual",
+  "def": "מקום {rank} וקרב הישרדות עד הסוף. {losses} הפסדים כואבים, אבל מכאן אפשר רק לעלות."
+ },
+ {
+  "key": "story-scorer-tmpl",
+  "screen": "סיכום עונה (מסך תוצאות)",
+  "label": "הערת מלך שערים (עם {name} ו-{goals})",
+  "selector": "virtual",
+  "def": "⚽ {name} הוביל את המתקפה עם {goals} שערים — פשוט לא הפסיק לכבוש."
+ },
+ {
+  "key": "story-assist-tmpl",
+  "screen": "סיכום עונה (מסך תוצאות)",
+  "label": "הערת מלך בישולים (עם {name} ו-{assists})",
+  "selector": "virtual",
+  "def": "🎯 {name} חילק את המשחק עם {assists} בישולים."
  }
 ];
