@@ -97,7 +97,10 @@ async function loadLeaderboard() {
     const other    = lbTab === 'ovr' ? `${row.points} נק׳` : `OVR ${row.ovr}`;
     const record   = `${row.wins}נ ${row.draws}ת ${row.losses}ה`;
     const date     = new Date(row.created_at).toLocaleDateString('he-IL', { day: 'numeric', month: 'numeric', year: '2-digit' });
-    const subStat  = `${other} · ${row.formation} · ${record} · ${date}`;
+    // Isolate each segment with <bdi> so the mixed Hebrew/Latin pieces keep a
+    // stable order regardless of which stat leads (OVR vs points).
+    const subStat  = [other, row.formation, record, date]
+      .map(x => `<bdi>${esc(x)}</bdi>`).join(' · ');
 
     const tr = document.createElement('div');
     tr.className = 'lb-row';
@@ -105,7 +108,7 @@ async function loadLeaderboard() {
       <span class="lb-rank ${rank <= 3 ? 'lb-rank-top' : ''}">${rank}</span>
       <span class="lb-name">${esc(username)}</span>
       <span class="lb-stat">${esc(mainStat)}</span>
-      <span class="lb-sub">${esc(subStat)}</span>
+      <span class="lb-sub" dir="rtl">${subStat}</span>
       <button class="lb-view-btn" data-id="${esc(row.id)}" data-user="${esc(username)}">הרכב</button>
     `;
     tr.querySelector('.lb-view-btn').addEventListener('click', e => {
