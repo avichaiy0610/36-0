@@ -59,6 +59,20 @@ body {
 }
 .welcome-inner { text-align: center; max-width: 420px; }
 
+.btn-coffee {
+  display: inline-block;
+  margin-top: 14px;
+  padding: 9px 22px;
+  border-radius: 50px;
+  background: #FFDD00;
+  color: #000;
+  font-weight: 700;
+  font-size: 14px;
+  text-decoration: none;
+  transition: transform .15s, box-shadow .15s;
+}
+.btn-coffee:hover { transform: translateY(-2px); box-shadow: 0 6px 18px #ffdd0044; }
+
 .site-disclaimer {
   max-width: 620px;
   margin: 40px auto 0;
