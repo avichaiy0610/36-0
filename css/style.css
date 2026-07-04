@@ -181,25 +181,37 @@ body {
 
 .btn-full { width: 100%; margin-top: 10px; padding: 16px; font-size: 16px; }
 
-/* ── Formation grid (shared by setup screen) ──────────────────────────────── */
-.formation-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
+/* ── Formation picker: compact chips + one live preview ───────────────────── */
+.formation-picker {
+  display: flex;
+  gap: 14px;
+  align-items: stretch;
   width: 100%;
 }
-.formation-card {
-  background: var(--surface);
-  border: 2px solid var(--border);
-  border-radius: var(--radius);
-  padding: 10px 8px;
-  text-align: center;
-  cursor: pointer;
-  transition: border-color .2s, transform .2s;
+.formation-preview {
+  width: 130px;
+  flex-shrink: 0;
 }
-.formation-card:hover { border-color: var(--accent2); transform: scale(1.03); }
-.formation-card.selected { border-color: var(--accent); background: #ffd70010; }
-.f-label { font-size: 14px; font-weight: 700; color: var(--accent); margin-bottom: 6px; }
+.formation-chips {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  align-content: stretch;
+}
+.formation-chip {
+  background: var(--surface2);
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 8px;
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color .15s, background .15s, color .15s;
+}
+.formation-chip:hover:not(.selected) { border-color: var(--accent2); background: #2d333b; }
+.formation-chip.selected { border-color: var(--accent); background: #ffd70012; color: var(--accent); }
 
 .mini-pitch-inner {
   position: relative;
@@ -806,7 +818,6 @@ body {
   .slot-name-label { font-size: 8px !important; max-width: 72px !important; }
 
   /* ── Setup screen ── */
-  .formation-grid { grid-template-columns: repeat(2, 1fr); }
   .option-row { flex-wrap: wrap; gap: 6px; }
   .opt-btn { min-width: 0; flex: 1 1 calc(50% - 3px); }
 

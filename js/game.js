@@ -333,23 +333,26 @@ function startGame() {
 let _selectedFormationKey = null;
 
 function buildFormationCards() {
-  const grid = document.getElementById('formation-grid');
-  grid.innerHTML = '';
+  const chips = document.getElementById('formation-chips');
+  chips.innerHTML = '';
   Object.entries(FORMATIONS).forEach(([key, f]) => {
-    const card = document.createElement('div');
-    card.className = 'formation-card';
-    card.dataset.key = key;
-    card.innerHTML = `<div class="f-label">${f.label}</div><div class="f-mini-pitch">${miniPitchHTML(f)}</div>`;
-    card.addEventListener('click', () => setFormationSelection(key));
-    grid.appendChild(card);
+    const btn = document.createElement('button');
+    btn.className = 'formation-chip';
+    btn.dataset.key = key;
+    btn.textContent = f.label;
+    btn.addEventListener('click', () => setFormationSelection(key));
+    chips.appendChild(btn);
   });
 }
 
 function setFormationSelection(key) {
   _selectedFormationKey = key;
-  document.querySelectorAll('.formation-card').forEach(c =>
+  document.querySelectorAll('.formation-chip').forEach(c =>
     c.classList.toggle('selected', c.dataset.key === key)
   );
+  // update the single live preview pitch
+  const preview = document.getElementById('formation-preview');
+  if (preview) preview.innerHTML = miniPitchHTML(FORMATIONS[key]);
 }
 
 function miniPitchHTML(f) {
