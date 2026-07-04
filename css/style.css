@@ -1538,3 +1538,7 @@ body {
 .sq-pos  { font-size: 0.7rem; font-weight: 700; color: #4CAF50; }
 .sq-name { font-size: 0.85rem; color: #fff; }
 .sq-ovr  { font-size: 0.8rem; color: #f1c40f; font-weight: 700; text-align: left; }
+
+.site-disclaimer .disclaimer-links { margin-top: 6px; }
+.site-disclaimer .disclaimer-links a { color: var(--dim); }
+.site-disclaimer .disclaimer-links a:hover { color: var(--accent); }
