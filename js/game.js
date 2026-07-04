@@ -96,6 +96,54 @@ const FORMATIONS = {
       { id: 'lw',  label: 'כנף שמאלי',     pos: 'LW',  x: 24, y: 22 },
     ],
   },
+  '4-1-4-1': {
+    label: '4-1-4-1',
+    slots: [
+      { id: 'gk',  label: 'שוער',          pos: 'GK',  x: 50, y: 87 },
+      { id: 'rb',  label: 'מגן ימני',      pos: 'RB',  x: 80, y: 70 },
+      { id: 'cb1', label: 'בלם',           pos: 'CB',  x: 62, y: 72 },
+      { id: 'cb2', label: 'בלם',           pos: 'CB',  x: 38, y: 72 },
+      { id: 'lb',  label: 'מגן שמאלי',     pos: 'LB',  x: 20, y: 70 },
+      { id: 'cdm', label: 'קשר הגנתי',     pos: 'CDM', x: 50, y: 58 },
+      { id: 'rm',  label: 'קשר ימין',      pos: 'RM',  x: 80, y: 40 },
+      { id: 'cm1', label: 'קשר',           pos: 'CM',  x: 60, y: 42 },
+      { id: 'cm2', label: 'קשר',           pos: 'CM',  x: 40, y: 42 },
+      { id: 'lm',  label: 'קשר שמאל',     pos: 'LM',  x: 20, y: 40 },
+      { id: 'st',  label: 'חלוץ',          pos: 'ST',  x: 50, y: 15 },
+    ],
+  },
+  '4-5-1': {
+    label: '4-5-1',
+    slots: [
+      { id: 'gk',  label: 'שוער',          pos: 'GK',  x: 50, y: 87 },
+      { id: 'rb',  label: 'מגן ימני',      pos: 'RB',  x: 80, y: 70 },
+      { id: 'cb1', label: 'בלם',           pos: 'CB',  x: 62, y: 72 },
+      { id: 'cb2', label: 'בלם',           pos: 'CB',  x: 38, y: 72 },
+      { id: 'lb',  label: 'מגן שמאלי',     pos: 'LB',  x: 20, y: 70 },
+      { id: 'rm',  label: 'קשר ימין',      pos: 'RM',  x: 82, y: 46 },
+      { id: 'cm1', label: 'קשר',           pos: 'CM',  x: 63, y: 48 },
+      { id: 'cam', label: 'קשר התקפי',     pos: 'CAM', x: 50, y: 42 },
+      { id: 'cm2', label: 'קשר',           pos: 'CM',  x: 37, y: 48 },
+      { id: 'lm',  label: 'קשר שמאל',     pos: 'LM',  x: 18, y: 46 },
+      { id: 'st',  label: 'חלוץ',          pos: 'ST',  x: 50, y: 15 },
+    ],
+  },
+  '4-3-2-1': {
+    label: '4-3-2-1',
+    slots: [
+      { id: 'gk',  label: 'שוער',          pos: 'GK',  x: 50, y: 87 },
+      { id: 'rb',  label: 'מגן ימני',      pos: 'RB',  x: 80, y: 70 },
+      { id: 'cb1', label: 'בלם',           pos: 'CB',  x: 62, y: 72 },
+      { id: 'cb2', label: 'בלם',           pos: 'CB',  x: 38, y: 72 },
+      { id: 'lb',  label: 'מגן שמאלי',     pos: 'LB',  x: 20, y: 70 },
+      { id: 'cdm', label: 'קשר הגנתי',     pos: 'CDM', x: 50, y: 58 },
+      { id: 'cm1', label: 'קשר',           pos: 'CM',  x: 64, y: 50 },
+      { id: 'cm2', label: 'קשר',           pos: 'CM',  x: 36, y: 50 },
+      { id: 'cam1',label: 'קשר התקפי',     pos: 'CAM', x: 62, y: 32 },
+      { id: 'cam2',label: 'קשר התקפי',     pos: 'CAM', x: 38, y: 32 },
+      { id: 'st',  label: 'חלוץ',          pos: 'ST',  x: 50, y: 14 },
+    ],
+  },
 };
 
 // ─── Position normalisation (raw Transfermarkt → standard codes) ───────────────
@@ -310,13 +358,25 @@ function countUp(elId, target, delay) {
 }
 
 // ─── Screen navigation ─────────────────────────────────────────────────────────
+// Reset every possible scroll container to the top (mobile scrolls the window/
+// body; desktop scrolls the fixed screen element).
+function scrollPageTop() {
+  window.scrollTo(0, 0);
+  if (document.scrollingElement) document.scrollingElement.scrollTop = 0;
+  document.documentElement.scrollTop = 0;
+  document.body.scrollTop = 0;
+  document.querySelectorAll('.screen, .side-panel, .results-side')
+    .forEach(el => { el.scrollTop = 0; });
+}
+
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   const el = document.getElementById('screen-' + id);
   if (el) { el.classList.add('active'); el.scrollTop = 0; }
   // on mobile the screens scroll as page flow, so reset the window too
   // (otherwise the results screen opens scrolled to the bottom)
-  window.scrollTo(0, 0);
+  scrollPageTop();
+  requestAnimationFrame(scrollPageTop);
   // pitches built while their screen was hidden couldn't be measured
   requestAnimationFrame(() => fitShortNames());
 }
@@ -1620,8 +1680,9 @@ function animateResults(ovr) {
     return sep;
   }
 
-  // Fills the summary cards, stats and story once all matches are on screen.
-  function finalizeResults() {
+  // Fills the summary cards, stats and story — WITHOUT revealing the tier/finish
+  // (those stay hidden until revealSummary(), so the reveal isn't spoiled).
+  function fillResults() {
     setEl('res-wins', wins); setEl('res-draws', draws); setEl('res-losses', losses);
     setEl('res-points', wins*3+draws); setEl('res-gf', gfTotal); setEl('res-ga', gaTotal);
 
@@ -1629,7 +1690,6 @@ function animateResults(ovr) {
     const td = tierDisplay(tier);
     setEl('res-tier', td.name, tier.color);
     setEl('res-tier-sub', td.sub);
-    document.getElementById('tier-box').classList.add('visible');
     window._lastResult = { wins, draws, losses, gfTotal, gaTotal, matches, ovr, inTopSix };
     window._lastTier   = tier;
     const diffMapR = {
@@ -1660,9 +1720,15 @@ function animateResults(ovr) {
     buildLeagueTable(leagueTable);
     renderSeasonStory({ wins, draws, losses, gfTotal, gaTotal, ovr, myRank,
                         projectedFinish: season.projectedFinish, ps: playerStats, tier });
+    return tier;
+  }
+
+  // Reveals the tier box + full stats (called after the placement popup closes)
+  function revealSummary() {
+    document.getElementById('tier-box').classList.add('visible');
     const sec = document.getElementById('res-stats-section');
     if (sec) sec.classList.add('visible');
-    return tier;
+    scrollPageTop();
   }
 
   // ── Restored season (page refresh): render everything instantly, no suspense ──
@@ -1671,11 +1737,15 @@ function animateResults(ovr) {
       if (idx === 26) grid.appendChild(separatorRow());
       grid.appendChild(makeMatchRow(m));
     });
-    finalizeResults();
+    fillResults();
+    revealSummary();
     return;
   }
 
   // ── Fresh simulation: reveal matches one by one with a running tally + skip ──
+  // keep the finish hidden until the popup
+  document.getElementById('tier-box').classList.remove('visible');
+  document.getElementById('res-stats-section')?.classList.remove('visible');
   let rw = 0, rd = 0, rl = 0;
   document.querySelectorAll('#res-wins,#res-draws,#res-losses').forEach(e => e.textContent = '0');
   const skipBtn = document.getElementById('btn-skip-matches');
@@ -1688,7 +1758,6 @@ function animateResults(ovr) {
     grid.appendChild(makeMatchRow(m));
     if (m.outcome === 'W') rw++; else if (m.outcome === 'D') rd++; else rl++;
     setEl('res-wins', rw); setEl('res-draws', rd); setEl('res-losses', rl);
-    grid.scrollTop = grid.scrollHeight;
     idx++;
     if (idx < matches.length) timer = setTimeout(revealOne, 130);
     else endReveal();
@@ -1701,15 +1770,17 @@ function animateResults(ovr) {
       grid.appendChild(makeMatchRow(matches[idx]));
     }
     if (skipBtn) skipBtn.style.display = 'none';
-    const tier = finalizeResults();
-    setTimeout(() => showPlacementPopup(tier, myRank), 400);
+    const tier = fillResults();
+    // Show the placement popup first; only reveal the finish/stats once it's closed.
+    setTimeout(() => showPlacementPopup(tier, myRank, revealSummary), 350);
   }
   if (skipBtn) skipBtn.onclick = endReveal;
   timer = setTimeout(revealOne, 200);
 }
 
-// Popup announcing where the season finished (shown after the reveal)
-function showPlacementPopup(tier, rank) {
+// Popup announcing where the season finished (shown after the reveal). onClose
+// runs when the user dismisses it (used to reveal the detailed results).
+function showPlacementPopup(tier, rank, onClose) {
   const td = tierDisplay(tier);
   let modal = document.getElementById('placement-modal');
   if (!modal) {
@@ -1729,7 +1800,10 @@ function showPlacementPopup(tier, rank) {
   tEl.textContent = td.name; tEl.style.color = tier.color;
   modal.querySelector('#placement-sub').textContent = td.sub;
   modal.querySelector('#placement-rank').textContent = placeLabel(rank);
-  modal.querySelector('#placement-close').onclick = () => { modal.style.display = 'none'; };
+  modal.querySelector('#placement-close').onclick = () => {
+    modal.style.display = 'none';
+    if (typeof onClose === 'function') onClose();
+  };
   modal.style.display = 'flex';
 }
 
