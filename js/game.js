@@ -115,7 +115,7 @@ function normalizePos(pos) { return POS_NORMALIZE[pos] ?? pos; }
 // winger playing striker, no attacking-mid dropping onto the wing, etc.
 const COMPAT = {
   GK:  ['GK'],
-  RB:  ['RB','LB'],  CB: ['CB'],  LB: ['LB','RB'],
+  RB:  ['RB'],  CB: ['CB'],  LB: ['LB'],
   CDM: ['CDM','CM'], CM: ['CM','CDM','CAM'], CAM: ['CAM','CM'],
   RM:  ['RM','RW'],  LM: ['LM','LW'],
   RW:  ['RW','RM'],  LW: ['LW','LM'],

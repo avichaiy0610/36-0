@@ -198,7 +198,10 @@ Deno.serve(async (req) => {
 
     const alreadyHas = new Set((existing ?? []).map((r: { achievement_key: string }) => r.achievement_key));
     const newAchievements = earned.filter(k => !alreadyHas.has(k));
-    const repeatedAchievements = earned.filter(k => alreadyHas.has(k));
+    // Cumulative one-time milestones (play N games, use all formations/clubs) are
+    // unlocked once and never "repeated" — don't bump their times_earned counter.
+    const isCumulative = (k: string) => /^games_\d+$/.test(k) || k === 'all_formations' || k === 'all_clubs';
+    const repeatedAchievements = earned.filter(k => alreadyHas.has(k) && !isCumulative(k));
 
     if (newAchievements.length > 0) {
       const { error: achError } = await supabase.from('user_achievements').insert(

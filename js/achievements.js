@@ -84,14 +84,19 @@ async function showAchievements() {
     const gm = /^games_(\d+)$/.exec(ach.key);
     if (gm && user) {
       const target = Number(gm[1]);
-      const cur    = Math.min(gamesPlayed, target);
+      const cur    = Math.min(gamesPlayed, target);  // don't display more than the target
       const gpct   = target > 0 ? (cur / target) * 100 : 0;
       progressHtml = `
         <div class="ach-progress">
           <div class="ach-progress-bar"><div class="ach-progress-fill" style="width:${gpct.toFixed(1)}%"></div></div>
-          <span class="ach-progress-lbl" dir="ltr">${gamesPlayed} / ${target}</span>
+          <span class="ach-progress-lbl" dir="ltr">${cur} / ${target}</span>
         </div>`;
     }
+
+    // Cumulative one-time milestones aren't "repeatable" — never show a ×N count
+    const isCumulative = /^games_\d+$/.test(ach.key) || ach.key === 'all_formations' || ach.key === 'all_clubs';
+    const times = unlockedMap[ach.key]?.times ?? 1;
+    const countHtml = (isUnlocked && !isCumulative && times > 1) ? `<span class="ach-count">×${times}</span>` : '';
 
     const card = document.createElement('div');
     card.className = `ach-card ${isUnlocked ? 'ach-unlocked' : 'ach-locked'}`;
@@ -99,7 +104,7 @@ async function showAchievements() {
       <div class="ach-icon">${isHiddenAndLocked ? '❓' : ach.icon}</div>
       <div class="ach-info">
         <div class="ach-name">${isHiddenAndLocked ? '???' : ach.name_he}
-          ${isUnlocked ? `<span class="ach-count">×${unlockedMap[ach.key].times}</span>` : ''}
+          ${countHtml}
         </div>
         <div class="ach-desc">${isHiddenAndLocked ? '' : ach.desc_he}</div>
         ${progressHtml}
