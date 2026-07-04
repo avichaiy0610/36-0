@@ -38,13 +38,18 @@ async function showAchievements() {
 
   const user = getCurrentUser();
 
-  const [{ data: allAchs }, { data: statsRows }, unlockedRows] = await Promise.all([
+  const [{ data: allAchs }, { data: statsRows }, unlockedRows, profileRow] = await Promise.all([
     _supabase.from('achievements').select('*').order('is_hidden', { ascending: true }),
     _supabase.rpc('get_achievement_stats'),
     user
       ? _supabase.from('user_achievements').select('achievement_key, unlocked_at, times_earned').eq('user_id', user.id)
       : Promise.resolve({ data: [] }),
+    user
+      ? _supabase.from('profiles').select('games_played').eq('id', user.id).single()
+      : Promise.resolve({ data: null }),
   ]);
+
+  const gamesPlayed = Number(profileRow?.data?.games_played ?? 0);
 
   const statsMap = {};
   (statsRows ?? []).forEach(r => { statsMap[r.key] = r; });
@@ -74,6 +79,20 @@ async function showAchievements() {
     const rarity      = getRarity(pct);
     const pctLabel    = totalUsers > 0 ? `${pct.toFixed(1)}%` : '—';
 
+    // Progress bar for the "play N games" achievements (games_10, games_50, ...)
+    let progressHtml = '';
+    const gm = /^games_(\d+)$/.exec(ach.key);
+    if (gm && user) {
+      const target = Number(gm[1]);
+      const cur    = Math.min(gamesPlayed, target);
+      const gpct   = target > 0 ? (cur / target) * 100 : 0;
+      progressHtml = `
+        <div class="ach-progress">
+          <div class="ach-progress-bar"><div class="ach-progress-fill" style="width:${gpct.toFixed(1)}%"></div></div>
+          <span class="ach-progress-lbl" dir="ltr">${gamesPlayed} / ${target}</span>
+        </div>`;
+    }
+
     const card = document.createElement('div');
     card.className = `ach-card ${isUnlocked ? 'ach-unlocked' : 'ach-locked'}`;
     card.innerHTML = `
@@ -83,6 +102,7 @@ async function showAchievements() {
           ${isUnlocked ? `<span class="ach-count">×${unlockedMap[ach.key].times}</span>` : ''}
         </div>
         <div class="ach-desc">${isHiddenAndLocked ? '' : ach.desc_he}</div>
+        ${progressHtml}
         ${isUnlocked ? `<div class="ach-date">${new Date(unlockedMap[ach.key].at).toLocaleDateString('he-IL')}</div>` : ''}
         <div class="ach-rarity-row">
           <span class="ach-rarity-tag" style="color:${rarity.color};border-color:${rarity.color}40">${rarity.label}</span>

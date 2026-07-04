@@ -110,14 +110,16 @@ const POS_NORMALIZE = {
 function normalizePos(pos) { return POS_NORMALIZE[pos] ?? pos; }
 
 // ─── Compatibility ─────────────────────────────────────────────────────────────
+// Which player-positions may fill each formation slot. Kept tight and realistic:
+// a player only slots into his own position or a close, same-line relative — no
+// winger playing striker, no attacking-mid dropping onto the wing, etc.
 const COMPAT = {
   GK:  ['GK'],
   RB:  ['RB','LB'],  CB: ['CB'],  LB: ['LB','RB'],
-  CDM: ['CDM','CM','CAM'], CM: ['CM','CDM','CAM','RM','LM'],
-  CAM: ['CAM','CM','CDM','CF','RW','LW'],
-  RM:  ['RM','RW','CM','LM'],  LM: ['LM','LW','CM','RM'],
-  RW:  ['RW','RM','CAM','CF','LW'], LW: ['LW','LM','CAM','CF','RW'],
-  CF:  ['CF','ST','CAM','RW','LW'], ST: ['ST','CF','CAM'],
+  CDM: ['CDM','CM'], CM: ['CM','CDM','CAM'], CAM: ['CAM','CM'],
+  RM:  ['RM','RW'],  LM: ['LM','LW'],
+  RW:  ['RW','RM'],  LW: ['LW','LM'],
+  CF:  ['CF','ST'],  ST: ['ST','CF'],
 };
 
 // ─── Hebrew position names ─────────────────────────────────────────────────────
