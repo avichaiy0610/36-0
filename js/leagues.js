@@ -1,12 +1,15 @@
-// ─── Leagues with friends (async) ──────────────────────────────────────────────
-// Players join a league by code, keep playing the normal game, and a shared
-// table ranks each member by their best season. All server logic is in RPCs.
+// ─── Leagues with friends (async, one-shot per member) ─────────────────────────
+// Create/join a fixed-size league with shared settings; each member plays one
+// dedicated league draft; the table is final once everyone has played.
 
 function lgEsc(s) {
   return String(s ?? '').replace(/[&<>"']/g, c => (
     { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
   ));
 }
+
+let _lgCreate = { max: 6, difficulty: 'normal', peak: false, ratings: true };
+let _pendingLeagueCode = null;
 
 async function showLeagues() {
   showScreen('leagues');
@@ -28,28 +31,52 @@ async function renderLeaguesHome() {
   }
 
   box.innerHTML = `
-    <div class="lg-actions">
-      <div class="lg-card">
-        <div class="lg-card-title">➕ צור ליגה חדשה</div>
-        <div class="lg-row">
-          <input id="lg-create-name" class="lg-input" maxlength="40" placeholder="שם הליגה (למשל: החבר'ה מהעבודה)">
-          <button class="btn-primary lg-btn" id="lg-create-btn">צור</button>
-        </div>
+    <div class="lg-card">
+      <div class="lg-card-title">➕ צור ליגה חדשה</div>
+      <div class="lg-row">
+        <input id="lg-create-name" class="lg-input" maxlength="40" placeholder="שם הליגה (למשל: החבר'ה מהעבודה)">
       </div>
-      <div class="lg-card">
-        <div class="lg-card-title">🔑 הצטרף בקוד</div>
-        <div class="lg-row">
-          <input id="lg-join-code" class="lg-input lg-code-input" maxlength="6" placeholder="קוד ליגה" dir="ltr">
-          <button class="btn-primary lg-btn" id="lg-join-btn">הצטרף</button>
-        </div>
+      <div class="lg-config">
+        <div class="lg-config-row"><span>מספר מקומות</span>
+          <input id="lg-max" class="lg-input lg-max-input" type="number" min="2" max="30" value="${_lgCreate.max}"></div>
+        <div class="lg-config-row"><span>קושי</span>
+          <div class="lg-mini" id="lg-diff">
+            <button data-v="easy">קל</button><button data-v="normal">רגיל</button><button data-v="hard">קשה</button>
+          </div></div>
+        <div class="lg-config-row"><span>מצב שיא ⚡</span>
+          <div class="lg-mini" id="lg-peak"><button data-v="off">כבוי</button><button data-v="on">פעיל</button></div></div>
+        <div class="lg-config-row"><span>דירוגים</span>
+          <div class="lg-mini" id="lg-ratings"><button data-v="on">גלויים</button><button data-v="off">מוסתרים</button></div></div>
+      </div>
+      <button class="btn-primary lg-btn" id="lg-create-btn" style="width:100%">צור ליגה</button>
+    </div>
+    <div class="lg-card">
+      <div class="lg-card-title">🔑 הצטרף בקוד</div>
+      <div class="lg-row">
+        <input id="lg-join-code" class="lg-input lg-code-input" maxlength="6" placeholder="קוד ליגה" dir="ltr" value="${lgEsc(_pendingLeagueCode || '')}">
+        <button class="btn-primary lg-btn" id="lg-join-btn">הצטרף</button>
       </div>
     </div>
     <div id="lg-msg" class="lg-msg"></div>
     <div class="section-label" style="margin-top:18px">הליגות שלי</div>
     <div id="lg-my" class="lg-my"><div class="page-loading">טוען...</div></div>`;
 
+  // wire mini toggles
+  const wireMini = (id, cur, cb) => {
+    const el = document.getElementById(id);
+    el.querySelectorAll('button').forEach(b => {
+      b.classList.toggle('on', b.dataset.v === cur);
+      b.onclick = () => { el.querySelectorAll('button').forEach(x => x.classList.remove('on')); b.classList.add('on'); cb(b.dataset.v); };
+    });
+  };
+  wireMini('lg-diff', _lgCreate.difficulty, v => _lgCreate.difficulty = v);
+  wireMini('lg-peak', _lgCreate.peak ? 'on' : 'off', v => _lgCreate.peak = v === 'on');
+  wireMini('lg-ratings', _lgCreate.ratings ? 'on' : 'off', v => _lgCreate.ratings = v === 'on');
+  document.getElementById('lg-max').oninput = e => _lgCreate.max = Math.max(2, Math.min(30, +e.target.value || 6));
+
   document.getElementById('lg-create-btn').onclick = createLeagueFlow;
   document.getElementById('lg-join-btn').onclick   = joinLeagueFlow;
+  if (_pendingLeagueCode) { lgMsg('נמצא קוד הזמנה — לחצו "הצטרף"', true); _pendingLeagueCode = null; }
   loadMyLeagues();
 }
 
@@ -63,10 +90,12 @@ function lgMsg(text, ok) {
 async function createLeagueFlow() {
   const name = document.getElementById('lg-create-name').value.trim();
   if (name.length < 2) { lgMsg('בחר שם ליגה (2 תווים לפחות)', false); return; }
-  const { data, error } = await _supabase.rpc('create_league', { p_name: name });
+  const settings = {
+    difficulty: _lgCreate.difficulty, peak_mode: _lgCreate.peak,
+    ratings_visible: _lgCreate.ratings, draft_mode: 'squad-first',
+  };
+  const { data, error } = await _supabase.rpc('create_league', { p_name: name, p_max: _lgCreate.max, p_settings: settings });
   if (error) { lgMsg('יצירת הליגה נכשלה: ' + error.message, false); return; }
-  lgMsg('הליגה נוצרה! הקוד: ' + data, true);
-  loadMyLeagues();
   openLeague(data);
 }
 
@@ -74,9 +103,11 @@ async function joinLeagueFlow() {
   const code = document.getElementById('lg-join-code').value.trim().toUpperCase();
   if (code.length < 4) { lgMsg('הכנס קוד ליגה תקין', false); return; }
   const { data, error } = await _supabase.rpc('join_league', { p_code: code });
-  if (error) { lgMsg(error.message.includes('not found') ? 'לא נמצאה ליגה עם הקוד הזה' : 'ההצטרפות נכשלה', false); return; }
-  lgMsg('הצטרפת לליגה "' + data + '" ✓', true);
-  loadMyLeagues();
+  if (error) {
+    const m = error.message.includes('full') ? 'הליגה מלאה' :
+              error.message.includes('not found') ? 'לא נמצאה ליגה עם הקוד הזה' : 'ההצטרפות נכשלה';
+    lgMsg(m, false); return;
+  }
   openLeague(code);
 }
 
@@ -105,39 +136,44 @@ async function openLeague(code) {
     _supabase.rpc('get_league_info', { p_code: code }),
     _supabase.rpc('get_league_standings', { p_code: code }),
   ]);
-  if (error) { box.innerHTML = '<div class="page-note">טעינת הטבלה נכשלה</div>'; return; }
-  const meta = info?.[0] ?? {};
+  if (error || !info?.length) { box.innerHTML = '<div class="page-note">טעינת הליגה נכשלה</div>'; return; }
+  const meta = info[0];
 
-  // Ligat Ha'al table: everyone's league team together, ranked by points then OVR.
   const rows = [...(data ?? [])].sort((a, b) => {
     const ap = a.points ?? -1, bp = b.points ?? -1;
     if (bp !== ap) return bp - ap;
     return (b.ovr ?? -1) - (a.ovr ?? -1);
   });
 
-  // Play / replay button for the current user
-  let playHtml = '';
+  // Status line + play button
+  let statusHtml, playHtml = '';
+  if (meta.is_complete) {
+    statusHtml = `<div class="lg-status complete">🏆 הליגה הסתיימה — הטבלה סופית!</div>`;
+  } else {
+    statusHtml = `<div class="lg-status">${meta.members}/${meta.max_players} שחקנים · ${meta.played_count} סיימו דראפט</div>`;
+  }
   if (meta.is_member) {
-    playHtml = meta.has_played
-      ? `<button class="btn-secondary lg-play" id="lg-play">🔁 שחק שוב לשיפור</button>`
-      : `<button class="btn-primary lg-play" id="lg-play">⚽ שחק את הדראפט שלך לליגה</button>`;
+    if (meta.has_played) {
+      playHtml = `<div class="lg-played-badge">✓ כבר שיחקת בליגה זו</div>`;
+    } else {
+      playHtml = `<button class="btn-primary lg-play" id="lg-play">⚽ שחק את הדראפט שלך לליגה</button>`;
+    }
   }
 
   let html = `
     <button class="back-btn lg-inner-back" id="lg-back-home">→ הליגות שלי</button>
-    <div class="lg-league-name">${lgEsc(meta.name ?? '')}</div>
+    <div class="lg-league-name">${lgEsc(meta.name)}</div>
     <div class="lg-share">
-      <span class="lg-share-lbl">שתפו את הקוד כדי שחברים יצטרפו:</span>
+      <span class="lg-share-lbl">קוד הליגה:</span>
       <span class="lg-share-code" id="lg-share-code" dir="ltr">${lgEsc(code)}</span>
-      <button class="lg-copy" id="lg-copy">העתק</button>
+      <button class="lg-copy" id="lg-copy">העתק הזמנה</button>
     </div>
+    ${statusHtml}
     ${playHtml}
     <div class="section-label" style="margin-top:14px">טבלת הליגה</div>
     <div class="lb-table lg-table">`;
 
-  if (!rows.length) {
-    html += '<div class="page-note">אין עדיין חברים בליגה</div>';
-  }
+  if (!rows.length) html += '<div class="page-note">אין עדיין חברים בליגה</div>';
   rows.forEach((r, i) => {
     const played = r.points != null;
     const rank = i + 1;
@@ -147,7 +183,7 @@ async function openLeague(code) {
       ? `OVR ${r.ovr} · ${lgEsc(r.formation ?? '')} · ${r.wins}נ ${r.draws}ת ${r.losses}ה`
       : 'עדיין לא שיחק';
     html += `
-      <div class="lb-row">
+      <div class="lb-row ${played ? 'lg-clickable' : ''}" data-idx="${i}">
         <span class="lb-rank ${rank <= 3 && played ? 'lb-rank-top' : ''}">${played ? rank : '·'}</span>
         <span class="lb-name">${teamName}</span>
         <span class="lb-stat">${main}</span>
@@ -155,13 +191,59 @@ async function openLeague(code) {
       </div>`;
   });
   html += '</div>';
+  if (meta.is_member) html += `<button class="lg-leave" id="lg-leave">עזוב ליגה</button>`;
   box.innerHTML = html;
 
   document.getElementById('lg-back-home').onclick = renderLeaguesHome;
   document.getElementById('lg-copy').onclick = async () => {
-    try { await navigator.clipboard.writeText(code); document.getElementById('lg-copy').textContent = '✓ הועתק'; }
-    catch (e) { /* ignore */ }
+    const link = location.origin + '/?league=' + code;
+    try { await navigator.clipboard.writeText(link); document.getElementById('lg-copy').textContent = '✓ הועתק'; }
+    catch (e) { document.getElementById('lg-copy').textContent = code; }
   };
   const playBtn = document.getElementById('lg-play');
-  if (playBtn) playBtn.onclick = () => startLeagueDraft(code);
+  if (playBtn) playBtn.onclick = () => startLeagueDraft(code, meta.settings);
+  const leaveBtn = document.getElementById('lg-leave');
+  if (leaveBtn) leaveBtn.onclick = () => leaveLeagueFlow(code);
+  // squad view on row click
+  box.querySelectorAll('.lb-row.lg-clickable').forEach(row => {
+    row.onclick = () => {
+      const r = rows[+row.dataset.idx];
+      if (r?.players?.length) showLeagueSquad(r.players, 'הקבוצה של ' + (r.username ?? ''));
+    };
+  });
 }
+
+async function leaveLeagueFlow(code) {
+  if (!confirm('לעזוב את הליגה? לא תוכל לחזור אליה ללא הקוד.')) return;
+  await _supabase.rpc('leave_league', { p_code: code });
+  renderLeaguesHome();
+}
+
+function showLeagueSquad(players, title) {
+  const modal = document.getElementById('squad-modal');
+  document.getElementById('squad-modal-title').textContent = title;
+  const pitch = document.getElementById('squad-modal-pitch');
+  const list = document.createElement('div');
+  list.className = 'squad-player-list';
+  [...players].sort((a, b) => (b.ovr ?? 0) - (a.ovr ?? 0)).forEach(p => {
+    const item = document.createElement('div');
+    item.className = 'squad-player-item';
+    item.innerHTML = `
+      <span class="sq-pos">${lgEsc(p.pos)}</span>
+      <span class="sq-name">${lgEsc(p.name)}</span>
+      <span class="sq-ovr">${lgEsc(p.ovr)}</span>`;
+    list.appendChild(item);
+  });
+  pitch.innerHTML = '';
+  pitch.appendChild(list);
+  document.getElementById('squad-modal-close').onclick = () => modal.style.display = 'none';
+  modal.style.display = 'flex';
+}
+
+// Invite link: /?league=CODE opens the leagues screen with the code ready to join.
+document.addEventListener('DOMContentLoaded', () => {
+  const m = /[?&]league=([A-Za-z0-9]{4,8})/.exec(location.search);
+  if (!m) return;
+  _pendingLeagueCode = m[1].toUpperCase();
+  setTimeout(() => { if (typeof showLeagues === 'function') showLeagues(); }, 1400);
+});

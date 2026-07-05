@@ -1606,3 +1606,29 @@ body {
 
 .lg-league-name { font-size: 20px; font-weight: 900; color: var(--accent); margin-bottom: 10px; }
 .lg-play { display: block; width: 100%; margin-bottom: 4px; }
+
+/* League mode: hide the shared-settings sections (creator fixed them) */
+#screen-setup.league-locked .lg-lockable { display: none; }
+.lg-setup-note {
+  background: #ffd70012; border: 1px solid #ffd70040; color: var(--accent);
+  border-radius: 10px; padding: 10px 14px; font-size: 13px; font-weight: 700;
+  text-align: center; margin: 6px 0 10px;
+}
+/* League create/config */
+.lg-config { display: flex; flex-direction: column; gap: 10px; margin: 8px 0; }
+.lg-config-row { display: flex; align-items: center; gap: 8px; justify-content: space-between; }
+.lg-config-row > span { font-size: 13px; color: var(--dim); }
+.lg-mini { display: flex; gap: 4px; }
+.lg-mini button {
+  background: var(--surface2); border: 1px solid var(--border); color: var(--text);
+  border-radius: 7px; padding: 5px 10px; font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit;
+}
+.lg-mini button.on { border-color: var(--accent); color: var(--accent); background: #ffd70012; }
+.lg-max-input { width: 60px; text-align: center; }
+.lg-status { font-size: 13px; color: var(--dim); margin: 4px 0 10px; }
+.lg-status.complete { color: #22c55e; font-weight: 800; font-size: 15px; }
+.lg-leave { background: none; border: 1px solid #f8514940; color: #f85149; border-radius: 8px; padding: 6px 12px; font-size: 12px; cursor: pointer; font-family: inherit; margin-top: 12px; }
+.lg-leave:hover { background: #f851491a; }
+.lb-row.lg-clickable { cursor: pointer; }
+.lb-row.lg-clickable:hover { border-color: var(--accent2); }
+.lg-played-badge { font-size: 12px; color: #22c55e; font-weight: 700; text-align: center; margin-bottom: 8px; }

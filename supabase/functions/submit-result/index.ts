@@ -198,12 +198,11 @@ Deno.serve(async (req) => {
         const { data: mem } = await supabase.from('league_members')
           .select('user_id').eq('league_id', lg.id).eq('user_id', user.id).maybeSingle();
         if (mem) {
+          // One-shot: a member's league season is locked once played (no replay).
           const { data: prev } = await supabase.from('league_results')
-            .select('points, ovr').eq('league_id', lg.id).eq('user_id', user.id).maybeSingle();
-          const better = !prev || payload.points > prev.points ||
-            (payload.points === prev.points && payload.ovr > prev.ovr);
-          if (better) {
-            await supabase.from('league_results').upsert({
+            .select('user_id').eq('league_id', lg.id).eq('user_id', user.id).maybeSingle();
+          if (!prev) {
+            await supabase.from('league_results').insert({
               league_id: lg.id, user_id: user.id,
               ovr: payload.ovr, points: payload.points,
               wins: payload.wins, draws: payload.draws, losses: payload.losses,

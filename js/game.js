@@ -385,16 +385,27 @@ function showScreen(id) {
 // ─── Welcome ───────────────────────────────────────────────────────────────────
 function startGame() {
   state.leagueCode = null;   // a normal game from the welcome screen isn't for a league
+  document.getElementById('screen-setup').classList.remove('league-locked');
+  const note = document.getElementById('lg-setup-note'); if (note) note.style.display = 'none';
   buildFormationCards();
   if (!_selectedFormationKey) setFormationSelection('4-3-3');
   else setFormationSelection(_selectedFormationKey);
   showScreen('setup');
 }
 
-// Start a draft that will be recorded for a specific league.
-function startLeagueDraft(code) {
+// Start a draft recorded for a league, with the league's shared settings locked in.
+function startLeagueDraft(code, settings) {
   startGame();
   state.leagueCode = code;
+  const s = settings || {};
+  const pick = (rowId, val) => document.querySelectorAll('#' + rowId + ' .opt-btn')
+    .forEach(b => b.classList.toggle('selected', b.dataset.val === val));
+  pick('diff-row', s.difficulty || 'normal');
+  pick('ratings-row', s.ratings_visible === false ? 'off' : 'on');
+  pick('peakmode-row', s.peak_mode ? 'on' : 'off');
+  pick('draftmode-row', s.draft_mode || 'squad-first');
+  document.getElementById('screen-setup').classList.add('league-locked');
+  const note = document.getElementById('lg-setup-note'); if (note) note.style.display = 'block';
 }
 
 // ─── Setup Screen ──────────────────────────────────────────────────────────────
