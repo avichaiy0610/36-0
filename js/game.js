@@ -258,6 +258,7 @@ const state = {
   teamRerollsLeft: 1, seasonRerollsLeft: 1,
   isAnimating: false, awaitingSlotPick: false,
   moveMode: false, movingFromIdx: null,
+  leagueCode: null,
 };
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
@@ -383,10 +384,17 @@ function showScreen(id) {
 
 // ─── Welcome ───────────────────────────────────────────────────────────────────
 function startGame() {
+  state.leagueCode = null;   // a normal game from the welcome screen isn't for a league
   buildFormationCards();
   if (!_selectedFormationKey) setFormationSelection('4-3-3');
   else setFormationSelection(_selectedFormationKey);
   showScreen('setup');
+}
+
+// Start a draft that will be recorded for a specific league.
+function startLeagueDraft(code) {
+  startGame();
+  state.leagueCode = code;
 }
 
 // ─── Setup Screen ──────────────────────────────────────────────────────────────
@@ -966,10 +974,21 @@ function showSquadCardData(squad) {
 }
 
 // ─── Draft: Player rendering ───────────────────────────────────────────────────
+const POS_ORDER = ['GK','RB','CB','LB','CDM','CM','CAM','RM','LM','RW','LW','CF','ST'];
+
 function renderSquadPlayers(squad, filterSlotIdx = null) {
   const list = document.getElementById('players-list');
   list.innerHTML = '';
-  const players = [...squad.players].sort((a,b) => playerOVR(b) - playerOVR(a));
+  const players = [...squad.players];
+  if (state.showRatings) {
+    players.sort((a,b) => playerOVR(b) - playerOVR(a));
+  } else {
+    // Hidden ratings: group by position, random order within — so the list
+    // order never leaks a player's OVR.
+    const rnd = new Map(players.map(p => [p, Math.random()]));
+    const rank = p => { const i = POS_ORDER.indexOf(normalizePos(p.position)); return i < 0 ? 99 : i; };
+    players.sort((a,b) => (rank(a) - rank(b)) || (rnd.get(a) - rnd.get(b)));
+  }
 
   // Check if any player in this squad can fill a remaining slot
   const anyAvailable = players.some(player => {
@@ -1112,9 +1131,10 @@ function assignPlayer(slotIdx, player) {
 function updateDraftOVR() {
   const picked = state.picks.filter(Boolean).length;
   if (picked === 0) return;
+  const hidden = !state.showRatings;   // hide numbers until the season is simulated
   const ovr = teamOVR();
   const el = document.getElementById('draft-ovr-display');
-  if (el) { el.style.display = 'block'; setEl('draft-ovr-val', ovr); }
+  if (el) { el.style.display = 'block'; setEl('draft-ovr-val', hidden ? '???' : ovr); }
 
   const lines = [
     { id:'dovr-atk', label:'🎯 התקפה', pos: ATK_POS, color:'#f97316' },
@@ -1136,11 +1156,14 @@ function updateDraftOVR() {
       container.appendChild(row);
     }
     row.style.display = 'flex';
-    const pct = Math.max(8, Math.min(100, ((val - 55) / 42) * 100));
+    const pct      = hidden ? 100 : Math.max(8, Math.min(100, ((val - 55) / 42) * 100));
+    const barBg    = hidden ? '#3a3f4b' : color;
+    const valText  = hidden ? '???' : val;
+    const valColor = hidden ? 'var(--dim)' : color;
     row.innerHTML = `
       <span class="dovr-label">${label}</span>
-      <div class="dovr-bar-wrap"><div class="dovr-bar" style="width:${pct}%;background:${color}"></div></div>
-      <span class="dovr-val" style="color:${color}">${val}</span>
+      <div class="dovr-bar-wrap"><div class="dovr-bar" style="width:${pct}%;background:${barBg}"></div></div>
+      <span class="dovr-val" style="color:${valColor}">${valText}</span>
     `;
   });
 }
@@ -1634,6 +1657,7 @@ function animateResults(ovr) {
       projectedFinish: window._preseasonProjected ?? calcPreseasonOdds(ovr).projectedFinish,
     };
     saveSeasonState(season);
+    window._resultSubmitted = false;   // a new season may be saved again
     // count every finished season (for the games_N achievements) — once per
     // season: restored seasons skip this block
     if (typeof getCurrentUser === 'function' && getCurrentUser()) {
@@ -1771,6 +1795,13 @@ function animateResults(ovr) {
     }
     if (skipBtn) skipBtn.style.display = 'none';
     const tier = fillResults();
+    // League draft: record the result to the league automatically.
+    if (state.leagueCode && typeof getCurrentUser === 'function' && getCurrentUser()) {
+      submitResult().then(() => {
+        const sb = document.getElementById('btn-save-result');
+        if (sb) { sb.disabled = true; sb.textContent = '✓ נשמר לליגה'; }
+      });
+    }
     // Show the placement popup first; only reveal the finish/stats once it's closed.
     setTimeout(() => showPlacementPopup(tier, myRank, revealSummary), 350);
   }
@@ -1993,13 +2024,16 @@ function generateShareText() {
   const formation = FORMATIONS[state.formationId]?.label ?? '';
   const pts = r.wins * 3 + r.draws;
   const grid = r.matches.map(m => m.outcome === 'W' ? '🟩' : m.outcome === 'D' ? '🟨' : '🟥').join('');
+  const st = typeof siteText === 'function' ? siteText : (_k, d) => d;
+  const vars = { formation, ovr: r.ovr, wins: r.wins, draws: r.draws, losses: r.losses,
+                 points: pts, tier: tierDisplay(t).name };
   return [
-    `🇮🇱 36–0 | ליגת העל`,
-    `מערך: ${formation} | דירוג: ${r.ovr}`,
-    `${r.wins}נ-${r.draws}ת-${r.losses}ה | ${pts} נקודות`,
+    fillTemplate(st('share-title', '🇮🇱 36–0 | ליגת העל'), vars),
+    fillTemplate(st('share-line-formation', 'מערך: {formation} | דירוג: {ovr}'), vars),
+    fillTemplate(st('share-line-record', '{wins}נ-{draws}ת-{losses}ה | {points} נקודות'), vars),
     tierDisplay(t).name,
     grid,
-    `36-0.app`,
+    fillTemplate(st('share-footer', '36-0.app'), vars),
   ].join('\n');
 }
 
@@ -2125,16 +2159,19 @@ function restartGame() {
 async function submitResult() {
   const user = getCurrentUser();
   if (!user) return;
+  if (window._resultSubmitted) return;      // never submit the same season twice
   const { data: { session } } = await _supabase.auth.getSession();
   if (!session) return;
 
   const r = window._lastResult;
   const t = window._lastTier;
   if (!r || !t) return;
+  window._resultSubmitted = true;
 
   const isPublic = document.getElementById('share-squad-checkbox')?.checked ?? false;
 
   const payload = {
+    league_code: state.leagueCode || undefined,
     ovr:       r.ovr,
     wins:      r.wins,
     draws:     r.draws,

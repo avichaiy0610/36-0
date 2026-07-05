@@ -1355,6 +1355,18 @@ body {
 .nav-avatar { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; }
 .nav-username { color: #fff; font-size: 0.9rem; }
 
+/* Narrow screens: keep the nav on one line and stop the buttons from
+   overlapping the logo (shrink the buttons, cap the username width). */
+@media (max-width: 620px) {
+  .app-nav { padding: 0 8px; gap: 6px; }
+  .nav-logo { font-size: 0.95rem; letter-spacing: 0; flex-shrink: 0; }
+  .nav-actions { gap: 4px; flex-wrap: nowrap; min-width: 0; }
+  .nav-btn { padding: 4px 7px; font-size: 0.72rem; }
+  .nav-btn-sm { padding: 3px 6px; font-size: 0.68rem; }
+  .nav-username { font-size: 0.75rem; max-width: 72px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .nav-avatar { width: 22px; height: 22px; }
+}
+
 /* ── Modals ──────────────────────────────────────────────────────────────── */
 .modal-overlay {
   position: fixed; inset: 0; background: rgba(0,0,0,0.75);
@@ -1591,3 +1603,6 @@ body {
   color: var(--dim); border-radius: 8px; padding: 6px 12px; cursor: pointer; font-family: inherit; font-size: 12px;
 }
 .lg-copy:hover { color: var(--accent); border-color: var(--accent2); }
+
+.lg-league-name { font-size: 20px; font-weight: 900; color: var(--accent); margin-bottom: 10px; }
+.lg-play { display: block; width: 100%; margin-bottom: 4px; }

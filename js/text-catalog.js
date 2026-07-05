@@ -1092,5 +1092,33 @@ const TEXT_CATALOG = [
   "label": "כפתור סגירת פופ-אפ המקום",
   "selector": "virtual",
   "def": "לצפייה בתוצאות ←"
+ },
+ {
+  "key": "share-title",
+  "screen": "הודעת שיתוף (וואטסאפ/X)",
+  "label": "שורת כותרת",
+  "selector": "virtual",
+  "def": "🇮🇱 36–0 | ליגת העל"
+ },
+ {
+  "key": "share-line-formation",
+  "screen": "הודעת שיתוף (וואטסאפ/X)",
+  "label": "שורת מערך+דירוג (עם {formation} {ovr})",
+  "selector": "virtual",
+  "def": "מערך: {formation} | דירוג: {ovr}"
+ },
+ {
+  "key": "share-line-record",
+  "screen": "הודעת שיתוף (וואטסאפ/X)",
+  "label": "שורת מאזן (עם {wins} {draws} {losses} {points})",
+  "selector": "virtual",
+  "def": "{wins}נ-{draws}ת-{losses}ה | {points} נקודות"
+ },
+ {
+  "key": "share-footer",
+  "screen": "הודעת שיתוף (וואטסאפ/X)",
+  "label": "שורת סיום",
+  "selector": "virtual",
+  "def": "36-0.app"
  }
 ];

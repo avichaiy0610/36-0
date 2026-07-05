@@ -48,6 +48,7 @@ interface Payload {
   players: Player[];
   matches: MatchResult[];
   is_public: boolean;
+  league_code?: string;
 }
 
 function validate(p: Payload): string | null {
@@ -188,6 +189,31 @@ Deno.serve(async (req) => {
       is_public: payload.is_public ?? false,
     });
     if (squadError) throw squadError;
+
+    // If this season was played for a league, record it there (best kept).
+    if (payload.league_code) {
+      const code = String(payload.league_code).toUpperCase().trim();
+      const { data: lg } = await supabase.from('leagues').select('id').eq('code', code).maybeSingle();
+      if (lg) {
+        const { data: mem } = await supabase.from('league_members')
+          .select('user_id').eq('league_id', lg.id).eq('user_id', user.id).maybeSingle();
+        if (mem) {
+          const { data: prev } = await supabase.from('league_results')
+            .select('points, ovr').eq('league_id', lg.id).eq('user_id', user.id).maybeSingle();
+          const better = !prev || payload.points > prev.points ||
+            (payload.points === prev.points && payload.ovr > prev.ovr);
+          if (better) {
+            await supabase.from('league_results').upsert({
+              league_id: lg.id, user_id: user.id,
+              ovr: payload.ovr, points: payload.points,
+              wins: payload.wins, draws: payload.draws, losses: payload.losses,
+              gf: payload.gf, ga: payload.ga,
+              formation: payload.formation, tier: payload.tier, players: payload.players,
+            });
+          }
+        }
+      }
+    }
 
     const earned = computeAchievements(payload, gamesPlayed, usedFormations, usedClubs);
 

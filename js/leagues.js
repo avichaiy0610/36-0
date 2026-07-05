@@ -101,28 +101,47 @@ async function loadMyLeagues() {
 async function openLeague(code) {
   const box = document.getElementById('leagues-content');
   box.innerHTML = '<div class="page-loading">טוען טבלה...</div>';
-  const { data, error } = await _supabase.rpc('get_league_standings', { p_code: code });
+  const [{ data: info }, { data, error }] = await Promise.all([
+    _supabase.rpc('get_league_info', { p_code: code }),
+    _supabase.rpc('get_league_standings', { p_code: code }),
+  ]);
   if (error) { box.innerHTML = '<div class="page-note">טעינת הטבלה נכשלה</div>'; return; }
+  const meta = info?.[0] ?? {};
 
-  // rank: members with a season first (by points, then ovr), unplayed last
+  // Ligat Ha'al table: everyone's league team together, ranked by points then OVR.
   const rows = [...(data ?? [])].sort((a, b) => {
     const ap = a.points ?? -1, bp = b.points ?? -1;
     if (bp !== ap) return bp - ap;
     return (b.ovr ?? -1) - (a.ovr ?? -1);
   });
 
+  // Play / replay button for the current user
+  let playHtml = '';
+  if (meta.is_member) {
+    playHtml = meta.has_played
+      ? `<button class="btn-secondary lg-play" id="lg-play">🔁 שחק שוב לשיפור</button>`
+      : `<button class="btn-primary lg-play" id="lg-play">⚽ שחק את הדראפט שלך לליגה</button>`;
+  }
+
   let html = `
     <button class="back-btn lg-inner-back" id="lg-back-home">→ הליגות שלי</button>
+    <div class="lg-league-name">${lgEsc(meta.name ?? '')}</div>
     <div class="lg-share">
       <span class="lg-share-lbl">שתפו את הקוד כדי שחברים יצטרפו:</span>
       <span class="lg-share-code" id="lg-share-code" dir="ltr">${lgEsc(code)}</span>
       <button class="lg-copy" id="lg-copy">העתק</button>
     </div>
+    ${playHtml}
+    <div class="section-label" style="margin-top:14px">טבלת הליגה</div>
     <div class="lb-table lg-table">`;
 
+  if (!rows.length) {
+    html += '<div class="page-note">אין עדיין חברים בליגה</div>';
+  }
   rows.forEach((r, i) => {
     const played = r.points != null;
     const rank = i + 1;
+    const teamName = 'הקבוצה של ' + lgEsc(r.username ?? 'אנונימי');
     const main = played ? `${r.points} נק׳` : '—';
     const sub  = played
       ? `OVR ${r.ovr} · ${lgEsc(r.formation ?? '')} · ${r.wins}נ ${r.draws}ת ${r.losses}ה`
@@ -130,7 +149,7 @@ async function openLeague(code) {
     html += `
       <div class="lb-row">
         <span class="lb-rank ${rank <= 3 && played ? 'lb-rank-top' : ''}">${played ? rank : '·'}</span>
-        <span class="lb-name">${lgEsc(r.username ?? 'אנונימי')}</span>
+        <span class="lb-name">${teamName}</span>
         <span class="lb-stat">${main}</span>
         <span class="lb-sub" dir="rtl">${sub}</span>
       </div>`;
@@ -143,4 +162,6 @@ async function openLeague(code) {
     try { await navigator.clipboard.writeText(code); document.getElementById('lg-copy').textContent = '✓ הועתק'; }
     catch (e) { /* ignore */ }
   };
+  const playBtn = document.getElementById('lg-play');
+  if (playBtn) playBtn.onclick = () => startLeagueDraft(code);
 }
