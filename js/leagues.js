@@ -184,8 +184,12 @@ async function openLeague(code) {
   if (leaveBtn) leaveBtn.onclick = () => leaveLeagueFlow(code);
 
   const area = document.getElementById('lg-table-area');
-  if (complete) renderLeagueReveal(area, members);
-  else          renderLeagueWaiting(area, members);
+  if (complete) {
+    const myName = (document.getElementById('nav-username')?.textContent || '').trim();
+    renderLeagueComplete(area, code, members, myName);
+  } else {
+    renderLeagueWaiting(area, members);
+  }
 }
 
 // Before the league is complete: show only who's ready vs. still drafting —
@@ -206,45 +210,8 @@ function renderLeagueWaiting(area, members) {
   area.innerHTML = h;
 }
 
-// Once everyone has played: the shared simulation. Same table for all members;
-// a button runs a dramatic bottom-to-top reveal of the final standings.
-function renderLeagueReveal(area, members) {
-  const rows = [...members].sort((a, b) => {
-    const ap = a.points ?? -1, bp = b.points ?? -1;
-    if (bp !== ap) return bp - ap;
-    return (b.ovr ?? -1) - (a.ovr ?? -1);
-  });
-  area.innerHTML = `
-    <button class="btn-primary lg-sim-btn" id="lg-sim-run">🎬 הרץ את סימולציית הליגה</button>
-    <div class="lb-table lg-table" id="lg-sim-table"></div>`;
-  const table  = document.getElementById('lg-sim-table');
-  const runBtn = document.getElementById('lg-sim-run');
-
-  const build = (animate) => {
-    table.innerHTML = '';
-    rows.forEach((r, i) => {
-      const rank = i + 1;
-      const played = r.points != null;
-      const teamName = 'הקבוצה של ' + lgEsc(r.username ?? 'אנונימי');
-      const main = played ? `${r.points} נק׳` : '—';
-      const sub  = played
-        ? `OVR ${r.ovr} · ${lgEsc(r.formation ?? '')} · ${r.wins}נ ${r.draws}ת ${r.losses}ה`
-        : 'לא שיחק';
-      const el = document.createElement('div');
-      el.className = `lb-row ${played ? 'lg-clickable' : ''}${animate ? ' lg-reveal' : ''}`;
-      el.innerHTML = `
-        <span class="lb-rank ${rank <= 3 && played ? 'lb-rank-top' : ''}">${played ? rank : '·'}</span>
-        <span class="lb-name">${teamName}</span>
-        <span class="lb-stat">${main}</span>
-        <span class="lb-sub" dir="rtl">${sub}</span>`;
-      el.onclick = () => { if (r?.players?.length) showLeagueSquad(r.players, 'הקבוצה של ' + (r.username ?? '')); };
-      table.appendChild(el);
-      if (animate) setTimeout(() => el.classList.add('shown'), (rows.length - 1 - i) * 300 + 80);
-    });
-  };
-
-  runBtn.onclick = () => { runBtn.style.display = 'none'; build(true); };
-}
+// (The completed-league view is rendered by renderLeagueComplete in league-sim.js:
+//  a full shared Ligat Ha'al season the members watch, then a members-only table.)
 
 async function leaveLeagueFlow(code) {
   if (!confirm('לעזוב את הליגה? לא תוכל לחזור אליה ללא הקוד.')) return;

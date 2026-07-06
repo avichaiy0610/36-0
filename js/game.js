@@ -1880,7 +1880,8 @@ async function submitLeagueDraft(ovr) {
   showLeagueSubmitModal('sending');
   if (typeof getCurrentUser === 'function' && getCurrentUser())
     _supabase.rpc('increment_games_played').then(() => {}, () => {});
-  await submitResult();                 // payload carries state.leagueCode
+  const ok = await submitResult();      // payload carries state.leagueCode
+  if (!ok) { showLeagueSubmitModal('error', code); return; }  // keep the draft to retry
   clearDraftState();                    // one-shot: nothing to resume, no results screen
   state.leagueCode = null;
   showLeagueSubmitModal('done', code);
@@ -1900,6 +1901,24 @@ function showLeagueSubmitModal(phase, code) {
         <div class="placement-tier" style="color:#22c55e">⚽</div>
         <div class="placement-sub">שולח את ההרכב לליגה…</div>
       </div>`;
+    modal.style.display = 'flex';
+    return;
+  }
+  if (phase === 'error') {
+    modal.innerHTML = `
+      <div class="modal-box placement-box">
+        <div class="placement-tier" style="color:#f85149">שליחה נכשלה</div>
+        <div class="placement-sub">רגע של תקלת רשת. ההרכב שלך נשמר — אפשר לנסות לשלוח שוב.</div>
+        <button class="btn-primary btn-full" id="league-submit-retry">נסה שוב</button>
+      </div>`;
+    modal.querySelector('#league-submit-retry').onclick = async () => {
+      showLeagueSubmitModal('sending');
+      const ok = await submitResult();
+      if (!ok) { showLeagueSubmitModal('error', code); return; }
+      clearDraftState();
+      state.leagueCode = null;
+      showLeagueSubmitModal('done', code);
+    };
     modal.style.display = 'flex';
     return;
   }
@@ -2238,15 +2257,16 @@ function restartGame() {
 // ─── Leaderboard integration ───────────────────────────────────────────────────
 async function submitResult() {
   const user = getCurrentUser();
-  if (!user) return;
-  if (window._resultSubmitted) return;      // never submit the same season twice
+  if (!user) return false;
+  if (window._resultSubmitted) return true;   // already saved this season
+  if (window._submitting) return false;        // a submit is already in flight
   const { data: { session } } = await _supabase.auth.getSession();
-  if (!session) return;
+  if (!session) return false;
 
   const r = window._lastResult;
   const t = window._lastTier;
-  if (!r || !t) return;
-  window._resultSubmitted = true;
+  if (!r || !t) return false;
+  window._submitting = true;
 
   const isPublic = document.getElementById('share-squad-checkbox')?.checked ?? false;
 
@@ -2283,21 +2303,41 @@ async function submitResult() {
     is_public: isPublic,
   };
 
+  // Retry transient failures (edge-function cold starts return a 502 without CORS
+  // headers, which the browser surfaces as a fetch error) so a season isn't lost.
+  const sleep = ms => new Promise(res => setTimeout(res, ms));
+  let ok = false;
   try {
-    const res = await fetch(`${SUPABASE_URL}/functions/v1/submit-result`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${session.access_token}`,
-        'apikey': SUPABASE_ANON_KEY,
-      },
-      body: JSON.stringify(payload),
-    });
-    const json = await res.json();
-    if (json.new_achievements?.length) await showAchievementToasts(json.new_achievements);
-  } catch (err) {
-    console.error('Failed to submit result:', err);
+    for (let attempt = 0; attempt < 3 && !ok; attempt++) {
+      try {
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/submit-result`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+            'apikey': SUPABASE_ANON_KEY,
+          },
+          body: JSON.stringify(payload),
+        });
+        if (res.ok) {
+          const json = await res.json();
+          if (json.new_achievements?.length) await showAchievementToasts(json.new_achievements);
+          ok = true;
+        } else if (res.status >= 500) {
+          await sleep(700 * (attempt + 1));    // cold start — back off and retry
+        } else {
+          console.error('submit-result rejected:', res.status);
+          break;                                // 4xx — client error, don't retry
+        }
+      } catch (err) {
+        await sleep(700 * (attempt + 1));        // network/CORS-on-crash — retry
+      }
+    }
+  } finally {
+    window._submitting = false;
   }
+  if (ok) window._resultSubmitted = true;
+  return ok;
 }
 
 function setupSaveSection() {
@@ -2323,8 +2363,9 @@ function setupSaveSection() {
   saveBtn.onclick = async () => {
     saveBtn.disabled = true;
     saveBtn.textContent = 'שומר...';
-    await submitResult();
-    saveBtn.textContent = '✓ נשמר!';
+    const ok = await submitResult();
+    if (ok) { saveBtn.textContent = '✓ נשמר!'; }
+    else    { saveBtn.textContent = 'נסה שוב'; saveBtn.disabled = false; }
   };
 }
 

@@ -1691,5 +1691,18 @@ body {
 .duel-scoreline b { font-size: 20px; }
 .duel-res-row { cursor: pointer; }
 .duel-quick-card { border-color: var(--accent2); background: linear-gradient(180deg, #1b2330, var(--panel2, #1b2330)); }
+/* shared league simulation */
+.lgsim-hero { text-align: center; padding: 18px 12px; }
+.lgsim-hero-title { font-size: 20px; font-weight: 900; color: #22c55e; }
+.lgsim-hero-sub { font-size: 13px; color: var(--dim); margin: 8px 0 14px; }
+.lgsim-start { width: 100%; font-size: 16px; }
+.lgsim-reveal-head { text-align: center; font-weight: 900; font-size: 16px; margin-bottom: 10px; }
+.lgsim-tally { margin-bottom: 8px; }
+.lgsim-pos { text-align: center; font-size: 15px; margin-top: 10px; }
+.lgsim-pos b { color: var(--accent2); font-size: 18px; }
+.lb-row.lgsim-member { border-color: var(--accent2); }
+.lb-row.lgsim-me { background: #22c55e14; border-color: #22c55e; }
+.nav-username { cursor: pointer; }
+.nav-username:hover { text-decoration: underline; }
 /* league-complete popup */
 .lgc-name { font-weight: 800; color: #22c55e; margin: 4px 0; }

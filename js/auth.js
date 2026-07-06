@@ -61,6 +61,23 @@ async function initAuth() {
   document.getElementById('nav-achievements').addEventListener('click', () => typeof showAchievements === 'function' && showAchievements());
   document.getElementById('nav-leagues')?.addEventListener('click', () => typeof showLeagues === 'function' && showLeagues());
   document.getElementById('nav-duel')?.addEventListener('click', () => typeof showDuel === 'function' && showDuel());
+  document.getElementById('nav-username')?.addEventListener('click', openUsernameEditor);
+}
+
+// Let a logged-in user rename themselves (reuses the username modal + saveUsername).
+function openUsernameEditor() {
+  if (!currentUser) return;
+  const modal = document.getElementById('username-modal');
+  const input = document.getElementById('username-input');
+  const title = modal.querySelector('.modal-title');
+  const sub   = modal.querySelector('.modal-sub');
+  const err   = document.getElementById('username-error');
+  input.value = (document.getElementById('nav-username').textContent || '').trim();
+  if (title) title.textContent = 'שנה שם משתמש';
+  if (sub)   sub.textContent = 'השם יוצג בטבלאות ובליגות';
+  if (err)   err.style.display = 'none';
+  modal.style.display = 'flex';
+  input.focus(); input.select();
 }
 
 async function onSignIn(user) {
