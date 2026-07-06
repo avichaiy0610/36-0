@@ -259,6 +259,7 @@ const state = {
   isAnimating: false, awaitingSlotPick: false,
   moveMode: false, movingFromIdx: null,
   leagueCode: null,
+  duelCode: null,
 };
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
@@ -385,8 +386,11 @@ function showScreen(id) {
 // ─── Welcome ───────────────────────────────────────────────────────────────────
 function startGame() {
   state.leagueCode = null;   // a normal game from the welcome screen isn't for a league
+  state.duelCode = null;
   window._leagueReviewMode = null;
+  window._duelReviewMode = null;
   document.getElementById('league-review-back')?.remove();
+  document.getElementById('duel-review-chrome')?.remove();
   document.getElementById('screen-setup').classList.remove('league-locked');
   const note = document.getElementById('lg-setup-note'); if (note) note.style.display = 'none';
   buildFormationCards();
@@ -1139,8 +1143,11 @@ function assignPlayer(slotIdx, player) {
   const moveBtn = document.getElementById('btn-move-player');
   if (moveBtn) moveBtn.style.display = '';
   updateDraftOVR();
-  if (state.currentRound >= state.slots.length) setTimeout(() => showPreseason(teamOVR()), 500);
-  else setTimeout(startRound, 400);
+  if (state.currentRound >= state.slots.length) {
+    // A duel draft skips the solo preseason — it submits the squad and waits.
+    if (state.duelCode && typeof submitDuelSquad === 'function') setTimeout(() => submitDuelSquad(), 500);
+    else setTimeout(() => showPreseason(teamOVR()), 500);
+  } else setTimeout(startRound, 400);
 }
 
 function updateDraftOVR() {
@@ -2350,8 +2357,8 @@ function setupSaveSection() {
   const loginPrompt = document.getElementById('save-login-prompt');
   if (!saveSection || !loginPrompt) return;
 
-  // Reviewing a league season — nothing to save (it isn't a fresh single-player draft).
-  if (window._leagueReviewMode) { saveSection.style.display = 'none'; loginPrompt.style.display = 'none'; return; }
+  // Reviewing a league/duel season — nothing to save (it isn't a fresh single-player draft).
+  if (window._leagueReviewMode || window._duelReviewMode) { saveSection.style.display = 'none'; loginPrompt.style.display = 'none'; return; }
 
   if (user) {
     saveSection.style.display = 'flex';
