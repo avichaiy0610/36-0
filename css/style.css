@@ -1690,5 +1690,6 @@ body {
 .duel-scoreline { text-align: center; font-size: 16px; font-weight: 700; margin-bottom: 6px; }
 .duel-scoreline b { font-size: 20px; }
 .duel-res-row { cursor: pointer; }
+.duel-quick-card { border-color: var(--accent2); background: linear-gradient(180deg, #1b2330, var(--panel2, #1b2330)); }
 /* league-complete popup */
 .lgc-name { font-weight: 800; color: #22c55e; margin: 4px 0; }
