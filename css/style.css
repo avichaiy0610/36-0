@@ -1632,3 +1632,29 @@ body {
 .lb-row.lg-clickable { cursor: pointer; }
 .lb-row.lg-clickable:hover { border-color: var(--accent2); }
 .lg-played-badge { font-size: 12px; color: #22c55e; font-weight: 700; text-align: center; margin-bottom: 8px; }
+.lg-status-hint { font-size: 11px; opacity: .8; }
+.lg-chip { font-size: 12px; font-weight: 800; white-space: nowrap; }
+.lg-chip.done { color: #22c55e; }
+.lg-chip.wait { color: #f59e0b; }
+.lg-masked .lb-row { opacity: .9; }
+.lg-sim-btn { display: block; width: 100%; margin-bottom: 12px; }
+.lb-row.lg-reveal { opacity: 0; transform: translateY(10px); transition: opacity .38s ease, transform .38s ease; }
+.lb-row.lg-reveal.shown { opacity: 1; transform: none; }
+
+/* ── Real-time duel (1v1) ─────────────────────────────────────────────────── */
+.nav-beta { font-size: 9px; font-weight: 800; color: #fff; background: var(--accent2); border-radius: 6px; padding: 1px 4px; margin-inline-start: 3px; vertical-align: middle; }
+.duel-slots { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 18px 0; }
+.duel-slot { flex: 1; min-width: 0; background: var(--panel2, #1b2330); border: 1.5px solid var(--border); border-radius: 12px; padding: 16px 10px; text-align: center; transition: border-color .2s, box-shadow .2s; }
+.duel-slot.filled { border-color: var(--accent2); }
+.duel-slot.ready { border-color: #22c55e; box-shadow: 0 0 0 2px #22c55e33; }
+.duel-slot.empty { opacity: .65; border-style: dashed; }
+.duel-slot-name { font-weight: 800; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.duel-slot-status { font-size: 12px; margin-top: 4px; color: var(--dim); }
+.duel-slot.ready .duel-slot-status { color: #22c55e; font-weight: 700; }
+.duel-vs { font-weight: 900; font-size: 14px; color: var(--dim); }
+.duel-ready-btn { display: block; width: 100%; margin-bottom: 10px; }
+.duel-ready-btn.on { background: #22c55e; }
+.duel-ready-btn:disabled { opacity: .55; cursor: default; }
+.duel-ready-note { text-align: center; font-weight: 800; color: #22c55e; margin: 8px 0; }
+.duel-soon { text-align: center; font-size: 13px; color: var(--dim); background: var(--panel2, #1b2330); border: 1px dashed var(--border); border-radius: 10px; padding: 12px; margin-bottom: 10px; }
+.duel-soon span { font-size: 11px; opacity: .7; }

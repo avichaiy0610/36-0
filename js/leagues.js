@@ -138,23 +138,20 @@ async function openLeague(code) {
   ]);
   if (error || !info?.length) { box.innerHTML = '<div class="page-note">טעינת הליגה נכשלה</div>'; return; }
   const meta = info[0];
-
-  const rows = [...(data ?? [])].sort((a, b) => {
-    const ap = a.points ?? -1, bp = b.points ?? -1;
-    if (bp !== ap) return bp - ap;
-    return (b.ovr ?? -1) - (a.ovr ?? -1);
-  });
+  const complete = meta.is_complete;
+  const members = [...(data ?? [])];
 
   // Status line + play button
   let statusHtml, playHtml = '';
-  if (meta.is_complete) {
-    statusHtml = `<div class="lg-status complete">🏆 הליגה הסתיימה — הטבלה סופית!</div>`;
+  if (complete) {
+    statusHtml = `<div class="lg-status complete">🏆 הליגה הסתיימה — הטבלה מוכנה לחשיפה!</div>`;
   } else {
-    statusHtml = `<div class="lg-status">${meta.members}/${meta.max_players} שחקנים · ${meta.played_count} סיימו דראפט</div>`;
+    statusHtml = `<div class="lg-status">${meta.members}/${meta.max_players} שחקנים · ${meta.played_count} סיימו דראפט
+      <br><span class="lg-status-hint">🔒 הטבלה תיחשף כשכל השחקנים יסיימו</span></div>`;
   }
   if (meta.is_member) {
     if (meta.has_played) {
-      playHtml = `<div class="lg-played-badge">✓ כבר שיחקת בליגה זו</div>`;
+      playHtml = `<div class="lg-played-badge">✓ שלחת את ההרכב — בהצלחה! 🤞</div>`;
     } else {
       playHtml = `<button class="btn-primary lg-play" id="lg-play">⚽ שחק את הדראפט שלך לליגה</button>`;
     }
@@ -171,26 +168,7 @@ async function openLeague(code) {
     ${statusHtml}
     ${playHtml}
     <div class="section-label" style="margin-top:14px">טבלת הליגה</div>
-    <div class="lb-table lg-table">`;
-
-  if (!rows.length) html += '<div class="page-note">אין עדיין חברים בליגה</div>';
-  rows.forEach((r, i) => {
-    const played = r.points != null;
-    const rank = i + 1;
-    const teamName = 'הקבוצה של ' + lgEsc(r.username ?? 'אנונימי');
-    const main = played ? `${r.points} נק׳` : '—';
-    const sub  = played
-      ? `OVR ${r.ovr} · ${lgEsc(r.formation ?? '')} · ${r.wins}נ ${r.draws}ת ${r.losses}ה`
-      : 'עדיין לא שיחק';
-    html += `
-      <div class="lb-row ${played ? 'lg-clickable' : ''}" data-idx="${i}">
-        <span class="lb-rank ${rank <= 3 && played ? 'lb-rank-top' : ''}">${played ? rank : '·'}</span>
-        <span class="lb-name">${teamName}</span>
-        <span class="lb-stat">${main}</span>
-        <span class="lb-sub" dir="rtl">${sub}</span>
-      </div>`;
-  });
-  html += '</div>';
+    <div id="lg-table-area"></div>`;
   if (meta.is_member) html += `<button class="lg-leave" id="lg-leave">עזוב ליגה</button>`;
   box.innerHTML = html;
 
@@ -204,13 +182,68 @@ async function openLeague(code) {
   if (playBtn) playBtn.onclick = () => startLeagueDraft(code, meta.settings);
   const leaveBtn = document.getElementById('lg-leave');
   if (leaveBtn) leaveBtn.onclick = () => leaveLeagueFlow(code);
-  // squad view on row click
-  box.querySelectorAll('.lb-row.lg-clickable').forEach(row => {
-    row.onclick = () => {
-      const r = rows[+row.dataset.idx];
-      if (r?.players?.length) showLeagueSquad(r.players, 'הקבוצה של ' + (r.username ?? ''));
-    };
+
+  const area = document.getElementById('lg-table-area');
+  if (complete) renderLeagueReveal(area, members);
+  else          renderLeagueWaiting(area, members);
+}
+
+// Before the league is complete: show only who's ready vs. still drafting —
+// no points, no order, no squads. The suspense is the whole point.
+function renderLeagueWaiting(area, members) {
+  if (!members.length) { area.innerHTML = '<div class="page-note">אין עדיין חברים בליגה</div>'; return; }
+  let h = '<div class="lb-table lg-table lg-masked">';
+  members.forEach(r => {
+    const played = r.points != null;
+    h += `
+      <div class="lb-row">
+        <span class="lb-rank">·</span>
+        <span class="lb-name">הקבוצה של ${lgEsc(r.username ?? 'אנונימי')}</span>
+        <span class="lg-chip ${played ? 'done' : 'wait'}">${played ? '✓ מוכן' : '⏳ ממתין'}</span>
+      </div>`;
   });
+  h += '</div>';
+  area.innerHTML = h;
+}
+
+// Once everyone has played: the shared simulation. Same table for all members;
+// a button runs a dramatic bottom-to-top reveal of the final standings.
+function renderLeagueReveal(area, members) {
+  const rows = [...members].sort((a, b) => {
+    const ap = a.points ?? -1, bp = b.points ?? -1;
+    if (bp !== ap) return bp - ap;
+    return (b.ovr ?? -1) - (a.ovr ?? -1);
+  });
+  area.innerHTML = `
+    <button class="btn-primary lg-sim-btn" id="lg-sim-run">🎬 הרץ את סימולציית הליגה</button>
+    <div class="lb-table lg-table" id="lg-sim-table"></div>`;
+  const table  = document.getElementById('lg-sim-table');
+  const runBtn = document.getElementById('lg-sim-run');
+
+  const build = (animate) => {
+    table.innerHTML = '';
+    rows.forEach((r, i) => {
+      const rank = i + 1;
+      const played = r.points != null;
+      const teamName = 'הקבוצה של ' + lgEsc(r.username ?? 'אנונימי');
+      const main = played ? `${r.points} נק׳` : '—';
+      const sub  = played
+        ? `OVR ${r.ovr} · ${lgEsc(r.formation ?? '')} · ${r.wins}נ ${r.draws}ת ${r.losses}ה`
+        : 'לא שיחק';
+      const el = document.createElement('div');
+      el.className = `lb-row ${played ? 'lg-clickable' : ''}${animate ? ' lg-reveal' : ''}`;
+      el.innerHTML = `
+        <span class="lb-rank ${rank <= 3 && played ? 'lb-rank-top' : ''}">${played ? rank : '·'}</span>
+        <span class="lb-name">${teamName}</span>
+        <span class="lb-stat">${main}</span>
+        <span class="lb-sub" dir="rtl">${sub}</span>`;
+      el.onclick = () => { if (r?.players?.length) showLeagueSquad(r.players, 'הקבוצה של ' + (r.username ?? '')); };
+      table.appendChild(el);
+      if (animate) setTimeout(() => el.classList.add('shown'), (rows.length - 1 - i) * 300 + 80);
+    });
+  };
+
+  runBtn.onclick = () => { runBtn.style.display = 'none'; build(true); };
 }
 
 async function leaveLeagueFlow(code) {

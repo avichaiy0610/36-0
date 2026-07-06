@@ -35,6 +35,7 @@
     <div class="nav-logo" dir="ltr">36–0</div>
     <div class="nav-actions">
       <button class="nav-btn" id="nav-leagues">ליגות</button>
+      <button class="nav-btn" id="nav-duel">1v1 <span class="nav-beta">בטא</span></button>
       <button class="nav-btn" id="nav-leaderboard">לוח שיאים</button>
       <button class="nav-btn" id="nav-achievements">הישגים</button>
       <div class="nav-user" id="nav-user" style="display:none">
@@ -624,6 +625,16 @@
     </div>
   </div>
 
+  <div id="screen-duel" class="screen screen-page">
+    <div class="page-inner lb-inner">
+      <div class="page-header">
+        <button class="back-btn" id="duel-back">→ חזרה</button>
+        <h2 class="page-title">דואל 1 על 1</h2>
+      </div>
+      <div id="duel-content"></div>
+    </div>
+  </div>
+
   <!-- ══ SQUAD VIEW MODAL ═══════════════════════════════════════════════════════ -->
   <div id="squad-modal" class="modal-overlay" style="display:none">
     <div class="modal-box squad-modal-box">
@@ -644,6 +655,7 @@
   <script src="js/achievements.js"></script>
   <script src="js/leaderboard.js"></script>
   <script src="js/leagues.js"></script>
+  <script src="js/duel.js"></script>
   <script src="js/data.js"></script>
   <script src="js/game.js"></script>
 </body>

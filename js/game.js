@@ -573,6 +573,7 @@ function saveDraftState() {
     localStorage.setItem(DRAFT_SAVE_KEY, JSON.stringify({
       v: 1,
       formationId: state.formationId,
+      leagueCode: state.leagueCode || null,
       difficulty: state.difficulty,
       showRatings: state.showRatings,
       draftMode: state.draftMode,
@@ -634,6 +635,7 @@ function restoreDraftState() {
 
   Object.assign(state, {
     formationId: d.formationId, slots, picks,
+    leagueCode: d.leagueCode ?? null,
     difficulty: d.difficulty, showRatings: d.showRatings,
     draftMode: d.draftMode, peakMode: d.peakMode,
     eraMin: d.eraMin, eraMax: d.eraMax,
@@ -1608,8 +1610,15 @@ function showPreseason(ovr) {
 }
 
 function showResults() {
-  buildResultsPitch();
   const ovr = teamOVR();
+  // League draft: no personal reveal. Simulate silently, record the season to
+  // the league, and send the player back to the (still-locked) league table —
+  // the standings are only unveiled once every member has played.
+  if (state.leagueCode && typeof getCurrentUser === 'function' && getCurrentUser()) {
+    submitLeagueDraft(ovr);
+    return;
+  }
+  buildResultsPitch();
   showScreen('results');
   setTimeout(() => animateResults(ovr), 400);
 }
@@ -1845,6 +1854,66 @@ function showPlacementPopup(tier, rank, onClose) {
   modal.querySelector('#placement-close').onclick = () => {
     modal.style.display = 'none';
     if (typeof onClose === 'function') onClose();
+  };
+  modal.style.display = 'flex';
+}
+
+// ── League draft: silent submission (no personal reveal) ─────────────────────
+// The whole point of a league is suspense — nobody sees anything until every
+// member has played. So a league season is simulated in the background, the
+// result is recorded, and the player only gets a "submitted" confirmation.
+async function submitLeagueDraft(ovr) {
+  const code = state.leagueCode;
+  const g = generateMatches(ovr);
+  let wins = 0, draws = 0, losses = 0, gfTotal = 0, gaTotal = 0;
+  g.matches.forEach(m => {
+    if (m.outcome === 'W') wins++; else if (m.outcome === 'D') draws++; else losses++;
+    gfTotal += m.gf; gaTotal += m.ga;
+  });
+  const leagueTable = generateLeagueTable(wins, draws, losses, g.inTopSix, g.champOpponents, g.relegOpponents);
+  const myRank = leagueTable.findIndex(t => t.us) + 1;
+  const tier = getTier(wins, draws, losses, myRank, leagueTable.length, g.matches.length);
+  window._lastResult = { wins, draws, losses, gfTotal, gaTotal, matches: g.matches, ovr, inTopSix: g.inTopSix };
+  window._lastTier = tier;
+  window._resultSubmitted = false;
+
+  showLeagueSubmitModal('sending');
+  if (typeof getCurrentUser === 'function' && getCurrentUser())
+    _supabase.rpc('increment_games_played').then(() => {}, () => {});
+  await submitResult();                 // payload carries state.leagueCode
+  clearDraftState();                    // one-shot: nothing to resume, no results screen
+  state.leagueCode = null;
+  showLeagueSubmitModal('done', code);
+}
+
+function showLeagueSubmitModal(phase, code) {
+  let modal = document.getElementById('league-submit-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'league-submit-modal';
+    modal.className = 'modal-overlay';
+    document.body.appendChild(modal);
+  }
+  if (phase === 'sending') {
+    modal.innerHTML = `
+      <div class="modal-box placement-box">
+        <div class="placement-tier" style="color:#22c55e">⚽</div>
+        <div class="placement-sub">שולח את ההרכב לליגה…</div>
+      </div>`;
+    modal.style.display = 'flex';
+    return;
+  }
+  modal.innerHTML = `
+    <div class="modal-box placement-box">
+      <div class="placement-tier" style="color:#22c55e">✓ ההרכב נשלח!</div>
+      <div class="placement-sub">בלי הצצות 🤫 — טבלת הליגה תיחשף רק כשכל השחקנים יסיימו את הדראפט שלהם.</div>
+      <button class="btn-primary btn-full" id="league-submit-close">${siteText('league-submit-close', 'לטבלת הליגה ←')}</button>
+    </div>`;
+  modal.querySelector('#league-submit-close').onclick = () => {
+    modal.style.display = 'none';
+    if (typeof showScreen === 'function') showScreen('leagues');
+    if (code && typeof openLeague === 'function') openLeague(code);
+    else if (typeof showLeagues === 'function') showLeagues();
   };
   modal.style.display = 'flex';
 }
