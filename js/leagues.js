@@ -12,6 +12,8 @@ let _lgCreate = { max: 6, difficulty: 'normal', peak: false, ratings: true };
 let _pendingLeagueCode = null;
 
 async function showLeagues() {
+  window._leagueReviewMode = null;
+  document.getElementById('league-review-back')?.remove();
   showScreen('leagues');
   document.getElementById('leagues-back').onclick = () => showScreen('welcome');
   renderLeaguesHome();
@@ -186,7 +188,7 @@ async function openLeague(code) {
   const area = document.getElementById('lg-table-area');
   if (complete) {
     const myName = (document.getElementById('nav-username')?.textContent || '').trim();
-    renderLeagueComplete(area, code, members, myName);
+    renderLeagueComplete(area, code, members, myName, meta.settings);
   } else {
     renderLeagueWaiting(area, members);
   }

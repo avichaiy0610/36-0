@@ -385,6 +385,8 @@ function showScreen(id) {
 // ─── Welcome ───────────────────────────────────────────────────────────────────
 function startGame() {
   state.leagueCode = null;   // a normal game from the welcome screen isn't for a league
+  window._leagueReviewMode = null;
+  document.getElementById('league-review-back')?.remove();
   document.getElementById('screen-setup').classList.remove('league-locked');
   const note = document.getElementById('lg-setup-note'); if (note) note.style.display = 'none';
   buildFormationCards();
@@ -1660,9 +1662,11 @@ function buildResultsPitch() { buildPitchInContainer('results-pitch-slots'); }
 function animateResults(ovr) {
   // Reuse a season restored from storage; otherwise simulate once and persist,
   // so refreshing cannot re-roll a different outcome for the same squad.
-  let season = window._restoredSeason ?? null;
-  window._restoredSeason = null;
-  const seasonWasRestored = !!season;  // refresh → skip the match-by-match suspense
+  // _restoredSeason → replay instantly (page refresh). _presetSeason → a season
+  // computed elsewhere (e.g. a league reveal) that still plays the full reveal.
+  let season = window._restoredSeason ?? window._presetSeason ?? null;
+  const seasonWasRestored = !!window._restoredSeason;
+  window._restoredSeason = null; window._presetSeason = null;
   if (!season) {
     const g = generateMatches(ovr);
     let w = 0, d = 0;
@@ -2345,6 +2349,9 @@ function setupSaveSection() {
   const saveSection = document.getElementById('save-result-section');
   const loginPrompt = document.getElementById('save-login-prompt');
   if (!saveSection || !loginPrompt) return;
+
+  // Reviewing a league season — nothing to save (it isn't a fresh single-player draft).
+  if (window._leagueReviewMode) { saveSection.style.display = 'none'; loginPrompt.style.display = 'none'; return; }
 
   if (user) {
     saveSection.style.display = 'flex';

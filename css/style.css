@@ -1702,6 +1702,7 @@ body {
 .lgsim-pos b { color: var(--accent2); font-size: 18px; }
 .lb-row.lgsim-member { border-color: var(--accent2); }
 .lb-row.lgsim-me { background: #22c55e14; border-color: #22c55e; }
+.league-review-back { position: fixed; top: 8px; inset-inline-start: 8px; z-index: 50; background: var(--accent2); color: #fff; border: none; border-radius: 8px; padding: 7px 12px; font-family: inherit; font-weight: 800; font-size: 13px; cursor: pointer; box-shadow: 0 2px 8px #0006; }
 .nav-username { cursor: pointer; }
 .nav-username:hover { text-decoration: underline; }
 /* league-complete popup */

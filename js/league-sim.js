@@ -1,11 +1,10 @@
-// ─── Shared league simulation (async "leagues with friends") ───────────────────
-// When a league is complete, every member watches the SAME deterministic Ligat
-// Ha'al season: the members' drafted teams are inserted alongside the AI teams
-// and play a full double round-robin against each other and the AI. The seed is
-// derived from the league code, so the fixtures, scores and scorers are identical
-// for everyone and every re-run. Then a members-only table ranks the friends.
-
-const LG_GOAL_W = { ST: 10, CF: 9, RW: 6, LW: 6, CAM: 6, RM: 4, LM: 4, CM: 3, CDM: 1, RB: 1, LB: 1, CB: 1, GK: 0 };
+// ─── Shared league reveal (async "leagues with friends") ───────────────────────
+// When a league is complete, each member watches the EXACT normal after-draft
+// results page for their own team — same rules, playoff, tier and stats — only
+// the league table also contains the friends' teams (instead of some AI teams).
+// Everything is deterministic (seed derived from league code + username), so the
+// season, scorers and the friends' points are identical for everyone and on every
+// re-run. This reuses the real single-player engine via a seeded Math.random.
 
 function lgSimSeed(str) {
   let h = 2166136261 >>> 0;
@@ -17,196 +16,155 @@ function lgAvgOvr(players) {
   const top = [...players].sort((a, b) => (b.ovr || 0) - (a.ovr || 0)).slice(0, 11);
   return Math.round(top.reduce((s, p) => s + (p.ovr || 0), 0) / top.length);
 }
-function lgPoisson(lambda, rng) {         // Knuth — deterministic given rng
-  const L = Math.exp(-lambda); let k = 0, p = 1;
-  do { k++; p *= rng(); } while (p > L);
-  return Math.min(k - 1, 7);
-}
-function lgWeightedIdx(weights, rng) {
-  const total = weights.reduce((a, b) => a + b, 0);
-  if (total <= 0) return Math.floor(rng() * weights.length);
-  let r = rng() * total;
-  for (let i = 0; i < weights.length; i++) { r -= weights[i]; if (r < 0) return i; }
-  return weights.length - 1;
-}
-function lgScorers(team, goals, rng) {
-  if (!team.players || !team.players.length || goals === 0) return [];
-  const weights = team.players.map(p => LG_GOAL_W[p.pos] ?? LG_GOAL_W[p.position] ?? 1);
-  const out = [];
-  for (let g = 0; g < goals; g++) {
-    const idx = lgWeightedIdx(weights, rng);
-    out.push({ n: playerShortName(team.players[idx].name), min: 1 + Math.floor(rng() * 90) });
-  }
-  return out.sort((a, b) => a.min - b.min);
-}
-function lgSimMatch(oa, ob, rng) {
-  const ea = Math.max(0.15, 1.35 + (oa - ob) / 18 + 0.15);  // +home advantage
-  const eb = Math.max(0.15, 1.30 + (ob - oa) / 18);
-  return [lgPoisson(ea, rng), lgPoisson(eb, rng)];
+
+// Run fn with Math.random replaced by a seeded generator, so the existing
+// (Math.random-based) simulation becomes fully reproducible.
+function withSeededRandom(seed, fn) {
+  const orig = Math.random;
+  Math.random = mulberry32(seed >>> 0 || 1);
+  try { return fn(); } finally { Math.random = orig; }
 }
 
-// Build the full season table. members = [{ username, ovr, players }].
-function simulateLeagueSeason(code, members) {
-  const rng = mulberry32(lgSimSeed(code));
-  const teams = members.map((m, i) => ({
-    id: 'm' + i, isMember: true, username: m.username || 'אנונימי',
-    name: 'הקבוצה של ' + (m.username || 'אנונימי'),
-    ovr: m.ovr || lgAvgOvr(m.players), players: m.players || [],
-    w: 0, d: 0, l: 0, gf: 0, ga: 0, fixtures: [],
-  }));
-  // pad with AI teams so there's always a real league context
-  const aiCount = Math.max(3, Math.min(IL_TEAMS_SIM.length, 14 - teams.length));
-  IL_TEAMS_SIM.slice(0, aiCount).forEach((t, i) => teams.push({
-    id: 'a' + i, isMember: false, name: t.name, ovr: t.ovr, players: null,
-    w: 0, d: 0, l: 0, gf: 0, ga: 0, fixtures: [],
-  }));
+// Rebuild the single-player `state` from a member's stored squad so the results
+// screen (pitch, player stats, OVR card, tier) renders their team.
+function lgReconstructState(players, formationLabel, settings) {
+  const fKey = Object.keys(FORMATIONS).find(k => FORMATIONS[k].label === formationLabel) || '4-3-3';
+  const slots = FORMATIONS[fKey].slots;
+  const picks = slots.map(slot => {
+    const pl = (players || []).find(p => p.slotId === slot.id);
+    if (!pl) return null;
+    const squad = SQUADS.find(s => s.teamId === pl.teamId && s.season === pl.season);
+    const player = squad && squad.players.find(x => x.name === pl.name);
+    return (squad && player) ? { player, squad } : null;
+  });
+  state.formationId = fKey;
+  state.slots = slots;
+  state.picks = picks;
+  state.difficulty  = (settings && settings.difficulty) || 'normal';
+  state.peakMode    = !!(settings && settings.peak_mode);
+  state.showRatings = !settings || settings.ratings_visible !== false;
+  state.eraMin = YEAR_MIN; state.eraMax = YEAR_MAX;
+  state.leagueCode = null;
+}
 
-  const bump = (t, o) => { if (o === 'W') t.w++; else if (o === 'D') t.d++; else t.l++; };
-  const play = (h, a) => {
-    const [gh, ga] = lgSimMatch(teams[h].ovr, teams[a].ovr, rng);
-    const oH = gh > ga ? 'W' : gh < ga ? 'L' : 'D';
-    const oA = oH === 'W' ? 'L' : oH === 'L' ? 'W' : 'D';
-    teams[h].gf += gh; teams[h].ga += ga; bump(teams[h], oH);
-    teams[a].gf += ga; teams[a].ga += gh; bump(teams[a], oA);
-    teams[h].fixtures.push({ opp: teams[a].name, home: true,  gf: gh, ga: ga, outcome: oH, scorers: lgScorers(teams[h], gh, rng) });
-    teams[a].fixtures.push({ opp: teams[h].name, home: false, gf: ga, ga: gh, outcome: oA, scorers: lgScorers(teams[a], ga, rng) });
+// A friend's full season, computed deterministically (real rules — 36/33 games).
+function lgFriendRecord(code, m) {
+  const ovr = m.ovr || lgAvgOvr(m.players);
+  const rec = withSeededRandom(lgSimSeed(code + '|' + (m.username || '')), () => {
+    const g = generateMatches(ovr);
+    let w = 0, d = 0, l = 0, gf = 0, ga = 0;
+    g.matches.forEach(x => { if (x.outcome === 'W') w++; else if (x.outcome === 'D') d++; else l++; gf += x.gf; ga += x.ga; });
+    return { w, d, l, gf, ga, inTopSix: g.inTopSix };
+  });
+  return { username: m.username, name: 'הקבוצה של ' + (m.username || 'אנונימי'),
+           ovr, players: m.players || [], ...rec, pts: rec.w * 3 + rec.d };
+}
+
+// Replace AI rows in the 14-team table with the friends' teams (each in the
+// bracket its season earned), then re-sort each bracket.
+function lgInjectFriends(table, friends) {
+  const champSlots = [], relegSlots = [];
+  for (let i = 0; i < table.length; i++) { if (table[i].us) continue; (i < 6 ? champSlots : relegSlots).push(i); }
+  friends.forEach(f => {
+    const primary = f.inTopSix ? champSlots : relegSlots;
+    const alt     = f.inTopSix ? relegSlots : champSlots;
+    let idx = primary.shift(); if (idx === undefined) idx = alt.shift();
+    if (idx === undefined) return;               // more friends than slots (huge league)
+    table[idx] = { name: f.name, pts: f.pts, w: f.w, d: f.d, l: f.l, gf: f.gf, ga: f.ga, us: false, isFriend: true };
+  });
+  const bySort = (a, b) => b.pts - a.pts || (b.w - a.w) || ((b.gf - b.ga) - (a.gf - a.ga));
+  return [...table.slice(0, 6).sort(bySort), ...table.slice(6).sort(bySort)];
+}
+
+// The main event: replay MY league season on the normal results screen.
+function runLeagueSimulation(code, members, myName, settings) {
+  const me = members.find(m => m.username === myName) || members[0];
+  if (!me) return;
+  const myOvr = me.ovr || lgAvgOvr(me.players);
+  const friends = members.filter(m => m !== me).map(m => lgFriendRecord(code, m));
+
+  lgReconstructState(me.players, me.formation, settings);
+  let projected = 8;
+  try { projected = calcPreseasonOdds(myOvr, 60).projectedFinish; } catch (e) {}
+
+  const season = withSeededRandom(lgSimSeed(code + '|' + myName), () => {
+    const g = generateMatches(myOvr);
+    let w = 0, d = 0;
+    g.matches.forEach(m => { if (m.outcome === 'W') w++; else if (m.outcome === 'D') d++; });
+    const l = g.matches.length - w - d;
+    const table = lgInjectFriends(
+      generateLeagueTable(w, d, l, g.inTopSix, g.champOpponents, g.relegOpponents), friends);
+    return { ovr: myOvr, matches: g.matches, inTopSix: g.inTopSix,
+             leagueTable: table, playerStats: simulatePlayerStats(g.matches), projectedFinish: projected };
+  });
+
+  window._presetSeason = season;
+  window._leagueReviewMode = { code, members, myName, settings };
+  showResults();
+  setTimeout(() => addLeagueReviewBackButton(code, members, myName, settings), 60);
+}
+
+function addLeagueReviewBackButton(code, members, myName, settings) {
+  document.getElementById('league-review-back')?.remove();
+  const btn = document.createElement('button');
+  btn.id = 'league-review-back';
+  btn.className = 'league-review-back';
+  btn.textContent = '→ לטבלת הליגה';
+  btn.onclick = () => {
+    btn.remove();
+    window._leagueReviewMode = null;
+    showLeagueMembersStandalone(code, members, myName, settings);
   };
-  for (let i = 0; i < teams.length; i++)
-    for (let j = i + 1; j < teams.length; j++) { play(i, j); play(j, i); }
-
-  teams.forEach(t => { t.pts = t.w * 3 + t.d; t.gd = t.gf - t.ga; });
-  teams.sort((a, b) => b.pts - a.pts || b.gd - a.gd || b.gf - a.gf);
-  teams.forEach((t, i) => t.rank = i + 1);
-  return teams;
+  document.getElementById('screen-results')?.appendChild(btn);
 }
 
-// ── Complete-league landing: the "start simulation" entry point ──
-function renderLeagueComplete(area, code, members, myName) {
+// ── Completed-league landing ──
+function renderLeagueComplete(area, code, members, myName, settings) {
   area.innerHTML = `
     <div class="lgsim-hero">
       <div class="lgsim-hero-title">🏆 כל השחקנים סיימו!</div>
-      <div class="lgsim-hero-sub">הגיע הרגע — צפו בעונה המלאה של הליגה, כשכל הקבוצות משחקות אחת נגד השנייה.</div>
+      <div class="lgsim-hero-sub">צפה בעונה שלך בליגת העל — עם הקבוצות של החברים בטבלה, אותם חוקים בדיוק.</div>
       <button class="btn-primary lgsim-start" id="lgsim-start">🎬 התחל סימולציה</button>
       <button class="lg-leave" id="lgsim-skip-table" style="margin-top:6px">דלג לטבלת הליגה ←</button>
     </div>`;
-  document.getElementById('lgsim-start').onclick = () => runLeagueSimulation(code, members, myName);
-  document.getElementById('lgsim-skip-table').onclick = () => renderLeagueMembersTable(area, code, members, myName);
+  document.getElementById('lgsim-start').onclick = () => runLeagueSimulation(code, members, myName, settings);
+  document.getElementById('lgsim-skip-table').onclick = () => renderLeagueMembersTable(area, code, members, myName, settings);
 }
 
-// ── Full match-by-match reveal of the viewing member's season ──
-function runLeagueSimulation(code, members, myName) {
-  const area = document.getElementById('lg-table-area') || document.getElementById('leagues-content');
-  const teams = simulateLeagueSeason(code, members);
-  const me = teams.find(t => t.isMember && t.username === myName) || teams.find(t => t.isMember);
-  const fixtures = me ? me.fixtures : [];
-
-  area.innerHTML = `
-    <div class="lgsim-reveal-head">⚽ העונה של ${lgEsc('הקבוצה של ' + (me ? me.username : myName))}</div>
-    <div class="record-display lgsim-tally">
-      <div class="rec-box wins"><div class="rec-num" id="lgs-w" dir="ltr">0</div><div class="rec-label">נצחונות</div></div>
-      <div class="rec-box draws"><div class="rec-num" id="lgs-d" dir="ltr">0</div><div class="rec-label">תיקו</div></div>
-      <div class="rec-box losses"><div class="rec-num" id="lgs-l" dir="ltr">0</div><div class="rec-label">הפסדים</div></div>
-    </div>
-    <button class="btn-skip-matches" id="lgs-skip" style="display:block">דלג ⏩</button>
-    <div class="matches-grid" id="lgs-matches"></div>
-    <div id="lgs-final"></div>`;
-
-  const grid = document.getElementById('lgs-matches');
-  const skip = document.getElementById('lgs-skip');
-  let w = 0, d = 0, l = 0, idx = 0, timer = null;
-
-  const rowFor = m => {
-    const rc = m.outcome === 'W' ? 'win' : m.outcome === 'D' ? 'draw' : 'loss';
-    const rl = m.outcome === 'W' ? 'נ' : m.outcome === 'D' ? 'ת' : 'ה';
-    const sc = m.scorers && m.scorers.length
-      ? `<div class="mr-scorers">⚽ ${m.scorers.map(s => `${lgEsc(s.n)} ${s.min}'`).join(' · ')}</div>` : '';
-    const el = document.createElement('div');
-    el.className = `match-row ${rc}`;
-    el.innerHTML = `
-      <div class="mr-main">
-        <span class="mr-badge ${rc}">${rl}</span>
-        <span class="mr-opponent">${lgEsc(m.opp)} <span class="mr-venue">${m.home ? '(ב)' : '(ח)'}</span></span>
-        <span class="mr-score" dir="ltr">${m.gf}-${m.ga}</span>
-      </div>${sc}`;
-    return el;
-  };
-  const tally = m => { if (m.outcome === 'W') w++; else if (m.outcome === 'D') d++; else l++;
-    document.getElementById('lgs-w').textContent = w;
-    document.getElementById('lgs-d').textContent = d;
-    document.getElementById('lgs-l').textContent = l; };
-
-  const finish = () => {
-    clearTimeout(timer);
-    for (; idx < fixtures.length; idx++) { grid.appendChild(rowFor(fixtures[idx])); tally(fixtures[idx]); }
-    skip.style.display = 'none';
-    renderLeagueFinal(document.getElementById('lgs-final'), code, members, myName, teams, me);
-  };
-  const step = () => {
-    if (idx >= fixtures.length) return finish();
-    grid.appendChild(rowFor(fixtures[idx])); tally(fixtures[idx]); idx++;
-    timer = setTimeout(step, 90);
-  };
-  skip.onclick = finish;
-  timer = setTimeout(step, 250);
+// ── Members-only "general" table (deterministic, re-runnable) ──
+function showLeagueMembersStandalone(code, members, myName, settings) {
+  showScreen('leagues');
+  const box = document.getElementById('leagues-content');
+  box.innerHTML = `
+    <button class="back-btn lg-inner-back" id="lgm-back">→ הליגות שלי</button>
+    <div class="lg-league-name">טבלת הליגה</div>
+    <div id="lg-table-area"></div>`;
+  document.getElementById('lgm-back').onclick = renderLeaguesHome;
+  renderLeagueMembersTable(document.getElementById('lg-table-area'), code, members, myName, settings);
 }
 
-// ── After the reveal: final position + the full league table ──
-function renderLeagueFinal(host, code, members, myName, teams, me) {
-  const total = teams.length;
-  const posLine = me ? `סיימת במקום <b>${me.rank}</b> מתוך ${total} · ${me.pts} נק׳` : '';
-  host.innerHTML = `
-    <div class="lgsim-pos">${posLine}</div>
-    <div class="section-label" style="margin-top:12px">טבלת ליגת העל המלאה</div>
-    <div class="lb-table lg-table">${leagueFullTableRows(teams, me)}</div>
-    <button class="btn-primary" id="lgs-to-members" style="width:100%;margin-top:10px">🏆 לטבלת הליגה של החברים ←</button>`;
-  wireSquadClicks(host, teams);
-  document.getElementById('lgs-to-members').onclick = () =>
-    renderLeagueMembersTable(document.getElementById('lg-table-area') || document.getElementById('leagues-content'), code, members, myName);
-}
-
-function leagueFullTableRows(teams, me) {
-  return teams.map(t => {
-    const mine = me && t.id === me.id;
-    return `
-      <div class="lb-row ${t.isMember ? 'lgsim-member' : ''} ${mine ? 'lgsim-me' : ''} ${t.isMember ? 'lg-clickable' : ''}" data-id="${t.id}">
-        <span class="lb-rank ${t.rank <= 3 ? 'lb-rank-top' : ''}">${t.rank}</span>
-        <span class="lb-name">${lgEsc(t.name)}${mine ? ' (אתה)' : ''}</span>
-        <span class="lb-stat">${t.pts}</span>
-        <span class="lb-sub" dir="rtl">${t.w}נ ${t.d}ת ${t.l}ה · ${t.gf}:${t.ga}</span>
-      </div>`;
-  }).join('');
-}
-
-// ── Members-only "general" table (re-runs the sim identically) ──
-function renderLeagueMembersTable(area, code, members, myName) {
-  const teams = simulateLeagueSeason(code, members);
-  const mine = teams.filter(t => t.isMember);
-  mine.forEach((t, i) => t.memberRank = i + 1);
-  const rows = mine.map(t => {
+function renderLeagueMembersTable(area, code, members, myName, settings) {
+  const recs = members.map(m => lgFriendRecord(code, m))
+    .sort((a, b) => b.pts - a.pts || b.w - a.w || ((b.gf - b.ga) - (a.gf - a.ga)));
+  const rows = recs.map((t, i) => {
     const isMe = t.username === myName;
     return `
-      <div class="lb-row lg-clickable lgsim-member ${isMe ? 'lgsim-me' : ''}" data-id="${t.id}">
-        <span class="lb-rank ${t.memberRank <= 3 ? 'lb-rank-top' : ''}">${t.memberRank}</span>
-        <span class="lb-name">${lgEsc(t.name)}${isMe ? ' (אתה)' : ''}</span>
+      <div class="lb-row lg-clickable ${isMe ? 'lgsim-me' : ''}" data-u="${lgEsc(t.username)}">
+        <span class="lb-rank ${i < 3 ? 'lb-rank-top' : ''}">${i + 1}</span>
+        <span class="lb-name">הקבוצה של ${lgEsc(t.username)}${isMe ? ' (אתה)' : ''}</span>
         <span class="lb-stat">${t.pts} נק׳</span>
-        <span class="lb-sub" dir="rtl">מקום ${t.rank} בליגה · ${t.w}נ ${t.d}ת ${t.l}ה</span>
+        <span class="lb-sub" dir="rtl">${t.w}נ ${t.d}ת ${t.l}ה · ${t.gf}:${t.ga}</span>
       </div>`;
   }).join('');
   area.innerHTML = `
     <div class="section-label">🏆 טבלת הליגה — הקבוצות של החברים</div>
     <div class="lb-table lg-table">${rows}</div>
     <p class="page-note" style="text-align:center;margin-top:8px">לחצו על קבוצה כדי לראות את ההרכב</p>
-    <button class="btn-primary" id="lgs-rewatch" style="width:100%;margin-top:6px">🎬 צפה בסימולציה שוב</button>`;
-  wireSquadClicks(area, teams);
-  document.getElementById('lgs-rewatch').onclick = () => runLeagueSimulation(code, members, myName);
-}
-
-function wireSquadClicks(scope, teams) {
-  scope.querySelectorAll('.lb-row.lg-clickable').forEach(row => {
-    const t = teams.find(x => x.id === row.dataset.id);
-    if (!t || !t.players || !t.players.length) return;
-    row.onclick = () => showLeagueSquad(
-      t.players.map(p => ({ pos: p.pos, name: p.name, ovr: p.ovr })),
-      lgEsc(t.name));
+    <button class="btn-primary" id="lgs-rewatch" style="width:100%;margin-top:6px">🎬 צפה בסימולציה שלך שוב</button>`;
+  area.querySelectorAll('.lb-row.lg-clickable').forEach(row => {
+    const m = members.find(x => x.username === row.dataset.u);
+    if (m && m.players && m.players.length)
+      row.onclick = () => showLeagueSquad(m.players.map(p => ({ pos: p.pos, name: p.name, ovr: p.ovr })), 'הקבוצה של ' + m.username);
   });
+  document.getElementById('lgs-rewatch').onclick = () => runLeagueSimulation(code, members, myName, settings);
 }
