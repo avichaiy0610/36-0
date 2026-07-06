@@ -273,6 +273,50 @@ function showLeagueSquad(players, title) {
   modal.style.display = 'flex';
 }
 
+// One-time notice: the first time a member connects after their league has been
+// played out by everyone, pop a heads-up so they don't have to keep checking.
+const LG_SEEN_KEY = '36-0-lg-complete-seen';
+function lgSeenSet() { try { return new Set(JSON.parse(localStorage.getItem(LG_SEEN_KEY) || '[]')); } catch (e) { return new Set(); } }
+function lgSaveSeen(set) { try { localStorage.setItem(LG_SEEN_KEY, JSON.stringify([...set])); } catch (e) {} }
+
+async function maybeNotifyLeagueComplete() {
+  if (typeof getCurrentUser !== 'function' || !getCurrentUser()) return;
+  const { data, error } = await _supabase.rpc('get_my_leagues');
+  if (error || !data?.length) return;
+  const seen = lgSeenSet();
+  const fresh = data.filter(l => l.is_complete && !seen.has(l.code));
+  if (!fresh.length) return;
+  fresh.forEach(l => seen.add(l.code));
+  lgSaveSeen(seen);
+  showLeagueCompletePopup(fresh);
+}
+
+function showLeagueCompletePopup(leagues) {
+  let modal = document.getElementById('lg-complete-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'lg-complete-modal';
+    modal.className = 'modal-overlay';
+    document.body.appendChild(modal);
+  }
+  const names = leagues.map(l => `<div class="lgc-name">🏆 ${lgEsc(l.name)}</div>`).join('');
+  modal.innerHTML = `
+    <div class="modal-box placement-box">
+      <div class="placement-tier" style="color:#22c55e">הליגה הסתיימה! 🎉</div>
+      <div class="placement-sub">${leagues.length > 1 ? 'הליגות הבאות מוכנות לחשיפה — כל השחקנים סיימו:' : 'כל השחקנים סיימו את הדראפט — הטבלה מוכנה לחשיפה:'}</div>
+      ${names}
+      <button class="btn-primary btn-full" id="lgc-go">לחשיפת הטבלה ←</button>
+      <button class="lg-leave" id="lgc-close" style="margin-top:8px">אחר כך</button>
+    </div>`;
+  modal.querySelector('#lgc-go').onclick = () => {
+    modal.style.display = 'none';
+    showLeagues();
+    if (leagues.length === 1) setTimeout(() => openLeague(leagues[0].code), 60);
+  };
+  modal.querySelector('#lgc-close').onclick = () => { modal.style.display = 'none'; };
+  modal.style.display = 'flex';
+}
+
 // Invite link: /?league=CODE opens the leagues screen with the code ready to join.
 document.addEventListener('DOMContentLoaded', () => {
   const m = /[?&]league=([A-Za-z0-9]{4,8})/.exec(location.search);

@@ -73,6 +73,8 @@ async function onSignIn(user) {
   } else {
     updateNavUser(profile.username, profile.avatar_url);
   }
+  // Heads-up if any of the user's leagues finished while they were away.
+  setTimeout(() => { if (typeof maybeNotifyLeagueComplete === 'function') maybeNotifyLeagueComplete(); }, 1600);
 }
 
 function onSignOut() {
