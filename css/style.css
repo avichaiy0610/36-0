@@ -1699,6 +1699,8 @@ body {
 .duel-sum-score { text-align: center; font-size: 18px; margin: 10px 0 4px; }
 .duel-sum-score b { font-size: 15px; }
 .duel-sum-ovr { text-align: center; font-size: 12px; color: var(--dim); margin-bottom: 12px; }
+.btn-draft-exit { display: block; width: 100%; margin-bottom: 8px; background: #f8514918; color: #f85149; border: 1px solid #f8514955; border-radius: 8px; padding: 8px; font-family: inherit; font-weight: 800; font-size: 13px; cursor: pointer; }
+.btn-draft-exit:hover { background: #f8514930; }
 /* shared league simulation */
 .lgsim-hero { text-align: center; padding: 18px 12px; }
 .lgsim-hero-title { font-size: 20px; font-weight: 900; color: #22c55e; }

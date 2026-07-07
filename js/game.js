@@ -2397,6 +2397,12 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-share').addEventListener('click', openShareModal);
   document.getElementById('btn-restart').addEventListener('click', restartGame);
   document.getElementById('btn-draft-restart').addEventListener('click', restartGame);
+  document.getElementById('btn-draft-exit')?.addEventListener('click', () => {
+    if (state.currentRound > 0 && !confirm('לצאת מהדראפט? ההתקדמות לא תישמר.')) return;
+    clearDraftState();
+    if (state.duelCode) { state.duelCode = null; if (typeof closeDuelRealtime === 'function') closeDuelRealtime(); }
+    showScreen('welcome');
+  });
   document.getElementById('btn-preseason-restart')?.addEventListener('click', restartGame);
   document.getElementById('btn-move-player').addEventListener('click', toggleMoveMode);
 
