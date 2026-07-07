@@ -19,6 +19,7 @@ let _quickBotTimer = null;
 let _duelRevealed = false;
 let _botRoom = null;          // local room object for bot games
 let _duelPickable = [];
+let _duelActive = false;      // true while an actual game is in progress (warn on leave)
 
 const DUEL_ERAS = [
   { v: 'all', label: 'כל התקופות' },
@@ -67,7 +68,7 @@ async function showDuel() {
 
 function renderDuelHome() {
   closeDuelRealtime();
-  _botRoom = null; _duelRevealed = false;
+  _botRoom = null; _duelRevealed = false; _duelActive = false;
   const box = document.getElementById('duel-content');
   const user = getCurrentUser();
   if (!user) {
@@ -77,6 +78,7 @@ function renderDuelHome() {
     return;
   }
   box.innerHTML = `
+    <div id="duel-record" class="duel-record"></div>
     <div class="lg-card duel-quick-card">
       <div class="lg-card-title">⚡ משחק מהיר</div>
       <p class="page-note" style="margin:4px 0 10px">מצא יריב אקראי — ואם אף אחד לא מצטרף תוך 10 שניות, שחק מול בוט 🤖.</p>
@@ -99,6 +101,11 @@ function renderDuelHome() {
   document.getElementById('duel-create').onclick = createDuelFlow;
   document.getElementById('duel-join').onclick = joinDuelFlow;
   if (_pendingDuelCode) { duelMsg('נמצא קוד הזמנה — לחצו "הצטרף"', true); _pendingDuelCode = null; }
+  _supabase.rpc('get_duel_record').then(({ data }) => {
+    const r = data?.[0]; const el = document.getElementById('duel-record');
+    if (!el || !r || (r.wins + r.losses + r.draws) === 0) return;
+    el.innerHTML = `📊 השיא שלך: <b>${r.wins}</b> נצחונות · <b>${r.losses}</b> הפסדים · <b>${r.draws}</b> תיקו`;
+  }, () => {});
 }
 
 function duelMsg(text, ok) {
@@ -165,6 +172,7 @@ function renderDuel(room) {
 
 function renderDuelLobby(room) {
   showScreen('duel');
+  _duelActive = false;
   const box = document.getElementById('duel-content');
   const bothHere = !!room.host_name && !!room.guest_name;
   const myReady = room.is_host ? room.host_ready : room.guest_ready;
@@ -232,8 +240,8 @@ function renderDuelLobby(room) {
   };
   if (room.is_host) {
     const save = patch => {
-      if (room._local) { room.settings = { ...room.settings, ...patch, ratings_visible: true }; return; }
-      _supabase.rpc('set_duel_settings', { p_code: room.code, p_settings: { ...s, ...patch, ratings_visible: true } });
+      if (room._local) { room.settings = { ...room.settings, ...patch }; return; }
+      _supabase.rpc('set_duel_settings', { p_code: room.code, p_settings: patch });   // server merges
     };
     wireDuelMini('duel-diff', v => save({ difficulty: v }));
     wireDuelMini('duel-peak', v => save({ peak_mode: v === 'on' }));
@@ -253,6 +261,30 @@ async function leaveDuelFlow() {
   if (code) await _supabase.rpc('leave_duel_room', { p_code: code });
   renderDuelHome();
 }
+
+// Leaving a game in progress = forfeit (counts as a loss). Used by the in-game
+// leave/exit buttons and the nav guard below.
+function duelForfeitCleanup() {
+  if (_duelActive && typeof getCurrentUser === 'function' && getCurrentUser())
+    _supabase.rpc('record_duel_outcome', { p_outcome: 'loss' }).then(() => {}, () => {});
+  _duelActive = false;
+  const code = _duelCode;
+  if (code) _supabase.rpc('leave_duel_room', { p_code: code }).then(() => {}, () => {});
+  _botRoom = null;
+  closeDuelRealtime();
+}
+function duelForfeit() {
+  if (!confirm('לצאת מהדואל? המשחק ייגמר ותפסיד אותו.')) return;
+  duelForfeitCleanup();
+  renderDuelHome();
+}
+// Warn before navigating away (top tabs / back) while a duel is in progress.
+document.addEventListener('click', (e) => {
+  const t = e.target.closest('.nav-btn, #duel-back');
+  if (!t || t.id === 'nav-duel' || !_duelActive) return;
+  if (!confirm('לצאת מהדואל? המשחק ייגמר ותפסיד אותו.')) { e.stopImmediatePropagation(); e.preventDefault(); return; }
+  duelForfeitCleanup();      // confirmed — let the click proceed to its destination
+}, true);
 function onDuelEnded() {
   if (_botRoom) return;
   closeDuelRealtime();
@@ -267,6 +299,7 @@ function closeDuelRealtime() {
 // ─── Formation choice ──────────────────────────────────────────────────────────
 function renderDuelFormation(room) {
   showScreen('duel');
+  _duelActive = true;
   const box = document.getElementById('duel-content');
   const myRole = room.is_host ? 'host' : 'guest';
   const mine = room.draft?.fmt?.[myRole];
@@ -296,17 +329,18 @@ function duelBoardState(room) {
   const picker = !rs[first] ? first : (first === 'host' ? 'guest' : 'host');
   const settings = room.settings || {};
   const seq = duelSeq(Number(room.seed) || 1, settings);
-  const team = seq[d.cursor] || null;
+  const team = d.squadId ? (SQUADS.find(s => s.id === d.squadId) || null) : (seq[d.cursor] || null);
+  const seasonAlts = team ? duelSquadPool(settings).filter(s => s.teamId === team.teamId && s.id !== team.id) : [];
   const taken = new Set();
   [...(d.picks.host || []), ...(d.picks.guest || [])].forEach(p => taken.add(p.squadId + '|' + p.player));
   if (rs.host) taken.add(rs.host.squadId + '|' + rs.host.player);
   if (rs.guest) taken.add(rs.guest.squadId + '|' + rs.guest.player);
   return {
-    d, myRole, oppRole, round, first, picker, isMyTurn: picker === myRole, team, taken, settings,
+    d, myRole, oppRole, round, first, picker, isMyTurn: picker === myRole, team, seasonAlts, taken, settings,
     myFmt: d.fmt[myRole], oppFmt: d.fmt[oppRole],
     myName: room.is_host ? room.host_name : room.guest_name,
     oppName: room.is_host ? room.guest_name : room.host_name,
-    canReroll: first === myRole && !rs[first] && (d.rr || 0) < 1,
+    canReroll: first === myRole && !rs[first] && (d.rr || 0) < 2,
   };
 }
 
@@ -335,6 +369,7 @@ function duelMiniPitchHTML(fmt, picks, title, isMe) {
 
 function renderDuelBoard(room) {
   showScreen('duel');
+  _duelActive = true;
   const box = document.getElementById('duel-content');
   const st = duelBoardState(room);
 
@@ -364,7 +399,10 @@ function renderDuelBoard(room) {
     </div>
     <div class="duel-team-panel">
       <div class="duel-team-name">⚽ ${teamLabel}</div>
-      ${st.canReroll ? '<button class="duel-reroll-btn" id="duel-reroll">🔄 החלף קבוצה (פעם אחת)</button>' : ''}
+      ${st.canReroll ? `<div class="duel-reroll-row">
+        <button class="duel-reroll-btn" id="duel-reroll-team">🔄 החלף קבוצה</button>
+        ${st.seasonAlts.length ? '<button class="duel-reroll-btn" id="duel-reroll-season">📅 החלף עונה</button>' : ''}
+      </div>` : ''}
       <div class="duel-pl-list">${listHtml || '<div class="page-note">—</div>'}</div>
       ${st.isMyTurn ? '' : '<div class="duel-wait-note">היריב בוחר…</div>'}
     </div>
@@ -374,10 +412,12 @@ function renderDuelBoard(room) {
     </div>
     <button class="lg-leave" id="duel-leave">עזוב דואל</button>`;
 
-  document.getElementById('duel-board-exit').onclick = () => leaveDuelFlow();
-  document.getElementById('duel-leave').onclick = () => leaveDuelFlow();
-  const rr = document.getElementById('duel-reroll');
-  if (rr) rr.onclick = () => duelReroll(room);
+  document.getElementById('duel-board-exit').onclick = () => duelForfeit();
+  document.getElementById('duel-leave').onclick = () => duelForfeit();
+  const rrT = document.getElementById('duel-reroll-team');
+  if (rrT) rrT.onclick = () => duelReroll(room, 'team');
+  const rrS = document.getElementById('duel-reroll-season');
+  if (rrS) rrS.onclick = () => duelReroll(room, 'season');
   if (st.isMyTurn && st.team) {
     box.querySelectorAll('.duel-pl').forEach(btn => btn.onclick = () => duelBoardPick(room, _duelPickable[+btn.dataset.i]));
   }
@@ -397,15 +437,22 @@ async function duelBoardPick(room, player) {
   const { error } = await _supabase.rpc('duel_draft_pick', { p_code: room.code, p_pick: pick });
   if (error) console.warn('duel_draft_pick:', error.message);
 }
-async function duelReroll(room) {
-  if (room._local) { duelLocalReroll(room); return; }
-  const { error } = await _supabase.rpc('duel_reroll', { p_code: room.code });
+async function duelReroll(room, mode) {
+  const st = duelBoardState(room);
+  let squadId = null;
+  if (mode === 'season') {
+    if (!st.seasonAlts.length) return;
+    squadId = st.seasonAlts[Math.floor(Math.random() * st.seasonAlts.length)].id;
+  }
+  if (room._local) { duelLocalReroll(room, mode, squadId); return; }
+  const { error } = await _supabase.rpc('duel_reroll', { p_code: room.code, p_mode: mode, p_squad: squadId });
   if (error) console.warn('duel_reroll:', error.message);
 }
 
 // ─── Rock-paper-scissors for the final round ───────────────────────────────────
 function renderDuelRPS(room) {
   showScreen('duel');
+  _duelActive = true;
   const box = document.getElementById('duel-content');
   const myRole = room.is_host ? 'host' : 'guest';
   const rps = room.draft.rps || {};
@@ -476,6 +523,13 @@ function startDuelReveal(room) {
     return { ovr: mySquad.ovr, matches: g.matches, inTopSix: g.inTopSix, leagueTable: table, playerStats: simulatePlayerStats(g.matches), projectedFinish: proj, _pts: w * 3 + dd };
   });
   const myPts = season._pts;
+
+  // record the online result (just for fun) — once per duel
+  _duelActive = false;
+  if (typeof getCurrentUser === 'function' && getCurrentUser()) {
+    const outcome = myPts > oppPts ? 'win' : myPts < oppPts ? 'loss' : 'draw';
+    _supabase.rpc('record_duel_outcome', { p_outcome: outcome }).then(() => {}, () => {});
+  }
 
   window._presetSeason = season;
   window._duelReviewMode = { mySquad, oppSquad, myName, oppName, myPts, oppPts };
@@ -588,10 +642,12 @@ function duelBotFormation() {
   const keys = Object.keys(FORMATIONS);
   return keys[Math.floor(Math.random() * keys.length)];
 }
-function duelLocalReroll(room) {
+function duelLocalReroll(room, mode, squadId) {
   const st = duelBoardState(room);
   if (!st.canReroll) return;
-  room.draft.cursor++; room.draft.rr = (room.draft.rr || 0) + 1;
+  if (mode === 'season' && squadId) room.draft.squadId = squadId;
+  else { room.draft.cursor = (room.draft.cursor || 0) + 1; delete room.draft.squadId; }
+  room.draft.rr = (room.draft.rr || 0) + 1;
   renderDuel(room);
 }
 function duelLocalPick(room, pick) {
@@ -613,7 +669,7 @@ function duelLocalApplyPick(room, role, pick) {
   if (d.roundState.host && d.roundState.guest) {
     d.picks.host.push(d.roundState.host);
     d.picks.guest.push(d.roundState.guest);
-    d.round++; d.cursor++; d.rr = 0; d.roundState = {};
+    d.round++; d.cursor++; d.rr = 0; d.roundState = {}; delete d.squadId;
     if (d.round >= 11) d.phase = 'done';
     else if (d.round === 10) { d.phase = 'rps'; d.rps = {}; }
   }

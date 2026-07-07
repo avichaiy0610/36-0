@@ -1704,8 +1704,11 @@ body {
 .duel-fmt-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 8px; }
 .duel-fmt-btn { background: var(--panel2, #1b2330); border: 1.5px solid var(--border); border-radius: 10px; padding: 16px 6px; font-family: inherit; font-weight: 900; font-size: 15px; color: var(--text); cursor: pointer; }
 .duel-fmt-btn:hover { border-color: var(--accent2); background: #2b3546; }
-.duel-reroll-btn { display: block; width: 100%; margin: 4px 0 8px; background: #eab30822; color: #eab308; border: 1px solid #eab30866; border-radius: 8px; padding: 8px; font-family: inherit; font-weight: 800; font-size: 13px; cursor: pointer; }
+.duel-reroll-row { display: flex; gap: 6px; margin: 4px 0 8px; }
+.duel-reroll-btn { flex: 1; background: #eab30822; color: #eab308; border: 1px solid #eab30866; border-radius: 8px; padding: 8px; font-family: inherit; font-weight: 800; font-size: 13px; cursor: pointer; }
 .duel-reroll-btn:hover { background: #eab30833; }
+.duel-record { text-align: center; font-size: 13px; color: var(--dim); margin-bottom: 10px; }
+.duel-record b { color: var(--text); }
 .duel-rps-row { display: flex; gap: 10px; margin-top: 14px; }
 .duel-rps-btn { flex: 1; background: var(--panel2, #1b2330); border: 1.5px solid var(--border); border-radius: 12px; padding: 18px 6px; font-family: inherit; font-weight: 800; font-size: 30px; line-height: 1.25; color: var(--text); cursor: pointer; }
 .duel-rps-btn:hover { border-color: var(--accent2); background: #2b3546; }
