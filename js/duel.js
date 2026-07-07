@@ -241,7 +241,8 @@ function renderDuelLobby(room) {
   if (room.is_host) {
     const save = patch => {
       if (room._local) { room.settings = { ...room.settings, ...patch }; return; }
-      _supabase.rpc('set_duel_settings', { p_code: room.code, p_settings: patch });   // server merges
+      // NOTE: supabase query builders are lazy — must .then()/await or it never runs.
+      _supabase.rpc('set_duel_settings', { p_code: room.code, p_settings: patch }).then(() => {}, () => {});
     };
     wireDuelMini('duel-diff', v => save({ difficulty: v }));
     wireDuelMini('duel-peak', v => save({ peak_mode: v === 'on' }));
@@ -335,12 +336,16 @@ function duelBoardState(room) {
   [...(d.picks.host || []), ...(d.picks.guest || [])].forEach(p => taken.add(p.squadId + '|' + p.player));
   if (rs.host) taken.add(rs.host.squadId + '|' + rs.host.player);
   if (rs.guest) taken.add(rs.guest.squadId + '|' + rs.guest.player);
+  const myRR = (d.rerolls && d.rerolls[myRole]) || { team: 0, season: 0 };
+  const isFirstNow = first === myRole && !rs[first];
   return {
     d, myRole, oppRole, round, first, picker, isMyTurn: picker === myRole, team, seasonAlts, taken, settings,
     myFmt: d.fmt[myRole], oppFmt: d.fmt[oppRole],
     myName: room.is_host ? room.host_name : room.guest_name,
     oppName: room.is_host ? room.guest_name : room.host_name,
-    canReroll: first === myRole && !rs[first] && (d.rr || 0) < 2,
+    teamRerolls: myRR.team || 0, seasonRerolls: myRR.season || 0,
+    canRerollTeam:   isFirstNow && (myRR.team || 0) > 0,
+    canRerollSeason: isFirstNow && (myRR.season || 0) > 0 && seasonAlts.length > 0,
   };
 }
 
@@ -399,9 +404,9 @@ function renderDuelBoard(room) {
     </div>
     <div class="duel-team-panel">
       <div class="duel-team-name">⚽ ${teamLabel}</div>
-      ${st.canReroll ? `<div class="duel-reroll-row">
-        <button class="duel-reroll-btn" id="duel-reroll-team">🔄 החלף קבוצה</button>
-        ${st.seasonAlts.length ? '<button class="duel-reroll-btn" id="duel-reroll-season">📅 החלף עונה</button>' : ''}
+      ${(st.canRerollTeam || st.canRerollSeason) ? `<div class="duel-reroll-row">
+        ${st.canRerollTeam ? `<button class="duel-reroll-btn" id="duel-reroll-team">🔄 החלף קבוצה <span class="rr-badge">${st.teamRerolls}</span></button>` : ''}
+        ${st.canRerollSeason ? `<button class="duel-reroll-btn" id="duel-reroll-season">📅 החלף עונה <span class="rr-badge">${st.seasonRerolls}</span></button>` : ''}
       </div>` : ''}
       <div class="duel-pl-list">${listHtml || '<div class="page-note">—</div>'}</div>
       ${st.isMyTurn ? '' : '<div class="duel-wait-note">היריב בוחר…</div>'}
@@ -636,6 +641,8 @@ function duelLocalFormation(room, fmt) {
   room.draft.fmt.host = fmt;
   room.draft.fmt.guest = duelBotFormation();
   room.draft.phase = 'draft';
+  const cnt = ({ easy: 3, normal: 1, hard: 0 })[room.settings?.difficulty] ?? 1;
+  room.draft.rerolls = { host: { team: cnt, season: cnt }, guest: { team: cnt, season: cnt } };
   duelLocalBotAdvance(room);
 }
 function duelBotFormation() {
@@ -644,10 +651,11 @@ function duelBotFormation() {
 }
 function duelLocalReroll(room, mode, squadId) {
   const st = duelBoardState(room);
-  if (!st.canReroll) return;
+  const key = mode === 'season' ? 'season' : 'team';
+  if (key === 'season' ? !st.canRerollSeason : !st.canRerollTeam) return;
   if (mode === 'season' && squadId) room.draft.squadId = squadId;
   else { room.draft.cursor = (room.draft.cursor || 0) + 1; delete room.draft.squadId; }
-  room.draft.rr = (room.draft.rr || 0) + 1;
+  room.draft.rerolls[st.myRole][key] = (room.draft.rerolls[st.myRole][key] || 0) - 1;
   renderDuel(room);
 }
 function duelLocalPick(room, pick) {

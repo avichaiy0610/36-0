@@ -1707,6 +1707,7 @@ body {
 .duel-reroll-row { display: flex; gap: 6px; margin: 4px 0 8px; }
 .duel-reroll-btn { flex: 1; background: #eab30822; color: #eab308; border: 1px solid #eab30866; border-radius: 8px; padding: 8px; font-family: inherit; font-weight: 800; font-size: 13px; cursor: pointer; }
 .duel-reroll-btn:hover { background: #eab30833; }
+.rr-badge { display: inline-block; min-width: 16px; padding: 0 4px; margin-inline-start: 3px; background: #eab308; color: #1b2330; border-radius: 8px; font-size: 11px; font-weight: 900; }
 .duel-record { text-align: center; font-size: 13px; color: var(--dim); margin-bottom: 10px; }
 .duel-record b { color: var(--text); }
 .duel-rps-row { display: flex; gap: 10px; margin-top: 14px; }
