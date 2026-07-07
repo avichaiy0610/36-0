@@ -288,11 +288,12 @@ function renderDuelWaiting() {
 }
 
 // ─── Reveal: normal results page + a separate duel summary ──────────────────────
-function duelSeasonPoints(seed, ovr) {
+function duelSeasonRecord(seed, ovr) {
   return withSeededRandom(seed, () => {
     const g = generateMatches(ovr);
-    let w = 0, d = 0; g.matches.forEach(m => { if (m.outcome === 'W') w++; else if (m.outcome === 'D') d++; });
-    return w * 3 + d;
+    let w = 0, d = 0, l = 0, gf = 0, ga = 0;
+    g.matches.forEach(m => { if (m.outcome === 'W') w++; else if (m.outcome === 'D') d++; else l++; gf += m.gf; ga += m.ga; });
+    return { w, d, l, gf, ga, pts: w * 3 + d, inTopSix: g.inTopSix };
   });
 }
 
@@ -303,23 +304,30 @@ function startDuelReveal(room) {
   const mySquad = room.draft[myRole], oppSquad = room.draft[oppRole];
   if (!mySquad || !oppSquad) return;
   const roomSeed = Number(room.seed) || lgSimSeed(String(room.code || 'bot'));
+  const myName = myRole === 'host' ? room.host_name : room.guest_name;
+  const oppName = oppRole === 'host' ? room.host_name : room.guest_name;
 
-  // Rebuild my team into `state` (safe across refresh) and compute my own season.
+  // The opponent's deterministic season — used both for the shared league table
+  // (they play in the same Ligat Ha'al) and the duel summary.
+  const oppRec = duelSeasonRecord(lgSimSeed(String(roomSeed) + '|' + oppRole), oppSquad.ovr);
+  const oppPts = oppRec.pts;
+  const oppTeam = { name: 'הקבוצה של ' + (oppName || 'יריב'), pts: oppRec.pts,
+    w: oppRec.w, d: oppRec.d, l: oppRec.l, gf: oppRec.gf, ga: oppRec.ga, inTopSix: oppRec.inTopSix };
+
+  // Rebuild my team into `state` (safe across refresh) and compute my own season,
+  // inserting the opponent's team into my league table (as in the leagues reveal).
   lgReconstructState(mySquad.players, mySquad.formation, mySquad.settings || {});
   let proj = 8; try { proj = calcPreseasonOdds(mySquad.ovr, 50).projectedFinish; } catch (e) {}
   const season = withSeededRandom(lgSimSeed(String(roomSeed) + '|' + myRole), () => {
     const g = generateMatches(mySquad.ovr);
     let w = 0, d = 0; g.matches.forEach(m => { if (m.outcome === 'W') w++; else if (m.outcome === 'D') d++; });
     const l = g.matches.length - w - d;
-    return { ovr: mySquad.ovr, matches: g.matches, inTopSix: g.inTopSix,
-      leagueTable: generateLeagueTable(w, d, l, g.inTopSix, g.champOpponents, g.relegOpponents),
+    const table = lgInjectFriends(
+      generateLeagueTable(w, d, l, g.inTopSix, g.champOpponents, g.relegOpponents), [oppTeam]);
+    return { ovr: mySquad.ovr, matches: g.matches, inTopSix: g.inTopSix, leagueTable: table,
       playerStats: simulatePlayerStats(g.matches), projectedFinish: proj, _pts: w * 3 + d };
   });
   const myPts = season._pts;
-  const oppPts = duelSeasonPoints(lgSimSeed(String(roomSeed) + '|' + oppRole), oppSquad.ovr);
-
-  const myName = myRole === 'host' ? room.host_name : room.guest_name;
-  const oppName = oppRole === 'host' ? room.host_name : room.guest_name;
 
   window._presetSeason = season;
   window._duelReviewMode = { room, mySquad, oppSquad, myName, oppName, myPts, oppPts };
