@@ -1,9 +1,10 @@
-// ─── Real-time 1v1 duels ───────────────────────────────────────────────────────
-// Two players share a room; when both are ready each plays the FULL normal draft
-// (own setup: formation, difficulty, mode) and submits their squad. When both
-// squads are in, each player sees the normal results page for their own team,
-// plus a separate duel summary comparing the two teams. A quick-match falls back
-// to a client-side bot if nobody joins in 10s.
+// ─── Real-time 1v1 duels — shared TURN-BASED draft ─────────────────────────────
+// Host sets the room's shared settings; both players ready up, each picks a
+// formation, then they draft from the SAME drawn teams: the first pick alternates
+// each round, the round's first picker may reroll the team once, and rock-paper-
+// scissors decides who's first in the final round. Both boards fill live. At the
+// end each player sees the normal results page (opponent in the league table) plus
+// a duel summary. Quick-match falls back to a local bot with the same rules.
 
 function dEsc(s) {
   return String(s ?? '').replace(/[&<>"']/g, c => (
@@ -14,10 +15,18 @@ function dEsc(s) {
 let _duelCode = null;
 let _duelChan = null;
 let _pendingDuelCode = null;
-let _duelPhase = 'lobby';      // lobby | drafting | waiting | done
-let _duelBot = false;
-let _duelRoomSeed = 0;
 let _quickBotTimer = null;
+let _duelRevealed = false;
+let _botRoom = null;          // local room object for bot games
+let _duelPickable = [];
+
+const DUEL_ERAS = [
+  { v: 'all', label: 'כל התקופות' },
+  { v: '90s', label: "שנות ה-90", min: 1990, max: 1999 },
+  { v: '00s', label: "2000-2009", min: 2000, max: 2009 },
+  { v: '10s', label: "2010-2019", min: 2010, max: 2019 },
+  { v: 'now', label: 'עדכני', min: 2018, max: 3000 },
+];
 
 function mulberry32(a) {
   return function () {
@@ -27,7 +36,29 @@ function mulberry32(a) {
     return ((t ^ t >>> 14) >>> 0) / 4294967296;
   };
 }
+function duelPosFits(p, slotPos) {
+  const allowed = COMPAT[slotPos] || [];
+  if (allowed.includes(p.position)) return true;
+  return Array.isArray(p.altPos) && p.altPos.some(x => allowed.includes(x));
+}
+function duelPOvr(p, settings) {
+  return (settings && settings.peak_mode) ? (p.peak_ovr ?? p.ovr) : p.ovr;
+}
+function duelSquadPool(settings) {
+  const emin = settings?.era_min ?? (typeof YEAR_MIN !== 'undefined' ? YEAR_MIN : 1990);
+  const emax = settings?.era_max ?? (typeof YEAR_MAX !== 'undefined' ? YEAR_MAX : 3000);
+  const pool = SQUADS.filter(sq => { const y = parseInt(sq.season, 10); return y >= emin && y <= emax; });
+  return pool.length >= 15 ? pool : SQUADS;
+}
+function duelSeq(seed, settings) {
+  const pool = duelSquadPool(settings).slice();
+  const rng = mulberry32((seed >>> 0) || 1);
+  for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
+  return pool;
+}
+function rpsHe(c) { return c === 'rock' ? '✊ אבן' : c === 'paper' ? '✋ נייר' : '✌ מספריים'; }
 
+// ─── Screens: home + lobby ─────────────────────────────────────────────────────
 async function showDuel() {
   showScreen('duel');
   document.getElementById('duel-back').onclick = () => { closeDuelRealtime(); showScreen('welcome'); };
@@ -36,15 +67,13 @@ async function showDuel() {
 
 function renderDuelHome() {
   closeDuelRealtime();
-  _duelPhase = 'lobby'; _duelBot = false;
+  _botRoom = null; _duelRevealed = false;
   const box = document.getElementById('duel-content');
   const user = getCurrentUser();
   if (!user) {
-    box.innerHTML = `
-      <p class="page-note">התחבר כדי לשחק דואל 1 על 1 מול חבר.</p>
+    box.innerHTML = `<p class="page-note">התחבר כדי לשחק דואל 1 על 1 מול חבר.</p>
       <button class="btn-primary" id="duel-login">התחבר</button>`;
-    document.getElementById('duel-login').onclick = () =>
-      document.getElementById('auth-modal').style.display = 'flex';
+    document.getElementById('duel-login').onclick = () => document.getElementById('auth-modal').style.display = 'flex';
     return;
   }
   box.innerHTML = `
@@ -55,7 +84,7 @@ function renderDuelHome() {
     </div>
     <div class="lg-card">
       <div class="lg-card-title">🎮 צור חדר חדש</div>
-      <p class="page-note" style="margin:4px 0 10px">חדר פרטי — שלח את הקוד לחבר והתחילו דואל.</p>
+      <p class="page-note" style="margin:4px 0 10px">חדר פרטי — אתה קובע את ההגדרות, שלח את הקוד לחבר.</p>
       <button class="btn-primary lg-btn" id="duel-create" style="width:100%">צור חדר</button>
     </div>
     <div class="lg-card">
@@ -80,35 +109,27 @@ function duelMsg(text, ok) {
 }
 
 async function createDuelFlow() {
-  const { data, error } = await _supabase.rpc('create_duel_room', { p_settings: {} });
+  const { data, error } = await _supabase.rpc('create_duel_room', { p_settings: { difficulty: 'normal', peak_mode: false, ratings_visible: true } });
   if (error) { duelMsg('יצירת החדר נכשלה: ' + error.message, false); return; }
   openDuelRoom(data);
 }
-
 async function joinDuelFlow() {
   const code = document.getElementById('duel-join-code').value.trim().toUpperCase();
   if (code.length < 4) { duelMsg('הכנס קוד חדר תקין (4 תווים)', false); return; }
   const { error } = await _supabase.rpc('join_duel_room', { p_code: code });
   if (error) {
-    const m = error.message.includes('full') ? 'החדר מלא' :
-              error.message.includes('not found') ? 'לא נמצא חדר עם הקוד הזה' : 'ההצטרפות נכשלה';
+    const m = error.message.includes('full') ? 'החדר מלא' : error.message.includes('not found') ? 'לא נמצא חדר עם הקוד הזה' : 'ההצטרפות נכשלה';
     duelMsg(m, false); return;
   }
   openDuelRoom(code);
 }
 
-// Open a room: subscribe to its live row and render the lobby.
 async function openDuelRoom(code) {
   closeDuelRealtime();
-  _duelCode = code; _duelPhase = 'lobby'; _duelBot = false;
-  _duelChan = _supabase
-    .channel('duel:' + code)
-    .on('postgres_changes',
-        { event: '*', schema: 'public', table: 'duel_rooms', filter: 'code=eq.' + code },
-        payload => {
-          if (payload.eventType === 'DELETE') { onDuelEnded(); return; }
-          refreshDuelRoom();
-        })
+  _duelCode = code; _duelRevealed = false;
+  _duelChan = _supabase.channel('duel:' + code)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'duel_rooms', filter: 'code=eq.' + code },
+        payload => { if (payload.eventType === 'DELETE') { onDuelEnded(); return; } refreshDuelRoom(); })
     .subscribe();
   await refreshDuelRoom();
 }
@@ -119,26 +140,47 @@ async function refreshDuelRoom() {
   if (error || !data?.length) { onDuelEnded(); return; }
   const room = data[0];
   if (room.guest_name && _quickBotTimer) { clearTimeout(_quickBotTimer); _quickBotTimer = null; }
+  renderDuel(room);
+}
 
-  if (_duelPhase === 'lobby') {
-    if (room.status === 'ready') { beginDuelDrafting(room); return; }
-    renderDuelLobby(room);
-  } else if (_duelPhase === 'drafting' || _duelPhase === 'waiting') {
-    // opponent still drafting → don't disturb my own draft; reveal only once both are in
-    if (room.status === 'done') startDuelReveal(room);
-  }
+// Master router — decides which duel view to show from the room state.
+function renderDuel(room) {
+  const d = room.draft || {};
+  if ((room.status === 'done' || d.phase === 'done')) { startDuelReveal(room); return; }
+  if (d.phase === 'rps') return renderDuelRPS(room);
+  if (d.phase === 'draft') return renderDuelBoard(room);
+  if (room.status === 'ready' || d.phase === 'formation') return renderDuelFormation(room);
+  return renderDuelLobby(room);
 }
 
 function renderDuelLobby(room) {
+  showScreen('duel');
   const box = document.getElementById('duel-content');
   const bothHere = !!room.host_name && !!room.guest_name;
   const myReady = room.is_host ? room.host_ready : room.guest_ready;
+  const s = room.settings || {};
 
   const slot = (name, ready, crown) => `
     <div class="duel-slot ${name ? 'filled' : 'empty'} ${ready ? 'ready' : ''}">
       <div class="duel-slot-name">${crown} ${name ? dEsc(name) : 'ממתין ליריב…'}</div>
       <div class="duel-slot-status">${name ? (ready ? '✓ מוכן' : '⏳ מתכונן') : ''}</div>
     </div>`;
+
+  // Host-only shared settings (difficulty / peak / era)
+  const eraV = DUEL_ERAS.find(e => e.min === s.era_min && e.max === s.era_max)?.v || 'all';
+  const mini = (id, opts, cur) => `<div class="lg-mini" id="${id}">${opts.map(o => `<button data-v="${o.v}" class="${o.v === cur ? 'on' : ''}">${o.label}</button>`).join('')}</div>`;
+  let settingsHtml;
+  if (room.is_host) {
+    settingsHtml = `
+      <div class="lg-config">
+        <div class="lg-config-row"><span>קושי</span>${mini('duel-diff', [{ v: 'easy', label: 'קל' }, { v: 'normal', label: 'רגיל' }, { v: 'hard', label: 'קשה' }], s.difficulty || 'normal')}</div>
+        <div class="lg-config-row"><span>מצב שיא ⚡</span>${mini('duel-peak', [{ v: 'off', label: 'כבוי' }, { v: 'on', label: 'פעיל' }], s.peak_mode ? 'on' : 'off')}</div>
+        <div class="lg-config-row"><span>תקופה</span>${mini('duel-era', DUEL_ERAS.map(e => ({ v: e.v, label: e.label })), eraV)}</div>
+      </div>`;
+  } else {
+    const diffHe = { easy: 'קל', normal: 'רגיל', hard: 'קשה' }[s.difficulty || 'normal'];
+    settingsHtml = `<div class="duel-hint">הגדרות החדר: ${diffHe}${s.peak_mode ? ' · מצב שיא ⚡' : ''} · ${DUEL_ERAS.find(e => e.v === eraV)?.label || 'כל התקופות'}</div>`;
+  }
 
   box.innerHTML = `
     <button class="back-btn lg-inner-back" id="duel-room-back">→ חדרים</button>
@@ -152,10 +194,11 @@ function renderDuelLobby(room) {
       <div class="duel-vs">VS</div>
       ${slot(room.guest_name, room.guest_ready, '🎽')}
     </div>
+    ${settingsHtml}
     <button class="btn-primary duel-ready-btn ${myReady ? 'on' : ''}" id="duel-ready" ${bothHere ? '' : 'disabled'}>
       ${myReady ? '↩ בטל מוכנות' : (bothHere ? 'אני מוכן ✓' : 'ממתין ליריב…')}
     </button>
-    ${bothHere ? '<div class="duel-hint">כששניכם מוכנים — כל אחד עושה דראפט רגיל, ובסוף משווים 🔥</div>' : ''}
+    ${bothHere ? '<div class="duel-hint">כששניכם מוכנים — בוחרים מערך ומתחיל דראפט תורות משותף 🔥</div>' : ''}
     <div id="duel-msg" class="lg-msg"></div>
     <button class="lg-leave" id="duel-leave">עזוב חדר</button>`;
 
@@ -170,8 +213,20 @@ function renderDuelLobby(room) {
   if (readyBtn) readyBtn.onclick = async () => {
     readyBtn.disabled = true;
     const { error } = await _supabase.rpc('set_duel_ready', { p_code: room.code, p_ready: !myReady });
-    if (error) { duelMsg('שגיאה בסימון מוכנות: ' + error.message, false); readyBtn.disabled = false; }
+    if (error) { duelMsg('שגיאה: ' + error.message, false); readyBtn.disabled = false; }
   };
+  if (room.is_host) {
+    const save = patch => _supabase.rpc('set_duel_settings', { p_code: room.code, p_settings: { ...s, ...patch, ratings_visible: true } });
+    wireDuelMini('duel-diff', v => save({ difficulty: v }));
+    wireDuelMini('duel-peak', v => save({ peak_mode: v === 'on' }));
+    wireDuelMini('duel-era', v => { const e = DUEL_ERAS.find(x => x.v === v); save({ era_min: e?.min ?? null, era_max: e?.max ?? null }); });
+  }
+}
+function wireDuelMini(id, cb) {
+  const el = document.getElementById(id); if (!el) return;
+  el.querySelectorAll('button').forEach(b => b.onclick = () => {
+    el.querySelectorAll('button').forEach(x => x.classList.remove('on')); b.classList.add('on'); cb(b.dataset.v);
+  });
 }
 
 async function leaveDuelFlow() {
@@ -180,114 +235,180 @@ async function leaveDuelFlow() {
   if (code) await _supabase.rpc('leave_duel_room', { p_code: code });
   renderDuelHome();
 }
-
 function onDuelEnded() {
-  // If we're mid-draft, don't yank the player out; only matters in the lobby.
-  if (_duelPhase !== 'lobby') return;
+  if (_botRoom) return;
   closeDuelRealtime();
-  if (document.getElementById('screen-duel')) {
-    renderDuelHome();
-    duelMsg('החדר נסגר (היריב עזב).', false);
-  }
+  if (document.getElementById('screen-duel')) { renderDuelHome(); duelMsg('החדר נסגר (היריב עזב).', false); }
 }
-
 function closeDuelRealtime() {
   if (_duelChan) { _supabase.removeChannel(_duelChan); _duelChan = null; }
   if (_quickBotTimer) { clearTimeout(_quickBotTimer); _quickBotTimer = null; }
   _duelCode = null;
 }
 
-// ─── Both ready → each plays the normal draft ──────────────────────────────────
-function beginDuelDrafting(room) {
-  _duelPhase = 'drafting';
-  _duelBot = false;
-  _duelRoomSeed = Number(room.seed) || lgSimSeed(room.code || 'duel');
-  startDuelDraft(room.code);      // → normal setup screen (formation/difficulty/mode)
+// ─── Formation choice ──────────────────────────────────────────────────────────
+function renderDuelFormation(room) {
+  showScreen('duel');
+  const box = document.getElementById('duel-content');
+  const myRole = room.is_host ? 'host' : 'guest';
+  const mine = room.draft?.fmt?.[myRole];
+  if (mine) {
+    box.innerHTML = `<div class="lgsim-hero"><div class="lgsim-hero-title">מערך נבחר: ${dEsc(mine)}</div>
+      <div class="lgsim-hero-sub">ממתין שהיריב יבחר מערך…</div><div class="duel-wait-spin">⚽</div></div>`;
+    return;
+  }
+  const cards = Object.keys(FORMATIONS).map(k => `<button class="duel-fmt-btn" data-f="${k}">${dEsc(FORMATIONS[k].label)}</button>`).join('');
+  box.innerHTML = `<div class="section-label" style="margin-top:8px">בחר את המערך שלך לדואל</div>
+    <div class="duel-fmt-grid">${cards}</div>`;
+  box.querySelectorAll('.duel-fmt-btn').forEach(b => b.onclick = () => duelSetFormation(room, b.dataset.f));
+}
+async function duelSetFormation(room, fmt) {
+  if (room._local) { duelLocalFormation(room, fmt); return; }
+  await _supabase.rpc('duel_set_formation', { p_code: room.code, p_formation: fmt });
 }
 
-// Launch the standard single-player draft, flagged as a duel.
-function startDuelDraft(code) {
-  startGame();                     // normal, unlocked setup + formation picker
-  state.duelCode = code;
-}
-
-function duelPosFits(p, slotPos) {
-  const allowed = COMPAT[slotPos] || [];
-  if (allowed.includes(p.position)) return true;
-  return Array.isArray(p.altPos) && p.altPos.some(x => allowed.includes(x));
-}
-
-function buildDuelSquadPayload() {
+// ─── The turn-based board ──────────────────────────────────────────────────────
+function duelBoardState(room) {
+  const d = room.draft;
+  const myRole = room.is_host ? 'host' : 'guest';
+  const oppRole = myRole === 'host' ? 'guest' : 'host';
+  const round = d.round;
+  const first = round < 10 ? (round % 2 === 0 ? 'host' : 'guest') : (d.rps && d.rps.decided);
+  const rs = d.roundState || {};
+  const picker = !rs[first] ? first : (first === 'host' ? 'guest' : 'host');
+  const settings = room.settings || {};
+  const seq = duelSeq(Number(room.seed) || 1, settings);
+  const team = seq[d.cursor] || null;
+  const taken = new Set();
+  [...(d.picks.host || []), ...(d.picks.guest || [])].forEach(p => taken.add(p.squadId + '|' + p.player));
+  if (rs.host) taken.add(rs.host.squadId + '|' + rs.host.player);
+  if (rs.guest) taken.add(rs.guest.squadId + '|' + rs.guest.player);
   return {
-    formation: FORMATIONS[state.formationId]?.label ?? state.formationId,
-    ovr: teamOVR(),
-    settings: { difficulty: state.difficulty, peak_mode: state.peakMode, ratings_visible: state.showRatings },
-    players: state.picks.flatMap((pick, i) => pick ? [{
-      teamId: pick.squad.teamId, season: pick.squad.season, name: pick.player.name,
-      pos: state.slots[i].pos, ovr: playerOVR(pick.player), slotId: state.slots[i].id,
-    }] : []),
+    d, myRole, oppRole, round, first, picker, isMyTurn: picker === myRole, team, taken, settings,
+    myFmt: d.fmt[myRole], oppFmt: d.fmt[oppRole],
+    myName: room.is_host ? room.host_name : room.guest_name,
+    oppName: room.is_host ? room.guest_name : room.host_name,
+    canReroll: first === myRole && !rs[first] && (d.rr || 0) < 1,
   };
 }
 
-// A random bot squad for the quick-match fallback (fills the player's formation).
-function makeBotSquad(formationLabel) {
-  const fKey = Object.keys(FORMATIONS).find(k => FORMATIONS[k].label === formationLabel) || '4-3-3';
-  const slots = FORMATIONS[fKey].slots;
-  const used = new Set();
-  const players = slots.map(slot => {
-    for (let t = 0; t < 60; t++) {
-      const sq = SQUADS[Math.floor(Math.random() * SQUADS.length)];
-      const cands = sq.players.filter(p => !used.has(p.name) && duelPosFits(p, slot.pos));
-      if (cands.length) {
-        const p = cands[Math.floor(Math.random() * cands.length)];
-        used.add(p.name);
-        return { teamId: sq.teamId, season: sq.season, name: p.name, pos: slot.pos, ovr: p.ovr, slotId: slot.id };
-      }
-    }
-    return null;
-  }).filter(Boolean);
-  const ovr = players.length ? Math.round(players.reduce((s, p) => s + p.ovr, 0) / players.length) : 70;
-  return { formation: formationLabel, ovr, players };
-}
-
-// Called by the draft engine when a duel draft is complete.
-async function submitDuelSquad() {
-  const squad = buildDuelSquadPayload();
-
-  if (_duelBot) {
-    const bot = makeBotSquad(squad.formation);
-    startDuelReveal({ _local: true, seed: _duelRoomSeed, is_host: true,
-      host_name: document.getElementById('nav-username')?.textContent?.trim() || 'אתה',
-      guest_name: 'בוט 🤖', draft: { host: squad, guest: bot } });
-    return;
-  }
-
-  _duelPhase = 'waiting';
-  renderDuelWaiting();
-  const { error } = await _supabase.rpc('duel_submit_squad', { p_code: state.duelCode, p_squad: squad });
-  if (error) {
-    document.getElementById('duel-content').innerHTML =
-      `<div class="lgsim-hero"><div class="lgsim-hero-title" style="color:#f85149">שליחה נכשלה</div>
-       <button class="btn-primary" id="duel-resub">נסה שוב</button></div>`;
-    document.getElementById('duel-resub').onclick = submitDuelSquad;
-    return;
-  }
-  await refreshDuelRoom();          // reveal immediately if the opponent already finished
-}
-
-function renderDuelWaiting() {
+function renderDuelBoard(room) {
   showScreen('duel');
-  document.getElementById('duel-content').innerHTML = `
-    <div class="lgsim-hero">
-      <div class="lgsim-hero-title">✓ ההרכב נשלח!</div>
-      <div class="lgsim-hero-sub">ממתין שהיריב יסיים את הדראפט…</div>
-      <div class="duel-wait-spin">⚽</div>
-      <button class="lg-leave" id="duel-leave">עזוב</button>
-    </div>`;
+  const box = document.getElementById('duel-content');
+  const st = duelBoardState(room);
+
+  const boardCol = (title, fmt, picks, isMe) => {
+    const slots = FORMATIONS[fmt].slots;
+    const bySlot = new Map((picks || []).map(p => [p.slotId, p]));
+    const rows = slots.map(s => {
+      const p = bySlot.get(s.id);
+      return `<div class="duel-sq-row ${p ? 'f' : ''}"><span class="duel-sq-pos">${s.pos}</span><span class="duel-sq-nm">${p ? dEsc(playerShortName(p.player)) : '—'}</span><span class="duel-sq-ovr">${p ? p.ovr : ''}</span></div>`;
+    }).join('');
+    return `<div class="duel-sq ${isMe ? 'mine' : ''}"><div class="duel-sq-h">${dEsc(title)} <span>${(picks || []).length}/11</span></div>${rows}</div>`;
+  };
+
+  let listHtml = '';
+  if (st.team) {
+    const avail = st.team.players.filter(pl => !st.taken.has(st.team.id + '|' + pl.name))
+      .slice().sort((a, b) => duelPOvr(b, st.settings) - duelPOvr(a, st.settings));
+    _duelPickable = avail;
+    listHtml = avail.map((pl, i) => `
+      <button class="duel-pl" data-i="${i}" ${st.isMyTurn ? '' : 'disabled'}>
+        <span class="duel-pl-pos">${dEsc(pl.position)}</span>
+        <span class="duel-pl-name">${dEsc(playerShortName(pl.name))}</span>
+        <span class="duel-pl-ovr">${duelPOvr(pl, st.settings)}</span>
+      </button>`).join('');
+  }
+
+  const teamLabel = st.team ? `${dEsc(getTeam(st.team.teamId).name)} · ${dEsc(st.team.season)}` : '';
+  const turnBadge = st.isMyTurn
+    ? `<span class="duel-turn me">🟢 תורך${st.first === st.myRole ? ' — אתה ראשון' : ''}</span>`
+    : `<span class="duel-turn opp">⏳ תור ${dEsc(st.oppName || 'היריב')}…</span>`;
+
+  box.innerHTML = `
+    <button class="btn-draft-exit" id="duel-board-exit" style="margin-bottom:8px">← יציאה</button>
+    <div class="duel-draft-top">
+      ${turnBadge}
+      <span class="duel-prog">סבב ${Math.min(st.round + 1, 11)}/11</span>
+    </div>
+    <div class="duel-team-panel">
+      <div class="duel-team-name">⚽ ${teamLabel}</div>
+      ${st.canReroll ? '<button class="duel-reroll-btn" id="duel-reroll">🔄 החלף קבוצה (פעם אחת)</button>' : ''}
+      <div class="duel-pl-list">${listHtml || '<div class="page-note">—</div>'}</div>
+      ${st.isMyTurn ? '' : '<div class="duel-wait-note">היריב בוחר…</div>'}
+    </div>
+    <div class="duel-squads">
+      ${boardCol('הקבוצה שלך', st.myFmt, st.d.picks[st.myRole], true)}
+      ${boardCol(st.oppName || 'יריב', st.oppFmt, st.d.picks[st.oppRole], false)}
+    </div>
+    <button class="lg-leave" id="duel-leave">עזוב דואל</button>`;
+
+  document.getElementById('duel-board-exit').onclick = () => leaveDuelFlow();
   document.getElementById('duel-leave').onclick = () => leaveDuelFlow();
+  const rr = document.getElementById('duel-reroll');
+  if (rr) rr.onclick = () => duelReroll(room);
+  if (st.isMyTurn && st.team) {
+    box.querySelectorAll('.duel-pl').forEach(btn => btn.onclick = () => duelBoardPick(room, _duelPickable[+btn.dataset.i]));
+  }
 }
 
-// ─── Reveal: normal results page + a separate duel summary ──────────────────────
+async function duelBoardPick(room, player) {
+  if (!player) return;
+  const st = duelBoardState(room);
+  if (!st.isMyTurn || !st.team) return;
+  const slots = FORMATIONS[st.myFmt].slots;
+  const filled = new Set((st.d.picks[st.myRole] || []).map(p => p.slotId));
+  const empties = slots.filter(s => !filled.has(s.id));
+  const slot = empties.find(s => duelPosFits(player, s.pos)) || empties[0];
+  if (!slot) return;
+  const pick = { round: st.round, squadId: st.team.id, player: player.name, slotId: slot.id, pos: slot.pos, ovr: duelPOvr(player, st.settings) };
+  if (room._local) { duelLocalPick(room, pick); return; }
+  const { error } = await _supabase.rpc('duel_draft_pick', { p_code: room.code, p_pick: pick });
+  if (error) console.warn('duel_draft_pick:', error.message);
+}
+async function duelReroll(room) {
+  if (room._local) { duelLocalReroll(room); return; }
+  const { error } = await _supabase.rpc('duel_reroll', { p_code: room.code });
+  if (error) console.warn('duel_reroll:', error.message);
+}
+
+// ─── Rock-paper-scissors for the final round ───────────────────────────────────
+function renderDuelRPS(room) {
+  showScreen('duel');
+  const box = document.getElementById('duel-content');
+  const myRole = room.is_host ? 'host' : 'guest';
+  const rps = room.draft.rps || {};
+  const myChoice = rps[myRole];
+  if (myChoice && !rps.tie) {
+    box.innerHTML = `<div class="lgsim-hero"><div class="lgsim-hero-title">בחרת ${rpsHe(myChoice)}</div>
+      <div class="lgsim-hero-sub">ממתין ליריב…</div><div class="duel-wait-spin">✊</div></div>`;
+    return;
+  }
+  box.innerHTML = `
+    <div class="section-label" style="margin-top:8px">🎮 אבן · נייר · מספריים</div>
+    <p class="page-note" style="text-align:center">הזוכה בוחר ראשון בסבב האחרון (ה-11)</p>
+    ${rps.tie ? '<div class="duel-hint" style="color:#f59e0b">תיקו! שחקו שוב</div>' : ''}
+    <div class="duel-rps-row">
+      <button class="duel-rps-btn" data-c="rock">✊<br>אבן</button>
+      <button class="duel-rps-btn" data-c="paper">✋<br>נייר</button>
+      <button class="duel-rps-btn" data-c="scissors">✌<br>מספריים</button>
+    </div>`;
+  box.querySelectorAll('.duel-rps-btn').forEach(b => b.onclick = () => duelRPS(room, b.dataset.c));
+}
+async function duelRPS(room, choice) {
+  if (room._local) { duelLocalRPS(room, choice); return; }
+  await _supabase.rpc('duel_rps', { p_code: room.code, p_choice: choice });
+}
+
+// ─── Reveal: normal results (opponent in the table) + duel summary ─────────────
+function duelPicksToSquad(picks, fmt) {
+  const players = (picks || []).map(p => {
+    const sq = SQUADS.find(s => s.id === p.squadId);
+    return { teamId: sq?.teamId, season: sq?.season, name: p.player, pos: p.pos, ovr: p.ovr, slotId: p.slotId };
+  });
+  const ovr = players.length ? Math.round(players.reduce((s, p) => s + p.ovr, 0) / players.length) : 70;
+  return { formation: fmt, ovr, players };
+}
 function duelSeasonRecord(seed, ovr) {
   return withSeededRandom(seed, () => {
     const g = generateMatches(ovr);
@@ -298,40 +419,37 @@ function duelSeasonRecord(seed, ovr) {
 }
 
 function startDuelReveal(room) {
-  _duelPhase = 'done';
+  if (_duelRevealed) return;
+  _duelRevealed = true;
   const myRole = room.is_host ? 'host' : 'guest';
   const oppRole = myRole === 'host' ? 'guest' : 'host';
-  const mySquad = room.draft[myRole], oppSquad = room.draft[oppRole];
-  if (!mySquad || !oppSquad) return;
+  const d = room.draft;
+  const mySquad = duelPicksToSquad(d.picks[myRole], d.fmt[myRole]);
+  const oppSquad = duelPicksToSquad(d.picks[oppRole], d.fmt[oppRole]);
   const roomSeed = Number(room.seed) || lgSimSeed(String(room.code || 'bot'));
   const myName = myRole === 'host' ? room.host_name : room.guest_name;
   const oppName = oppRole === 'host' ? room.host_name : room.guest_name;
+  const settings = room.settings || {};
 
-  // The opponent's deterministic season — used both for the shared league table
-  // (they play in the same Ligat Ha'al) and the duel summary.
   const oppRec = duelSeasonRecord(lgSimSeed(String(roomSeed) + '|' + oppRole), oppSquad.ovr);
   const oppPts = oppRec.pts;
-  const oppTeam = { name: 'הקבוצה של ' + (oppName || 'יריב'), pts: oppRec.pts,
-    w: oppRec.w, d: oppRec.d, l: oppRec.l, gf: oppRec.gf, ga: oppRec.ga, inTopSix: oppRec.inTopSix };
+  const oppTeam = { name: 'הקבוצה של ' + (oppName || 'יריב'), pts: oppRec.pts, w: oppRec.w, d: oppRec.d, l: oppRec.l, gf: oppRec.gf, ga: oppRec.ga, inTopSix: oppRec.inTopSix };
 
-  // Rebuild my team into `state` (safe across refresh) and compute my own season,
-  // inserting the opponent's team into my league table (as in the leagues reveal).
-  lgReconstructState(mySquad.players, mySquad.formation, mySquad.settings || {});
+  lgReconstructState(mySquad.players, mySquad.formation, settings);
   let proj = 8; try { proj = calcPreseasonOdds(mySquad.ovr, 50).projectedFinish; } catch (e) {}
   const season = withSeededRandom(lgSimSeed(String(roomSeed) + '|' + myRole), () => {
     const g = generateMatches(mySquad.ovr);
-    let w = 0, d = 0; g.matches.forEach(m => { if (m.outcome === 'W') w++; else if (m.outcome === 'D') d++; });
-    const l = g.matches.length - w - d;
-    const table = lgInjectFriends(
-      generateLeagueTable(w, d, l, g.inTopSix, g.champOpponents, g.relegOpponents), [oppTeam]);
-    return { ovr: mySquad.ovr, matches: g.matches, inTopSix: g.inTopSix, leagueTable: table,
-      playerStats: simulatePlayerStats(g.matches), projectedFinish: proj, _pts: w * 3 + d };
+    let w = 0, dd = 0; g.matches.forEach(m => { if (m.outcome === 'W') w++; else if (m.outcome === 'D') dd++; });
+    const l = g.matches.length - w - dd;
+    const table = lgInjectFriends(generateLeagueTable(w, dd, l, g.inTopSix, g.champOpponents, g.relegOpponents), [oppTeam]);
+    return { ovr: mySquad.ovr, matches: g.matches, inTopSix: g.inTopSix, leagueTable: table, playerStats: simulatePlayerStats(g.matches), projectedFinish: proj, _pts: w * 3 + dd };
   });
   const myPts = season._pts;
 
   window._presetSeason = season;
-  window._duelReviewMode = { room, mySquad, oppSquad, myName, oppName, myPts, oppPts };
+  window._duelReviewMode = { mySquad, oppSquad, myName, oppName, myPts, oppPts };
   state.duelCode = null; state.leagueCode = null;
+  closeDuelRealtime(); _botRoom = null;
   showResults();
   setTimeout(() => addDuelReviewChrome(), 80);
 }
@@ -344,44 +462,34 @@ function addDuelReviewChrome() {
   const color = draw ? '#f59e0b' : (iWon ? '#22c55e' : '#f85149');
   const bar = document.createElement('div');
   bar.id = 'duel-review-chrome';
-  bar.innerHTML = `
-    <button class="duel-chrome-summary" id="duel-chrome-open" style="color:${color}">
-      🆚 ${label} · ${d.myPts}–${d.oppPts}
-    </button>
+  bar.innerHTML = `<button class="duel-chrome-summary" id="duel-chrome-open" style="color:${color}">🆚 ${label} · ${d.myPts}–${d.oppPts}</button>
     <button class="duel-chrome-exit" id="duel-chrome-exit">יציאה</button>`;
   document.getElementById('screen-results')?.appendChild(bar);
   document.getElementById('duel-chrome-open').onclick = showDuelSummary;
-  document.getElementById('duel-chrome-exit').onclick = () => {
-    bar.remove(); window._duelReviewMode = null; renderDuelHome();
-  };
-  setTimeout(showDuelSummary, 4600);     // surface the summary once the reveal settles
+  document.getElementById('duel-chrome-exit').onclick = () => { bar.remove(); window._duelReviewMode = null; showDuel(); };
+  setTimeout(showDuelSummary, 4600);
 }
-
 function showDuelSummary() {
   const d = window._duelReviewMode; if (!d) return;
   const draw = d.myPts === d.oppPts, iWon = d.myPts > d.oppPts;
   const headline = draw ? '🤝 תיקו!' : (iWon ? '🏆 ניצחת בדואל!' : '😞 הפסדת בדואל');
   const color = draw ? '#f59e0b' : (iWon ? '#22c55e' : '#f85149');
-
   let modal = document.getElementById('duel-summary-modal');
   if (!modal) { modal = document.createElement('div'); modal.id = 'duel-summary-modal'; modal.className = 'modal-overlay'; document.body.appendChild(modal); }
   modal.innerHTML = `
     <div class="modal-box placement-box">
       <div class="placement-tier" style="color:${color}">${headline}</div>
-      <div class="duel-sum-score" dir="ltr">
-        <b>${dEsc(d.myName || 'אתה')}</b> ${d.myPts} — ${d.oppPts} <b>${dEsc(d.oppName || 'יריב')}</b>
-      </div>
+      <div class="duel-sum-score" dir="ltr"><b>${dEsc(d.myName || 'אתה')}</b> ${d.myPts} — ${d.oppPts} <b>${dEsc(d.oppName || 'יריב')}</b></div>
       <div class="duel-sum-ovr">OVR ${d.mySquad.ovr} · ${d.oppSquad.ovr}</div>
       <button class="btn-primary btn-full" id="duel-sum-opp">👁 צפה בהרכב היריב</button>
       <button class="btn-primary btn-full" id="duel-sum-close" style="margin-top:6px">לצפייה בתוצאות שלך ←</button>
     </div>`;
-  modal.querySelector('#duel-sum-opp').onclick = () =>
-    showLeagueSquad(d.oppSquad.players.map(p => ({ pos: p.pos, name: p.name, ovr: p.ovr })), 'הקבוצה של ' + (d.oppName || 'יריב'));
+  modal.querySelector('#duel-sum-opp').onclick = () => showLeagueSquad(d.oppSquad.players.map(p => ({ pos: p.pos, name: p.name, ovr: p.ovr })), 'הקבוצה של ' + (d.oppName || 'יריב'));
   modal.querySelector('#duel-sum-close').onclick = () => { modal.style.display = 'none'; };
   modal.style.display = 'flex';
 }
 
-// ─── Quick match + bot fallback ────────────────────────────────────────────────
+// ─── Quick match + local bot ───────────────────────────────────────────────────
 async function quickMatchFlow() {
   duelMsg('מחפש יריב…', true);
   const { data, error } = await _supabase.rpc('quick_match');
@@ -391,8 +499,8 @@ async function quickMatchFlow() {
   if (role === 'host') {
     clearTimeout(_quickBotTimer);
     _quickBotTimer = setTimeout(async () => {
-      const { data: d } = await _supabase.rpc('get_duel_room', { p_code: code });
-      if (d?.[0]?.guest_name) return;                 // a real opponent joined
+      const { data: dd } = await _supabase.rpc('get_duel_room', { p_code: code });
+      if (dd?.[0]?.guest_name) return;
       await _supabase.rpc('leave_duel_room', { p_code: code });
       startBotDuel();
     }, 10000);
@@ -401,11 +509,93 @@ async function quickMatchFlow() {
 
 function startBotDuel() {
   closeDuelRealtime();
-  _duelBot = true;
-  _duelPhase = 'drafting';
-  _duelRoomSeed = Math.floor(Math.random() * 2147483646);
+  _duelRevealed = false;
+  _botRoom = {
+    _local: true, code: null, is_host: true,
+    host_name: document.getElementById('nav-username')?.textContent?.trim() || 'אתה',
+    guest_name: 'בוט 🤖',
+    seed: Math.floor(Math.random() * 2147483646),
+    status: 'drafting',
+    settings: { difficulty: 'normal', peak_mode: false, ratings_visible: true },
+    draft: { phase: 'formation', fmt: {}, round: 0, cursor: 0, rr: 0, picks: { host: [], guest: [] }, roundState: {}, rps: {} },
+  };
   duelMsg('לא נמצא יריב — משחקים מול בוט 🤖', true);
-  startDuelDraft('__BOT__');
+  renderDuel(_botRoom);
+}
+
+// local mirrors of the server rules (host = human, guest = bot)
+function duelLocalFormation(room, fmt) {
+  room.draft.fmt.host = fmt;
+  room.draft.fmt.guest = duelBotFormation();
+  room.draft.phase = 'draft';
+  duelLocalBotAdvance(room);
+}
+function duelBotFormation() {
+  const keys = Object.keys(FORMATIONS);
+  return keys[Math.floor(Math.random() * keys.length)];
+}
+function duelLocalReroll(room) {
+  const st = duelBoardState(room);
+  if (!st.canReroll) return;
+  room.draft.cursor++; room.draft.rr = (room.draft.rr || 0) + 1;
+  renderDuel(room);
+}
+function duelLocalPick(room, pick) {
+  duelLocalApplyPick(room, 'host', pick);
+  duelLocalBotAdvance(room);
+}
+function duelLocalRPS(room, choice) {
+  const bot = ['rock', 'paper', 'scissors'][Math.floor(Math.random() * 3)];
+  if (choice === bot) { room.draft.rps = { tie: true }; renderDuel(room); return; }
+  const hostWins = (choice === 'rock' && bot === 'scissors') || (choice === 'scissors' && bot === 'paper') || (choice === 'paper' && bot === 'rock');
+  room.draft.rps = { decided: hostWins ? 'host' : 'guest', host: choice, guest: bot };
+  room.draft.phase = 'draft';
+  duelLocalBotAdvance(room);
+}
+// apply a pick to local state and advance the round if both picked
+function duelLocalApplyPick(room, role, pick) {
+  const d = room.draft;
+  d.roundState[role] = pick;
+  if (d.roundState.host && d.roundState.guest) {
+    d.picks.host.push(d.roundState.host);
+    d.picks.guest.push(d.roundState.guest);
+    d.round++; d.cursor++; d.rr = 0; d.roundState = {};
+    if (d.round >= 11) d.phase = 'done';
+    else if (d.round === 10) { d.phase = 'rps'; d.rps = {}; }
+  }
+}
+// run the bot's moves until it's the human's turn again (or done)
+function duelLocalBotAdvance(room) {
+  const d = room.draft;
+  let guard = 0;
+  while (guard++ < 40) {
+    if (d.phase === 'done') break;
+    if (d.phase === 'rps') {
+      if (!d.rps.guest && !d.rps.decided) { /* wait for human */ break; }
+      break;
+    }
+    const st = duelBoardState(room);
+    if (st.picker !== 'guest') break;          // human's turn (or first & human)
+    // bot picks highest available for its formation
+    const bp = duelBotPick(room);
+    if (!bp) break;
+    duelLocalApplyPick(room, 'guest', bp);
+  }
+  renderDuel(room);
+}
+function duelBotPick(room) {
+  const st = duelBoardState(room);
+  if (!st.team) return null;
+  const slots = FORMATIONS[st.oppFmt].slots;   // oppFmt = guest (bot) formation from host's perspective
+  const filled = new Set((room.draft.picks.guest || []).map(p => p.slotId));
+  const empties = slots.filter(s => !filled.has(s.id));
+  const avail = st.team.players.filter(pl => !st.taken.has(st.team.id + '|' + pl.name));
+  const fitting = avail.filter(pl => empties.some(s => duelPosFits(pl, s.pos)));
+  const cand = (fitting.length ? fitting : avail).slice().sort((a, b) => duelPOvr(b, st.settings) - duelPOvr(a, st.settings))[0];
+  if (!cand) return null;
+  const slot = empties.find(s => duelPosFits(cand, s.pos)) || empties[0];
+  if (!slot) return null;
+  return { round: st.round, squadId: st.team.id, player: cand.name, slotId: slot.id, pos: slot.pos, ovr: duelPOvr(cand, st.settings) };
 }
 
 // Invite link: /?duel=CODE opens the duel screen with the code ready to join.

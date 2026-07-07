@@ -1701,6 +1701,22 @@ body {
 .duel-sum-ovr { text-align: center; font-size: 12px; color: var(--dim); margin-bottom: 12px; }
 .btn-draft-exit { display: block; width: 100%; margin-bottom: 8px; background: #f8514918; color: #f85149; border: 1px solid #f8514955; border-radius: 8px; padding: 8px; font-family: inherit; font-weight: 800; font-size: 13px; cursor: pointer; }
 .btn-draft-exit:hover { background: #f8514930; }
+.duel-fmt-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 8px; }
+.duel-fmt-btn { background: var(--panel2, #1b2330); border: 1.5px solid var(--border); border-radius: 10px; padding: 16px 6px; font-family: inherit; font-weight: 900; font-size: 15px; color: var(--text); cursor: pointer; }
+.duel-fmt-btn:hover { border-color: var(--accent2); background: #2b3546; }
+.duel-reroll-btn { display: block; width: 100%; margin: 4px 0 8px; background: #eab30822; color: #eab308; border: 1px solid #eab30866; border-radius: 8px; padding: 8px; font-family: inherit; font-weight: 800; font-size: 13px; cursor: pointer; }
+.duel-reroll-btn:hover { background: #eab30833; }
+.duel-rps-row { display: flex; gap: 10px; margin-top: 14px; }
+.duel-rps-btn { flex: 1; background: var(--panel2, #1b2330); border: 1.5px solid var(--border); border-radius: 12px; padding: 18px 6px; font-family: inherit; font-weight: 800; font-size: 30px; line-height: 1.25; color: var(--text); cursor: pointer; }
+.duel-rps-btn:hover { border-color: var(--accent2); background: #2b3546; }
+.duel-fmt-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 8px; }
+.duel-fmt-btn { background: var(--panel2, #1b2330); border: 1.5px solid var(--border); border-radius: 10px; padding: 16px 6px; font-family: inherit; font-weight: 900; font-size: 15px; color: var(--text); cursor: pointer; }
+.duel-fmt-btn:hover { border-color: var(--accent2); background: #2b3546; }
+.duel-reroll-btn { display: block; width: 100%; margin: 4px 0 8px; background: #eab30822; color: #eab308; border: 1px solid #eab30866; border-radius: 8px; padding: 8px; font-family: inherit; font-weight: 800; font-size: 13px; cursor: pointer; }
+.duel-reroll-btn:hover { background: #eab30833; }
+.duel-rps-row { display: flex; gap: 10px; margin-top: 14px; }
+.duel-rps-btn { flex: 1; background: var(--panel2, #1b2330); border: 1.5px solid var(--border); border-radius: 12px; padding: 18px 6px; font-family: inherit; font-weight: 800; font-size: 30px; line-height: 1.25; color: var(--text); cursor: pointer; }
+.duel-rps-btn:hover { border-color: var(--accent2); background: #2b3546; }
 /* shared league simulation */
 .lgsim-hero { text-align: center; padding: 18px 12px; }
 .lgsim-hero-title { font-size: 20px; font-weight: 900; color: #22c55e; }
