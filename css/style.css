@@ -1709,14 +1709,20 @@ body {
 .duel-rps-row { display: flex; gap: 10px; margin-top: 14px; }
 .duel-rps-btn { flex: 1; background: var(--panel2, #1b2330); border: 1.5px solid var(--border); border-radius: 12px; padding: 18px 6px; font-family: inherit; font-weight: 800; font-size: 30px; line-height: 1.25; color: var(--text); cursor: pointer; }
 .duel-rps-btn:hover { border-color: var(--accent2); background: #2b3546; }
-.duel-fmt-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 8px; }
-.duel-fmt-btn { background: var(--panel2, #1b2330); border: 1.5px solid var(--border); border-radius: 10px; padding: 16px 6px; font-family: inherit; font-weight: 900; font-size: 15px; color: var(--text); cursor: pointer; }
-.duel-fmt-btn:hover { border-color: var(--accent2); background: #2b3546; }
-.duel-reroll-btn { display: block; width: 100%; margin: 4px 0 8px; background: #eab30822; color: #eab308; border: 1px solid #eab30866; border-radius: 8px; padding: 8px; font-family: inherit; font-weight: 800; font-size: 13px; cursor: pointer; }
-.duel-reroll-btn:hover { background: #eab30833; }
-.duel-rps-row { display: flex; gap: 10px; margin-top: 14px; }
-.duel-rps-btn { flex: 1; background: var(--panel2, #1b2330); border: 1.5px solid var(--border); border-radius: 12px; padding: 18px 6px; font-family: inherit; font-weight: 800; font-size: 30px; line-height: 1.25; color: var(--text); cursor: pointer; }
-.duel-rps-btn:hover { border-color: var(--accent2); background: #2b3546; }
+/* two mini-pitches side by side during the draft */
+.duel-boards { display: flex; gap: 8px; margin-bottom: 12px; }
+.duel-mini { flex: 1; min-width: 0; }
+.duel-mini.mine .duel-mini-wrap { border-color: var(--accent2); }
+.duel-mini-head { display: flex; justify-content: space-between; padding: 4px 6px; font-size: 11px; font-weight: 800; overflow: hidden; }
+.duel-mini-head span { color: var(--dim); }
+.duel-mini-wrap { position: relative; width: 100%; aspect-ratio: 3 / 4; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.duel-mini-pitch { top: 3px; right: 3px; bottom: 3px; left: 3px; }
+.duel-mini-pitch .slot-token { gap: 1px; cursor: default; }
+.duel-mini-pitch .slot-token:hover { transform: translate(-50%, -50%); }
+.duel-mini-pitch .slot-circle { width: 20px; height: 20px; border-width: 1.5px; }
+.duel-mini-pitch .slot-player-short { font-size: 6px; max-width: 20px; }
+.duel-mini-pitch .slot-pos-label { font-size: 6px; }
+.duel-mini-pitch .slot-name-label { font-size: 6px; max-width: 46px; padding: 0 3px; border-radius: 2px; }
 /* shared league simulation */
 .lgsim-hero { text-align: center; padding: 18px 12px; }
 .lgsim-hero-title { font-size: 20px; font-weight: 900; color: #22c55e; }

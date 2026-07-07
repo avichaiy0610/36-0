@@ -143,14 +143,24 @@ async function refreshDuelRoom() {
   renderDuel(room);
 }
 
+// Generic Israeli-football-flavoured handles the "bots" appear under, so a bot
+// opponent is indistinguishable from a real player who just joined.
+const DUEL_BOT_NICKS = [
+  'מכבי_לנצח', 'בית"ר_בלב', 'הפועל_אדום', 'אלוף_הליגה', 'גול_בדקה90', 'שוער_ברזל',
+  'מלך_השערים', 'ילד_פלא', 'קוסם_הכדור', 'נשר_מהיציע', 'אגדת_הדשא', 'דרבי_מנצח',
+  'פנטזיה2026', 'טורנדו10', 'בולדוזר9', 'קפטן_מהשכונה', 'חלוץ_חוד', 'רוח_אלופים',
+  'ליגת_העל', 'כדורגלן_חובב', 'אריה_יהודה', 'סופר_גול', 'מהיר_כברק', 'חומת_הגנה',
+];
+function duelBotNick() { return DUEL_BOT_NICKS[Math.floor(Math.random() * DUEL_BOT_NICKS.length)]; }
+
 // Master router — decides which duel view to show from the room state.
 function renderDuel(room) {
   const d = room.draft || {};
-  if ((room.status === 'done' || d.phase === 'done')) { startDuelReveal(room); return; }
+  if (room.status === 'waiting') return renderDuelLobby(room);
+  if (room.status === 'done' || d.phase === 'done') { startDuelReveal(room); return; }
   if (d.phase === 'rps') return renderDuelRPS(room);
   if (d.phase === 'draft') return renderDuelBoard(room);
-  if (room.status === 'ready' || d.phase === 'formation') return renderDuelFormation(room);
-  return renderDuelLobby(room);
+  return renderDuelFormation(room);
 }
 
 function renderDuelLobby(room) {
@@ -211,12 +221,20 @@ function renderDuelLobby(room) {
   };
   const readyBtn = document.getElementById('duel-ready');
   if (readyBtn) readyBtn.onclick = async () => {
+    if (room._local) {
+      room.host_ready = !myReady;
+      duelLocalMaybeStart(room);
+      renderDuel(room); return;
+    }
     readyBtn.disabled = true;
     const { error } = await _supabase.rpc('set_duel_ready', { p_code: room.code, p_ready: !myReady });
     if (error) { duelMsg('שגיאה: ' + error.message, false); readyBtn.disabled = false; }
   };
   if (room.is_host) {
-    const save = patch => _supabase.rpc('set_duel_settings', { p_code: room.code, p_settings: { ...s, ...patch, ratings_visible: true } });
+    const save = patch => {
+      if (room._local) { room.settings = { ...room.settings, ...patch, ratings_visible: true }; return; }
+      _supabase.rpc('set_duel_settings', { p_code: room.code, p_settings: { ...s, ...patch, ratings_visible: true } });
+    };
     wireDuelMini('duel-diff', v => save({ difficulty: v }));
     wireDuelMini('duel-peak', v => save({ peak_mode: v === 'on' }));
     wireDuelMini('duel-era', v => { const e = DUEL_ERAS.find(x => x.v === v); save({ era_min: e?.min ?? null, era_max: e?.max ?? null }); });
@@ -292,20 +310,33 @@ function duelBoardState(room) {
   };
 }
 
+// A compact real pitch (field + positioned tokens) for one team.
+function duelMiniPitchHTML(fmt, picks, title, isMe) {
+  const slots = FORMATIONS[fmt].slots;
+  const bySlot = new Map((picks || []).map(p => [p.slotId, p]));
+  const tokens = slots.map(slot => {
+    const pick = bySlot.get(slot.id);
+    if (pick) {
+      const sq = SQUADS.find(s => s.id === pick.squadId);
+      const team = sq ? getTeam(sq.teamId) : { primaryColor: '#333', secondaryColor: '#fff' };
+      const tx = textColorFor(team.primaryColor);
+      return `<div class="slot-token filled" style="left:${slot.x}%;top:${slot.y}%;--tc:${team.primaryColor};--ts:${team.secondaryColor};--tx:${tx}">
+        <div class="slot-circle filled-circle"><span class="slot-player-short">${dEsc(playerShortName(pick.player))}</span></div>
+        <div class="slot-name-label">${dEsc(pick.player)}</div></div>`;
+    }
+    return `<div class="slot-token empty" style="left:${slot.x}%;top:${slot.y}%">
+      <div class="slot-circle"><span class="slot-pos-label">${slot.pos}</span></div></div>`;
+  }).join('');
+  return `<div class="duel-mini ${isMe ? 'mine' : ''}">
+    <div class="duel-mini-head">${dEsc(title)} <span>${(picks || []).length}/11</span></div>
+    <div class="duel-mini-wrap"><div class="pitch duel-mini-pitch">${tokens}</div></div>
+  </div>`;
+}
+
 function renderDuelBoard(room) {
   showScreen('duel');
   const box = document.getElementById('duel-content');
   const st = duelBoardState(room);
-
-  const boardCol = (title, fmt, picks, isMe) => {
-    const slots = FORMATIONS[fmt].slots;
-    const bySlot = new Map((picks || []).map(p => [p.slotId, p]));
-    const rows = slots.map(s => {
-      const p = bySlot.get(s.id);
-      return `<div class="duel-sq-row ${p ? 'f' : ''}"><span class="duel-sq-pos">${s.pos}</span><span class="duel-sq-nm">${p ? dEsc(playerShortName(p.player)) : '—'}</span><span class="duel-sq-ovr">${p ? p.ovr : ''}</span></div>`;
-    }).join('');
-    return `<div class="duel-sq ${isMe ? 'mine' : ''}"><div class="duel-sq-h">${dEsc(title)} <span>${(picks || []).length}/11</span></div>${rows}</div>`;
-  };
 
   let listHtml = '';
   if (st.team) {
@@ -315,7 +346,7 @@ function renderDuelBoard(room) {
     listHtml = avail.map((pl, i) => `
       <button class="duel-pl" data-i="${i}" ${st.isMyTurn ? '' : 'disabled'}>
         <span class="duel-pl-pos">${dEsc(pl.position)}</span>
-        <span class="duel-pl-name">${dEsc(playerShortName(pl.name))}</span>
+        <span class="duel-pl-name">${dEsc(pl.name)}</span>
         <span class="duel-pl-ovr">${duelPOvr(pl, st.settings)}</span>
       </button>`).join('');
   }
@@ -337,9 +368,9 @@ function renderDuelBoard(room) {
       <div class="duel-pl-list">${listHtml || '<div class="page-note">—</div>'}</div>
       ${st.isMyTurn ? '' : '<div class="duel-wait-note">היריב בוחר…</div>'}
     </div>
-    <div class="duel-squads">
-      ${boardCol('הקבוצה שלך', st.myFmt, st.d.picks[st.myRole], true)}
-      ${boardCol(st.oppName || 'יריב', st.oppFmt, st.d.picks[st.oppRole], false)}
+    <div class="duel-boards">
+      ${duelMiniPitchHTML(st.myFmt, st.d.picks[st.myRole], 'הקבוצה שלך', true)}
+      ${duelMiniPitchHTML(st.oppFmt, st.d.picks[st.oppRole], st.oppName || 'יריב', false)}
     </div>
     <button class="lg-leave" id="duel-leave">עזוב דואל</button>`;
 
@@ -501,26 +532,49 @@ async function quickMatchFlow() {
     _quickBotTimer = setTimeout(async () => {
       const { data: dd } = await _supabase.rpc('get_duel_room', { p_code: code });
       if (dd?.[0]?.guest_name) return;
+      const settings = dd?.[0]?.settings || {};
       await _supabase.rpc('leave_duel_room', { p_code: code });
-      startBotDuel();
+      startBotDuel(settings);
     }, 10000);
   }
 }
 
-function startBotDuel() {
+// A bot game runs entirely locally, but presents like a real opponent: it joins
+// the lobby under a nickname and takes a moment to press "ready".
+function startBotDuel(settings) {
   closeDuelRealtime();
   _duelRevealed = false;
+  const nick = duelBotNick();
   _botRoom = {
     _local: true, code: null, is_host: true,
     host_name: document.getElementById('nav-username')?.textContent?.trim() || 'אתה',
-    guest_name: 'בוט 🤖',
+    guest_name: null, host_ready: false, guest_ready: false,
     seed: Math.floor(Math.random() * 2147483646),
-    status: 'drafting',
-    settings: { difficulty: 'normal', peak_mode: false, ratings_visible: true },
-    draft: { phase: 'formation', fmt: {}, round: 0, cursor: 0, rr: 0, picks: { host: [], guest: [] }, roundState: {}, rps: {} },
+    status: 'waiting',
+    settings: settings && Object.keys(settings).length ? { ...settings, ratings_visible: true }
+                                                       : { difficulty: 'normal', peak_mode: false, ratings_visible: true },
+    draft: {},
   };
-  duelMsg('לא נמצא יריב — משחקים מול בוט 🤖', true);
   renderDuel(_botRoom);
+  setTimeout(() => {                                   // opponent "joins"
+    if (!_botRoom) return;
+    _botRoom.guest_name = nick;
+    if (_botRoom.status === 'waiting') renderDuel(_botRoom);
+    setTimeout(() => {                                 // opponent "readies up"
+      if (!_botRoom) return;
+      _botRoom.guest_ready = true;
+      duelLocalMaybeStart(_botRoom);
+      if (_botRoom.status === 'waiting' || _botRoom.status === 'ready') renderDuel(_botRoom);
+    }, 1300 + Math.random() * 1600);
+  }, 900 + Math.random() * 1500);
+}
+
+// Both sides ready in a local (bot) game → begin the formation phase.
+function duelLocalMaybeStart(room) {
+  if (room.host_ready && room.guest_ready && room.status === 'waiting') {
+    room.status = 'ready';
+    room.draft = { phase: 'formation', fmt: {}, round: 0, cursor: 0, rr: 0, picks: { host: [], guest: [] }, roundState: {}, rps: {} };
+  }
 }
 
 // local mirrors of the server rules (host = human, guest = bot)
