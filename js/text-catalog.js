@@ -1120,5 +1120,14 @@ const TEXT_CATALOG = [
   "label": "שורת סיום",
   "selector": "virtual",
   "def": "36-0.app"
- }
+ },
+ { "key": "page-duel",         "screen": "דואל 1 על 1", "label": "כותרת המסך",            "selector": "#screen-duel .page-title", "def": "דואל 1 על 1" },
+ { "key": "duel-quick-title",  "screen": "דואל 1 על 1", "label": "כותרת 'משחק מהיר'",      "selector": "virtual", "def": "⚡ משחק מהיר" },
+ { "key": "duel-quick-note",   "screen": "דואל 1 על 1", "label": "תיאור 'משחק מהיר'",      "selector": "virtual", "def": "מצא יריב אקראי והתחל דואל תורות מיד." },
+ { "key": "duel-quick-btn",    "screen": "דואל 1 על 1", "label": "כפתור 'חפש יריב'",       "selector": "virtual", "def": "חפש יריב" },
+ { "key": "duel-create-title", "screen": "דואל 1 על 1", "label": "כותרת 'צור חדר'",        "selector": "virtual", "def": "🎮 צור חדר חדש" },
+ { "key": "duel-create-note",  "screen": "דואל 1 על 1", "label": "תיאור 'צור חדר'",        "selector": "virtual", "def": "חדר פרטי — אתה קובע את ההגדרות, שלח את הקוד לחבר." },
+ { "key": "duel-create-btn",   "screen": "דואל 1 על 1", "label": "כפתור 'צור חדר'",        "selector": "virtual", "def": "צור חדר" },
+ { "key": "duel-join-title",   "screen": "דואל 1 על 1", "label": "כותרת 'הצטרף לחדר'",     "selector": "virtual", "def": "🔑 הצטרף לחדר" },
+ { "key": "duel-join-btn",     "screen": "דואל 1 על 1", "label": "כפתור 'הצטרף'",          "selector": "virtual", "def": "הצטרף" }
 ];

@@ -20,6 +20,9 @@ let _duelRevealed = false;
 let _botRoom = null;          // local room object for bot games
 let _duelPickable = [];
 let _duelActive = false;      // true while an actual game is in progress (warn on leave)
+let _duelSel = null;          // current selection: {type:'pick',player} | {type:'move',slotId}
+let _duelMove = false;        // move (rearrange) mode toggle
+let _duelRelax = false;       // no player fits an open slot → allow any placement
 
 const DUEL_ERAS = [
   { v: 'all', label: 'כל התקופות' },
@@ -68,7 +71,7 @@ async function showDuel() {
 
 function renderDuelHome() {
   closeDuelRealtime();
-  _botRoom = null; _duelRevealed = false; _duelActive = false;
+  _botRoom = null; _duelRevealed = false; _duelActive = false; _duelSel = null; _duelMove = false;
   const box = document.getElementById('duel-content');
   const user = getCurrentUser();
   if (!user) {
@@ -80,20 +83,20 @@ function renderDuelHome() {
   box.innerHTML = `
     <div id="duel-record" class="duel-record"></div>
     <div class="lg-card duel-quick-card">
-      <div class="lg-card-title">⚡ משחק מהיר</div>
-      <p class="page-note" style="margin:4px 0 10px">מצא יריב אקראי — ואם אף אחד לא מצטרף תוך 10 שניות, שחק מול בוט 🤖.</p>
-      <button class="btn-primary lg-btn" id="duel-quick" style="width:100%">חפש יריב</button>
+      <div class="lg-card-title">${siteText('duel-quick-title', '⚡ משחק מהיר')}</div>
+      <p class="page-note" style="margin:4px 0 10px">${siteText('duel-quick-note', 'מצא יריב אקראי והתחל דואל תורות מיד.')}</p>
+      <button class="btn-primary lg-btn" id="duel-quick" style="width:100%">${siteText('duel-quick-btn', 'חפש יריב')}</button>
     </div>
     <div class="lg-card">
-      <div class="lg-card-title">🎮 צור חדר חדש</div>
-      <p class="page-note" style="margin:4px 0 10px">חדר פרטי — אתה קובע את ההגדרות, שלח את הקוד לחבר.</p>
-      <button class="btn-primary lg-btn" id="duel-create" style="width:100%">צור חדר</button>
+      <div class="lg-card-title">${siteText('duel-create-title', '🎮 צור חדר חדש')}</div>
+      <p class="page-note" style="margin:4px 0 10px">${siteText('duel-create-note', 'חדר פרטי — אתה קובע את ההגדרות, שלח את הקוד לחבר.')}</p>
+      <button class="btn-primary lg-btn" id="duel-create" style="width:100%">${siteText('duel-create-btn', 'צור חדר')}</button>
     </div>
     <div class="lg-card">
-      <div class="lg-card-title">🔑 הצטרף לחדר</div>
+      <div class="lg-card-title">${siteText('duel-join-title', '🔑 הצטרף לחדר')}</div>
       <div class="lg-row">
         <input id="duel-join-code" class="lg-input lg-code-input" maxlength="4" placeholder="קוד חדר" dir="ltr" value="${dEsc(_pendingDuelCode || '')}">
-        <button class="btn-primary lg-btn" id="duel-join">הצטרף</button>
+        <button class="btn-primary lg-btn" id="duel-join">${siteText('duel-join-btn', 'הצטרף')}</button>
       </div>
     </div>
     <div id="duel-msg" class="lg-msg"></div>`;
@@ -349,27 +352,30 @@ function duelBoardState(room) {
   };
 }
 
-// A compact real pitch (field + positioned tokens) for one team.
-function duelMiniPitchHTML(fmt, picks, title, isMe) {
+// A full-width, readable pitch with positioned tokens. `isMe` makes it
+// interactive (tap a slot to place/move); highlights reflect the current selection.
+function duelPitchHTML(fmt, picks, isMe) {
   const slots = FORMATIONS[fmt].slots;
   const bySlot = new Map((picks || []).map(p => [p.slotId, p]));
+  const selPlayer = (isMe && _duelSel && _duelSel.type === 'pick') ? _duelSel.player : null;
+  const moveFrom  = (isMe && _duelSel && _duelSel.type === 'move') ? _duelSel.slotId : null;
   const tokens = slots.map(slot => {
     const pick = bySlot.get(slot.id);
+    let cls = '';
+    if (isMe && selPlayer && !pick && (_duelRelax || duelPosFits(selPlayer, slot.pos))) cls = ' hl';
+    if (isMe && moveFrom) { if (slot.id === moveFrom) cls = ' selmove'; else if (pick) cls = ' hl'; }
     if (pick) {
       const sq = SQUADS.find(s => s.id === pick.squadId);
       const team = sq ? getTeam(sq.teamId) : { primaryColor: '#333', secondaryColor: '#fff' };
       const tx = textColorFor(team.primaryColor);
-      return `<div class="slot-token filled" style="left:${slot.x}%;top:${slot.y}%;--tc:${team.primaryColor};--ts:${team.secondaryColor};--tx:${tx}">
+      return `<div class="slot-token filled${cls}" data-slot="${slot.id}" style="left:${slot.x}%;top:${slot.y}%;--tc:${team.primaryColor};--ts:${team.secondaryColor};--tx:${tx}">
         <div class="slot-circle filled-circle"><span class="slot-player-short">${dEsc(playerShortName(pick.player))}</span></div>
         <div class="slot-name-label">${dEsc(pick.player)}</div></div>`;
     }
-    return `<div class="slot-token empty" style="left:${slot.x}%;top:${slot.y}%">
+    return `<div class="slot-token empty${cls}" data-slot="${slot.id}" style="left:${slot.x}%;top:${slot.y}%">
       <div class="slot-circle"><span class="slot-pos-label">${slot.pos}</span></div></div>`;
   }).join('');
-  return `<div class="duel-mini ${isMe ? 'mine' : ''}">
-    <div class="duel-mini-head">${dEsc(title)} <span>${(picks || []).length}/11</span></div>
-    <div class="duel-mini-wrap"><div class="pitch duel-mini-pitch">${tokens}</div></div>
-  </div>`;
+  return `<div class="pitch duel-pitch ${isMe ? 'mine' : 'opp'}">${tokens}</div>`;
 }
 
 function renderDuelBoard(room) {
@@ -377,70 +383,112 @@ function renderDuelBoard(room) {
   _duelActive = true;
   const box = document.getElementById('duel-content');
   const st = duelBoardState(room);
+  const myPicks = st.d.picks[st.myRole] || [];
+  const oppPicks = st.d.picks[st.oppRole] || [];
+  const myEmpties = FORMATIONS[st.myFmt].slots.filter(s => !myPicks.some(p => p.slotId === s.id));
 
+  // Only offer players that fit an open slot; if none fit, relax the constraint.
   let listHtml = '';
-  if (st.team) {
-    const avail = st.team.players.filter(pl => !st.taken.has(st.team.id + '|' + pl.name))
-      .slice().sort((a, b) => duelPOvr(b, st.settings) - duelPOvr(a, st.settings));
-    _duelPickable = avail;
-    listHtml = avail.map((pl, i) => `
-      <button class="duel-pl" data-i="${i}" ${st.isMyTurn ? '' : 'disabled'}>
+  if (st.team && st.isMyTurn) {
+    const avail = st.team.players.filter(pl => !st.taken.has(st.team.id + '|' + pl.name));
+    const fitting = avail.filter(pl => myEmpties.some(s => duelPosFits(pl, s.pos)));
+    _duelRelax = fitting.length === 0;
+    _duelPickable = (_duelRelax ? avail : fitting).slice().sort((a, b) => duelPOvr(b, st.settings) - duelPOvr(a, st.settings));
+    listHtml = _duelPickable.map((pl, i) => {
+      const sel = _duelSel && _duelSel.type === 'pick' && _duelSel.player && _duelSel.player.name === pl.name;
+      return `<button class="duel-pl ${sel ? 'sel' : ''}" data-i="${i}">
         <span class="duel-pl-pos">${dEsc(pl.position)}</span>
         <span class="duel-pl-name">${dEsc(pl.name)}</span>
-        <span class="duel-pl-ovr">${duelPOvr(pl, st.settings)}</span>
-      </button>`).join('');
+        <span class="duel-pl-ovr">${duelPOvr(pl, st.settings)}</span></button>`;
+    }).join('');
   }
 
   const teamLabel = st.team ? `${dEsc(getTeam(st.team.teamId).name)} · ${dEsc(st.team.season)}` : '';
   const turnBadge = st.isMyTurn
     ? `<span class="duel-turn me">🟢 תורך${st.first === st.myRole ? ' — אתה ראשון' : ''}</span>`
     : `<span class="duel-turn opp">⏳ תור ${dEsc(st.oppName || 'היריב')}…</span>`;
+  const hint = !st.isMyTurn ? '' :
+    _duelSel && _duelSel.type === 'pick' ? '👉 בחר משבצת פנויה במגרש שלך' :
+    _duelSel && _duelSel.type === 'move' ? '⇄ בחר שחקן שני להחלפה' :
+    _duelMove ? '⇄ בחר שני שחקנים כדי להחליף ביניהם' :
+    (myPicks.length < 11 ? '👇 בחר שחקן מהרשימה, ואז משבצת במגרש' : '');
 
   box.innerHTML = `
     <button class="btn-draft-exit" id="duel-board-exit" style="margin-bottom:8px">← יציאה</button>
-    <div class="duel-draft-top">
-      ${turnBadge}
-      <span class="duel-prog">סבב ${Math.min(st.round + 1, 11)}/11</span>
-    </div>
+    <div class="duel-draft-top">${turnBadge}<span class="duel-prog">סבב ${Math.min(st.round + 1, 11)}/11</span></div>
     <div class="duel-team-panel">
       <div class="duel-team-name">⚽ ${teamLabel}</div>
       ${(st.canRerollTeam || st.canRerollSeason) ? `<div class="duel-reroll-row">
         ${st.canRerollTeam ? `<button class="duel-reroll-btn" id="duel-reroll-team">🔄 החלף קבוצה <span class="rr-badge">${st.teamRerolls}</span></button>` : ''}
         ${st.canRerollSeason ? `<button class="duel-reroll-btn" id="duel-reroll-season">📅 החלף עונה <span class="rr-badge">${st.seasonRerolls}</span></button>` : ''}
       </div>` : ''}
-      <div class="duel-pl-list">${listHtml || '<div class="page-note">—</div>'}</div>
-      ${st.isMyTurn ? '' : '<div class="duel-wait-note">היריב בוחר…</div>'}
+      ${st.isMyTurn ? `<div class="duel-pl-list">${listHtml || '<div class="page-note">—</div>'}</div>` : '<div class="duel-wait-note">היריב בוחר…</div>'}
+      ${hint ? `<div class="duel-hint2">${hint}</div>` : ''}
     </div>
-    <div class="duel-boards">
-      ${duelMiniPitchHTML(st.myFmt, st.d.picks[st.myRole], 'הקבוצה שלך', true)}
-      ${duelMiniPitchHTML(st.oppFmt, st.d.picks[st.oppRole], st.oppName || 'יריב', false)}
+    <div class="duel-board-head">
+      <span>הקבוצה שלך · ${myPicks.length}/11</span>
+      ${st.isMyTurn && myPicks.length >= 2 ? `<button class="duel-move-btn ${_duelMove ? 'on' : ''}" id="duel-move">⇄ הזז</button>` : ''}
     </div>
+    <div class="duel-pitch-wrap">${duelPitchHTML(st.myFmt, myPicks, true)}</div>
+    <div class="duel-board-head opp"><span>${dEsc(st.oppName || 'יריב')} · ${oppPicks.length}/11</span></div>
+    <div class="duel-pitch-wrap opp">${duelPitchHTML(st.oppFmt, oppPicks, false)}</div>
     <button class="lg-leave" id="duel-leave">עזוב דואל</button>`;
 
   document.getElementById('duel-board-exit').onclick = () => duelForfeit();
   document.getElementById('duel-leave').onclick = () => duelForfeit();
-  const rrT = document.getElementById('duel-reroll-team');
-  if (rrT) rrT.onclick = () => duelReroll(room, 'team');
-  const rrS = document.getElementById('duel-reroll-season');
-  if (rrS) rrS.onclick = () => duelReroll(room, 'season');
-  if (st.isMyTurn && st.team) {
-    box.querySelectorAll('.duel-pl').forEach(btn => btn.onclick = () => duelBoardPick(room, _duelPickable[+btn.dataset.i]));
+  const rrT = document.getElementById('duel-reroll-team'); if (rrT) rrT.onclick = () => duelReroll(room, 'team');
+  const rrS = document.getElementById('duel-reroll-season'); if (rrS) rrS.onclick = () => duelReroll(room, 'season');
+  const mv = document.getElementById('duel-move'); if (mv) mv.onclick = () => { _duelMove = !_duelMove; _duelSel = null; renderDuel(room); };
+  if (st.isMyTurn) {
+    box.querySelectorAll('.duel-pl').forEach(btn => btn.onclick = () => duelPlayerClick(room, +btn.dataset.i));
+    box.querySelectorAll('.duel-pitch-wrap:not(.opp) .slot-token').forEach(tok => tok.onclick = () => duelSlotClick(room, tok.dataset.slot));
   }
 }
 
-async function duelBoardPick(room, player) {
-  if (!player) return;
+function duelPlayerClick(room, i) {
+  const pl = _duelPickable[i]; if (!pl) return;
+  _duelMove = false;
+  _duelSel = (_duelSel && _duelSel.type === 'pick' && _duelSel.player.name === pl.name) ? null : { type: 'pick', player: pl };
+  renderDuel(room);
+}
+
+function duelSlotClick(room, slotId) {
   const st = duelBoardState(room);
-  if (!st.isMyTurn || !st.team) return;
-  const slots = FORMATIONS[st.myFmt].slots;
-  const filled = new Set((st.d.picks[st.myRole] || []).map(p => p.slotId));
-  const empties = slots.filter(s => !filled.has(s.id));
-  const slot = empties.find(s => duelPosFits(player, s.pos)) || empties[0];
-  if (!slot) return;
-  const pick = { round: st.round, squadId: st.team.id, player: player.name, slotId: slot.id, pos: slot.pos, ovr: duelPOvr(player, st.settings) };
-  if (room._local) { duelLocalPick(room, pick); return; }
-  const { error } = await _supabase.rpc('duel_draft_pick', { p_code: room.code, p_pick: pick });
-  if (error) console.warn('duel_draft_pick:', error.message);
+  if (!st.isMyTurn) return;
+  const myPicks = st.d.picks[st.myRole] || [];
+  const occupied = myPicks.some(p => p.slotId === slotId);
+  const slot = FORMATIONS[st.myFmt].slots.find(s => s.id === slotId);
+
+  if (_duelSel && _duelSel.type === 'pick') {
+    if (occupied || !st.team) return;
+    if (!_duelRelax && !duelPosFits(_duelSel.player, slot.pos)) return;
+    const pl = _duelSel.player; _duelSel = null;
+    const pick = { round: st.round, squadId: st.team.id, player: pl.name, slotId, pos: slot.pos, ovr: duelPOvr(pl, st.settings) };
+    if (room._local) { duelLocalPick(room, pick); return; }
+    _supabase.rpc('duel_draft_pick', { p_code: room.code, p_pick: pick }).then(() => {}, () => {});
+    return;
+  }
+  if (_duelMove) {
+    if (_duelSel && _duelSel.type === 'move') {
+      const from = _duelSel.slotId; _duelSel = null;
+      if (from !== slotId && occupied) duelMove(room, from, slotId); else renderDuel(room);
+    } else if (occupied) {
+      _duelSel = { type: 'move', slotId }; renderDuel(room);
+    }
+  }
+}
+
+async function duelMove(room, a, b) {
+  if (room._local) { duelLocalMove(room, a, b); return; }
+  await _supabase.rpc('duel_move', { p_code: room.code, p_a: a, p_b: b });
+}
+function duelLocalMove(room, a, b) {
+  const picks = room.draft.picks[room.is_host ? 'host' : 'guest'] || [];
+  const pa = picks.find(p => p.slotId === a), pb = picks.find(p => p.slotId === b);
+  if (pa && pb) {
+    const s = pa.slotId, ps = pa.pos; pa.slotId = pb.slotId; pa.pos = pb.pos; pb.slotId = s; pb.pos = ps;
+  }
+  renderDuel(room);
 }
 async function duelReroll(room, mode) {
   const st = duelBoardState(room);

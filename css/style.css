@@ -1708,6 +1708,28 @@ body {
 .duel-reroll-btn { flex: 1; background: #eab30822; color: #eab308; border: 1px solid #eab30866; border-radius: 8px; padding: 8px; font-family: inherit; font-weight: 800; font-size: 13px; cursor: pointer; }
 .duel-reroll-btn:hover { background: #eab30833; }
 .rr-badge { display: inline-block; min-width: 16px; padding: 0 4px; margin-inline-start: 3px; background: #eab308; color: #1b2330; border-radius: 8px; font-size: 11px; font-weight: 900; }
+/* interactive duel pitches (full width, readable) */
+.duel-pitch-wrap { position: relative; width: 100%; aspect-ratio: 3 / 4; margin-bottom: 4px; background: var(--panel2, #1b2330); border: 1px solid var(--border); border-radius: 12px; }
+.duel-pitch-wrap.opp { max-width: 72%; margin-inline: auto; }
+.duel-pitch { top: 6px; right: 6px; bottom: 6px; left: 6px; }
+.duel-pitch.mine .slot-circle { width: 34px; height: 34px; }
+.duel-pitch.mine .slot-player-short { font-size: 8px; max-width: 30px; }
+.duel-pitch.mine .slot-name-label { font-size: 9px; max-width: 76px; }
+.duel-pitch.mine .slot-pos-label { font-size: 9px; }
+.duel-pitch.opp .slot-token { cursor: default; }
+.duel-pitch.opp .slot-token:hover { transform: translate(-50%, -50%); }
+.duel-pitch.opp .slot-circle { width: 26px; height: 26px; }
+.duel-pitch.opp .slot-player-short { font-size: 7px; max-width: 24px; }
+.duel-pitch.opp .slot-name-label { font-size: 7px; max-width: 60px; }
+.duel-pitch.opp .slot-pos-label { font-size: 7px; }
+.duel-pitch .slot-token.hl .slot-circle { border-color: #22c55e !important; box-shadow: 0 0 0 2px #22c55e66, 0 0 10px #22c55e99; }
+.duel-pitch .slot-token.selmove .slot-circle { border-color: #eab308 !important; box-shadow: 0 0 0 2px #eab308aa; }
+.duel-board-head { display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: 800; margin: 8px 0 3px; }
+.duel-board-head.opp { color: var(--dim); margin-top: 10px; }
+.duel-move-btn { background: #3b82f622; color: #3b82f6; border: 1px solid #3b82f666; border-radius: 8px; padding: 4px 12px; font-family: inherit; font-weight: 800; font-size: 12px; cursor: pointer; }
+.duel-move-btn.on { background: #3b82f6; color: #fff; }
+.duel-hint2 { text-align: center; font-size: 12px; color: var(--accent2); margin-top: 8px; font-weight: 700; }
+.duel-pl.sel { border-color: var(--accent2); background: #2b3546; box-shadow: 0 0 0 2px var(--accent2); }
 .duel-record { text-align: center; font-size: 13px; color: var(--dim); margin-bottom: 10px; }
 .duel-record b { color: var(--text); }
 .duel-rps-row { display: flex; gap: 10px; margin-top: 14px; }
