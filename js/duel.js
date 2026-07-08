@@ -62,6 +62,29 @@ function duelSeq(seed, settings) {
 }
 function rpsHe(c) { return c === 'rock' ? '✊ אבן' : c === 'paper' ? '✋ נייר' : '✌ מספריים'; }
 
+// Settings a searcher/host chooses — used for quick-match pairing.
+let _quickSettings = { difficulty: 'normal', peak_mode: false, era_min: null, era_max: null, ratings_visible: true };
+function duelEraV(s) { return DUEL_ERAS.find(e => (e.min ?? null) === (s.era_min ?? null) && (e.max ?? null) === (s.era_max ?? null))?.v || 'all'; }
+function duelSettingsText(s) {
+  const diffHe = { easy: 'קל', normal: 'רגיל', hard: 'קשה' }[s.difficulty || 'normal'];
+  const eraLbl = DUEL_ERAS.find(e => e.v === duelEraV(s))?.label || 'כל התקופות';
+  return `${diffHe}${s.peak_mode ? ' · מצב שיא ⚡' : ''} · ${eraLbl}`;
+}
+// The three mini toggle rows (difficulty / peak / era) bound to a settings object.
+function duelSettingsRows(prefix, s) {
+  const mini = (id, opts, cur) => `<div class="lg-mini" id="${id}">${opts.map(o => `<button data-v="${o.v}" class="${o.v === cur ? 'on' : ''}">${o.label}</button>`).join('')}</div>`;
+  return `<div class="lg-config">
+    <div class="lg-config-row"><span>קושי</span>${mini(prefix + '-diff', [{ v: 'easy', label: 'קל' }, { v: 'normal', label: 'רגיל' }, { v: 'hard', label: 'קשה' }], s.difficulty || 'normal')}</div>
+    <div class="lg-config-row"><span>מצב שיא ⚡</span>${mini(prefix + '-peak', [{ v: 'off', label: 'כבוי' }, { v: 'on', label: 'פעיל' }], s.peak_mode ? 'on' : 'off')}</div>
+    <div class="lg-config-row"><span>תקופה</span>${mini(prefix + '-era', DUEL_ERAS.map(e => ({ v: e.v, label: e.label })), duelEraV(s))}</div>
+  </div>`;
+}
+function wireDuelSettings(prefix, s, onChange) {
+  wireDuelMini(prefix + '-diff', v => { s.difficulty = v; onChange && onChange(); });
+  wireDuelMini(prefix + '-peak', v => { s.peak_mode = v === 'on'; onChange && onChange(); });
+  wireDuelMini(prefix + '-era', v => { const e = DUEL_ERAS.find(x => x.v === v); s.era_min = e?.min ?? null; s.era_max = e?.max ?? null; onChange && onChange(); });
+}
+
 // ─── Screens: home + lobby ─────────────────────────────────────────────────────
 async function showDuel() {
   showScreen('duel');
@@ -84,8 +107,9 @@ function renderDuelHome() {
     <div id="duel-record" class="duel-record"></div>
     <div class="lg-card duel-quick-card">
       <div class="lg-card-title">${siteText('duel-quick-title', '⚡ משחק מהיר')}</div>
-      <p class="page-note" style="margin:4px 0 10px">${siteText('duel-quick-note', 'מצא יריב אקראי והתחל דואל תורות מיד.')}</p>
-      <button class="btn-primary lg-btn" id="duel-quick" style="width:100%">${siteText('duel-quick-btn', 'חפש יריב')}</button>
+      <p class="page-note" style="margin:4px 0 8px">${siteText('duel-quick-note', 'בחר תנאים ומצא יריב שבחר בדיוק את אותם תנאים.')}</p>
+      ${duelSettingsRows('qm', _quickSettings)}
+      <button class="btn-primary lg-btn" id="duel-quick" style="width:100%;margin-top:8px">${siteText('duel-quick-btn', 'חפש יריב')}</button>
     </div>
     <div class="lg-card">
       <div class="lg-card-title">${siteText('duel-create-title', '🎮 צור חדר חדש')}</div>
@@ -100,6 +124,7 @@ function renderDuelHome() {
       </div>
     </div>
     <div id="duel-msg" class="lg-msg"></div>`;
+  wireDuelSettings('qm', _quickSettings);
   document.getElementById('duel-quick').onclick = quickMatchFlow;
   document.getElementById('duel-create').onclick = createDuelFlow;
   document.getElementById('duel-join').onclick = joinDuelFlow;
@@ -187,21 +212,12 @@ function renderDuelLobby(room) {
       <div class="duel-slot-status">${name ? (ready ? '✓ מוכן' : '⏳ מתכונן') : ''}</div>
     </div>`;
 
-  // Host-only shared settings (difficulty / peak / era)
-  const eraV = DUEL_ERAS.find(e => e.min === s.era_min && e.max === s.era_max)?.v || 'all';
-  const mini = (id, opts, cur) => `<div class="lg-mini" id="${id}">${opts.map(o => `<button data-v="${o.v}" class="${o.v === cur ? 'on' : ''}">${o.label}</button>`).join('')}</div>`;
-  let settingsHtml;
-  if (room.is_host) {
-    settingsHtml = `
-      <div class="lg-config">
-        <div class="lg-config-row"><span>קושי</span>${mini('duel-diff', [{ v: 'easy', label: 'קל' }, { v: 'normal', label: 'רגיל' }, { v: 'hard', label: 'קשה' }], s.difficulty || 'normal')}</div>
-        <div class="lg-config-row"><span>מצב שיא ⚡</span>${mini('duel-peak', [{ v: 'off', label: 'כבוי' }, { v: 'on', label: 'פעיל' }], s.peak_mode ? 'on' : 'off')}</div>
-        <div class="lg-config-row"><span>תקופה</span>${mini('duel-era', DUEL_ERAS.map(e => ({ v: e.v, label: e.label })), eraV)}</div>
-      </div>`;
-  } else {
-    const diffHe = { easy: 'קל', normal: 'רגיל', hard: 'קשה' }[s.difficulty || 'normal'];
-    settingsHtml = `<div class="duel-hint">הגדרות החדר: ${diffHe}${s.peak_mode ? ' · מצב שיא ⚡' : ''} · ${DUEL_ERAS.find(e => e.v === eraV)?.label || 'כל התקופות'}</div>`;
-  }
+  // The host may set the conditions only while alone; once both are in they are
+  // locked and shown as agreed (a quick-match pair already chose the same ones).
+  const canEditSettings = room.is_host && !bothHere;
+  const settingsHtml = canEditSettings
+    ? duelSettingsRows('duel', s)
+    : `<div class="duel-agreed ${bothHere ? 'ok' : ''}">${bothHere ? '✓ הגדרות מוסכמות · ' : 'הגדרות החדר · '}${duelSettingsText(s)}</div>`;
 
   box.innerHTML = `
     <button class="back-btn lg-inner-back" id="duel-room-back">→ חדרים</button>
@@ -241,7 +257,7 @@ function renderDuelLobby(room) {
     const { error } = await _supabase.rpc('set_duel_ready', { p_code: room.code, p_ready: !myReady });
     if (error) { duelMsg('שגיאה: ' + error.message, false); readyBtn.disabled = false; }
   };
-  if (room.is_host) {
+  if (canEditSettings) {
     const save = patch => {
       if (room._local) { room.settings = { ...room.settings, ...patch }; return; }
       // NOTE: supabase query builders are lazy — must .then()/await or it never runs.
@@ -629,8 +645,8 @@ function showDuelSummary() {
 
 // ─── Quick match + local bot ───────────────────────────────────────────────────
 async function quickMatchFlow() {
-  duelMsg('מחפש יריב…', true);
-  const { data, error } = await _supabase.rpc('quick_match');
+  duelMsg('מחפש יריב עם אותם תנאים…', true);
+  const { data, error } = await _supabase.rpc('quick_match', { p_settings: { ..._quickSettings, ratings_visible: true } });
   if (error || !data?.length) { duelMsg('החיפוש נכשל, נסו שוב', false); return; }
   const { code, role } = data[0];
   await openDuelRoom(code);
@@ -639,7 +655,7 @@ async function quickMatchFlow() {
     _quickBotTimer = setTimeout(async () => {
       const { data: dd } = await _supabase.rpc('get_duel_room', { p_code: code });
       if (dd?.[0]?.guest_name) return;
-      const settings = dd?.[0]?.settings || {};
+      const settings = dd?.[0]?.settings || { ..._quickSettings, ratings_visible: true };
       await _supabase.rpc('leave_duel_room', { p_code: code });
       startBotDuel(settings);
     }, 10000);
