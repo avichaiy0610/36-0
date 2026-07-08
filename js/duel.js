@@ -334,7 +334,9 @@ function duelBoardState(room) {
   const settings = room.settings || {};
   const seq = duelSeq(Number(room.seed) || 1, settings);
   const team = d.squadId ? (SQUADS.find(s => s.id === d.squadId) || null) : (seq[d.cursor] || null);
-  const seasonAlts = team ? duelSquadPool(settings).filter(s => s.teamId === team.teamId && s.id !== team.id) : [];
+  const pool = team ? duelSquadPool(settings) : [];
+  const seasonAlts = team ? pool.filter(s => s.teamId === team.teamId && s.id !== team.id) : [];        // same club, other season
+  const teamAlts   = team ? pool.filter(s => s.teamId !== team.teamId && s.season === team.season) : []; // other club, same season
   const taken = new Set();
   [...(d.picks.host || []), ...(d.picks.guest || [])].forEach(p => taken.add(p.squadId + '|' + p.player));
   if (rs.host) taken.add(rs.host.squadId + '|' + rs.host.player);
@@ -342,12 +344,12 @@ function duelBoardState(room) {
   const myRR = (d.rerolls && d.rerolls[myRole]) || { team: 0, season: 0 };
   const isFirstNow = first === myRole && !rs[first];
   return {
-    d, myRole, oppRole, round, first, picker, isMyTurn: picker === myRole, team, seasonAlts, taken, settings,
+    d, myRole, oppRole, round, first, picker, isMyTurn: picker === myRole, team, seasonAlts, teamAlts, taken, settings,
     myFmt: d.fmt[myRole], oppFmt: d.fmt[oppRole],
     myName: room.is_host ? room.host_name : room.guest_name,
     oppName: room.is_host ? room.guest_name : room.host_name,
     teamRerolls: myRR.team || 0, seasonRerolls: myRR.season || 0,
-    canRerollTeam:   isFirstNow && (myRR.team || 0) > 0,
+    canRerollTeam:   isFirstNow && (myRR.team || 0) > 0 && teamAlts.length > 0,
     canRerollSeason: isFirstNow && (myRR.season || 0) > 0 && seasonAlts.length > 0,
   };
 }
@@ -492,11 +494,9 @@ function duelLocalMove(room, a, b) {
 }
 async function duelReroll(room, mode) {
   const st = duelBoardState(room);
-  let squadId = null;
-  if (mode === 'season') {
-    if (!st.seasonAlts.length) return;
-    squadId = st.seasonAlts[Math.floor(Math.random() * st.seasonAlts.length)].id;
-  }
+  const alts = mode === 'season' ? st.seasonAlts : st.teamAlts;   // season: same club · team: same season
+  if (!alts.length) return;
+  const squadId = alts[Math.floor(Math.random() * alts.length)].id;
   if (room._local) { duelLocalReroll(room, mode, squadId); return; }
   const { error } = await _supabase.rpc('duel_reroll', { p_code: room.code, p_mode: mode, p_squad: squadId });
   if (error) console.warn('duel_reroll:', error.message);
@@ -701,8 +701,7 @@ function duelLocalReroll(room, mode, squadId) {
   const st = duelBoardState(room);
   const key = mode === 'season' ? 'season' : 'team';
   if (key === 'season' ? !st.canRerollSeason : !st.canRerollTeam) return;
-  if (mode === 'season' && squadId) room.draft.squadId = squadId;
-  else { room.draft.cursor = (room.draft.cursor || 0) + 1; delete room.draft.squadId; }
+  if (squadId) room.draft.squadId = squadId;    // both swap types land on a chosen squad
   room.draft.rerolls[st.myRole][key] = (room.draft.rerolls[st.myRole][key] || 0) - 1;
   renderDuel(room);
 }
