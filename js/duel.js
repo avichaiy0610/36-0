@@ -638,7 +638,10 @@ function showDuelSummary() {
       <button class="btn-primary btn-full" id="duel-sum-opp">👁 צפה בהרכב היריב</button>
       <button class="btn-primary btn-full" id="duel-sum-close" style="margin-top:6px">לצפייה בתוצאות שלך ←</button>
     </div>`;
-  modal.querySelector('#duel-sum-opp').onclick = () => showLeagueSquad(d.oppSquad.players.map(p => ({ pos: p.pos, name: p.name, ovr: p.ovr })), 'הקבוצה של ' + (d.oppName || 'יריב'));
+  modal.querySelector('#duel-sum-opp').onclick = () => {
+    modal.style.display = 'none';   // close the summary so the squad modal isn't stacked under it
+    showLeagueSquad(d.oppSquad.players.map(p => ({ pos: p.pos, name: p.name, ovr: p.ovr })), 'הקבוצה של ' + (d.oppName || 'יריב'));
+  };
   modal.querySelector('#duel-sum-close').onclick = () => { modal.style.display = 'none'; };
   modal.style.display = 'flex';
 }
