@@ -24,6 +24,11 @@ let _duelSel = null;          // current selection: {type:'pick',player} | {type
 let _duelMove = false;        // move (rearrange) mode toggle
 let _duelRelax = false;       // no player fits an open slot → allow any placement
 
+// Remember the active room so a refresh keeps you in the game.
+const DUEL_PERSIST_KEY = '36-0-duel-room';
+function duelSavePersist(code) { try { localStorage.setItem(DUEL_PERSIST_KEY, code); } catch (e) {} }
+function duelClearPersist() { try { localStorage.removeItem(DUEL_PERSIST_KEY); } catch (e) {} }
+
 const DUEL_ERAS = [
   { v: 'all', label: 'כל התקופות' },
   { v: '90s', label: "שנות ה-90", min: 1990, max: 1999 },
@@ -94,6 +99,7 @@ async function showDuel() {
 
 function renderDuelHome() {
   closeDuelRealtime();
+  duelClearPersist();
   _botRoom = null; _duelRevealed = false; _duelActive = false; _duelSel = null; _duelMove = false;
   const box = document.getElementById('duel-content');
   const user = getCurrentUser();
@@ -162,6 +168,7 @@ async function joinDuelFlow() {
 async function openDuelRoom(code) {
   closeDuelRealtime();
   _duelCode = code; _duelRevealed = false;
+  duelSavePersist(code);
   _duelChan = _supabase.channel('duel:' + code)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'duel_rooms', filter: 'code=eq.' + code },
         payload => { if (payload.eventType === 'DELETE') { onDuelEnded(); return; } refreshDuelRoom(); })
@@ -291,6 +298,7 @@ function duelForfeitCleanup() {
   const code = _duelCode;
   if (code) _supabase.rpc('leave_duel_room', { p_code: code }).then(() => {}, () => {});
   _botRoom = null;
+  duelClearPersist();
   closeDuelRealtime();
 }
 function duelForfeit() {
@@ -353,10 +361,10 @@ function duelBoardState(room) {
   const pool = team ? duelSquadPool(settings) : [];
   const seasonAlts = team ? pool.filter(s => s.teamId === team.teamId && s.id !== team.id) : [];        // same club, other season
   const teamAlts   = team ? pool.filter(s => s.teamId !== team.teamId && s.season === team.season) : []; // other club, same season
-  const taken = new Set();
-  [...(d.picks.host || []), ...(d.picks.guest || [])].forEach(p => taken.add(p.squadId + '|' + p.player));
-  if (rs.host) taken.add(rs.host.squadId + '|' + rs.host.player);
-  if (rs.guest) taken.add(rs.guest.squadId + '|' + rs.guest.player);
+  const taken = new Set();   // by player NAME — the same person can't be taken twice
+  [...(d.picks.host || []), ...(d.picks.guest || [])].forEach(p => taken.add(p.player));
+  if (rs.host) taken.add(rs.host.player);
+  if (rs.guest) taken.add(rs.guest.player);
   const myRR = (d.rerolls && d.rerolls[myRole]) || { team: 0, season: 0 };
   const isFirstNow = first === myRole && !rs[first];
   return {
@@ -408,7 +416,7 @@ function renderDuelBoard(room) {
   // Only offer players that fit an open slot; if none fit, relax the constraint.
   let listHtml = '';
   if (st.team && st.isMyTurn) {
-    const avail = st.team.players.filter(pl => !st.taken.has(st.team.id + '|' + pl.name));
+    const avail = st.team.players.filter(pl => !st.taken.has(pl.name));
     const fitting = avail.filter(pl => myEmpties.some(s => duelPosFits(pl, s.pos)));
     _duelRelax = fitting.length === 0;
     _duelPickable = (_duelRelax ? avail : fitting).slice().sort((a, b) => duelPOvr(b, st.settings) - duelPOvr(a, st.settings));
@@ -470,7 +478,7 @@ function duelPlayerClick(room, i) {
   renderDuel(room);
 }
 
-function duelSlotClick(room, slotId) {
+async function duelSlotClick(room, slotId) {
   const st = duelBoardState(room);
   if (!st.isMyTurn) return;
   const myPicks = st.d.picks[st.myRole] || [];
@@ -483,7 +491,8 @@ function duelSlotClick(room, slotId) {
     const pl = _duelSel.player; _duelSel = null;
     const pick = { round: st.round, squadId: st.team.id, player: pl.name, slotId, pos: slot.pos, ovr: duelPOvr(pl, st.settings) };
     if (room._local) { duelLocalPick(room, pick); return; }
-    _supabase.rpc('duel_draft_pick', { p_code: room.code, p_pick: pick }).then(() => {}, () => {});
+    await _supabase.rpc('duel_draft_pick', { p_code: room.code, p_pick: pick });
+    await refreshDuelRoom();   // show the pick immediately, don't wait for the realtime echo
     return;
   }
   if (_duelMove) {
@@ -556,53 +565,76 @@ function duelPicksToSquad(picks, fmt) {
   const ovr = players.length ? Math.round(players.reduce((s, p) => s + p.ovr, 0) / players.length) : 70;
   return { formation: fmt, ovr, players };
 }
-function duelSeasonRecord(seed, ovr) {
-  return withSeededRandom(seed, () => {
-    const g = generateMatches(ovr);
-    let w = 0, d = 0, l = 0, gf = 0, ga = 0;
-    g.matches.forEach(m => { if (m.outcome === 'W') w++; else if (m.outcome === 'D') d++; else l++; gf += m.gf; ga += m.ga; });
-    return { w, d, l, gf, ga, pts: w * 3 + d, inTopSix: g.inTopSix };
-  });
+// A team's raw season (records only) — used to build both league tables.
+function duelRawSeason(squad) {
+  const g = generateMatches(squad.ovr);
+  let w = 0, d = 0, gf = 0, ga = 0;
+  g.matches.forEach(m => { if (m.outcome === 'W') w++; else if (m.outcome === 'D') d++; gf += m.gf; ga += m.ga; });
+  return { g, w, d, l: g.matches.length - w - d, gf, ga, pts: w * 3 + d, inTopSix: g.inTopSix };
+}
+// A team's full season object for the results screen (opponent injected into the table).
+function duelBuildSeason(squad, raw, oppTeamRow, settings) {
+  lgReconstructState(squad.players, squad.formation, settings);   // for simulatePlayerStats / pitch
+  let proj = 8; try { proj = calcPreseasonOdds(squad.ovr, 40).projectedFinish; } catch (e) {}
+  const table = lgInjectFriends(generateLeagueTable(raw.w, raw.d, raw.l, raw.g.inTopSix, raw.g.champOpponents, raw.g.relegOpponents), [oppTeamRow]);
+  return { ovr: squad.ovr, matches: raw.g.matches, inTopSix: raw.g.inTopSix, leagueTable: table,
+           playerStats: simulatePlayerStats(raw.g.matches), projectedFinish: proj, pts: raw.pts };
+}
+// Compute BOTH teams' full seasons in one place (so a single stored copy is shared).
+function duelComputeResult(hostSquad, guestSquad, hostName, guestName, settings) {
+  const hRaw = duelRawSeason(hostSquad), gRaw = duelRawSeason(guestSquad);
+  const hRow = { name: 'הקבוצה של ' + (hostName || 'מארח'), pts: hRaw.pts, w: hRaw.w, d: hRaw.d, l: hRaw.l, gf: hRaw.gf, ga: hRaw.ga, inTopSix: hRaw.inTopSix };
+  const gRow = { name: 'הקבוצה של ' + (guestName || 'יריב'), pts: gRaw.pts, w: gRaw.w, d: gRaw.d, l: gRaw.l, gf: gRaw.gf, ga: gRaw.ga, inTopSix: gRaw.inTopSix };
+  return {
+    host:  duelBuildSeason(hostSquad,  hRaw, gRow, settings),
+    guest: duelBuildSeason(guestSquad, gRaw, hRow, settings),
+  };
 }
 
-function startDuelReveal(room) {
+// Reveal is computed ONCE and stored in the room; both clients render the same
+// stored result, so the two seasons/tables are always in sync.
+async function startDuelReveal(room) {
   if (_duelRevealed) return;
   _duelRevealed = true;
   const myRole = room.is_host ? 'host' : 'guest';
   const oppRole = myRole === 'host' ? 'guest' : 'host';
   const d = room.draft;
-  const mySquad = duelPicksToSquad(d.picks[myRole], d.fmt[myRole]);
-  const oppSquad = duelPicksToSquad(d.picks[oppRole], d.fmt[oppRole]);
-  const roomSeed = Number(room.seed) || lgSimSeed(String(room.code || 'bot'));
+  if (!d.picks?.[myRole]?.length || !d.picks?.[oppRole]?.length) { _duelRevealed = false; return; }
+  const settings = room.settings || {};
+  const hostSquad = duelPicksToSquad(d.picks.host, d.fmt.host);
+  const guestSquad = duelPicksToSquad(d.picks.guest, d.fmt.guest);
+
+  let result = d.result;
+  if (!result) {
+    result = duelComputeResult(hostSquad, guestSquad, room.host_name, room.guest_name, settings);
+    if (!room._local) {
+      await _supabase.rpc('duel_set_result', { p_code: room.code, p_result: result });   // first writer wins
+      const { data } = await _supabase.rpc('get_duel_room', { p_code: room.code });
+      result = data?.[0]?.draft?.result || result;                                        // use the authoritative copy
+    }
+  }
+  duelRenderResult(room, result, myRole, oppRole);
+}
+
+function duelRenderResult(room, result, myRole, oppRole) {
+  const mySeason = result[myRole], oppSeason = result[oppRole];
+  const myPts = mySeason.pts, oppPts = oppSeason.pts;
   const myName = myRole === 'host' ? room.host_name : room.guest_name;
   const oppName = oppRole === 'host' ? room.host_name : room.guest_name;
-  const settings = room.settings || {};
+  const mySquad = duelPicksToSquad(room.draft.picks[myRole], room.draft.fmt[myRole]);
+  const oppSquad = duelPicksToSquad(room.draft.picks[oppRole], room.draft.fmt[oppRole]);
 
-  const oppRec = duelSeasonRecord(lgSimSeed(String(roomSeed) + '|' + oppRole), oppSquad.ovr);
-  const oppPts = oppRec.pts;
-  const oppTeam = { name: 'הקבוצה של ' + (oppName || 'יריב'), pts: oppRec.pts, w: oppRec.w, d: oppRec.d, l: oppRec.l, gf: oppRec.gf, ga: oppRec.ga, inTopSix: oppRec.inTopSix };
-
-  lgReconstructState(mySquad.players, mySquad.formation, settings);
-  let proj = 8; try { proj = calcPreseasonOdds(mySquad.ovr, 50).projectedFinish; } catch (e) {}
-  const season = withSeededRandom(lgSimSeed(String(roomSeed) + '|' + myRole), () => {
-    const g = generateMatches(mySquad.ovr);
-    let w = 0, dd = 0; g.matches.forEach(m => { if (m.outcome === 'W') w++; else if (m.outcome === 'D') dd++; });
-    const l = g.matches.length - w - dd;
-    const table = lgInjectFriends(generateLeagueTable(w, dd, l, g.inTopSix, g.champOpponents, g.relegOpponents), [oppTeam]);
-    return { ovr: mySquad.ovr, matches: g.matches, inTopSix: g.inTopSix, leagueTable: table, playerStats: simulatePlayerStats(g.matches), projectedFinish: proj, _pts: w * 3 + dd };
-  });
-  const myPts = season._pts;
-
-  // record the online result (just for fun) — once per duel
   _duelActive = false;
   if (typeof getCurrentUser === 'function' && getCurrentUser()) {
     const outcome = myPts > oppPts ? 'win' : myPts < oppPts ? 'loss' : 'draw';
     _supabase.rpc('record_duel_outcome', { p_outcome: outcome }).then(() => {}, () => {});
   }
 
-  window._presetSeason = season;
+  lgReconstructState(mySquad.players, mySquad.formation, room.settings || {});   // my pitch/OVR
+  window._presetSeason = mySeason;
   window._duelReviewMode = { mySquad, oppSquad, myName, oppName, myPts, oppPts };
   state.duelCode = null; state.leagueCode = null;
+  duelClearPersist();
   closeDuelRealtime(); _botRoom = null;
   showResults();
   setTimeout(() => addDuelReviewChrome(), 80);
@@ -782,10 +814,36 @@ function duelBotPick(room) {
   return { round: st.round, squadId: st.team.id, player: cand.name, slotId: slot.id, pos: slot.pos, ovr: duelPOvr(cand, st.settings) };
 }
 
-// Invite link: /?duel=CODE opens the duel screen with the code ready to join.
+// On load: an invite link (/?duel=CODE) auto-joins that room; otherwise, if a
+// game was in progress, a refresh rejoins it (keeps you in the match).
+function duelOpenWhenReady(code, isInvite) {
+  let tries = 0;
+  const tick = () => {
+    if (typeof getCurrentUser === 'function' && getCurrentUser()) {
+      showDuel();
+      if (isInvite) {
+        _supabase.rpc('join_duel_room', { p_code: code }).then(({ error }) => {
+          if (!error) openDuelRoom(code);
+          else { renderDuelHome(); duelMsg(error.message.includes('full') ? 'החדר מלא' : 'לא נמצא חדר עם הקוד הזה', false); }
+        }, () => renderDuelHome());
+      } else {
+        _supabase.rpc('get_duel_room', { p_code: code }).then(({ data }) => {
+          if (data?.[0] && data[0].status !== 'done') openDuelRoom(code);
+          else duelClearPersist();
+        }, () => {});
+      }
+      return;
+    }
+    if (++tries < 30) setTimeout(tick, 400);   // wait up to ~12s for auth to resolve
+  };
+  setTimeout(tick, 700);
+}
 document.addEventListener('DOMContentLoaded', () => {
   const m = /[?&]duel=([A-Za-z0-9]{4})/.exec(location.search);
-  if (!m) return;
-  _pendingDuelCode = m[1].toUpperCase();
-  setTimeout(() => { if (typeof showDuel === 'function') showDuel(); }, 1400);
+  const invite = m ? m[1].toUpperCase() : null;
+  let saved = null; try { saved = localStorage.getItem(DUEL_PERSIST_KEY); } catch (e) {}
+  const target = invite || saved;
+  if (!target) return;
+  _pendingDuelCode = invite;
+  duelOpenWhenReady(target, !!invite);
 });
