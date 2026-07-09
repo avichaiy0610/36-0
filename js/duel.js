@@ -572,22 +572,35 @@ function duelRawSeason(squad) {
   g.matches.forEach(m => { if (m.outcome === 'W') w++; else if (m.outcome === 'D') d++; gf += m.gf; ga += m.ga; });
   return { g, w, d, l: g.matches.length - w - d, gf, ga, pts: w * 3 + d, inTopSix: g.inTopSix };
 }
-// A team's full season object for the results screen (opponent injected into the table).
-function duelBuildSeason(squad, raw, oppTeamRow, settings) {
+// A team's personal season (matches + stats) for the results screen.
+function duelBuildPersonal(squad, raw, settings) {
   lgReconstructState(squad.players, squad.formation, settings);   // for simulatePlayerStats / pitch
   let proj = 8; try { proj = calcPreseasonOdds(squad.ovr, 40).projectedFinish; } catch (e) {}
-  const table = lgInjectFriends(generateLeagueTable(raw.w, raw.d, raw.l, raw.g.inTopSix, raw.g.champOpponents, raw.g.relegOpponents), [oppTeamRow]);
-  return { ovr: squad.ovr, matches: raw.g.matches, inTopSix: raw.g.inTopSix, leagueTable: table,
+  return { ovr: squad.ovr, matches: raw.g.matches, inTopSix: raw.g.inTopSix,
            playerStats: simulatePlayerStats(raw.g.matches), projectedFinish: proj, pts: raw.pts };
 }
-// Compute BOTH teams' full seasons in one place (so a single stored copy is shared).
+// ONE combined 14-team league table (both real teams + 12 AI), identical for both
+// players — so the whole table (not just the two of them) is in sync.
+function duelCombinedTable(hRaw, gRaw, hostName, guestName) {
+  const aiRows = IL_TEAMS_SIM.slice(0, 12).map(t => {
+    const winP = Math.max(0.1, Math.min(0.85, 0.47 + (t.ovr - 78) * WINP_SLOPE));
+    const est  = Math.max(20, Math.round((winP * 3 + 0.2) * 34 + rand(-5, 5)));   // ~34-game points
+    const d = rand(4, 9);
+    const w = Math.max(0, Math.min(34 - d, Math.round((est - d) / 3)));
+    return { name: t.name, role: null, pts: w * 3 + d, w, d, l: Math.max(0, 34 - w - d) };
+  });
+  const real = [
+    { name: 'הקבוצה של ' + (hostName || 'מארח'),  role: 'host',  pts: hRaw.pts, w: hRaw.w, d: hRaw.d, l: hRaw.l },
+    { name: 'הקבוצה של ' + (guestName || 'יריב'), role: 'guest', pts: gRaw.pts, w: gRaw.w, d: gRaw.d, l: gRaw.l },
+  ];
+  return [...real, ...aiRows].sort((a, b) => b.pts - a.pts || b.w - a.w);
+}
 function duelComputeResult(hostSquad, guestSquad, hostName, guestName, settings) {
   const hRaw = duelRawSeason(hostSquad), gRaw = duelRawSeason(guestSquad);
-  const hRow = { name: 'הקבוצה של ' + (hostName || 'מארח'), pts: hRaw.pts, w: hRaw.w, d: hRaw.d, l: hRaw.l, gf: hRaw.gf, ga: hRaw.ga, inTopSix: hRaw.inTopSix };
-  const gRow = { name: 'הקבוצה של ' + (guestName || 'יריב'), pts: gRaw.pts, w: gRaw.w, d: gRaw.d, l: gRaw.l, gf: gRaw.gf, ga: gRaw.ga, inTopSix: gRaw.inTopSix };
   return {
-    host:  duelBuildSeason(hostSquad,  hRaw, gRow, settings),
-    guest: duelBuildSeason(guestSquad, gRaw, hRow, settings),
+    table: duelCombinedTable(hRaw, gRaw, hostName, guestName),
+    host:  duelBuildPersonal(hostSquad,  hRaw, settings),
+    guest: duelBuildPersonal(guestSquad, gRaw, settings),
   };
 }
 
@@ -631,7 +644,15 @@ function duelRenderResult(room, result, myRole, oppRole) {
   }
 
   lgReconstructState(mySquad.players, mySquad.formation, room.settings || {});   // my pitch/OVR
-  window._presetSeason = mySeason;
+  // Shared table, marked/renamed for THIS viewer (my row = "הקבוצה שלי").
+  const table = result.table
+    ? result.table.map(r => {
+        const isMe = r.role === myRole, isOpp = r.role === oppRole;
+        return { name: isMe ? 'הקבוצה שלי' : (isOpp ? ('הקבוצה של ' + (oppName || 'יריב')) : r.name),
+                 pts: r.pts, w: r.w, d: r.d, l: r.l, us: isMe };
+      })
+    : mySeason.leagueTable;   // legacy result (pre-shared-table)
+  window._presetSeason = { ...mySeason, leagueTable: table };
   window._duelReviewMode = { mySquad, oppSquad, myName, oppName, myPts, oppPts };
   state.duelCode = null; state.leagueCode = null;
   duelClearPersist();
