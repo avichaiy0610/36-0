@@ -1,0 +1,19 @@
+{
+  "name": "36–0 | ליגת העל",
+  "short_name": "36–0",
+  "description": "בנה את הרכב החלומות בליגת העל הישראלית מכל הדורות. אתגר יומי, ליגות עם חברים ו-1 על 1.",
+  "lang": "he",
+  "dir": "rtl",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0d1117",
+  "theme_color": "#0d1117",
+  "categories": ["games", "sports"],
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

@@ -2,6 +2,7 @@
 *.csv
 *.py
 *.txt
+!robots.txt
 *.log
 scraped_squads.json
 squads_review.json

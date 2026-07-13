@@ -1854,3 +1854,8 @@ body {
 /* real flag images (Windows can't render flag emoji) */
 .nat-flag { width: 17px; height: auto; border-radius: 2px; vertical-align: -2px; box-shadow: 0 0 0 1px #00000033; }
 .pc-nats .nat-flag { width: 14px; vertical-align: -2px; }
+
+/* footer policy links (about / privacy / contact) — AdSense + credibility */
+.footer-links { margin-top: 8px; display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+.footer-links a { color: var(--dim); text-decoration: none; font-size: 11px; }
+.footer-links a:hover { color: var(--accent); text-decoration: underline; }

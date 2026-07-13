@@ -643,7 +643,7 @@ const TEXT_CATALOG = [
   "screen": "חלון שיתוף",
   "label": "כתובת בתחתית כרטיס השיתוף",
   "selector": ".sc-footer",
-  "def": "36-0.app"
+  "def": "36-0.co.il"
  },
  {
   "key": "toast-label",
@@ -1119,7 +1119,7 @@ const TEXT_CATALOG = [
   "screen": "הודעת שיתוף (וואטסאפ/X)",
   "label": "שורת סיום",
   "selector": "virtual",
-  "def": "36-0.app"
+  "def": "36-0.co.il"
  },
  { "key": "page-duel",         "screen": "דואל 1 על 1", "label": "כותרת המסך",            "selector": "#screen-duel .page-title", "def": "דואל 1 על 1" },
  { "key": "duel-quick-title",  "screen": "דואל 1 על 1", "label": "כותרת 'משחק מהיר'",      "selector": "virtual", "def": "⚡ משחק מהיר" },

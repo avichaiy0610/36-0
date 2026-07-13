@@ -3,25 +3,67 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>36–0 | ליגת העל</title>
-  <meta name="description" content="בנה את הרכב החלומות בליגת העל הישראלית בכל הזמנים. 11 שחקנים, 36 משחקים — האם תצליח לסיים עונה מושלמת 36-0?" />
+  <title>36–0 | משחק ליגת העל — בנה הרכב חלומות מכל הדורות</title>
+  <meta name="description" content="משחק ליגת העל הישראלית: בנה את הרכב החלומות מכל הדורות (1999–2025), 11 שחקנים ו-36 משחקים. אתגר יומי, ליגות עם חברים ודו-קרב 1 על 1. האם תצליח עונה מושלמת 36-0?" />
+  <meta name="keywords" content="ליגת העל, כדורגל ישראלי, הרכב חלומות, משחק כדורגל, אתגר יומי, מכבי חיפה, הפועל באר שבע, בית&quot;ר ירושלים, 36-0" />
+  <!-- canonical/OG use the live host (vercel.app) today; a single find-replace
+       to 36-0.co.il completes the switch once the custom domain is connected -->
+  <link rel="canonical" href="https://36-0.vercel.app/" />
 
   <!-- Favicon -->
   <link rel="icon" href="/favicon.ico" sizes="any" />
   <link rel="icon" type="image/png" href="/icon.png" />
   <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
 
+  <!-- PWA -->
+  <link rel="manifest" href="/manifest.json" />
+  <meta name="theme-color" content="#0d1117" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="36–0" />
+
   <!-- Open Graph / social preview (WhatsApp, X, Facebook...) -->
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="36–0" />
-  <meta property="og:title" content="36–0 | ליגת העל הישראלית" />
-  <meta property="og:description" content="בנה את הרכב החלומות בליגת העל בכל הזמנים. האם תצליח 36-0?" />
+  <meta property="og:title" content="36–0 | משחק ליגת העל הישראלית" />
+  <meta property="og:description" content="בנה את הרכב החלומות בליגת העל מכל הדורות. אתגר יומי, ליגות עם חברים ו-1 על 1. האם תצליח 36-0?" />
   <meta property="og:image" content="https://36-0.vercel.app/og-image.png" />
   <meta property="og:url" content="https://36-0.vercel.app/" />
+  <meta property="og:locale" content="he_IL" />
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="36–0 | ליגת העל הישראלית" />
-  <meta name="twitter:description" content="בנה את הרכב החלומות בליגת העל בכל הזמנים. האם תצליח 36-0?" />
+  <meta name="twitter:title" content="36–0 | משחק ליגת העל הישראלית" />
+  <meta name="twitter:description" content="בנה את הרכב החלומות בליגת העל מכל הדורות. אתגר יומי, ליגות עם חברים ו-1 על 1. האם תצליח 36-0?" />
   <meta name="twitter:image" content="https://36-0.vercel.app/og-image.png" />
+
+  <!-- Structured data for search engines -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "WebSite",
+        "name": "36–0",
+        "url": "https://36-0.vercel.app/",
+        "inLanguage": "he-IL",
+        "description": "משחק ליגת העל הישראלית — בנה את הרכב החלומות מכל הדורות."
+      },
+      {
+        "@type": "VideoGame",
+        "name": "36–0 | ליגת העל",
+        "url": "https://36-0.vercel.app/",
+        "inLanguage": "he-IL",
+        "genre": "ספורט, כדורגל",
+        "gamePlatform": "Web",
+        "applicationCategory": "Game",
+        "operatingSystem": "Any",
+        "image": "https://36-0.vercel.app/og-image.png",
+        "description": "בנה את הרכב החלומות בליגת העל הישראלית מכל הדורות. 11 שחקנים, 36 משחקים, אתגר יומי וליגות עם חברים.",
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "ILS" }
+      }
+    ]
+  }
+  </script>
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -120,6 +162,11 @@
         שמות המועדונים, שמות השחקנים, הדירוגים והנתונים משמשים למטרות מידע ובידור בלבד.
         אין שימוש בלוגואים, סמלים או תמונות רשמיים. כל הסימנים המסחריים והזכויות שמורים לבעליהם.
       </p>
+      <nav class="footer-links">
+        <a href="/about.html">אודות</a>
+        <a href="/privacy.html">פרטיות</a>
+        <a href="/contact.html">צור קשר</a>
+      </nav>
     </footer>
   </div>
 
@@ -234,6 +281,11 @@
         שמות המועדונים, שמות השחקנים, הדירוגים והנתונים משמשים למטרות מידע ובידור בלבד.
         אין שימוש בלוגואים, סמלים או תמונות רשמיים. כל הסימנים המסחריים והזכויות שמורים לבעליהם.
       </p>
+      <nav class="footer-links">
+        <a href="/about.html">אודות</a>
+        <a href="/privacy.html">פרטיות</a>
+        <a href="/contact.html">צור קשר</a>
+      </nav>
     </footer>
   </div>
 
@@ -570,7 +622,7 @@
         <div class="sc-divider"></div>
         <div class="sc-awards" id="sc-share-awards"></div>
         <div class="sc-emoji" id="sc-emoji" dir="ltr"></div>
-        <div class="sc-footer">36-0.app</div>
+        <div class="sc-footer">36-0.co.il</div>
       </div>
       <div class="share-btns-row">
         <button class="sh-btn sh-wa" id="sh-wa">📱 WhatsApp</button>
