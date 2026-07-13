@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="robots" content="noindex, nofollow">
-  <title>36-0 · ניהול טקסטים</title>
+  <title>36-0 · ניהול</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;700;800;900&display=swap" rel="stylesheet">
@@ -31,6 +31,42 @@
     .legend { font-size: 12px; color: #8b949e; margin-bottom: 6px; }
     .legend b.g { color: #4CAF50; } .legend b.y { color: #FFD700; }
     @media (max-width: 600px) { .item { grid-template-columns: 1fr; gap: 3px; } .item .reset { justify-self: start; } }
+
+    /* ── challenges editor ── */
+    .chal-period-tabs { display: flex; gap: 6px; margin-bottom: 10px; }
+    .chal-period-tabs button { background: #21262d; border: 1px solid #30363d; color: #ccc; border-radius: 8px; padding: 6px 14px; cursor: pointer; font-family: inherit; font-size: 13px; }
+    .chal-period-tabs button.on { border-color: #FFD700; color: #FFD700; background: #ffd70010; }
+    .chal-row { background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 10px 12px; margin-bottom: 6px; }
+    .chal-row-head { display: flex; align-items: center; gap: 10px; cursor: pointer; flex-wrap: wrap; }
+    .chal-key { font-weight: 800; color: #e6edf3; direction: ltr; }
+    .chal-num { color: #FFD700; font-weight: 800; font-size: 12px; }
+    .chal-summary { color: #8b949e; font-size: 12px; flex: 1; min-width: 180px; }
+    .chal-badge { font-size: 11px; font-weight: 700; color: #4CAF50; border: 1px solid #4CAF5060; border-radius: 999px; padding: 1px 8px; }
+    .chal-edit { display: none; margin-top: 10px; border-top: 1px dashed #30363d; padding-top: 10px; }
+    .chal-row.open .chal-edit { display: block; }
+    .chal-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin-bottom: 10px; }
+    .chal-grid label { display: block; font-size: 11.5px; color: #8b949e; margin-bottom: 3px; }
+    .chal-grid select, .chal-grid input { width: 100%; background: #21262d; border: 1px solid #30363d; color: #e6edf3; border-radius: 8px; padding: 7px 9px; font-family: inherit; font-size: 13px; }
+    .chal-actions { display: flex; gap: 8px; align-items: center; }
+    .chal-actions .save { background: #FFD700; color: #000; border: none; border-radius: 8px; padding: 7px 18px; font-weight: 700; cursor: pointer; font-family: inherit; }
+    .chal-actions .del { background: none; border: 1px solid #f8514960; color: #f85149; border-radius: 8px; padding: 7px 12px; cursor: pointer; font-family: inherit; font-size: 12.5px; }
+    .chal-note { font-size: 11.5px; color: #8b949e; margin: 2px 0 12px; }
+    .chal-status { font-size: 12.5px; min-height: 16px; margin-top: 4px; }
+    .chal-status.ok { color: #4CAF50; } .chal-status.err { color: #f85149; }
+    .nat-flag { width: 17px; height: auto; border-radius: 2px; vertical-align: -2px; box-shadow: 0 0 0 1px #00000055; }
+    .nat-flag-preview { display: inline-block; min-width: 20px; margin-inline-end: 2px; }
+    .chal-missions-editor { border-top: 1px dashed #30363d; padding-top: 10px; margin-bottom: 10px; }
+    .chal-req-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+    .chal-req-head label { font-size: 12.5px; color: #FFD700; font-weight: 700; }
+    .chal-req-head select { background: #21262d; border: 1px solid #30363d; color: #e6edf3; border-radius: 8px; padding: 6px 9px; font-family: inherit; font-size: 12.5px; }
+    .req-auto-preview { font-size: 12.5px; color: #8b949e; margin-bottom: 6px; }
+    .req-auto-line { padding: 2px 0; }
+    .req-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 7px 9px; margin-bottom: 6px; }
+    .req-row select, .req-row input { background: #21262d; border: 1px solid #30363d; color: #e6edf3; border-radius: 6px; padding: 5px 7px; font-family: inherit; font-size: 12.5px; }
+    .req-row input { width: 76px; }
+    .req-p { font-size: 11.5px; color: #8b949e; display: inline-flex; align-items: center; gap: 5px; }
+    .req-del { background: none; border: none; color: #f85149; cursor: pointer; font-size: 14px; margin-inline-start: auto; }
+    .req-add { background: #21262d; border: 1px dashed #30363d; color: #ccc; border-radius: 8px; padding: 6px 14px; cursor: pointer; font-family: inherit; font-size: 12.5px; }
   </style>
 </head>
 <body>
@@ -44,6 +80,21 @@
   </div>
 
   <div id="editor" style="display:none">
+    <h2>🎯 ניהול אתגרים (יומי / שבועי / חודשי)</h2>
+    <div class="chal-note">
+      כל אתגר מקבל תנאים אוטומטיים שנגזרים מהתאריך. כאן אפשר לדרוס אותם — גם לאתגרים
+      עתידיים. שדה שנשאר "אוטומטי" ממשיך להיגזר לבד. שינוי לאתגר שכבר רץ ישפיע רק על
+      מי שמתחיל אחרי השינוי — עדיף לערוך מראש.
+    </div>
+    <div class="chal-period-tabs" id="chal-period-tabs">
+      <button data-period="daily" class="on">🗓️ יומי</button>
+      <button data-period="weekly">📅 שבועי</button>
+      <button data-period="monthly">🏆 חודשי</button>
+    </div>
+    <div id="chal-list"></div>
+    <div class="chal-status" id="chal-status"></div>
+
+    <h2>📝 ניהול טקסטים</h2>
     <div class="legend">מסגרת <b class="y">צהובה</b> = שינוי שלא נשמר · מסגרת <b class="g">ירוקה</b> = טקסט שכבר דרסת בעבר · 🗑 מחזיר לברירת המחדל</div>
     <div id="groups"></div>
   </div>
@@ -57,6 +108,13 @@
 <script src="js/config.js"></script>
 <script src="js/supabase-client.js"></script>
 <script src="js/text-catalog.js"></script>
+<!-- the challenge editor derives each challenge's automatic conditions with the
+     exact same code the game uses (game.js provides FORMATIONS + era range and
+     skips all its UI wiring on this page) -->
+<script src="js/data.js"></script>
+<script src="js/game.js"></script>
+<script src="js/player_nats.js"></script>
+<script src="js/challenges.js"></script>
 <script>
 const statusEl = document.getElementById('status');
 let overrides = {};   // key -> value currently stored in site_texts
@@ -127,6 +185,297 @@ async function saveAll() {
   setStatus('נשמרו ' + ups.length + ' שינויים ✓ — רענן את האתר כדי לראות', true);
 }
 
+/* ─── Challenges editor ──────────────────────────────────────────────────── */
+const CHAL_ADMIN_COUNTS = { daily: 14, weekly: 8, monthly: 6 };
+let chalPeriod = 'daily';
+
+function chalStatus(msg, ok) {
+  const el = document.getElementById('chal-status');
+  el.textContent = msg;
+  el.className = 'chal-status ' + (ok ? 'ok' : 'err');
+}
+
+// Upcoming keys for a period (starting from the CURRENT challenge)
+function chalFutureKeys(period) {
+  if (period === 'monthly') {
+    const { y, m } = chalIsraelParts();
+    return Array.from({ length: CHAL_ADMIN_COUNTS.monthly }, (_, i) => {
+      const t = m - 1 + i;
+      return `${y + Math.floor(t / 12)}-${String((t % 12) + 1).padStart(2, '0')}`;
+    });
+  }
+  const step = period === 'weekly' ? 7 : 1;
+  return Array.from({ length: CHAL_ADMIN_COUNTS[period] }, (_, i) =>
+    challengeKey(period, new Date(Date.now() + i * step * 86400000)));
+}
+
+function chalKeyTitle(period, key, idx) {
+  const when = idx === 0 ? '(נוכחי)' : idx === 1 ? '(הבא)' : '';
+  return `#${challengeNumber(period, key)} ${when}`;
+}
+
+const CHAL_SEL = (opts, cur) => opts.map(([v, l]) =>
+  `<option value="${v}" ${String(cur ?? 'auto') === String(v) ? 'selected' : ''}>${l}</option>`).join('');
+
+/* ── mission (requirements) editor ── */
+const REQ_TYPES = [
+  ['club_count',     'שחקנים ממועדון מסוים'],
+  ['nat_count',      'שחקנים ממדינה מסוימת 🌍'],
+  ['max_team_ovr',   'דירוג הרכב מקסימלי'],
+  ['max_player_ovr', 'בלי שחקנים מעל דירוג'],
+  ['min_low_ovr',    'מינימום שחקנים בדירוג נמוך'],
+  ['all_diff_clubs', 'כל השחקנים ממועדונים שונים'],
+  ['min_era_before', 'מינימום שחקנים מלפני שנה'],
+  ['min_era_after',  'מינימום שחקנים משנה ומעלה'],
+];
+// nationality missions are admin-only — the auto generator never rolls them,
+// and player nationalities are shown in the draft only when one is active
+// plain names in the <option>s — Windows renders flag emoji as letters, and
+// <option> can't contain images; a live flag preview sits beside the select
+const NAT_OPTIONS = () => ALL_NATS.map(n => [n, n]);
+const CLUB_OPTIONS = () => Object.keys(TEAMS)
+  .sort((a, b) => TEAMS[a].name.localeCompare(TEAMS[b].name, 'he'))
+  .map(id => [id, TEAMS[id].name]);
+
+function reqParamsHTML(type, req = {}) {
+  const num = (f, val, ph, lbl) =>
+    `<label class="req-p">${lbl} <input data-p="${f}" type="number" value="${val ?? ''}" placeholder="${ph}"></label>`;
+  switch (type) {
+    case 'club_count':
+      return `<label class="req-p">מועדון <select data-p="teamId">${CHAL_SEL(CLUB_OPTIONS(), req.teamId ?? 'maccabi-haifa')}</select></label>`
+           + num('n', req.n ?? 1, '1', 'כמות');
+    case 'nat_count': {
+      const cur = req.nat ?? 'ברזיל';
+      return `<label class="req-p">מדינה <span class="nat-flag-preview">${natFlagImg(cur)}</span>`
+           + `<select data-p="nat" onchange="this.parentElement.querySelector('.nat-flag-preview').innerHTML = natFlagImg(this.value)">${CHAL_SEL(NAT_OPTIONS(), cur)}</select></label>`
+           + num('n', req.n ?? 1, '1', 'כמות')
+           + `<label class="req-p">אזרחות <select data-p="dual">${CHAL_SEL([['first', 'ראשית בלבד'], ['dual', 'כולל שנייה']], req.dual ? 'dual' : 'first')}</select></label>`;
+    }
+    case 'max_team_ovr':   return num('x', req.x ?? 82, '82', 'עד דירוג');
+    case 'max_player_ovr': return num('x', req.x ?? 82, '82', 'עד דירוג');
+    case 'min_low_ovr':    return num('n', req.n ?? 3, '3', 'כמות') + num('x', req.x ?? 74, '74', 'דירוג עד');
+    case 'min_era_before': return num('n', req.n ?? 2, '2', 'כמות') + num('year', req.year ?? 2010, '2010', 'לפני שנת');
+    case 'min_era_after':  return num('n', req.n ?? 2, '2', 'כמות') + num('year', req.year ?? 2016, '2016', 'משנת');
+    default: return '';
+  }
+}
+
+function reqRowHTML(req = { type: 'club_count' }) {
+  return `
+    <div class="req-row">
+      <select class="req-type">${CHAL_SEL(REQ_TYPES, req.type)}</select>
+      <span class="req-params">${reqParamsHTML(req.type, req)}</span>
+      <button class="req-del" title="הסר משימה">✕</button>
+    </div>`;
+}
+
+function wireReqRow(row) {
+  row.querySelector('.req-type').onchange = e => {
+    row.querySelector('.req-params').innerHTML = reqParamsHTML(e.target.value);
+  };
+  row.querySelector('.req-del').onclick = () => row.remove();
+}
+
+function readReqRow(row) {
+  const type = row.querySelector('.req-type').value;
+  const p = f => row.querySelector(`[data-p="${f}"]`)?.value;
+  const req = { type };
+  if (type === 'club_count') { req.teamId = p('teamId'); req.n = Math.max(1, +p('n') || 1); }
+  else if (type === 'nat_count') {
+    req.nat = p('nat'); req.n = Math.max(1, +p('n') || 1);
+    if (p('dual') === 'dual') req.dual = true;
+  }
+  else if (type === 'max_team_ovr' || type === 'max_player_ovr') { req.x = +p('x') || 82; }
+  else if (type === 'min_low_ovr') { req.n = Math.max(1, +p('n') || 3); req.x = +p('x') || 74; }
+  else if (type === 'min_era_before' || type === 'min_era_after') { req.n = Math.max(1, +p('n') || 2); req.year = +p('year') || 2010; }
+  return req;
+}
+
+// club/country missions must have enough supply in the era to be completable
+function reqSupplyError(req, eraMin, eraMax) {
+  if (req.type === 'club_count') {
+    const supply = SQUADS.filter(sq => {
+      const y = parseSeasonYear(sq.season);
+      return sq.teamId === req.teamId && y >= eraMin && y <= eraMax;
+    }).length;
+    if (supply < req.n + 2)
+      return `ל${TEAMS[req.teamId]?.name ?? req.teamId} יש רק ${supply} סגלים בעידן הזה — צריך לפחות ${req.n + 2} כדי שהמשימה תהיה הוגנת`;
+    return null;
+  }
+  if (req.type === 'nat_count') {
+    const playersFound = new Set();
+    let squadsWith = 0;
+    SQUADS.forEach(sq => {
+      const y = parseSeasonYear(sq.season);
+      if (y < eraMin || y > eraMax) return;
+      let has = false;
+      sq.players.forEach(pl => {
+        const nats = playerNats(pl.name);
+        const match = req.dual ? nats.includes(req.nat) : nats[0] === req.nat;
+        if (match) { playersFound.add(natKey(pl.name)); has = true; }
+      });
+      if (has) squadsWith++;
+    });
+    if (playersFound.size < req.n + 2 || squadsWith < req.n + 2)
+      return `ל${req.nat} יש רק ${playersFound.size} שחקנים ב־${squadsWith} סגלים בעידן הזה — ` +
+             `צריך לפחות ${req.n + 2} מכל אחד כדי שהמשימה תהיה הוגנת`;
+    return null;
+  }
+  return null;
+}
+
+function renderChalList() {
+  const list = document.getElementById('chal-list');
+  list.innerHTML = '';
+  chalFutureKeys(chalPeriod).forEach((key, idx) => {
+    const ovKey = chalPeriod + '|' + key;
+    const ov = _chalOverrides[ovKey] ?? {};
+    const hasOv = ovKey in _chalOverrides;
+    const s = challengeSettings(chalPeriod, key);
+    const reqs = challengeRequirements(chalPeriod, key, s);
+    const reqMode = Array.isArray(ov.requirements) ? (ov.requirements.length ? 'custom' : 'none') : 'auto';
+    const reqsSummary = reqs.length ? ' · 🎯 ' + reqs.map(challengeReqText).join(' · ') : ' · 🎯 בלי משימות';
+    const row = document.createElement('div');
+    row.className = 'chal-row';
+    row.innerHTML = `
+      <div class="chal-row-head">
+        <span class="chal-key">${key}</span>
+        <span class="chal-num">${chalKeyTitle(chalPeriod, key, idx)}</span>
+        <span class="chal-summary">${challengeConditionChips(s).join(' · ')}${reqsSummary}</span>
+        ${hasOv ? '<span class="chal-badge">✓ נערך</span>' : ''}
+      </div>
+      <div class="chal-edit">
+        <div class="chal-grid">
+          <div><label>מערך</label>
+            <select data-f="formation_id">${CHAL_SEL([['auto', 'אוטומטי (' + (FORMATIONS[s.formationId]?.label ?? '') + ')'], ...CHAL_FORMATION_KEYS.map(k => [k, k])], ov.formation_id)}</select></div>
+          <div><label>קושי</label>
+            <select data-f="difficulty">${CHAL_SEL([['auto', 'אוטומטי'], ['easy', 'קל'], ['normal', 'רגיל'], ['hard', 'קשה']], ov.difficulty)}</select></div>
+          <div><label>דירוגים</label>
+            <select data-f="ratings_visible">${CHAL_SEL([['auto', 'אוטומטי'], ['true', 'גלויים'], ['false', 'מוסתרים']], typeof ov.ratings_visible === 'boolean' ? String(ov.ratings_visible) : 'auto')}</select></div>
+          <div><label>מצב שיא ⚡</label>
+            <select data-f="peak_mode">${CHAL_SEL([['auto', 'אוטומטי'], ['true', 'פעיל'], ['false', 'כבוי']], typeof ov.peak_mode === 'boolean' ? String(ov.peak_mode) : 'auto')}</select></div>
+          <div><label>עידן מ־ (ריק = אוטומטי)</label>
+            <input data-f="era_min" type="number" min="${chalYearMin()}" max="${chalYearMax()}" value="${ov.era_min ?? ''}" placeholder="${s.eraMin}"></div>
+          <div><label>עידן עד (ריק = אוטומטי)</label>
+            <input data-f="era_max" type="number" min="${chalYearMin()}" max="${chalYearMax()}" value="${ov.era_max ?? ''}" placeholder="${s.eraMax}"></div>
+        </div>
+        <div class="chal-missions-editor">
+          <div class="chal-req-head">
+            <label>🎯 משימות</label>
+            <select class="req-mode">${CHAL_SEL([['auto', 'אוטומטי (נגזר מהתאריך)'], ['custom', 'מותאם אישית'], ['none', 'בלי משימות']], reqMode)}</select>
+          </div>
+          <div class="req-auto-preview" ${reqMode !== 'auto' ? 'style="display:none"' : ''}>
+            ${reqs.length ? reqs.map(r => `<div class="req-auto-line">· ${challengeReqText(r)}</div>`).join('') : '<div class="req-auto-line">אין משימות אוטומטיות לאתגר הזה</div>'}
+          </div>
+          <div class="req-custom" ${reqMode !== 'custom' ? 'style="display:none"' : ''}>
+            <div class="req-rows">${reqMode === 'custom' ? ov.requirements.map(reqRowHTML).join('') : ''}</div>
+            <button class="req-add">+ הוסף משימה</button>
+          </div>
+        </div>
+        <div class="chal-actions">
+          <button class="save">💾 שמור אתגר</button>
+          ${hasOv ? '<button class="del">🗑 חזרה לאוטומטי</button>' : ''}
+        </div>
+      </div>`;
+
+    row.querySelector('.chal-row-head').onclick = () => row.classList.toggle('open');
+
+    // missions editor wiring
+    const modeSel = row.querySelector('.req-mode');
+    modeSel.onchange = () => {
+      row.querySelector('.req-auto-preview').style.display = modeSel.value === 'auto' ? '' : 'none';
+      row.querySelector('.req-custom').style.display = modeSel.value === 'custom' ? '' : 'none';
+      const rowsEl = row.querySelector('.req-rows');
+      if (modeSel.value === 'custom' && !rowsEl.children.length) {
+        rowsEl.insertAdjacentHTML('beforeend', reqRowHTML());
+        wireReqRow(rowsEl.lastElementChild);
+      }
+    };
+    row.querySelectorAll('.req-row').forEach(wireReqRow);
+    row.querySelector('.req-add').onclick = () => {
+      const rowsEl = row.querySelector('.req-rows');
+      rowsEl.insertAdjacentHTML('beforeend', reqRowHTML());
+      wireReqRow(rowsEl.lastElementChild);
+    };
+
+    row.querySelector('.save').onclick = async () => {
+      const val = f => row.querySelector(`[data-f="${f}"]`).value;
+      const settings = {};
+      if (val('formation_id') !== 'auto') settings.formation_id = val('formation_id');
+      if (val('difficulty') !== 'auto') settings.difficulty = val('difficulty');
+      if (val('ratings_visible') !== 'auto') settings.ratings_visible = val('ratings_visible') === 'true';
+      if (val('peak_mode') !== 'auto') settings.peak_mode = val('peak_mode') === 'true';
+      if (val('era_min')) settings.era_min = +val('era_min');
+      if (val('era_max')) settings.era_max = +val('era_max');
+      if (settings.era_min && settings.era_max && settings.era_min > settings.era_max) {
+        chalStatus('טווח עידן הפוך — "מ־" גדול מ"עד"', false); return;
+      }
+
+      // missions: auto = omit the field · none = [] · custom = the rows
+      if (modeSel.value === 'none') settings.requirements = [];
+      else if (modeSel.value === 'custom') {
+        const rows = [...row.querySelectorAll('.req-row')];
+        if (!rows.length) { chalStatus('הוסף לפחות משימה אחת, או עבור ל"בלי משימות"', false); return; }
+        const customReqs = rows.map(readReqRow);
+        // validate club supply against the era the challenge will actually use
+        const effEraMin = settings.era_min ?? s.eraMin;
+        const effEraMax = settings.era_max ?? s.eraMax;
+        for (const r of customReqs) {
+          const err = reqSupplyError(r, effEraMin, effEraMax);
+          if (err) { chalStatus(err, false); return; }
+        }
+        settings.requirements = customReqs;
+      }
+      if (!Object.keys(settings).length) {
+        // everything back to auto — remove the override entirely
+        const { error } = await _supabase.from('challenge_overrides')
+          .delete().eq('period', chalPeriod).eq('challenge_key', key);
+        if (error) { chalStatus('מחיקה נכשלה: ' + error.message, false); return; }
+        delete _chalOverrides[ovKey];
+        chalStatus(`${key} חזר לתנאים אוטומטיים ✓`, true);
+      } else {
+        const { error } = await _supabase.from('challenge_overrides')
+          .upsert({ period: chalPeriod, challenge_key: key, settings, updated_at: new Date().toISOString() });
+        if (error) {
+          chalStatus('שמירה נכשלה: ' + error.message + (error.code === '42501' ? ' — אתה לא מחובר עם חשבון המנהל' : ''), false);
+          return;
+        }
+        _chalOverrides[ovKey] = settings;
+        chalStatus(`האתגר של ${key} נשמר ✓`, true);
+      }
+      renderChalList();
+    };
+
+    const delBtn = row.querySelector('.del');
+    if (delBtn) delBtn.onclick = async () => {
+      const { error } = await _supabase.from('challenge_overrides')
+        .delete().eq('period', chalPeriod).eq('challenge_key', key);
+      if (error) { chalStatus('מחיקה נכשלה: ' + error.message, false); return; }
+      delete _chalOverrides[ovKey];
+      chalStatus(`${key} חזר לתנאים אוטומטיים ✓`, true);
+      renderChalList();
+    };
+
+    list.appendChild(row);
+  });
+}
+
+async function initChallengesEditor() {
+  // load ALL overrides (incl. future ones), not just the current keys
+  const { data, error } = await _supabase.from('challenge_overrides').select('period, challenge_key, settings');
+  if (error) { chalStatus('טעינת האתגרים נכשלה: ' + error.message, false); }
+  (data ?? []).forEach(r => { _chalOverrides[r.period + '|' + r.challenge_key] = r.settings; });
+  document.querySelectorAll('#chal-period-tabs button').forEach(b => {
+    b.onclick = () => {
+      document.querySelectorAll('#chal-period-tabs button').forEach(x => x.classList.remove('on'));
+      b.classList.add('on');
+      chalPeriod = b.dataset.period;
+      renderChalList();
+    };
+  });
+  renderChalList();
+}
+
 async function init() {
   const { data: { session } } = await _supabase.auth.getSession();
   if (!session) return;
@@ -138,6 +487,7 @@ async function init() {
   (data ?? []).forEach(r => { overrides[r.key] = r.value; });
   render();
   document.getElementById('btn-save').onclick = saveAll;
+  initChallengesEditor();
 }
 init();
 </script>

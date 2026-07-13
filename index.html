@@ -34,6 +34,7 @@
   <nav id="app-nav" class="app-nav">
     <div class="nav-logo" dir="ltr">36–0</div>
     <div class="nav-actions">
+      <button class="nav-btn" id="nav-daily">🗓️ אתגרים</button>
       <button class="nav-btn" id="nav-leagues">ליגות</button>
       <button class="nav-btn" id="nav-duel">1v1 <span class="nav-beta">בטא</span></button>
       <button class="nav-btn" id="nav-leaderboard">לוח שיאים</button>
@@ -98,6 +99,15 @@
         11 שחקנים, 36 משחקים — האם תצליח <span dir="ltr">36–0</span>?
       </p>
       <button id="btn-start" class="btn-primary">שחק עכשיו ⚽</button>
+      <button id="btn-daily" class="daily-welcome-card">
+        <span class="dw-top">
+          <span class="dw-icon">🗓️</span>
+          <span class="dw-title">האתגר היומי <span id="dw-num" dir="ltr"></span></span>
+          <span class="dw-arrow">←</span>
+        </span>
+        <span class="dw-sub" id="dw-conditions">אותם תנאים לכולם — פעם ביום</span>
+        <span class="dw-more">יש גם אתגר שבועי 📅 וחודשי 🏆</span>
+      </button>
     </div>
     <footer class="site-disclaimer">
       <p>
@@ -251,6 +261,7 @@
         </div>
       </div>
       <div id="peak-mode-banner" class="peak-mode-banner" style="display:none">⚡ מצב שיא פעיל</div>
+      <div id="chal-reqs-panel" class="chal-reqs-panel" style="display:none"></div>
       <button id="btn-move-player" class="btn-move-player" style="display:none">⇄ הזז שחקן</button>
       <div class="pick-hint" id="pick-hint">ממתין להגרלה...</div>
       <div id="players-list"></div>
@@ -319,6 +330,8 @@
           <div class="page-loading" style="font-size:0.8rem">מחשב...</div>
         </div>
       </div>
+
+      <div id="chal-reqs-pre" class="chal-reqs-pre" style="display:none"></div>
 
       <div id="pre-signin-prompt" class="pre-signin-prompt" style="display:none">
         <div class="pre-signin-icon">🏆</div>
@@ -626,6 +639,22 @@
     </div>
   </div>
 
+  <!-- ══ CHALLENGES (daily / weekly / monthly) ═══════════════════════════════════ -->
+  <div id="screen-daily" class="screen screen-page">
+    <div class="page-inner lb-inner">
+      <div class="page-header">
+        <button class="back-btn" id="daily-back">→ חזרה</button>
+        <h2 class="page-title">אתגרים</h2>
+      </div>
+      <div class="lb-tabs chal-tabs">
+        <button class="lb-tab chal-tab selected" data-period="daily">🗓️ יומי</button>
+        <button class="lb-tab chal-tab" data-period="weekly">📅 שבועי</button>
+        <button class="lb-tab chal-tab" data-period="monthly">🏆 חודשי</button>
+      </div>
+      <div id="daily-content"></div>
+    </div>
+  </div>
+
   <div id="screen-duel" class="screen screen-page">
     <div class="page-inner lb-inner">
       <div class="page-header">
@@ -660,5 +689,7 @@
   <script src="js/data.js"></script>
   <script src="js/game.js"></script>
   <script src="js/league-sim.js"></script>
+  <script src="js/player_nats.js"></script>
+  <script src="js/challenges.js"></script>
 </body>
 </html>

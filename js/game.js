@@ -260,10 +260,22 @@ const state = {
   moveMode: false, movingFromIdx: null,
   leagueCode: null,
   duelCode: null,
+  challenge: null, challengeDeck: null, challengeReqs: null,   // { period, key } + missions for challenge runs
 };
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 const rand = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+
+// In-place Fisher–Yates. Never use sort(() => Math.random() - 0.5) for shuffling:
+// V8 calls an inconsistent comparator a JIT-tier-dependent number of times, which
+// breaks every seeded (deterministic) simulation — league reveals and dailies.
+function shuffleArr(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
 
 // Returns the OVR to use for a player, respecting peak mode.
 function playerOVR(player) {
@@ -387,6 +399,7 @@ function showScreen(id) {
 function startGame() {
   state.leagueCode = null;   // a normal game from the welcome screen isn't for a league
   state.duelCode = null;
+  state.challenge = null; state.challengeDeck = null; state.challengeReqs = null;
   window._leagueReviewMode = null;
   window._duelReviewMode = null;
   document.getElementById('league-review-back')?.remove();
@@ -541,12 +554,20 @@ function beginDraft() {
   state.showRatings = (ratingsEl?.dataset.val ?? 'on') === 'on';
   state.draftMode   = draftModeEl?.dataset.val ?? 'squad-first';
   state.peakMode    = (peakModeEl?.dataset.val ?? 'off') === 'on';
+  state.formationId = _selectedFormationKey;
+  state.challenge   = null; state.challengeDeck = null; state.challengeReqs = null;   // the setup screen never starts a challenge run
 
+  beginDraftWithState();
+}
+
+// Starts the draft from whatever is already in `state` (formation, difficulty,
+// era, ratings, peak, challenge/deck) — used by beginDraft after reading the
+// setup screen, and directly by the challenges which lock everything.
+function beginDraftWithState() {
   const rerolls = { easy:3, normal:1, hard:0 };
   state.teamRerollsLeft   = rerolls[state.difficulty] ?? 1;
   state.seasonRerollsLeft = rerolls[state.difficulty] ?? 1;
-  state.formationId    = _selectedFormationKey;
-  state.slots          = FORMATIONS[_selectedFormationKey].slots;
+  state.slots          = FORMATIONS[state.formationId].slots;
   state.picks          = new Array(state.slots.length).fill(null);
   state.currentRound   = 0;
   state.usedSquadIds   = new Set();
@@ -566,6 +587,7 @@ function beginDraft() {
   if (ovrLines) { ovrLines.innerHTML = ''; ovrLines.style.display = 'none'; }
 
   buildPitch('pitch-slots', true);
+  if (typeof updateChallengeReqsUI === 'function') updateChallengeReqsUI();
   showScreen('draft');
   startRound();
 }
@@ -580,6 +602,8 @@ function saveDraftState() {
       v: 1,
       formationId: state.formationId,
       leagueCode: state.leagueCode || null,
+      challenge: state.challenge || null,
+      challengeReqs: state.challengeReqs || null,
       difficulty: state.difficulty,
       showRatings: state.showRatings,
       draftMode: state.draftMode,
@@ -626,6 +650,12 @@ function restoreDraftState() {
   let d;
   try { d = JSON.parse(localStorage.getItem(DRAFT_SAVE_KEY)); } catch (e) { return false; }
   if (!d || d.v !== 1 || !FORMATIONS[d.formationId]) return false;
+  // A challenge draft whose period rolled over is void — the challenge changed
+  if (d.challenge && typeof challengeKey === 'function' &&
+      d.challenge.key !== challengeKey(d.challenge.period)) {
+    clearDraftState();
+    return false;
+  }
   const slots = FORMATIONS[d.formationId].slots;
   if (!Array.isArray(d.picks) || d.picks.length !== slots.length) return false;
 
@@ -642,6 +672,7 @@ function restoreDraftState() {
   Object.assign(state, {
     formationId: d.formationId, slots, picks,
     leagueCode: d.leagueCode ?? null,
+    challenge: d.challenge ?? null,
     difficulty: d.difficulty, showRatings: d.showRatings,
     draftMode: d.draftMode, peakMode: d.peakMode,
     eraMin: d.eraMin, eraMax: d.eraMax,
@@ -653,6 +684,11 @@ function restoreDraftState() {
     isAnimating: false, awaitingSlotPick: false,
     moveMode: false, movingFromIdx: null,
   });
+  // the challenge deck is derived from the key (and the missions snapshot taken
+  // at start — overrides may change later), so a restore rebuilds it exactly
+  state.challengeReqs = d.challengeReqs ?? null;
+  state.challengeDeck = (state.challenge && typeof challengeDeckFor === 'function')
+    ? challengeDeckFor(state.challenge.period, state.challenge.key, state.eraMin, state.eraMax, state.challengeReqs) : null;
 
   const banner = document.getElementById('peak-mode-banner');
   if (banner) banner.style.display = state.peakMode ? 'block' : 'none';
@@ -736,22 +772,40 @@ function fillToken(idx, player, squad) {
   fitShortNames(token);
 }
 
-// Shrink token short-names until they fit their circle (nothing gets cut to
-// "אבוק…"); re-run on resize/orientation change so the size always matches.
+// Fit token short-names inside their circle. First try a single line at a
+// readable size; if the name is still too long (small mobile circles), WRAP
+// it to up to two lines instead of shrinking into unreadable territory or
+// cutting it to "אבוק…" — no ellipsis, ever.
 function fitShortNames(root = document) {
   root.querySelectorAll('.slot-circle').forEach(circle => {
     const span = circle.querySelector('.slot-player-short');
     if (!span) return;
-    const max = circle.clientWidth - 6;
+    const max  = circle.clientWidth - 6;
+    const maxH = circle.clientHeight - 4;
     if (max <= 0) return; // hidden screen — fitted again when shown
+    // reset to a single line at the CSS font size
     span.style.maxWidth = 'none';
     span.style.fontSize = '';
+    span.style.whiteSpace = 'nowrap';
+    span.style.wordBreak = '';
+    span.style.lineHeight = '';
+    span.style.textAlign = '';
     let size = parseFloat(getComputedStyle(span).fontSize) || 8;
-    while (size > 4.5 && span.scrollWidth > max) {
+    while (size > 7 && span.scrollWidth > max) {
       size -= 0.5;
       span.style.fontSize = size + 'px';
     }
-    if (span.scrollWidth > max) span.style.maxWidth = max + 'px';
+    if (span.scrollWidth <= max) return;
+    // still too wide at a readable size — go two-line
+    span.style.whiteSpace = 'normal';
+    span.style.wordBreak = 'break-word';
+    span.style.lineHeight = '1.05';
+    span.style.textAlign = 'center';
+    span.style.maxWidth = max + 'px';
+    while (size > 4.5 && (span.scrollHeight > maxH || span.scrollWidth > max)) {
+      size -= 0.5;
+      span.style.fontSize = size + 'px';
+    }
   });
 }
 
@@ -907,7 +961,23 @@ function getEraFilteredSquads() {
   return filtered.length > 0 ? filtered : SQUADS;
 }
 
+// Challenge mode: draw the first deck squad that isn't used yet (and matches
+// the optional filter). The deck order is the same for everyone, and
+// usedSquadIds is persisted — a refresh resumes at the same point in the deck.
+function challengeDrawNext(filter) {
+  const deck = state.challengeDeck ?? [];
+  let sq = deck.find(s => !state.usedSquadIds.has(s.id) && (!filter || filter(s)));
+  if (!sq) sq = deck.find(s => !filter || filter(s));   // deck exhausted — allow reuse
+  if (!sq) return null;
+  state.usedSquadIds.add(sq.id);
+  return sq;
+}
+
 function pickNextSquad() {
+  if (state.challenge && state.challengeDeck) {
+    const sq = challengeDrawNext();
+    if (sq) return sq;
+  }
   const pool = getEraFilteredSquads();
   const unused = pool.filter(sq => !state.usedSquadIds.has(sq.id));
   const draw = unused.length > 0 ? unused : pool;
@@ -1009,6 +1079,13 @@ function renderSquadPlayers(squad, filterSlotIdx = null) {
     players.sort((a,b) => (rank(a) - rank(b)) || (rnd.get(a) - rnd.get(b)));
   }
 
+  // Attribute badges are contextual: nationality shows ONLY when the active
+  // challenge has a nationality mission (never in regular play or other
+  // challenges). The second citizenship "doesn't exist" for the game — it's
+  // shown and counted only when the mission explicitly opted in (dual).
+  const activeNats = (typeof challengeActiveNats === 'function') ? challengeActiveNats() : [];
+  const dualNats = (typeof challengeDualNatsActive === 'function') && challengeDualNatsActive();
+
   // Check if any player in this squad can fill a remaining slot
   const anyAvailable = players.some(player => {
     if (state.usedPlayerKeys.has(player.name)) return false;
@@ -1049,9 +1126,20 @@ function renderSquadPlayers(squad, filterSlotIdx = null) {
     const fits = playerPositions(player);
     const posLabel = fits.map(p => POS_HE[p] ?? p).join(' | ');
     const posShort = fits.join(' | ');
+    let natHTML = '';
+    if (activeNats.length && typeof playerNats === 'function') {
+      const nats = dualNats ? playerNats(player.name) : playerNats(player.name).slice(0, 1);
+      if (nats.length) {
+        const hit = nats.some(n => activeNats.includes(n));
+        // real flag images — Windows browsers can't render flag emoji
+        const flag = typeof natFlagImg === 'function' ? natFlagImg : () => '';
+        const label = nats.map(n => `${flag(n)} ${n}`.trim()).join(' · ');
+        natHTML = `<span class="pc-nats${hit ? ' pc-nats-hit' : ''}">${hit ? '🎯 ' : ''}${label}</span>`;
+      }
+    }
     card.innerHTML = `
       <span class="pc-pos-badge" title="${posLabel}">${posShort}</span>
-      <span class="pc-name">${player.name}</span>
+      <span class="pc-name">${player.name}${natHTML}</span>
       ${ovrHTML}
     `;
     if (!unavailable) card.addEventListener('click', () => handlePlayerClick(player, card));
@@ -1151,6 +1239,7 @@ function assignPlayer(slotIdx, player) {
 }
 
 function updateDraftOVR() {
+  if (typeof updateChallengeReqsUI === 'function') updateChallengeReqsUI();
   const picked = state.picks.filter(Boolean).length;
   if (picked === 0) return;
   const hidden = !state.showRatings;   // hide numbers until the season is simulated
@@ -1199,14 +1288,21 @@ function rerollTeam() {
   const currentSeason = state.currentSquad?.season;
   // A player selected from the OLD squad must not carry over to the new one
   cancelPendingSelection();
-  const era = getEraFilteredSquads();
 
-  let pool = era.filter(sq => sq.teamId !== currentTeamId && sq.season === currentSeason && !state.usedSquadIds.has(sq.id));
-  if (pool.length === 0) pool = era.filter(sq => sq.teamId !== currentTeamId && sq.season === currentSeason);
-  if (pool.length === 0) pool = era.filter(sq => sq.teamId !== currentTeamId && !state.usedSquadIds.has(sq.id));
-  if (pool.length === 0) pool = era.filter(sq => sq.teamId !== currentTeamId);
-  if (pool.length === 0) pool = SQUADS.filter(sq => sq.teamId !== currentTeamId);
-  const newSquad = pool[rand(0, pool.length - 1)];
+  let newSquad = null;
+  if (state.challenge && state.challengeDeck) {
+    // deterministic: the next deck squad from a different team
+    newSquad = challengeDrawNext(sq => sq.teamId !== currentTeamId);
+  }
+  if (!newSquad) {
+    const era = getEraFilteredSquads();
+    let pool = era.filter(sq => sq.teamId !== currentTeamId && sq.season === currentSeason && !state.usedSquadIds.has(sq.id));
+    if (pool.length === 0) pool = era.filter(sq => sq.teamId !== currentTeamId && sq.season === currentSeason);
+    if (pool.length === 0) pool = era.filter(sq => sq.teamId !== currentTeamId && !state.usedSquadIds.has(sq.id));
+    if (pool.length === 0) pool = era.filter(sq => sq.teamId !== currentTeamId);
+    if (pool.length === 0) pool = SQUADS.filter(sq => sq.teamId !== currentTeamId);
+    newSquad = pool[rand(0, pool.length - 1)];
+  }
   state.usedSquadIds.add(newSquad.id); state.currentSquad = newSquad;
   saveDraftState();
 
@@ -1227,7 +1323,12 @@ function rerollSeason() {
   // A player selected from the OLD season must not carry over to the new one
   cancelPendingSelection();
   state.seasonRerollsLeft--; updateRerollButtons();
-  const newSquad = sameTeam[rand(0, sameTeam.length - 1)];
+  let newSquad = null;
+  if (state.challenge && state.challengeDeck) {
+    // deterministic: the next deck season of the SAME team
+    newSquad = challengeDrawNext(sq => sq.teamId === currentTeamId && sq.id !== state.currentSquad?.id);
+  }
+  if (!newSquad) newSquad = sameTeam[rand(0, sameTeam.length - 1)];
   state.usedSquadIds.add(newSquad.id); state.currentSquad = newSquad;
   saveDraftState();
 
@@ -1289,7 +1390,7 @@ function simulateMatch(myOvr, opp, homeOverride = null) {
 
 function generateMatches(ovr) {
   // ── שלב הליגה: 26 משחקים (13 יריבים × בית + חוץ) ───────────────────────────
-  const regPool    = [...IL_TEAMS_SIM, ...IL_TEAMS_SIM].sort(() => Math.random() - 0.5);
+  const regPool    = shuffleArr([...IL_TEAMS_SIM, ...IL_TEAMS_SIM]);
   const regMatches = regPool.map(opp => simulateMatch(ovr, opp));
   const regPts     = regMatches.reduce((s, m) => s + (m.outcome === 'W' ? 3 : m.outcome === 'D' ? 1 : 0), 0);
 
@@ -1313,14 +1414,13 @@ function generateMatches(ovr) {
   if (inTopSix) {
     // פלייאוף עליון: 5 יריבים מהשישייה × בית + חוץ = 10 משחקים
     const top5 = sortedTeams.slice(0, 5);
-    const pool = [...top5, ...top5].sort(() => Math.random() - 0.5);
+    const pool = shuffleArr([...top5, ...top5]);
     playoffMatches = pool.map(opp => simulateMatch(ovr, opp));
   } else {
     // פלייאוף תחתון: 7 יריבים × משחק אחד  (4 בית + 3 חוץ  או  3 בית + 4 חוץ)
     const bottom7   = sortedTeams.slice(6);
     const homeCount = Math.random() < 0.5 ? 4 : 3;
-    const homes     = [...Array(homeCount).fill(true), ...Array(7 - homeCount).fill(false)]
-                        .sort(() => Math.random() - 0.5);
+    const homes     = shuffleArr([...Array(homeCount).fill(true), ...Array(7 - homeCount).fill(false)]);
     playoffMatches  = bottom7.map((opp, i) => simulateMatch(ovr, opp, homes[i]));
   }
 
@@ -1576,6 +1676,7 @@ function calcPreseasonOdds(ovr, simCount = 300) {
 
 function showPreseason(ovr) {
   buildPitchInContainer('preseason-pitch-slots');
+  if (typeof renderChallengeReqsPreseason === 'function') renderChallengeReqsPreseason();
   showScreen('preseason');
 
   const signinPrompt = document.getElementById('pre-signin-prompt');
@@ -1675,18 +1776,26 @@ function animateResults(ovr) {
   const seasonWasRestored = !!window._restoredSeason;
   window._restoredSeason = null; window._presetSeason = null;
   if (!season) {
-    const g = generateMatches(ovr);
-    let w = 0, d = 0;
-    g.matches.forEach(m => { if (m.outcome === 'W') w++; else if (m.outcome === 'D') d++; });
-    const l = g.matches.length - w - d;
-    season = {
-      ovr,
-      matches: g.matches,
-      inTopSix: g.inTopSix,
-      leagueTable: generateLeagueTable(w, d, l, g.inTopSix, g.champOpponents, g.relegOpponents),
-      playerStats: simulatePlayerStats(g.matches),
-      projectedFinish: window._preseasonProjected ?? calcPreseasonOdds(ovr).projectedFinish,
+    const projected = window._preseasonProjected ?? calcPreseasonOdds(ovr).projectedFinish;
+    const simulate = () => {
+      const g = generateMatches(ovr);
+      let w = 0, d = 0;
+      g.matches.forEach(m => { if (m.outcome === 'W') w++; else if (m.outcome === 'D') d++; });
+      const l = g.matches.length - w - d;
+      return {
+        ovr,
+        matches: g.matches,
+        inTopSix: g.inTopSix,
+        leagueTable: generateLeagueTable(w, d, l, g.inTopSix, g.champOpponents, g.relegOpponents),
+        playerStats: simulatePlayerStats(g.matches),
+        projectedFinish: projected,
+      };
     };
+    // Challenge run: the season is a pure function of (challenge, lineup) — the
+    // same XI always produces the same result, so retries can't grind luck.
+    season = state.challenge
+      ? withSeededRandom(chalSeed(`chal|${state.challenge.period}|${state.challenge.key}|sim|` + challengeLineupKey()), simulate)
+      : simulate();
     saveSeasonState(season);
     window._resultSubmitted = false;   // a new season may be saved again
     // count every finished season (for the games_N achievements) — once per
@@ -1755,9 +1864,12 @@ function animateResults(ovr) {
     const modeParts = [diffMapR[state.difficulty] ?? state.difficulty];
     if (state.peakMode) modeParts.push(siteText('label-peak-mode', '⚡ מצב שיא'));
     if (!state.showRatings) modeParts.push(siteText('label-hidden-ratings', '🙈 דירוגים מוסתרים'));
+    if (state.challenge && typeof challengeLabel === 'function')
+      modeParts.unshift(`${CHAL_PERIODS[state.challenge.period]?.icon ?? '🗓️'} ${challengeLabel(state.challenge.period)} #${challengeNumber(state.challenge.period, state.challenge.key)}`);
     const modeInfoEl = document.getElementById('res-mode-info');
     if (modeInfoEl) modeInfoEl.textContent = modeParts.join(' · ');
     setupSaveSection();
+    if (typeof setupChallengeResultsUI === 'function') setupChallengeResultsUI();
 
     buildOVRCard(ovr);
     window._lastPlayerStats = playerStats;
@@ -1831,6 +1943,13 @@ function animateResults(ovr) {
       submitResult().then(() => {
         const sb = document.getElementById('btn-save-result');
         if (sb) { sb.disabled = true; sb.textContent = '✓ נשמר לליגה'; }
+      });
+    }
+    // Challenge run: submit automatically — the server keeps the best per challenge.
+    if (state.challenge && typeof getCurrentUser === 'function' && getCurrentUser()) {
+      submitResult().then(ok => {
+        const sb = document.getElementById('btn-save-result');
+        if (sb && ok) { sb.disabled = true; sb.textContent = '✓ נשמר לאתגר'; }
       });
     }
     // Show the placement popup first; only reveal the finish/stats once it's closed.
@@ -2076,6 +2195,8 @@ function populateShareCard() {
   document.getElementById('sc-p-ovr').textContent = `OVR ${r.ovr}`;
   const modeParts = [];
   const diffMap = { easy: 'קל', normal: 'רגיל', hard: 'קשה' };
+  if (state.challenge && typeof challengeNumber === 'function')
+    modeParts.push(`${CHAL_PERIODS[state.challenge.period]?.icon ?? '🗓️'} ${CHAL_PERIODS[state.challenge.period]?.short ?? ''} #${challengeNumber(state.challenge.period, state.challenge.key)}`);
   modeParts.push(diffMap[state.difficulty] ?? state.difficulty);
   if (state.peakMode) modeParts.push('⚡ שיא');
   if (!state.showRatings) modeParts.push('🙈 סמוי');
@@ -2137,8 +2258,11 @@ function generateShareText() {
   const st = typeof siteText === 'function' ? siteText : (_k, d) => d;
   const vars = { formation, ovr: r.ovr, wins: r.wins, draws: r.draws, losses: r.losses,
                  points: pts, tier: tierDisplay(t).name };
+  const title = state.challenge && typeof challengeLabel === 'function'
+    ? `${CHAL_PERIODS[state.challenge.period]?.icon ?? '🗓️'} 36–0 | ${challengeLabel(state.challenge.period)} #${challengeNumber(state.challenge.period, state.challenge.key)}`
+    : fillTemplate(st('share-title', '🇮🇱 36–0 | ליגת העל'), vars);
   return [
-    fillTemplate(st('share-title', '🇮🇱 36–0 | ליגת העל'), vars),
+    title,
     fillTemplate(st('share-line-formation', 'מערך: {formation} | דירוג: {ovr}'), vars),
     fillTemplate(st('share-line-record', '{wins}נ-{draws}ת-{losses}ה | {points} נקודות'), vars),
     tierDisplay(t).name,
@@ -2251,6 +2375,7 @@ function restartGame() {
   const rerolls = { easy:3, normal:1, hard:0 };
   Object.assign(state, {
     difficulty, showRatings, draftMode, peakMode, formationId,
+    challenge: null, challengeDeck: null, challengeReqs: null,
     slots:[], picks:[], currentRound:0,
     usedSquadIds:new Set(), usedPlayerKeys:new Set(), currentSquad:null,
     selectedPlayer:null, selectedSlotIdx:null,
@@ -2281,8 +2406,12 @@ async function submitResult() {
 
   const isPublic = document.getElementById('share-squad-checkbox')?.checked ?? false;
 
+  // a challenge run only counts for the challenge board if every mission was met
+  const challengeDone = state.challenge &&
+    (typeof challengeReqsMet !== 'function' || challengeReqsMet());
   const payload = {
     league_code: state.leagueCode || undefined,
+    challenge:  challengeDone ? state.challenge : undefined,
     ovr:       r.ovr,
     wins:      r.wins,
     draws:     r.draws,
@@ -2298,6 +2427,7 @@ async function submitResult() {
       era_max:         state.eraMax,
       peak_mode:       state.peakMode,
       ratings_visible: state.showRatings,
+      ...(state.challenge ? { challenge: state.challenge.period + '|' + state.challenge.key } : {}),
     },
     players: state.picks.flatMap((pick, i) => {
       if (!pick) return [];
@@ -2332,6 +2462,7 @@ async function submitResult() {
         });
         if (res.ok) {
           const json = await res.json();
+          if (json.challenge && typeof showChallengeSubmitNote === 'function') showChallengeSubmitNote(json.challenge);
           if (json.new_achievements?.length) await showAchievementToasts(json.new_achievements);
           ok = true;
         } else if (res.status >= 500) {
@@ -2385,6 +2516,9 @@ function setupSaveSection() {
 
 // ─── Init ──────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
+  // Loaded on a page without the game UI (e.g. admin.html uses this file for
+  // FORMATIONS/era data) — skip all game wiring.
+  if (!document.getElementById('btn-start')) return;
   // Resume a saved draft if one exists; otherwise start at the welcome screen
   if (!restoreDraftState()) showScreen('welcome');
   initEraSlider();
@@ -2401,6 +2535,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (state.currentRound > 0 && !confirm('לצאת מהדראפט? ההתקדמות לא תישמר.')) return;
     clearDraftState();
     if (state.duelCode) { state.duelCode = null; if (typeof closeDuelRealtime === 'function') closeDuelRealtime(); }
+    state.challenge = null; state.challengeDeck = null; state.challengeReqs = null;
     showScreen('welcome');
   });
   document.getElementById('btn-preseason-restart')?.addEventListener('click', restartGame);

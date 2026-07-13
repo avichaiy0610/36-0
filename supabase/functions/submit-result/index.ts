@@ -49,6 +49,26 @@ interface Payload {
   matches: MatchResult[];
   is_public: boolean;
   league_code?: string;
+  challenge?: { period: string; key: string };
+}
+
+// Challenge boundaries follow Israel time. Returns the CURRENT key for a
+// period: daily 'YYYY-MM-DD' · weekly the week's Sunday date · monthly 'YYYY-MM'.
+function currentChallengeKey(period: string): string | null {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Jerusalem', year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'short',
+  }).formatToParts(new Date());
+  const get = (t: string) => parts.find(p => p.type === t)?.value ?? '';
+  const y = +get('year'), m = +get('month'), d = +get('day');
+  const pad = (n: number) => String(n).padStart(2, '0');
+  if (period === 'daily')   return `${y}-${pad(m)}-${pad(d)}`;
+  if (period === 'monthly') return `${y}-${pad(m)}`;
+  if (period === 'weekly') {
+    const wd = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(get('weekday'));
+    if (wd < 0) return null;
+    return new Date(Date.UTC(y, m - 1, d) - wd * 86400000).toISOString().slice(0, 10);
+  }
+  return null;
 }
 
 function validate(p: Payload): string | null {
@@ -142,6 +162,17 @@ Deno.serve(async (req) => {
       });
     }
 
+    // A challenge run may only be submitted for the CURRENT key of its period
+    // (Israel time) — a stale tab that crossed the boundary gets rejected here.
+    if (payload.challenge) {
+      const { period, key } = payload.challenge;
+      if (currentChallengeKey(period) !== key) {
+        return new Response(JSON.stringify({ error: 'challenge key is not current' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
     // Query history BEFORE insert so counts reflect prior games only
     const { data: pastResults } = await supabase
       .from('game_results')
@@ -214,6 +245,37 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Challenge run: one row per (user, period, key) — keep the BEST, count attempts.
+    let challenge: { attempts: number; is_best: boolean } | undefined;
+    if (payload.challenge) {
+      const { period, key } = payload.challenge;
+      const { data: prev } = await supabase.from('challenge_results')
+        .select('points, ovr, attempts')
+        .eq('user_id', user.id).eq('period', period).eq('challenge_key', key).maybeSingle();
+      const isBest = !prev ||
+        payload.points > prev.points ||
+        (payload.points === prev.points && payload.ovr > prev.ovr);
+      const bestFields = {
+        ovr: payload.ovr, points: payload.points,
+        wins: payload.wins, draws: payload.draws, losses: payload.losses,
+        gf: payload.gf, ga: payload.ga,
+        formation: payload.formation, tier: payload.tier, players: payload.players,
+      };
+      if (!prev) {
+        await supabase.from('challenge_results').insert({
+          user_id: user.id, period, challenge_key: key, attempts: 1, ...bestFields,
+        });
+        challenge = { attempts: 1, is_best: true };
+      } else {
+        await supabase.from('challenge_results').update({
+          attempts: prev.attempts + 1,
+          updated_at: new Date().toISOString(),
+          ...(isBest ? bestFields : {}),
+        }).eq('user_id', user.id).eq('period', period).eq('challenge_key', key);
+        challenge = { attempts: prev.attempts + 1, is_best: isBest };
+      }
+    }
+
     const earned = computeAchievements(payload, gamesPlayed, usedFormations, usedClubs);
 
     const { data: existing } = await supabase
@@ -245,7 +307,7 @@ Deno.serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ result_id: result.id, new_achievements: newAchievements }),
+      JSON.stringify({ result_id: result.id, new_achievements: newAchievements, challenge }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (err) {

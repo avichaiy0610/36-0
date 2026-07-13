@@ -13,3 +13,4 @@ supabase/.temp/
 
 # DB backups (local only)
 backups/
+nationalities_cache.json
