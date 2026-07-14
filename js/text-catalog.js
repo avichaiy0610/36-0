@@ -1133,7 +1133,9 @@ const TEXT_CATALOG = [
 
  { "key": "nav-daily",           "screen": "אתגרים", "label": "כפתור ניווט 'אתגרים'",          "selector": "#nav-daily", "def": "🗓️ אתגרים" },
  { "key": "page-challenges",     "screen": "אתגרים", "label": "כותרת מסך האתגרים",             "selector": "#screen-daily .page-title", "def": "אתגרים" },
- { "key": "chal-card-more",      "screen": "אתגרים", "label": "כרטיס פתיחה — שורת 'יש גם'",    "selector": ".dw-more", "def": "יש גם אתגר שבועי 📅 וחודשי 🏆" },
+ { "key": "chal-avail-both",     "screen": "אתגרים", "label": "כרטיס פתיחה — שבועי+חודשי זמינים", "selector": "virtual", "def": "📅🏆 האתגר השבועי והחודשי זמינים!" },
+ { "key": "chal-avail-weekly",   "screen": "אתגרים", "label": "כרטיס פתיחה — השבועי זמין",        "selector": "virtual", "def": "📅 האתגר השבועי זמין!" },
+ { "key": "chal-avail-monthly",  "screen": "אתגרים", "label": "כרטיס פתיחה — החודשי זמין",        "selector": "virtual", "def": "🏆 האתגר החודשי זמין!" },
  { "key": "chal-label-daily",    "screen": "אתגרים", "label": "שם האתגר היומי",                "selector": "virtual", "def": "האתגר היומי" },
  { "key": "chal-label-weekly",   "screen": "אתגרים", "label": "שם האתגר השבועי",               "selector": "virtual", "def": "האתגר השבועי" },
  { "key": "chal-label-monthly",  "screen": "אתגרים", "label": "שם האתגר החודשי",               "selector": "virtual", "def": "האתגר החודשי" },

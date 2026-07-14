@@ -387,6 +387,8 @@ function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   const el = document.getElementById('screen-' + id);
   if (el) { el.classList.add('active'); el.scrollTop = 0; }
+  // refresh the "weekly/monthly available" hint whenever the welcome card shows
+  if (id === 'welcome' && typeof updateChallengeAvailability === 'function') updateChallengeAvailability();
   // on mobile the screens scroll as page flow, so reset the window too
   // (otherwise the results screen opens scrolled to the bottom)
   scrollPageTop();

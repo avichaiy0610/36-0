@@ -92,11 +92,14 @@ async function onSignIn(user) {
   }
   // Heads-up if any of the user's leagues finished while they were away.
   setTimeout(() => { if (typeof maybeNotifyLeagueComplete === 'function') maybeNotifyLeagueComplete(); }, 1600);
+  // now that we know the user, refresh the weekly/monthly "available" hint
+  if (typeof updateChallengeAvailability === 'function') updateChallengeAvailability();
 }
 
 function onSignOut() {
   currentUser = null;
   showLoginButton();
+  if (typeof updateChallengeAvailability === 'function') updateChallengeAvailability();
 }
 
 function showLoginButton() {

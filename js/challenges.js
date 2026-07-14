@@ -775,10 +775,40 @@ function fillChallengeWelcomeCard() {
     : 'תנאי היום: ' + challengeConditionChips(s).join(' · ');
 }
 
+// Under the daily card, nudge the player about the weekly/monthly challenges
+// they haven't done THIS period. Once both are done → nothing shows; when a
+// challenge refreshes (new week/month) it reappears so they know it's available.
+// Anonymous visitors always see them as available (an invitation to sign in).
+async function updateChallengeAvailability() {
+  const el = document.getElementById('dw-avail');
+  if (!el) return;
+  let weeklyDone = false, monthlyDone = false;
+  const user = (typeof getCurrentUser === 'function') ? getCurrentUser() : null;
+  if (user && typeof _supabase !== 'undefined') {
+    const wKey = challengeKey('weekly'), mKey = challengeKey('monthly');
+    try {
+      const { data } = await _supabase.from('challenge_results')
+        .select('period, challenge_key')
+        .eq('user_id', user.id).in('period', ['weekly', 'monthly']);
+      (data ?? []).forEach(r => {
+        if (r.period === 'weekly'  && r.challenge_key === wKey) weeklyDone  = true;
+        if (r.period === 'monthly' && r.challenge_key === mKey) monthlyDone = true;
+      });
+    } catch (e) { /* offline — leave as not-done (shown as available) */ }
+  }
+  let msg = '';
+  if (!weeklyDone && !monthlyDone) msg = chalText('chal-avail-both', '📅🏆 האתגר השבועי והחודשי זמינים!');
+  else if (!weeklyDone)            msg = chalText('chal-avail-weekly', '📅 האתגר השבועי זמין!');
+  else if (!monthlyDone)           msg = chalText('chal-avail-monthly', '🏆 האתגר החודשי זמין!');
+  el.textContent = msg;
+  el.style.display = msg ? '' : 'none';
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('nav-daily')?.addEventListener('click', () => showChallenges());
   document.getElementById('btn-daily')?.addEventListener('click', () => showChallenges('daily'));
   fillChallengeWelcomeCard();
+  updateChallengeAvailability();
   // overrides may change today's card — refresh it once they're in
   if (typeof _supabase !== 'undefined')
     loadChallengeOverrides().then(fillChallengeWelcomeCard);
