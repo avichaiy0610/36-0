@@ -244,19 +244,30 @@ function showLeagueSquad(players, title) {
 
 // One-time notice: the first time a member connects after their league has been
 // played out by everyone, pop a heads-up so they don't have to keep checking.
+// "Seen" is tracked in the DB (league_members.completion_seen) so the popup
+// never reappears once acknowledged — even on another device or after the
+// browser cleared its storage. The old localStorage set is still read as an
+// extra suppressor, so users who already dismissed it locally aren't re-popped
+// once by the new server flag defaulting to false.
 const LG_SEEN_KEY = '36-0-lg-complete-seen';
 function lgSeenSet() { try { return new Set(JSON.parse(localStorage.getItem(LG_SEEN_KEY) || '[]')); } catch (e) { return new Set(); } }
 function lgSaveSeen(set) { try { localStorage.setItem(LG_SEEN_KEY, JSON.stringify([...set])); } catch (e) {} }
 
+let _lgNotifiedThisSession = false;   // onSignIn can fire twice per load — guard
 async function maybeNotifyLeagueComplete() {
+  if (_lgNotifiedThisSession) return;
   if (typeof getCurrentUser !== 'function' || !getCurrentUser()) return;
   const { data, error } = await _supabase.rpc('get_my_leagues');
   if (error || !data?.length) return;
-  const seen = lgSeenSet();
-  const fresh = data.filter(l => l.is_complete && !seen.has(l.code));
+  const localSeen = lgSeenSet();
+  // show only for leagues that are complete AND not yet acknowledged (server or legacy-local)
+  const fresh = data.filter(l => l.is_complete && !l.completion_seen && !localSeen.has(l.code));
   if (!fresh.length) return;
-  fresh.forEach(l => seen.add(l.code));
-  lgSaveSeen(seen);
+  _lgNotifiedThisSession = true;
+  // persist the acknowledgement durably (server) + legacy-local fast path
+  fresh.forEach(l => localSeen.add(l.code));
+  lgSaveSeen(localSeen);
+  await _supabase.rpc('mark_leagues_complete_seen', { p_codes: fresh.map(l => l.code) }).then(() => {}, () => {});
   showLeagueCompletePopup(fresh);
 }
 
