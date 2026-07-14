@@ -65,6 +65,14 @@
   }
   </script>
 
+  <!-- apply the saved dark/light mode before CSS paints, to avoid a flash -->
+  <script>
+    try {
+      var _t = JSON.parse(localStorage.getItem('36-0-theme') || '{}');
+      document.documentElement.setAttribute('data-theme', _t.mode === 'light' ? 'light' : 'dark');
+    } catch (e) {}
+  </script>
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;700;800;900&display=swap" rel="stylesheet">
@@ -81,6 +89,7 @@
       <button class="nav-btn" id="nav-duel">1v1 <span class="nav-beta">בטא</span></button>
       <button class="nav-btn" id="nav-leaderboard">לוח שיאים</button>
       <button class="nav-btn" id="nav-achievements">הישגים</button>
+      <button class="nav-btn nav-btn-icon" id="nav-theme" title="עיצוב" aria-label="עיצוב">⚙️</button>
       <div class="nav-user" id="nav-user" style="display:none">
         <img class="nav-avatar" id="nav-avatar" src="" alt="" style="display:none">
         <span class="nav-username" id="nav-username"></span>
@@ -88,6 +97,7 @@
       </div>
       <button class="nav-btn nav-btn-primary" id="nav-login">התחבר</button>
     </div>
+    <div id="theme-panel" class="theme-panel" style="display:none"></div>
   </nav>
 
   <!-- ══ AUTH MODAL ════════════════════════════════════════════════════════════ -->
@@ -743,5 +753,6 @@
   <script src="js/league-sim.js"></script>
   <script src="js/player_nats.js"></script>
   <script src="js/challenges.js"></script>
+  <script src="js/theme.js"></script>
 </body>
 </html>

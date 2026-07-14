@@ -13,7 +13,29 @@ button, input, textarea, select { font-family: inherit; }
   --pitch2:   #1e3c1a;
   --accent:   #FFD700;
   --accent2:  #f0a500;
+  --accent-ink: #111;      /* readable text ON an accent-coloured fill */
+  --panel:    #1a1f2e;     /* dark navy panels (nav, modals, side panels) */
+  --panel2:   #2a2a4e;
+  --hover:    #2d333b;   /* button/card hover fill */
   --radius:   12px;
+}
+
+/* ── Light mode ─────────────────────────────────────────────────────────────
+   Overrides only the structural colours + the few hardcoded-dark chrome bits.
+   The pitch stays green and the share card stays a dark graphic by design. */
+[data-theme="light"] {
+  --bg:       #eef1f6;
+  --surface:  #ffffff;
+  --surface2: #e7ebf1;
+  --border:   #d3d9e0;
+  --text:     #1a2130;
+  --dim:      #5a6472;
+  --panel:    #ffffff;
+  --panel2:   #e7ebf1;
+  --accent:   #b8860b;     /* default gold is unreadable on white → dark goldenrod */
+  --accent2:  #9a6f00;
+  --accent-ink: #ffffff;
+  --hover:    #dce1e8;
 }
 
 html {
@@ -103,7 +125,7 @@ body {
 /* ── Buttons ──────────────────────────────────────────────────────────────── */
 .btn-primary {
   background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
-  color: #000;
+  color: var(--accent-ink, #000);
   border: none;
   border-radius: 50px;
   padding: 15px 44px;
@@ -173,7 +195,7 @@ body {
   color: var(--text);
   transition: border-color .15s, background .15s;
 }
-.opt-btn:hover:not(.selected) { border-color: var(--accent2); background: #2d333b; }
+.opt-btn:hover:not(.selected) { border-color: var(--accent2); background: var(--hover); }
 .opt-btn.selected { border-color: var(--accent); background: #ffd70012; }
 .opt-title { font-size: 13px; font-weight: 700; margin-bottom: 3px; }
 .opt-sub   { font-size: 10px; color: var(--dim); line-height: 1.3; }
@@ -210,7 +232,7 @@ body {
   cursor: pointer;
   transition: border-color .15s, background .15s, color .15s;
 }
-.formation-chip:hover:not(.selected) { border-color: var(--accent2); background: #2d333b; }
+.formation-chip:hover:not(.selected) { border-color: var(--accent2); background: var(--hover); }
 .formation-chip.selected { border-color: var(--accent); background: #ffd70012; color: var(--accent); }
 
 .mini-pitch-inner {
@@ -536,7 +558,7 @@ body {
   flex-shrink: 0;
   transition: background .15s, border-color .15s;
 }
-.player-card:hover { background: #2d333b; border-color: #484f58; }
+.player-card:hover { background: var(--hover); border-color: #484f58; }
 
 .pc-pos-badge {
   font-size: 9px; font-weight: 800;
@@ -1340,25 +1362,50 @@ body {
 /* ── Nav Bar ─────────────────────────────────────────────────────────────── */
 .app-nav {
   position: fixed; top: 0; left: 0; right: 0; height: 48px;
-  background: #1a1a2e; border-bottom: 1px solid #333;
+  background: var(--panel); border-bottom: 1px solid var(--border);
   display: flex; align-items: center; justify-content: space-between;
   padding: 0 16px; z-index: 100; direction: rtl;
 }
-.nav-logo { font-weight: 900; font-size: 1.1rem; color: #fff; letter-spacing: 1px; }
+.nav-logo { font-weight: 900; font-size: 1.1rem; color: var(--text); letter-spacing: 1px; }
 .nav-actions { display: flex; align-items: center; gap: 8px; }
 .nav-btn {
-  background: transparent; border: 1px solid #444; color: #ccc;
+  background: transparent; border: 1px solid var(--border); color: var(--text);
   padding: 4px 12px; border-radius: 6px; cursor: pointer;
   font-size: 0.85rem; font-family: inherit; transition: background 0.15s;
   white-space: nowrap;
 }
-.nav-btn:hover { background: #2a2a4e; color: #fff; }
+.nav-btn:hover { background: var(--panel2); color: var(--text); }
 .nav-btn-primary { background: #4CAF50; border-color: #4CAF50; color: #fff; }
 .nav-btn-primary:hover { background: #45a049; }
 .nav-btn-sm { padding: 2px 8px; font-size: 0.75rem; }
+.nav-btn-icon { padding: 4px 8px; font-size: 1rem; line-height: 1; }
 .nav-user { display: flex; align-items: center; gap: 8px; }
 .nav-avatar { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; }
-.nav-username { color: #fff; font-size: 0.9rem; }
+.nav-username { color: var(--text); font-size: 0.9rem; }
+
+/* ── Theme settings popover (⚙️) ─────────────────────────────────────────── */
+.theme-panel {
+  position: absolute; top: 52px; inset-inline-end: 8px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  padding: 12px 14px; width: 240px; z-index: 300;
+  box-shadow: 0 10px 34px #00000066;
+}
+.tp-row { margin-bottom: 12px; }
+.tp-label { display: block; font-size: 12px; color: var(--dim); margin-bottom: 6px; font-weight: 700; }
+.tp-seg { display: flex; gap: 6px; }
+.tp-seg button {
+  flex: 1; background: var(--surface2); border: 1px solid var(--border); color: var(--text);
+  border-radius: 8px; padding: 7px; cursor: pointer; font-family: inherit; font-size: 13px;
+}
+.tp-seg button.on { border-color: var(--accent); color: var(--accent); background: transparent; font-weight: 800; }
+.tp-select {
+  width: 100%; background: var(--surface2); border: 1px solid var(--border); color: var(--text);
+  border-radius: 8px; padding: 8px; font-family: inherit; font-size: 13px;
+}
+.tp-swatch {
+  height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center;
+  font-weight: 800; font-size: 13px; border: 1px solid #ffffff22;
+}
 
 /* Narrow screens: keep the nav on one line and stop the buttons from
    overlapping the logo. When there are more buttons than fit (logged-in user),
@@ -1391,7 +1438,7 @@ body {
   z-index: 200; direction: rtl;
 }
 .modal-box {
-  background: #1e1e3a; border: 1px solid #333; border-radius: 12px;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
   padding: 28px 24px; width: 340px; max-width: 90vw; position: relative;
 }
 .modal-close {
@@ -1416,8 +1463,8 @@ body {
 }
 .auth-tab.selected { background: #4CAF50; border-color: #4CAF50; color: #fff; }
 .auth-input {
-  width: 100%; padding: 10px 12px; background: #13132a; border: 1px solid #444;
-  border-radius: 8px; color: #fff; font-size: 0.9rem; margin-bottom: 10px;
+  width: 100%; padding: 10px 12px; background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 8px; color: var(--text); font-size: 0.9rem; margin-bottom: 10px;
   box-sizing: border-box; font-family: inherit;
 }
 .auth-error { color: #e74c3c; font-size: 0.8rem; margin-top: 8px; text-align: center; }
@@ -1493,12 +1540,12 @@ body {
 }
 
 /* ── Page Screens (achievements, leaderboard) ────────────────────────────── */
-.screen-page { flex-direction: column; min-height: 100vh; background: #0d0d1a; }
+.screen-page { flex-direction: column; min-height: 100vh; background: var(--bg); }
 .page-inner  { max-width: 600px; margin: 0 auto; padding: 24px 16px; width: 100%; box-sizing: border-box; }
 .page-header { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; direction: rtl; }
-.page-title  { font-size: 1.4rem; font-weight: 700; color: #fff; margin: 0; flex: 1; text-align: center; }
-.back-btn    { background: none; border: 1px solid #444; color: #aaa; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.85rem; font-family: inherit; }
-.page-loading { color: #666; text-align: center; padding: 40px; }
+.page-title  { font-size: 1.4rem; font-weight: 700; color: var(--text); margin: 0; flex: 1; text-align: center; }
+.back-btn    { background: none; border: 1px solid var(--border); color: var(--dim); padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.85rem; font-family: inherit; }
+.page-loading { color: var(--dim); text-align: center; padding: 40px; }
 .page-note   { color: #aaa; text-align: center; font-size: 0.9rem; margin-bottom: 20px; }
 
 /* ── Achievements Grid ───────────────────────────────────────────────────── */
@@ -1540,14 +1587,14 @@ body {
 .lb-inner { max-width: 700px; }
 .lb-tabs { display: flex; gap: 6px; margin-bottom: 12px; direction: rtl; }
 .lb-tab {
-  flex: 1; padding: 8px; background: transparent; border: 1px solid #444;
-  color: #aaa; border-radius: 8px; cursor: pointer; font-family: inherit; font-size: 0.9rem;
+  flex: 1; padding: 8px; background: transparent; border: 1px solid var(--border);
+  color: var(--dim); border-radius: 8px; cursor: pointer; font-family: inherit; font-size: 0.9rem;
 }
 .lb-tab.selected { background: #4CAF50; border-color: #4CAF50; color: #fff; font-weight: 700; }
 .lb-filters { display: flex; gap: 6px; margin-bottom: 16px; direction: rtl; }
 .lb-filter, .lb-mode {
-  padding: 4px 14px; background: transparent; border: 1px solid #333;
-  color: #888; border-radius: 20px; cursor: pointer; font-family: inherit; font-size: 0.8rem;
+  padding: 4px 14px; background: transparent; border: 1px solid var(--border);
+  color: var(--dim); border-radius: 20px; cursor: pointer; font-family: inherit; font-size: 0.8rem;
 }
 .lb-filter.selected, .lb-mode.selected { border-color: #4CAF50; color: #4CAF50; }
 .lb-table { display: flex; flex-direction: column; gap: 6px; direction: rtl; }
@@ -1555,11 +1602,11 @@ body {
   display: grid;
   grid-template-columns: 32px 1fr auto auto 64px;
   align-items: center; gap: 8px;
-  background: #141425; border: 1px solid #222; border-radius: 8px; padding: 10px 12px;
+  background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px;
 }
-.lb-rank      { font-weight: 900; color: #666; font-size: 0.95rem; text-align: center; }
+.lb-rank      { font-weight: 900; color: var(--dim); font-size: 0.95rem; text-align: center; }
 .lb-rank-top  { color: #f1c40f; }
-.lb-name      { font-size: 0.9rem; color: #fff; font-weight: 600; }
+.lb-name      { font-size: 0.9rem; color: var(--text); font-weight: 600; }
 .lb-stat      { font-size: 0.9rem; color: #4CAF50; font-weight: 700; }
 .lb-sub       { font-size: 0.75rem; color: #666; }
 .lb-view-btn  {
@@ -1859,3 +1906,9 @@ body {
 .footer-links { margin-top: 8px; display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
 .footer-links a { color: var(--dim); text-decoration: none; font-size: 11px; }
 .footer-links a:hover { color: var(--accent); text-decoration: underline; }
+
+/* ── Light-mode targeted fixes for hardcoded-dark chrome ──────────────────── */
+[data-theme="light"] #screen-welcome {
+  background: radial-gradient(ellipse at 50% 30%, #e2f0e2 0%, var(--bg) 62%);
+}
+[data-theme="light"] .site-disclaimer p { color: #8a93a0; }
