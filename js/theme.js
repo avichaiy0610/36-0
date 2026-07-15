@@ -17,7 +17,8 @@ function themeSave(s) { try { localStorage.setItem(THEME_KEY, JSON.stringify(s))
 
 // ── colour helpers ──
 function thHexToRgb(hex) {
-  const h = String(hex || '').replace('#', '');
+  let h = String(hex || '').replace('#', '');
+  if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];   // #fff → #ffffff
   if (h.length < 6) return null;
   return { r: parseInt(h.slice(0, 2), 16), g: parseInt(h.slice(2, 4), 16), b: parseInt(h.slice(4, 6), 16) };
 }
@@ -38,6 +39,22 @@ function thMix(hex, amt) {
 // readable ink to put ON an accent fill (same rule as textColorFor)
 function thInk(hex) { return thLum(hex) > 0.59 ? '#111' : '#fff'; }
 
+// How much hue a colour carries, 0..255. Black, white and greys score 0.
+function thChroma(hex) {
+  const c = thHexToRgb(hex); if (!c) return 0;
+  return Math.max(c.r, c.g, c.b) - Math.min(c.r, c.g, c.b);
+}
+// WCAG contrast ratio (1..21), so an ink choice can be checked rather than assumed.
+function thRelLum(hex) {
+  const c = thHexToRgb(hex); if (!c) return 0;
+  const f = v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+  return 0.2126 * f(c.r) + 0.7152 * f(c.g) + 0.0722 * f(c.b);
+}
+function thContrast(a, b) {
+  const l1 = thRelLum(a), l2 = thRelLum(b);
+  return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
+}
+
 // Nudge the team colour so it contrasts with the current mode's background.
 function thAccentFor(hex, mode) {
   const L = thLum(hex);
@@ -51,6 +68,32 @@ function thAccentFor(hex, mode) {
   return hex;
 }
 
+// Which of the club's colours carries the accent in this mode, and what ink goes
+// on top of it? Returns { accent, ink }.
+//
+// thAccentFor() lightens/darkens the colour so it stays legible against the
+// background. For a hued colour that's harmless — a lightened Maccabi Haifa green
+// still reads as green, a lightened Hapoel red still reads as red. But a
+// black/white/grey primary has no hue to preserve, so the same nudge yields
+// featureless grey and the club is gone: Beitar's #1A1A1A came out #757575.
+// Those clubs are named by their OTHER colour (Beitar are yellow-and-black), so:
+//   • nudge would wreck the primary (dark mode) → use the hued secondary as the fill.
+//   • primary survives as-is (black on a light bg) → keep it, but write the club's
+//     colour on it instead of plain white, i.e. black-and-gold.
+function thTeamAccent(team, mode) {
+  const p = team.primaryColor, s = team.secondaryColor;
+  const nudged = thAccentFor(p, mode);
+  const flat = thChroma(p) < 20;               // black/white/grey — no hue to keep
+  const hued = s && thChroma(s) >= 20;
+  if (!flat || !hued) return { accent: nudged, ink: thInk(nudged) };
+
+  if (nudged.toLowerCase() !== String(p).toLowerCase()) {
+    const a = thAccentFor(s, mode);
+    return { accent: a, ink: thInk(a) };
+  }
+  return { accent: nudged, ink: thContrast(nudged, s) >= 4.5 ? s : thInk(nudged) };
+}
+
 function applyTheme() {
   const s = themeState();
   const root = document.documentElement;
@@ -59,11 +102,11 @@ function applyTheme() {
   // team accent (or clear back to the CSS default gold)
   const team = s.team && typeof TEAMS !== 'undefined' ? TEAMS[s.team] : null;
   if (team && team.primaryColor) {
-    const accent  = thAccentFor(team.primaryColor, s.mode);
+    const { accent, ink } = thTeamAccent(team, s.mode);
     const accent2 = thMix(accent, s.mode === 'light' ? -0.18 : -0.22);   // gradient depth
     root.style.setProperty('--accent', accent);
     root.style.setProperty('--accent2', accent2);
-    root.style.setProperty('--accent-ink', thInk(accent));
+    root.style.setProperty('--accent-ink', ink);
   } else {
     root.style.removeProperty('--accent');
     root.style.removeProperty('--accent2');
@@ -118,10 +161,13 @@ function buildThemePanel() {
     if (sel) sel.value = st.team || '';
     const sw = panel.querySelector('#tp-swatch');
     if (sw) {
-      const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#FFD700';
+      const css = getComputedStyle(document.documentElement);
+      const accent = css.getPropertyValue('--accent').trim() || '#FFD700';
       sw.style.background = accent;
       sw.textContent = st.team && TEAMS[st.team] ? TEAMS[st.team].name : 'זהב';
-      sw.style.color = thInk(accent);
+      // read the ink applyTheme() decided, so the swatch shows the real pairing
+      // (Beitar in light mode is black-on-gold ink, not the plain thInk() guess)
+      sw.style.color = css.getPropertyValue('--accent-ink').trim() || thInk(accent);
     }
   };
 
