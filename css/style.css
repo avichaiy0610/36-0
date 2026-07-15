@@ -764,8 +764,22 @@ body {
 
 @media (max-width: 700px) {
   /* Allow page scroll on mobile — desktop uses overflow:hidden to prevent
-     the viewport from bouncing, but mobile needs the full-page scroll */
-  html, body { overflow-x: hidden; height: auto; min-height: 100%; }
+     the viewport from bouncing, but mobile needs the full-page scroll.
+     overflow-y MUST be re-declared: the base rule is the `overflow: hidden`
+     shorthand, which sets BOTH axes, and a lone `overflow-x` here would leave
+     overflow-y:hidden in place — an unscrollable page.
+     overflow-x:clip clips sideways WITHOUT becoming a scroll container, so
+     overflow-y stays `visible` and the viewport itself does the scrolling.
+     (`hidden` would force overflow-y to compute to `auto` — still scrollable,
+     but it spawns a nested scroller, which is the iOS jank we're avoiding.
+     It stays as the fallback for engines without `clip`, i.e. pre-iOS 16.) */
+  html, body {
+    overflow-x: hidden;
+    overflow-x: clip;
+    overflow-y: visible;
+    height: auto;
+    min-height: 100%;
+  }
 
   /* iOS: a position:fixed box with its own overflow scroll feels "stuck" —
      no momentum hand-off, the URL bar never collapses, and it fights the body

@@ -835,21 +835,30 @@ function duelBotPick(room) {
   return { round: st.round, squadId: st.team.id, player: cand.name, slotId: slot.id, pos: slot.pos, ovr: duelPOvr(cand, st.settings) };
 }
 
-// On load: an invite link (/?duel=CODE) auto-joins that room; otherwise, if a
-// game was in progress, a refresh rejoins it (keeps you in the match).
+// On load: an invite link (/?duel=CODE) auto-joins that room. A plain visit only
+// rejoins a duel whose DRAFT is actually still running — anything else must leave
+// you on the landing screen.
 function duelOpenWhenReady(code, isInvite) {
   let tries = 0;
   const tick = () => {
     if (typeof getCurrentUser === 'function' && getCurrentUser()) {
-      showDuel();
       if (isInvite) {
+        // Following an invite link is an explicit request for this room.
+        showDuel();
         _supabase.rpc('join_duel_room', { p_code: code }).then(({ error }) => {
           if (!error) openDuelRoom(code);
           else { renderDuelHome(); duelMsg(error.message.includes('full') ? 'החדר מלא' : 'לא נמצא חדר עם הקוד הזה', false); }
         }, () => renderDuelHome());
       } else {
+        // Plain visit. Do NOT touch the screen until we know the room is mid-draft:
+        // showDuel() here used to fire before the room was checked, so a finished
+        // or abandoned room still dumped you on the 1v1 screen with nothing to do
+        // but hit Back. Worse, a 'waiting' lobby you never closed made openDuelRoom
+        // re-save the key, so the hijack repeated on every single visit.
+        // status: waiting | ready → lobby, never started; done → finished.
+        // Only 'drafting' is a draft you're in the middle of and haven't finished.
         _supabase.rpc('get_duel_room', { p_code: code }).then(({ data }) => {
-          if (data?.[0] && data[0].status !== 'done') openDuelRoom(code);
+          if (data?.[0]?.status === 'drafting') { showDuel(); openDuelRoom(code); }
           else duelClearPersist();
         }, () => {});
       }
