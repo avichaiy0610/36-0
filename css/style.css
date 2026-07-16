@@ -1392,7 +1392,7 @@ body {
   display: flex; align-items: center; justify-content: space-between;
   padding: 0 16px; z-index: 100; direction: rtl;
 }
-.nav-logo { font-weight: 900; font-size: 1.1rem; color: var(--text); letter-spacing: 1px; }
+.nav-logo { font-weight: 900; font-size: 1.1rem; color: var(--text); letter-spacing: 1px; cursor: pointer; }
 .nav-actions { display: flex; align-items: center; gap: 8px; }
 .nav-btn {
   background: transparent; border: 1px solid var(--border); color: var(--text);

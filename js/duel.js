@@ -308,7 +308,7 @@ function duelForfeit() {
 }
 // Warn before navigating away (top tabs / back) while a duel is in progress.
 document.addEventListener('click', (e) => {
-  const t = e.target.closest('.nav-btn, #duel-back');
+  const t = e.target.closest('.nav-btn, #duel-back, #nav-home');
   if (!t || t.id === 'nav-duel' || !_duelActive) return;
   if (!confirm('לצאת מהדואל? המשחק ייגמר ותפסיד אותו.')) { e.stopImmediatePropagation(); e.preventDefault(); return; }
   duelForfeitCleanup();      // confirmed — let the click proceed to its destination
@@ -404,6 +404,25 @@ function duelPitchHTML(fmt, picks, isMe) {
   return `<div class="pitch duel-pitch ${isMe ? 'mine' : 'opp'}">${tokens}</div>`;
 }
 
+// Long names used to wrap to a second line / get clipped mid-word on the boards.
+// Instead, shrink the font so the WHOLE name stays on a single line.
+function duelShrinkToFit(el) {
+  const targetW = parseFloat(getComputedStyle(el).maxWidth);
+  if (!targetW || !isFinite(targetW)) return;
+  el.style.whiteSpace = 'nowrap';
+  el.style.textOverflow = 'clip';
+  let size = parseFloat(getComputedStyle(el).fontSize) || 9;
+  const floor = Math.max(5, size - 4);
+  while (size > floor && el.scrollWidth > targetW + 0.5) {
+    size -= 0.5;
+    el.style.fontSize = size + 'px';
+  }
+}
+function duelFitPitch(root) {
+  if (!root) return;
+  root.querySelectorAll('.duel-pitch .slot-name-label, .duel-pitch .slot-player-short').forEach(duelShrinkToFit);
+}
+
 function renderDuelBoard(room) {
   showScreen('duel');
   _duelActive = true;
@@ -469,6 +488,7 @@ function renderDuelBoard(room) {
     box.querySelectorAll('.duel-pl').forEach(btn => btn.onclick = () => duelPlayerClick(room, +btn.dataset.i));
     box.querySelectorAll('.duel-pitch-wrap:not(.opp) .slot-token').forEach(tok => tok.onclick = () => duelSlotClick(room, tok.dataset.slot));
   }
+  requestAnimationFrame(() => duelFitPitch(box));
 }
 
 function duelPlayerClick(room, i) {
@@ -565,9 +585,55 @@ function duelPicksToSquad(picks, fmt) {
   const ovr = players.length ? Math.round(players.reduce((s, p) => s + p.ovr, 0) / players.length) : 70;
   return { formation: fmt, ovr, players };
 }
+// Flip a head-to-head leg to the opponent's point of view (their home is my away).
+function duelFlipMatch(m, oppName) {
+  return {
+    outcome: m.outcome === 'W' ? 'L' : m.outcome === 'L' ? 'W' : 'D',
+    gf: m.ga, ga: m.gf, opponent: oppName, home: !m.home,
+  };
+}
+// A duel season plays the SAME teams shown in the shared table: 12 AI clubs
+// (home+away) PLUS the friend's real team (home+away) — the friend takes the slot
+// of the 13th AI team, so you actually meet them on the pitch, not just in the
+// standings. The two friend legs are pre-simulated once (duelComputeResult) so
+// both players see mirror-image results.
+function duelGenerateMatches(myOvr, oppTeam, h2h) {
+  const ai = IL_TEAMS_SIM.slice(0, 12);
+  const aiPool = shuffleArr([...ai, ...ai]);
+  const aiMatches = aiPool.map(opp => simulateMatch(myOvr, opp));
+  const regMatches = shuffleArr([...aiMatches, ...h2h]);   // 24 AI + 2 friend = 26 games
+  const regPts = regMatches.reduce((s, m) => s + (m.outcome === 'W' ? 3 : m.outcome === 'D' ? 1 : 0), 0);
+
+  // Rank the 13 opponents (12 AI + friend) to decide our playoff bracket.
+  const simPool = [...ai, oppTeam];
+  const avgOppOvr = Math.round(simPool.reduce((s, t) => s + t.ovr, 0) / simPool.length);
+  const simTeamPts = simPool.map(t => {
+    const diff  = t.ovr - avgOppOvr;
+    const winP  = Math.max(0.1, Math.min(0.85, 0.47 + diff * WINP_SLOPE));
+    const drawP = Math.max(0.05, 0.22 - Math.abs(diff) * 0.005);
+    const pts   = Math.max(5, Math.round((winP * 3 + drawP) * 26 + rand(-4, 4)));
+    return { ...t, pts };
+  });
+  const myRegRank = simTeamPts.filter(t => t.pts > regPts).length + 1;
+  const inTopSix  = myRegRank <= 6;
+  const sortedTeams = [...simTeamPts].sort((a, b) => b.pts - a.pts);
+
+  let playoffMatches;
+  if (inTopSix) {
+    const top5 = sortedTeams.slice(0, 5);
+    const pool = shuffleArr([...top5, ...top5]);
+    playoffMatches = pool.map(opp => simulateMatch(myOvr, opp));
+  } else {
+    const bottom7   = sortedTeams.slice(6);
+    const homeCount = Math.random() < 0.5 ? 4 : 3;
+    const homes     = shuffleArr([...Array(homeCount).fill(true), ...Array(7 - homeCount).fill(false)]);
+    playoffMatches  = bottom7.map((opp, i) => simulateMatch(myOvr, opp, homes[i]));
+  }
+  return { matches: [...regMatches, ...playoffMatches], inTopSix };
+}
 // A team's raw season (records only) — used to build both league tables.
-function duelRawSeason(squad) {
-  const g = generateMatches(squad.ovr);
+function duelRawSeason(squad, oppTeam, h2h) {
+  const g = duelGenerateMatches(squad.ovr, oppTeam, h2h);
   let w = 0, d = 0, gf = 0, ga = 0;
   g.matches.forEach(m => { if (m.outcome === 'W') w++; else if (m.outcome === 'D') d++; gf += m.gf; ga += m.ga; });
   return { g, w, d, l: g.matches.length - w - d, gf, ga, pts: w * 3 + d, inTopSix: g.inTopSix };
@@ -596,7 +662,16 @@ function duelCombinedTable(hRaw, gRaw, hostName, guestName) {
   return [...real, ...aiRows].sort((a, b) => b.pts - a.pts || b.w - a.w);
 }
 function duelComputeResult(hostSquad, guestSquad, hostName, guestName, settings) {
-  const hRaw = duelRawSeason(hostSquad), gRaw = duelRawSeason(guestSquad);
+  // Names must match the friend's row in the shared table exactly.
+  const hostOppName  = 'הקבוצה של ' + (guestName || 'יריב');
+  const guestOppName = 'הקבוצה של ' + (hostName || 'מארח');
+  // Two head-to-head legs simulated ONCE, then mirrored, so host home = guest away.
+  const legHost  = simulateMatch(hostSquad.ovr,  { ovr: guestSquad.ovr, name: hostOppName },  true);
+  const legGuest = simulateMatch(guestSquad.ovr, { ovr: hostSquad.ovr,  name: guestOppName }, true);
+  const hostH2H  = [legHost, duelFlipMatch(legGuest, hostOppName)];    // host: home leg + away leg
+  const guestH2H = [legGuest, duelFlipMatch(legHost, guestOppName)];   // guest: home leg + away leg
+  const hRaw = duelRawSeason(hostSquad,  { ovr: guestSquad.ovr, name: hostOppName },  hostH2H);
+  const gRaw = duelRawSeason(guestSquad, { ovr: hostSquad.ovr,  name: guestOppName }, guestH2H);
   return {
     table: duelCombinedTable(hRaw, gRaw, hostName, guestName),
     host:  duelBuildPersonal(hostSquad,  hRaw, settings),

@@ -62,6 +62,7 @@ async function initAuth() {
   document.getElementById('nav-leagues')?.addEventListener('click', () => typeof showLeagues === 'function' && showLeagues());
   document.getElementById('nav-duel')?.addEventListener('click', () => typeof showDuel === 'function' && showDuel());
   document.getElementById('nav-username')?.addEventListener('click', openUsernameEditor);
+  document.getElementById('nav-home')?.addEventListener('click', () => { if (typeof showScreen === 'function') showScreen('welcome'); });
 }
 
 // Let a logged-in user rename themselves (reuses the username modal + saveUsername).
