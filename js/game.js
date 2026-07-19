@@ -220,22 +220,44 @@ const ASSIST_W = {
   CB:0.5, RB:2, LB:2, GK:0,
 };
 
-// ─── Simulation opponents: computed from the latest season in the data ─────────
-// The 13 strongest clubs of the newest season, each rated by its top-11 average,
-// so the sim league always matches the current data (2025/26 today).
-const IL_TEAMS_SIM = (() => {
-  const latest = Math.max(...SQUADS.map(s => parseInt(s.season)));
-  return SQUADS.filter(s => parseInt(s.season) === latest)
-    .map(s => {
-      const top = [...s.players].sort((a, b) => b.ovr - a.ovr).slice(0, 11);
-      return {
-        name: (TEAMS[s.teamId] ?? { name: s.teamId }).name,
-        ovr: Math.round(top.reduce((sum, p) => sum + p.ovr, 0) / top.length),
-      };
-    })
-    .sort((a, b) => b.ovr - a.ovr)
-    .slice(0, 13);
-})();
+// ─── Simulation opponents ("era opponents") ────────────────────────────────────
+// The sim league can be any season's real clubs, each rated by its top-11
+// average. The format is always today's — exactly 13 opponents → 26 regular +
+// playoff = 36/33 games — so tiers, tables and the server validator hold for
+// every era. Seasons with fewer clubs in the data (12 in 2000-2008) are topped
+// up with the strongest not-already-present clubs of the nearest seasons.
+const LATEST_SEASON_YEAR = Math.max(...SQUADS.map(s => parseInt(s.season)));
+const _simTeamsCache = {};
+function simTeamsForSeason(year) {
+  const y = year ?? LATEST_SEASON_YEAR;
+  if (_simTeamsCache[y]) return _simTeamsCache[y];
+  const clubOf = sq => {
+    const top = [...sq.players].sort((a, b) => b.ovr - a.ovr).slice(0, 11);
+    return {
+      teamId: sq.teamId,
+      name: (TEAMS[sq.teamId] ?? { name: sq.teamId }).name,
+      ovr: Math.round(top.reduce((sum, p) => sum + p.ovr, 0) / top.length),
+    };
+  };
+  const clubs = SQUADS.filter(s => parseInt(s.season) === y).map(clubOf)
+    .sort((a, b) => b.ovr - a.ovr);
+  const have = new Set(clubs.map(c => c.teamId));
+  for (let d = 1; clubs.length < 13 && d < 30; d++) {
+    for (const ny of [y + d, y - d]) {
+      const extra = SQUADS.filter(s => parseInt(s.season) === ny && !have.has(s.teamId))
+        .map(clubOf).sort((a, b) => b.ovr - a.ovr);
+      for (const c of extra) {
+        if (clubs.length >= 13) break;
+        clubs.push(c); have.add(c.teamId);
+      }
+    }
+  }
+  return (_simTeamsCache[y] = clubs.slice(0, 13));
+}
+const IL_TEAMS_SIM = simTeamsForSeason(LATEST_SEASON_YEAR);
+// The opponents for the CURRENT run. null oppSeason = latest, so squad-data
+// updates roll the default league forward automatically.
+function oppTeamsForState() { return simTeamsForSeason(state.oppSeason ?? LATEST_SEASON_YEAR); }
 
 // ─── Era helpers ──────────────────────────────────────────────────────────────
 function parseSeasonYear(s) { return parseInt(s.split('/')[0]); }
@@ -252,6 +274,7 @@ const state = {
   difficulty: 'normal', showRatings: true, draftMode: 'squad-first',
   peakMode: false,
   eraMin: YEAR_MIN, eraMax: YEAR_MAX,
+  oppSeason: null, oppSeasonChoice: 'latest',   // null = the latest season's league
   formationId: null, slots: [], picks: [], currentRound: 0,
   usedSquadIds: new Set(), usedPlayerKeys: new Set(), currentSquad: null,
   selectedPlayer: null, selectedSlotIdx: null,
@@ -409,6 +432,7 @@ function startGame() {
   document.getElementById('screen-setup').classList.remove('league-locked');
   const note = document.getElementById('lg-setup-note'); if (note) note.style.display = 'none';
   buildFormationCards();
+  initOppSeasonSelect();
   if (!_selectedFormationKey) setFormationSelection('4-3-3');
   else setFormationSelection(_selectedFormationKey);
   showScreen('setup');
@@ -425,6 +449,8 @@ function startLeagueDraft(code, settings) {
   pick('ratings-row', s.ratings_visible === false ? 'off' : 'on');
   pick('peakmode-row', s.peak_mode ? 'on' : 'off');
   pick('draftmode-row', s.draft_mode || 'squad-first');
+  const oppSel = document.getElementById('opp-season-sel');
+  if (oppSel) { oppSel.value = 'latest'; updateOppSeasonNote(); }
   document.getElementById('screen-setup').classList.add('league-locked');
   const note = document.getElementById('lg-setup-note'); if (note) note.style.display = 'block';
 }
@@ -544,6 +570,57 @@ function selectOption(rowId, val) {
   );
 }
 
+// ─── Opponents-league selector ("era opponents") ───────────────────────────────
+function resolveOppSeason(choice) {
+  if (choice === 'random') return ALL_SEASON_YEARS[Math.floor(Math.random() * ALL_SEASON_YEARS.length)];
+  const y = parseInt(choice);
+  return Number.isFinite(y) && ALL_SEASON_YEARS.includes(y) && y !== LATEST_SEASON_YEAR ? y : null;
+}
+
+function oppLeagueStrength(year) {
+  const teams = simTeamsForSeason(year);
+  return teams.reduce((s, t) => s + t.ovr, 0) / teams.length;
+}
+
+// tercile tag of a season's league strength across all seasons
+function oppStrengthTag(year) {
+  const all = ALL_SEASON_YEARS.map(y => oppLeagueStrength(y)).sort((a, b) => a - b);
+  const v = oppLeagueStrength(year);
+  const t = (typeof siteText === 'function') ? siteText : (_k, d) => d;
+  if (v >= all[Math.ceil(all.length * 2 / 3)]) return t('opp-tag-hard', '🔥 מהקשות בהיסטוריה');
+  if (v <= all[Math.floor(all.length / 3) - 1]) return t('opp-tag-soft', '🌱 מהנוחות בהיסטוריה');
+  return t('opp-tag-mid', 'עוצמה ממוצעת');
+}
+
+function initOppSeasonSelect() {
+  const sel = document.getElementById('opp-season-sel');
+  if (!sel) return;
+  if (!sel.options.length) {
+    const add = (v, label) => {
+      const o = document.createElement('option');
+      o.value = v; o.textContent = label;
+      sel.appendChild(o);
+    };
+    add('latest', `עדכנית — ${yearToSeason(LATEST_SEASON_YEAR)}`);
+    add('random', '🎲 עונה אקראית');
+    [...ALL_SEASON_YEARS].reverse().forEach(y => {
+      if (y !== LATEST_SEASON_YEAR) add(String(y), `ליגת ${yearToSeason(y)}`);
+    });
+    sel.onchange = updateOppSeasonNote;
+  }
+  updateOppSeasonNote();
+}
+
+function updateOppSeasonNote() {
+  const sel = document.getElementById('opp-season-sel');
+  const note = document.getElementById('opp-season-note');
+  if (!sel || !note) return;
+  const t = (typeof siteText === 'function') ? siteText : (_k, d) => d;
+  if (sel.value === 'random') { note.textContent = t('opp-note-random', 'כל עונה חדשה מגרילה ליגת יריבות אחרת'); return; }
+  const y = sel.value === 'latest' ? LATEST_SEASON_YEAR : parseInt(sel.value);
+  note.textContent = `${t('opp-note-strength', 'עוצמת הליגה')}: ${oppLeagueStrength(y).toFixed(1)} · ${oppStrengthTag(y)}`;
+}
+
 function beginDraft() {
   if (!_selectedFormationKey) setFormationSelection('4-3-3');
 
@@ -558,6 +635,12 @@ function beginDraft() {
   state.peakMode    = (peakModeEl?.dataset.val ?? 'off') === 'on';
   state.formationId = _selectedFormationKey;
   state.challenge   = null; state.challengeDeck = null; state.challengeReqs = null;   // the setup screen never starts a challenge run
+
+  // Opponents league — league drafts always face the latest season (shared fairness)
+  const oppChoice = state.leagueCode ? 'latest'
+    : (document.getElementById('opp-season-sel')?.value ?? 'latest');
+  state.oppSeasonChoice = oppChoice;
+  state.oppSeason = resolveOppSeason(oppChoice);
 
   beginDraftWithState();
 }
@@ -612,6 +695,8 @@ function saveDraftState() {
       peakMode: state.peakMode,
       eraMin: state.eraMin,
       eraMax: state.eraMax,
+      oppSeason: state.oppSeason,
+      oppSeasonChoice: state.oppSeasonChoice,
       currentRound: state.currentRound,
       teamRerollsLeft: state.teamRerollsLeft,
       seasonRerollsLeft: state.seasonRerollsLeft,
@@ -678,6 +763,7 @@ function restoreDraftState() {
     difficulty: d.difficulty, showRatings: d.showRatings,
     draftMode: d.draftMode, peakMode: d.peakMode,
     eraMin: d.eraMin, eraMax: d.eraMax,
+    oppSeason: d.oppSeason ?? null, oppSeasonChoice: d.oppSeasonChoice ?? 'latest',
     currentRound: d.currentRound,
     teamRerollsLeft: d.teamRerollsLeft, seasonRerollsLeft: d.seasonRerollsLeft,
     usedSquadIds: new Set(d.usedSquadIds), usedPlayerKeys: new Set(d.usedPlayerKeys),
@@ -1390,15 +1476,15 @@ function simulateMatch(myOvr, opp, homeOverride = null) {
   return { outcome, gf, ga, opponent: opp.name, home };
 }
 
-function generateMatches(ovr) {
+function generateMatches(ovr, oppTeams = IL_TEAMS_SIM) {
   // ── שלב הליגה: 26 משחקים (13 יריבים × בית + חוץ) ───────────────────────────
-  const regPool    = shuffleArr([...IL_TEAMS_SIM, ...IL_TEAMS_SIM]);
+  const regPool    = shuffleArr([...oppTeams, ...oppTeams]);
   const regMatches = regPool.map(opp => simulateMatch(ovr, opp));
   const regPts     = regMatches.reduce((s, m) => s + (m.outcome === 'W' ? 3 : m.outcome === 'D' ? 1 : 0), 0);
 
   // Estimate opponent regular-season pts to determine which playoff bracket we land in
-  const avgOppOvr = Math.round(IL_TEAMS_SIM.reduce((s, t) => s + t.ovr, 0) / IL_TEAMS_SIM.length);
-  const simTeamPts = IL_TEAMS_SIM.map(t => {
+  const avgOppOvr = Math.round(oppTeams.reduce((s, t) => s + t.ovr, 0) / oppTeams.length);
+  const simTeamPts = oppTeams.map(t => {
     const diff  = t.ovr - avgOppOvr;
     const winP  = Math.max(0.1, Math.min(0.85, 0.47 + diff * WINP_SLOPE));
     const drawP = Math.max(0.05, 0.22 - Math.abs(diff) * 0.005);
@@ -1656,7 +1742,7 @@ function tierDisplay(tier) {
 function calcPreseasonOdds(ovr, simCount = 300) {
   let ranks = [], totalPts = 0;
   for (let i = 0; i < simCount; i++) {
-    const { matches, inTopSix, champOpponents, relegOpponents } = generateMatches(ovr);
+    const { matches, inTopSix, champOpponents, relegOpponents } = generateMatches(ovr, oppTeamsForState());
     const w = matches.filter(m => m.outcome === 'W').length;
     const d = matches.filter(m => m.outcome === 'D').length;
     const l = matches.filter(m => m.outcome === 'L').length;
@@ -1780,7 +1866,7 @@ function animateResults(ovr) {
   if (!season) {
     const projected = window._preseasonProjected ?? calcPreseasonOdds(ovr).projectedFinish;
     const simulate = () => {
-      const g = generateMatches(ovr);
+      const g = generateMatches(ovr, oppTeamsForState());
       let w = 0, d = 0;
       g.matches.forEach(m => { if (m.outcome === 'W') w++; else if (m.outcome === 'D') d++; });
       const l = g.matches.length - w - d;
@@ -1866,6 +1952,8 @@ function animateResults(ovr) {
     const modeParts = [diffMapR[state.difficulty] ?? state.difficulty];
     if (state.peakMode) modeParts.push(siteText('label-peak-mode', '⚡ מצב שיא'));
     if (!state.showRatings) modeParts.push(siteText('label-hidden-ratings', '🙈 דירוגים מוסתרים'));
+    if (state.oppSeason)
+      modeParts.push(siteText('label-opp-league', '🆚 ליגת {season}').replace('{season}', yearToSeason(state.oppSeason)));
     if (state.challenge && typeof challengeLabel === 'function')
       modeParts.unshift(`${CHAL_PERIODS[state.challenge.period]?.icon ?? '🗓️'} ${challengeLabel(state.challenge.period)} #${challengeNumber(state.challenge.period, state.challenge.key)}`);
     const modeInfoEl = document.getElementById('res-mode-info');
@@ -2202,6 +2290,7 @@ function populateShareCard() {
   modeParts.push(diffMap[state.difficulty] ?? state.difficulty);
   if (state.peakMode) modeParts.push('⚡ שיא');
   if (!state.showRatings) modeParts.push('🙈 סמוי');
+  if (state.oppSeason) modeParts.push('🆚 ליגת ' + yearToSeason(state.oppSeason));
   const modeEl = document.getElementById('sc-p-mode');
   modeEl.textContent = modeParts.join(' · ');
   modeEl.style.display = 'inline-block';
@@ -2266,11 +2355,14 @@ function generateShareText() {
   return [
     title,
     fillTemplate(st('share-line-formation', 'מערך: {formation} | דירוג: {ovr}'), vars),
+    state.oppSeason
+      ? fillTemplate(st('share-line-opp', '🆚 מול ליגת {opp}'), { ...vars, opp: yearToSeason(state.oppSeason) })
+      : null,
     fillTemplate(st('share-line-record', '{wins}נ-{draws}ת-{losses}ה | {points} נקודות'), vars),
     tierDisplay(t).name,
     grid,
     fillTemplate(st('share-footer', '36-0.co.il'), vars),
-  ].join('\n');
+  ].filter(Boolean).join('\n');
 }
 
 async function loadHtml2Canvas() {
@@ -2373,10 +2465,12 @@ async function downloadShareImage() {
 
 // ─── Restart ───────────────────────────────────────────────────────────────────
 function restartGame() {
-  const { difficulty, showRatings, draftMode, peakMode, formationId } = state;
+  const { difficulty, showRatings, draftMode, peakMode, formationId, oppSeason, oppSeasonChoice } = state;
   const rerolls = { easy:3, normal:1, hard:0 };
   Object.assign(state, {
     difficulty, showRatings, draftMode, peakMode, formationId,
+    oppSeasonChoice,
+    oppSeason: oppSeasonChoice === 'random' ? resolveOppSeason('random') : oppSeason,
     challenge: null, challengeDeck: null, challengeReqs: null,
     slots:[], picks:[], currentRound:0,
     usedSquadIds:new Set(), usedPlayerKeys:new Set(), currentSquad:null,
@@ -2429,6 +2523,7 @@ async function submitResult() {
       era_max:         state.eraMax,
       peak_mode:       state.peakMode,
       ratings_visible: state.showRatings,
+      ...(state.oppSeason ? { opp_season: state.oppSeason } : {}),
       ...(state.challenge ? { challenge: state.challenge.period + '|' + state.challenge.key } : {}),
     },
     players: state.picks.flatMap((pick, i) => {

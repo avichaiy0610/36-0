@@ -358,6 +358,12 @@ function renderChalList() {
             <input data-f="era_min" type="number" min="${chalYearMin()}" max="${chalYearMax()}" value="${ov.era_min ?? ''}" placeholder="${s.eraMin}"></div>
           <div><label>עידן עד (ריק = אוטומטי)</label>
             <input data-f="era_max" type="number" min="${chalYearMin()}" max="${chalYearMax()}" value="${ov.era_max ?? ''}" placeholder="${s.eraMax}"></div>
+          <div><label>🆚 ליגת היריבות</label>
+            <select data-f="opp_season">${CHAL_SEL([
+              ['auto', 'אוטומטי (' + (s.oppSeason ? 'ליגת ' + chalSeasonLabel(s.oppSeason) : 'עדכנית') + ')'],
+              ['latest', 'עדכנית'],
+              ...(chalSeasonTiers()?.all ?? []).slice().reverse().map(y => [String(y), 'ליגת ' + chalSeasonLabel(y)]),
+            ], ov.opp_season != null ? String(ov.opp_season) : 'auto')}</select></div>
         </div>
         <div class="chal-missions-editor">
           <div class="chal-req-head">
@@ -407,6 +413,8 @@ function renderChalList() {
       if (val('peak_mode') !== 'auto') settings.peak_mode = val('peak_mode') === 'true';
       if (val('era_min')) settings.era_min = +val('era_min');
       if (val('era_max')) settings.era_max = +val('era_max');
+      if (val('opp_season') !== 'auto')
+        settings.opp_season = val('opp_season') === 'latest' ? 'latest' : +val('opp_season');
       if (settings.era_min && settings.era_max && settings.era_min > settings.era_max) {
         chalStatus('טווח עידן הפוך — "מ־" גדול מ"עד"', false); return;
       }

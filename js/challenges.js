@@ -20,6 +20,11 @@ const CHAL_EPOCH = '2026-07-10';   // daily #1; weekly #1 = its week; monthly #1
 const CHAL_GEN2_FROM = { daily: '2026-07-20', weekly: '2026-07-26', monthly: '2026-08' };
 function chalGen2(period, key) { return String(key) >= (CHAL_GEN2_FROM[period] ?? '9999'); }
 
+// Era opponents in challenges — the sim league can be a past season's clubs.
+// Same key-gate mechanics and deploy rule as CHAL_GEN2_FROM.
+const CHAL_OPP_FROM = { daily: '2026-07-20', weekly: '2026-07-26', monthly: '2026-08' };
+function chalOppOn(period, key) { return String(key) >= (CHAL_OPP_FROM[period] ?? '9999'); }
+
 const CHAL_PERIODS = {
   daily:   { label: 'האתגר היומי',   short: 'יומי',   icon: '🗓️' },
   weekly:  { label: 'האתגר השבועי', short: 'שבועי', icon: '📅' },
@@ -160,10 +165,56 @@ function deriveChallengeSettingsV2(period, key) {
     : rv >= (difficulty === 'hard' ? 0.55 : 0.25);
   const peakMode = pk < (difficulty === 'easy' ? 0.08 : difficulty === 'hard' ? 0.25 : 0.15);
 
+  // Era opponents (own key-gate; these draws sit at the END of the stream, so
+  // pre-gate keys keep deriving exactly the same settings). Difficulty-coherent:
+  // hard challenges usually face a historically strong league, easy a soft one.
+  let oppSeason = null;
+  if (chalOppOn(period, key)) {
+    const r1 = rng(), r2 = rng();
+    const tiers = chalSeasonTiers();
+    if (tiers) {
+      const pickY = arr => arr.length ? arr[Math.floor(r2 * arr.length)] : null;
+      if (difficulty === 'easy')      oppSeason = r1 < 0.6 ? null : pickY(tiers.weak);
+      else if (difficulty === 'hard') oppSeason = pickY(r1 < 0.7 ? tiers.strong : tiers.all);
+      else                            oppSeason = r1 < 0.4 ? null : pickY(tiers.all);
+      if (oppSeason === tiers.latest) oppSeason = null;
+    }
+  }
+
   return {
-    formationId, difficulty, ratingsVisible, peakMode,
+    formationId, difficulty, ratingsVisible, peakMode, oppSeason,
     eraMin: era.min, eraMax: era.max, eraLabel: era.label,
   };
+}
+
+// Season-strength thirds for era-opponent selection. Self-contained (works in
+// admin.html too); prefers game.js's simTeamsForSeason when loaded so the
+// numbers match the actual sim (incl. 12-club-season top-up).
+let _chalSeasonTiersCache = null;
+function chalSeasonTiers() {
+  if (_chalSeasonTiersCache) return _chalSeasonTiersCache;
+  if (typeof SQUADS === 'undefined') return null;
+  const years = [...new Set(SQUADS.map(sq => parseSeasonYear(sq.season)))].sort((a, b) => a - b);
+  const strength = y => {
+    if (typeof simTeamsForSeason === 'function') {
+      const t = simTeamsForSeason(y);
+      return t.reduce((s, c) => s + c.ovr, 0) / t.length;
+    }
+    const clubs = SQUADS.filter(sq => parseSeasonYear(sq.season) === y).map(sq => {
+      const top = [...sq.players].sort((a, b) => b.ovr - a.ovr).slice(0, 11);
+      return top.reduce((s, p) => s + p.ovr, 0) / top.length;
+    }).sort((a, b) => b - a).slice(0, 13);
+    return clubs.reduce((s, v) => s + v, 0) / clubs.length;
+  };
+  const rows = years.map(y => ({ y, v: strength(y) })).sort((a, b) => b.v - a.v);
+  const third = Math.max(1, Math.floor(rows.length / 3));
+  _chalSeasonTiersCache = {
+    latest: years[years.length - 1],
+    all: years,
+    strong: rows.slice(0, third).map(r => r.y),
+    weak: rows.slice(-third).map(r => r.y),
+  };
+  return _chalSeasonTiersCache;
 }
 
 // ── Admin overrides (challenge_overrides) — merged over the derived values ─────
@@ -194,6 +245,8 @@ function challengeSettings(period, key) {
     if (ov.difficulty) s.difficulty = ov.difficulty;
     if (typeof ov.ratings_visible === 'boolean') s.ratingsVisible = ov.ratings_visible;
     if (typeof ov.peak_mode === 'boolean') s.peakMode = ov.peak_mode;
+    if (ov.opp_season != null)   // a year, or 'latest' to force the default league
+      s.oppSeason = ov.opp_season === 'latest' ? null : (+ov.opp_season || null);
     if (ov.era_min || ov.era_max) {
       s.eraMin = ov.era_min ?? s.eraMin;
       s.eraMax = ov.era_max ?? s.eraMax;
@@ -284,6 +337,8 @@ function challengeConditionChips(s) {
       : '🙈 ' + chalText('chal-chip-ratings-off', 'דירוגים מוסתרים'),
   ];
   if (s.peakMode) chips.push('⚡ ' + chalText('chal-chip-peak', 'מצב שיא'));
+  if (s.oppSeason)
+    chips.push('🆚 ' + chalText('chal-chip-opp', 'ליגת {season}').replace('{season}', chalSeasonLabel(s.oppSeason)));
   return chips;
 }
 
@@ -692,6 +747,8 @@ async function startChallenge(period) {
   state.peakMode    = s.peakMode;
   state.eraMin      = s.eraMin;
   state.eraMax      = s.eraMax;
+  state.oppSeason   = s.oppSeason ?? null;
+  state.oppSeasonChoice = s.oppSeason ? String(s.oppSeason) : 'latest';
   state.challengeReqs = challengeRequirements(period, key, s);
   state.challengeDeck = challengeDeckFor(period, key, s.eraMin, s.eraMax, state.challengeReqs);
 

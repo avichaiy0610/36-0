@@ -1223,6 +1223,21 @@ body {
 .era-lbl-mid  { font-size: 10px; color: var(--dim); }
 .era-note     { font-size: 10px; color: var(--dim); margin-top: 5px; }
 
+/* Opponents-league selector (era opponents) */
+.opp-season-sel {
+  width: 100%;
+  background: var(--surface2);
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.opp-season-sel:focus { outline: none; border-color: var(--accent); }
+
 /* ── Move player button ────────────────────────────────────────────────────── */
 .btn-move-player {
   margin: 0 12px 4px;
