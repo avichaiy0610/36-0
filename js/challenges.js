@@ -17,7 +17,9 @@ const CHAL_EPOCH = '2026-07-10';   // daily #1; weekly #1 = its week; monthly #1
 // comparable (a challenge already in progress must never change). On deploy the
 // cutoffs must still be in the future (Israel time): daily = tomorrow,
 // weekly = next Sunday, monthly = next month — bump them if the deploy slips.
-const CHAL_GEN2_FROM = { daily: '2026-07-20', weekly: '2026-07-26', monthly: '2026-08' };
+// ⏸ v2 is ON HOLD (owner wants to launch/market with v1 first) — to enable,
+// set real future dates here, deploy the same day, and you're done.
+const CHAL_GEN2_FROM = { daily: '2099-01-01', weekly: '2099-01-01', monthly: '2099-01' };
 function chalGen2(period, key) { return String(key) >= (CHAL_GEN2_FROM[period] ?? '9999'); }
 
 const CHAL_PERIODS = {
