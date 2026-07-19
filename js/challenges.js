@@ -11,6 +11,15 @@
 
 const CHAL_EPOCH = '2026-07-10';   // daily #1; weekly #1 = its week; monthly #1 = its month
 
+// Generator v2 — difficulty-coherent challenges: the label is rolled first and
+// every mission/setting scales from it. Periods whose key >= the cutoff use v2;
+// older keys keep v1 forever, because scores within a period must stay
+// comparable (a challenge already in progress must never change). On deploy the
+// cutoffs must still be in the future (Israel time): daily = tomorrow,
+// weekly = next Sunday, monthly = next month — bump them if the deploy slips.
+const CHAL_GEN2_FROM = { daily: '2026-07-20', weekly: '2026-07-26', monthly: '2026-08' };
+function chalGen2(period, key) { return String(key) >= (CHAL_GEN2_FROM[period] ?? '9999'); }
+
 const CHAL_PERIODS = {
   daily:   { label: 'האתגר היומי',   short: 'יומי',   icon: '🗓️' },
   weekly:  { label: 'האתגר השבועי', short: 'שבועי', icon: '📅' },
@@ -88,14 +97,9 @@ function challengeLabel(period) {
 }
 
 // ── Derived conditions (pure function of period + key) ─────────────────────────
-function deriveChallengeSettings(period, key) {
-  const rng  = chalRng(`chal|${period}|${key}|settings`);
-  const pick = arr => arr[Math.floor(rng() * arr.length)];
-
-  const formationId = pick(CHAL_FORMATION_KEYS);
-
+function chalEraOptions() {
   const yMin = chalYearMin(), yMax = chalYearMax();
-  const eraOptions = [
+  return [
     { label: chalText('chal-era-all', 'כל הזמנים'),        min: yMin,                 max: yMax, w: 3 },
     { label: chalText('chal-era-2003', '2003 והלאה'),      min: Math.max(2003, yMin), max: yMax, w: 2 },
     { label: chalText('chal-era-2010', '2010 והלאה'),      min: Math.max(2010, yMin), max: yMax, w: 2 },
@@ -103,15 +107,58 @@ function deriveChallengeSettings(period, key) {
     { label: chalText('chal-era-00s', 'שנות ה-2000'),      min: Math.max(2000, yMin), max: 2009, w: 1 },
     { label: chalText('chal-era-10s', 'העשור של 2010'),    min: Math.max(2010, yMin), max: 2019, w: 1 },
   ];
+}
+
+function chalPickEra(rng) {
+  const eraOptions = chalEraOptions();
   const totalW = eraOptions.reduce((s, e) => s + e.w, 0);
   let r = rng() * totalW;
-  let era = eraOptions[0];
-  for (const e of eraOptions) { r -= e.w; if (r <= 0) { era = e; break; } }
+  for (const e of eraOptions) { r -= e.w; if (r <= 0) return e; }
+  return eraOptions[0];
+}
+
+function deriveChallengeSettings(period, key) {
+  return chalGen2(period, key)
+    ? deriveChallengeSettingsV2(period, key)
+    : deriveChallengeSettingsV1(period, key);
+}
+
+// v1 — frozen: keys before CHAL_GEN2_FROM must derive exactly this forever.
+function deriveChallengeSettingsV1(period, key) {
+  const rng  = chalRng(`chal|${period}|${key}|settings`);
+  const pick = arr => arr[Math.floor(rng() * arr.length)];
+
+  const formationId = pick(CHAL_FORMATION_KEYS);
+  const era = chalPickEra(rng);
 
   const dr = rng();
   const difficulty = dr < 0.15 ? 'easy' : dr < 0.75 ? 'normal' : 'hard';
   const ratingsVisible = rng() >= 0.3;
   const peakMode = rng() < 0.15;
+
+  return {
+    formationId, difficulty, ratingsVisible, peakMode,
+    eraMin: era.min, eraMax: era.max, eraLabel: era.label,
+  };
+}
+
+// v2 — difficulty is rolled first and the other settings lean into it: easy
+// never hides ratings, hard often does (hidden ratings and peak mode are real
+// difficulty, so their odds scale with the label instead of being independent).
+function deriveChallengeSettingsV2(period, key) {
+  const rng  = chalRng(`chal|${period}|${key}|settings`);
+  const pick = arr => arr[Math.floor(rng() * arr.length)];
+
+  const formationId = pick(CHAL_FORMATION_KEYS);
+  const era = chalPickEra(rng);
+
+  const dr = rng();
+  const difficulty = dr < 0.15 ? 'easy' : dr < 0.75 ? 'normal' : 'hard';
+  const rv = rng();   // both rolls always consumed — keeps the stream aligned
+  const pk = rng();
+  const ratingsVisible = difficulty === 'easy' ? true
+    : rv >= (difficulty === 'hard' ? 0.55 : 0.25);
+  const peakMode = pk < (difficulty === 'easy' ? 0.08 : difficulty === 'hard' ? 0.25 : 0.15);
 
   return {
     formationId, difficulty, ratingsVisible, peakMode,
@@ -313,13 +360,48 @@ function chalEligibleNats(eraMin, eraMax, minPlayers, minSquads) {
     .sort();
 }
 
+// Squad supply around a cut year inside an era window (cached per window).
+// v2 era missions use it to aim for a slice that actually bites. Falls back to
+// year-fractions when SQUADS isn't loaded (standalone consumers) — seasons are
+// near-uniform (12-16 squads each), so the derived cut is almost always the same.
+let _chalEraCutCache = {};
+function chalEraCut(eraMin, eraMax, year) {
+  if (typeof SQUADS === 'undefined') {
+    const total = eraMax + 1 - eraMin;
+    const before = year - eraMin;
+    return { before, after: total - before, total };
+  }
+  const ck = eraMin + '|' + eraMax;
+  if (!_chalEraCutCache[ck]) {
+    const byYear = {}; let total = 0;
+    SQUADS.forEach(sq => {
+      const y = parseSeasonYear(sq.season);
+      if (y >= eraMin && y <= eraMax) { byYear[y] = (byYear[y] ?? 0) + 1; total++; }
+    });
+    _chalEraCutCache[ck] = { byYear, total };
+  }
+  const { byYear, total } = _chalEraCutCache[ck];
+  let before = 0;
+  for (const y in byYear) if (+y < year) before += byYear[y];
+  return { before, after: total - before, total };
+}
+
 // The auto-derived requirement set for a challenge (admin override replaces it).
+// Note: since v2 scales mission params by difficulty, an admin difficulty
+// override on a future challenge also rescales its auto missions.
 function challengeRequirements(period, key, settings) {
   const k = key ?? challengeKey(period);
   const ov = _chalOverrides[period + '|' + k];
   if (ov && Array.isArray(ov.requirements)) return ov.requirements;   // [] = no missions
 
   const s = settings ?? challengeSettings(period, k);
+  return chalGen2(period, k)
+    ? challengeRequirementsV2(period, k, s)
+    : challengeRequirementsV1(period, k, s);
+}
+
+// v1 — frozen, like deriveChallengeSettingsV1.
+function challengeRequirementsV1(period, k, s) {
   const rng = chalRng(`chal|${period}|${k}|reqs`);
   const pickOf = arr => arr[Math.floor(rng() * arr.length)];
   const intIn = (lo, hi) => lo + Math.floor(rng() * (hi - lo + 1));
@@ -369,6 +451,116 @@ function challengeRequirements(period, key, settings) {
     }
   }
   return reqs;
+}
+
+// ── v2 mission generation ──────────────────────────────────────────────────────
+// Every mission's numbers come from the challenge difficulty, so the label
+// finally means something. Rating-cap missions are heavily down-weighted
+// (they used to be ~37% of daily missions; now ~15%).
+const CHAL_V2 = {
+  count:     { easy: [1, 1],   normal: [1, 2],   hard: [2, 3] },     // club/nat n
+  teamOvr:   { easy: [83, 85], normal: [81, 84], hard: [79, 81] },
+  playerOvr: { easy: [83, 84], normal: [81, 83], hard: [80, 81] },
+  lowOvrN:   { easy: [2, 2],   normal: [2, 3],   hard: [3, 4] },
+  lowOvrX:   { easy: [75, 76], normal: [73, 75], hard: [72, 73] },
+  eraN:      { easy: [2, 2],   normal: [2, 3],   hard: [4, 5] },
+  // target: the fraction of era squads on the required side of the cut year
+  eraShare:  { easy: [0.45, 0.70], normal: [0.28, 0.55], hard: [0.12, 0.35] },
+};
+// On weekly/monthly, missions after the first are one notch easier — mission
+// count already scales difficulty, a hard monthly shouldn't be 3× brutal.
+const CHAL_V2_NOTCH = { hard: 'normal', normal: 'easy', easy: 'easy' };
+const CHAL_V2_WEIGHTS = {
+  club_count: 3, nat_count: 3, all_diff_clubs: 2,
+  min_era_before: 2, min_era_after: 2,
+  max_team_ovr: 1, max_player_ovr: 1, min_low_ovr: 1,
+};
+const CHAL_V2_OVR_FAMILY = ['max_team_ovr', 'max_player_ovr', 'min_low_ovr'];
+
+function challengeRequirementsV2(period, key, s) {
+  const rng = chalRng(`chal|${period}|${key}|reqs`);
+  const pickOf = arr => arr[Math.floor(rng() * arr.length)];
+  const intIn = (lo, hi) => lo + Math.floor(rng() * (hi - lo + 1));
+  const rollIn = range => intIn(range[0], range[1]);
+
+  // era-based missions need room on both sides of the cut year
+  const eraYears = [];
+  for (let y = s.eraMin + 4; y <= s.eraMax - 4; y++) eraYears.push(y);
+  // 6 squads min (was 5): hard club missions roll n=3 → deck seeding needs 5
+  const clubs = chalEligibleClubs(s.eraMin, s.eraMax, 6);
+  const natCands = chalEligibleNats(s.eraMin, s.eraMax, 6, 6);
+
+  const pool = [];
+  const add = t => pool.push({ t, w: CHAL_V2_WEIGHTS[t] });
+  if (clubs.length) add('club_count');
+  if (natCands.length) add('nat_count');
+  add('all_diff_clubs');
+  if (s.ratingsVisible) CHAL_V2_OVR_FAMILY.forEach(add);
+  if (eraYears.length) { add('min_era_before'); add('min_era_after'); }
+
+  const wanted = Math.min(CHAL_REQ_COUNT[period] ?? 1, pool.length);
+  const reqs = [];
+  let supplyReqs = 0;   // club/nat/era missions rearrange the deck — cap at 2
+  const ovrUsed = () => reqs.some(r => CHAL_V2_OVR_FAMILY.includes(r.type));
+
+  while (reqs.length < wanted && pool.length) {
+    // weighted draw without replacement
+    let r = rng() * pool.reduce((sum, e) => sum + e.w, 0);
+    let idx = pool.length - 1;
+    for (let i = 0; i < pool.length; i++) { r -= pool[i].w; if (r <= 0) { idx = i; break; } }
+    const type = pool.splice(idx, 1)[0].t;
+
+    // one rating-axis mission max — a cap + min_low_ovr is the same constraint twice
+    if (CHAL_V2_OVR_FAMILY.includes(type) && ovrUsed()) continue;
+    if ((type === 'club_count' || type === 'nat_count' || type.startsWith('min_era')) && supplyReqs >= 2) continue;
+
+    const d = reqs.length === 0 ? s.difficulty : (CHAL_V2_NOTCH[s.difficulty] ?? 'normal');
+
+    if (type === 'club_count') {
+      reqs.push({ type, teamId: pickOf(clubs), n: rollIn(CHAL_V2.count[d]) });
+      supplyReqs++;
+    } else if (type === 'nat_count') {
+      // auto nat missions use the PRIMARY nationality only (never dual)
+      reqs.push({ type, nat: pickOf(natCands), n: rollIn(CHAL_V2.count[d]) });
+      supplyReqs++;
+    } else if (type === 'max_team_ovr') {
+      reqs.push({ type, x: rollIn(CHAL_V2.teamOvr[d]) });
+    } else if (type === 'max_player_ovr') {
+      reqs.push({ type, x: rollIn(CHAL_V2.playerOvr[d]) });
+    } else if (type === 'min_low_ovr') {
+      reqs.push({ type, n: rollIn(CHAL_V2.lowOvrN[d]), x: rollIn(CHAL_V2.lowOvrX[d]) });
+    } else if (type === 'all_diff_clubs') {
+      reqs.push({ type });
+    } else if (type === 'min_era_before' || type === 'min_era_after') {
+      const req = chalEraReqV2(type, d, s, eraYears, rng, intIn);
+      if (req) { reqs.push(req); supplyReqs++; }
+    }
+  }
+  return reqs;
+}
+
+// Build a v2 era mission: roll a target share in the difficulty band, then take
+// the cut year whose REAL squad share is closest to it (tie → earlier year).
+// "2 players before 2013/14" on a 2003+ era was a ~45% slice with n=2 — now a
+// hard mission lands on a genuinely scarce slice and demands 4-5 players.
+function chalEraReqV2(type, d, s, eraYears, rng, intIn) {
+  const side = type === 'min_era_before' ? 'before' : 'after';
+  const band = CHAL_V2.eraShare[d];
+  const target = band[0] + rng() * (band[1] - band[0]);
+  let year = null, best = Infinity, share = 0, supply = 0;
+  for (const y of eraYears) {
+    const cut = chalEraCut(s.eraMin, s.eraMax, y);
+    const sh = cut.total ? cut[side] / cut.total : 0;
+    const diff = Math.abs(sh - target);
+    if (diff < best) { best = diff; year = y; share = sh; supply = cut[side]; }
+  }
+  let [nLo, nHi] = CHAL_V2.eraN[d];
+  // narrow eras can't produce a scarce slice — soften hard's player count
+  if (d === 'hard' && share > 0.40) { nLo = 3; nHi = 4; }
+  const n = Math.min(intIn(nLo, nHi), supply - 2);
+  // only weird admin era overrides can starve supply — skip rather than break
+  if (year == null || supply < 4 || n < 2) return null;
+  return { type, n, year };
 }
 
 // Every mission-text template is editable in the admin texts panel.
