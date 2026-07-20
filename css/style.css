@@ -1953,3 +1953,13 @@ body {
   background: radial-gradient(ellipse at 50% 30%, #e2f0e2 0%, var(--bg) 62%);
 }
 [data-theme="light"] .site-disclaimer p { color: #8a93a0; }
+
+/* footer social links (brand-colour on hover) */
+.social-links { display: flex; gap: 14px; justify-content: center; margin-top: 12px; }
+.social-links a { color: var(--dim); display: inline-flex; align-items: center; transition: color .15s, transform .15s; }
+.social-links a:hover { transform: translateY(-2px); }
+.social-links a.social-fb:hover { color: #1877F2; }
+.social-links a.social-ig:hover { color: #E4405F; }
+.social-links a.social-tt:hover { color: var(--text); }
+.social-links a.social-x:hover  { color: var(--text); }
+.social-links a.social-yt:hover { color: #FF0000; }
