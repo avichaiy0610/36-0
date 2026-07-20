@@ -14,14 +14,24 @@
     .wrap { max-width: 720px; margin: 0 auto; padding: 40px 20px 80px; }
     .logo { font-size: 42px; font-weight: 900; background: linear-gradient(135deg, #FFD700, #ff9500 55%, #FFD700); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
     .logo a { text-decoration: none; }
-    h1 { font-size: 26px; margin: 24px 0 16px; color: #FFD700; }
+    h1 { font-size: 26px; margin: 24px 0 12px; color: #FFD700; }
     p { color: #c2cbd6; margin-bottom: 14px; }
     a { color: #FFD700; }
     .back { display: inline-block; margin-bottom: 20px; color: #8b949e; text-decoration: none; font-size: 14px; }
     .back:hover { color: #FFD700; }
-    .contact-box { background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 20px; margin: 16px 0; }
-    .contact-box .lbl { font-size: 13px; color: #8b949e; margin-bottom: 4px; }
-    .contact-box .val { font-size: 18px; font-weight: 700; }
+    form { background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 20px; margin: 16px 0; }
+    label { display: block; font-size: 13px; color: #8b949e; margin: 12px 0 5px; }
+    input, textarea { width: 100%; background: #0d1117; border: 1px solid #30363d; color: #e6edf3; border-radius: 8px; padding: 11px 12px; font-family: inherit; font-size: 15px; }
+    input:focus, textarea:focus { outline: none; border-color: #FFD700; }
+    textarea { min-height: 130px; resize: vertical; }
+    .req { color: #f0a500; }
+    button { margin-top: 16px; width: 100%; background: linear-gradient(135deg, #FFD700, #f0a500); color: #111; border: none; border-radius: 50px; padding: 13px; font-family: inherit; font-size: 16px; font-weight: 800; cursor: pointer; }
+    button:disabled { opacity: .6; cursor: default; }
+    .msg { margin-top: 14px; font-size: 14px; text-align: center; min-height: 20px; }
+    .msg.ok { color: #22c55e; } .msg.err { color: #f85149; }
+    .sent-box { display: none; text-align: center; padding: 26px 16px; }
+    .sent-box .ic { font-size: 44px; }
+    .sent-box h2 { color: #22c55e; margin: 8px 0; }
     .foot { margin-top: 40px; border-top: 1px solid #30363d; padding-top: 16px; font-size: 12px; color: #5a6472; }
   </style>
 </head>
@@ -31,23 +41,76 @@
     <div class="logo"><a href="/"><span dir="ltr">36–0</span></a></div>
 
     <h1>צור קשר</h1>
-    <p>
-      שאלה, הצעה לשיפור, דיווח על באג, או פנייה בנוגע לפרטיות? נשמח לשמוע.
-    </p>
+    <p>שאלה, הצעה לשיפור, דיווח על באג, או פנייה בנוגע לפרטיות? נשמח לשמוע — ההודעה תגיע אלינו ישירות.</p>
 
-    <div class="contact-box">
-      <div class="lbl">אימייל</div>
-      <!-- החליפו את הכתובת בכתובת האמיתית שלכם (למשל hello@הדומיין-שלכם) -->
-      <a class="val" id="contact-email" href="mailto:hello@example.com" dir="ltr">hello@example.com</a>
+    <form id="contact-form">
+      <label for="c-name">שם <span style="color:#5a6472">(לא חובה)</span></label>
+      <input type="text" id="c-name" maxlength="80" autocomplete="name" placeholder="איך קוראים לך?">
+
+      <label for="c-email">אימייל לחזרה <span style="color:#5a6472">(לא חובה)</span></label>
+      <input type="email" id="c-email" maxlength="200" autocomplete="email" dir="ltr" placeholder="you@example.com">
+
+      <label for="c-message">ההודעה <span class="req">*</span></label>
+      <textarea id="c-message" maxlength="4000" required placeholder="כתוב כאן..."></textarea>
+
+      <button type="submit" id="c-submit">שליחה</button>
+      <div class="msg" id="c-msg"></div>
+    </form>
+
+    <div class="sent-box" id="c-sent">
+      <div class="ic">✅</div>
+      <h2>ההודעה נשלחה!</h2>
+      <p>תודה שפנית אלינו. נקרא את ההודעה בהקדם.</p>
+      <p><a href="/">← חזרה למשחק</a></p>
     </div>
 
-    <p>
-      אפשר גם לתמוך בפרויקט דרך <a href="https://ko-fi.com/360ligathaal" target="_blank" rel="noopener">Ko-fi</a> ☕.
-    </p>
+    <p style="margin-top:18px">אפשר גם לתמוך בפרויקט דרך <a href="https://ko-fi.com/360ligathaal" target="_blank" rel="noopener">Ko-fi</a> ☕.</p>
 
     <div class="foot">
       <a href="/about.html">אודות</a> · <a href="/privacy.html">מדיניות פרטיות</a> · <a href="/">משחק</a>
     </div>
   </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/config.js"></script>
+  <script src="js/supabase-client.js"></script>
+  <script>
+    (function () {
+      const form = document.getElementById('contact-form');
+      const btn  = document.getElementById('c-submit');
+      const msg  = document.getElementById('c-msg');
+
+      function setMsg(text, ok) { msg.textContent = text; msg.className = 'msg ' + (ok ? 'ok' : 'err'); }
+
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const message = document.getElementById('c-message').value.trim();
+        const name    = document.getElementById('c-name').value.trim();
+        const email   = document.getElementById('c-email').value.trim();
+        if (message.length < 2) { setMsg('כתוב הודעה קצרה לפני השליחה', false); return; }
+
+        btn.disabled = true; btn.textContent = 'שולח…'; setMsg('', true);
+
+        // attach the user id if this browser already has a logged-in session
+        let user_id = null;
+        try {
+          const { data: { session } } = await _supabase.auth.getSession();
+          user_id = session?.user?.id ?? null;
+        } catch (e) {}
+
+        const { error } = await _supabase.from('contact_messages').insert({
+          name: name || null, email: email || null, message, user_id,
+        });
+
+        if (error) {
+          btn.disabled = false; btn.textContent = 'שליחה';
+          setMsg('השליחה נכשלה. נסה שוב בעוד רגע.', false);
+          return;
+        }
+        form.style.display = 'none';
+        document.getElementById('c-sent').style.display = 'block';
+      });
+    })();
+  </script>
 </body>
 </html>

@@ -2361,7 +2361,7 @@ function generateShareText() {
     fillTemplate(st('share-line-record', '{wins}נ-{draws}ת-{losses}ה | {points} נקודות'), vars),
     tierDisplay(t).name,
     grid,
-    fillTemplate(st('share-footer', '36-0.co.il'), vars),
+    fillTemplate(st('share-footer', 'https://www.36-0.co.il/'), vars),
   ].filter(Boolean).join('\n');
 }
 

@@ -67,6 +67,21 @@
     .req-p { font-size: 11.5px; color: #8b949e; display: inline-flex; align-items: center; gap: 5px; }
     .req-del { background: none; border: none; color: #f85149; cursor: pointer; font-size: 14px; margin-inline-start: auto; }
     .req-add { background: #21262d; border: 1px dashed #30363d; color: #ccc; border-radius: 8px; padding: 6px 14px; cursor: pointer; font-family: inherit; font-size: 12.5px; }
+
+    /* ── contact messages ── */
+    .cm-badge { font-size: 12px; font-weight: 700; color: #000; background: #FFD700; border-radius: 999px; padding: 1px 9px; vertical-align: middle; }
+    .cm-msg { background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 12px 14px; margin-bottom: 8px; }
+    .cm-msg.unread { border-color: #FFD70066; background: #1a1a12; }
+    .cm-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+    .cm-from { font-weight: 800; color: #e6edf3; }
+    .cm-email { font-size: 12.5px; color: #58a6ff; direction: ltr; }
+    .cm-email a { color: #58a6ff; }
+    .cm-date { font-size: 12px; color: #8b949e; margin-inline-start: auto; }
+    .cm-body { color: #c2cbd6; white-space: pre-wrap; word-break: break-word; font-size: 14px; }
+    .cm-actions { margin-top: 8px; }
+    .cm-actions button { background: #21262d; border: 1px solid #30363d; color: #ccc; border-radius: 8px; padding: 5px 12px; cursor: pointer; font-family: inherit; font-size: 12.5px; }
+    .cm-actions button.done { color: #22c55e; border-color: #22c55e55; }
+    .cm-empty { color: #8b949e; font-size: 13px; padding: 8px 0; }
   </style>
 </head>
 <body>
@@ -80,6 +95,10 @@
   </div>
 
   <div id="editor" style="display:none">
+    <h2>📨 הודעות יצירת קשר <span id="cm-unread" class="cm-badge" style="display:none"></span></h2>
+    <div class="chal-note">כל הודעה שנשלחה דרך עמוד "צור קשר" מגיעה לכאן. אין תיבת מייל — הכל כאן.</div>
+    <div id="cm-list"><div class="chal-note">טוען…</div></div>
+
     <h2>🎯 ניהול אתגרים (יומי / שבועי / חודשי)</h2>
     <div class="chal-note">
       כל אתגר מקבל תנאים אוטומטיים שנגזרים מהתאריך. כאן אפשר לדרוס אותם — גם לאתגרים
@@ -496,6 +515,55 @@ async function init() {
   render();
   document.getElementById('btn-save').onclick = saveAll;
   initChallengesEditor();
+  loadContactMessages();
+}
+
+/* ─── Contact messages ────────────────────────────────────────────────────── */
+function cmEsc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+async function loadContactMessages() {
+  const box = document.getElementById('cm-list');
+  const { data, error } = await _supabase
+    .from('contact_messages')
+    .select('id, name, email, message, handled, created_at')
+    .order('created_at', { ascending: false })
+    .limit(200);
+  if (error) { box.innerHTML = '<div class="cm-empty">טעינת ההודעות נכשלה: ' + cmEsc(error.message) + '</div>'; return; }
+  if (!data || !data.length) { box.innerHTML = '<div class="cm-empty">אין הודעות עדיין.</div>'; return; }
+
+  const unread = data.filter(m => !m.handled).length;
+  const badge = document.getElementById('cm-unread');
+  if (badge) { badge.textContent = unread + ' חדשות'; badge.style.display = unread ? '' : 'none'; }
+
+  box.innerHTML = '';
+  data.forEach(m => {
+    const div = document.createElement('div');
+    div.className = 'cm-msg' + (m.handled ? '' : ' unread');
+    const date = new Date(m.created_at).toLocaleString('he-IL', { day: 'numeric', month: 'numeric', year: '2-digit', hour: '2-digit', minute: '2-digit' });
+    const emailHtml = m.email
+      ? `<a class="cm-email" href="mailto:${cmEsc(m.email)}">${cmEsc(m.email)}</a>` : '';
+    div.innerHTML = `
+      <div class="cm-head">
+        <span class="cm-from">${cmEsc(m.name || 'אנונימי')}</span>
+        ${emailHtml}
+        <span class="cm-date">${cmEsc(date)}</span>
+      </div>
+      <div class="cm-body">${cmEsc(m.message)}</div>
+      <div class="cm-actions">
+        <button class="${m.handled ? 'done' : ''}">${m.handled ? '✓ טופל' : 'סמן כטופל'}</button>
+      </div>`;
+    const btn = div.querySelector('.cm-actions button');
+    btn.onclick = async () => {
+      const next = !m.handled;
+      const { error: e2 } = await _supabase.from('contact_messages').update({ handled: next }).eq('id', m.id);
+      if (e2) { btn.textContent = 'נכשל'; return; }
+      m.handled = next;
+      loadContactMessages();
+    };
+    box.appendChild(div);
+  });
 }
 init();
 </script>
