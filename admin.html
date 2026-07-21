@@ -86,6 +86,8 @@
     /* ── real squads + tables viewer ── */
     .hist-controls { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
     .hist-controls label { font-size: 13px; color: #8b949e; font-weight: 700; }
+    .hist-check { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+    .hist-check input { accent-color: #FFD700; cursor: pointer; }
     /* the screenshot stage: pitch (left) + table (right) */
     .hist-stage { display: grid; grid-template-columns: 1.15fr 1fr; gap: 14px; background: #0d1117; border: 1px solid #30363d; border-radius: 14px; padding: 14px; }
     @media (max-width: 720px) { .hist-stage { grid-template-columns: 1fr; } }
@@ -102,8 +104,8 @@
     .hp-title { position: absolute; top: 6px; inset-inline: 0; text-align: center; font-weight: 900; font-size: 14px; color: #fff; text-shadow: 0 1px 4px #000; z-index: 3; }
     .hp-token { position: absolute; transform: translate(-50%, -50%); text-align: center; z-index: 2; width: 74px; }
     .hp-circle { width: 46px; height: 46px; margin: 0 auto; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 2.5px solid var(--ts, #fff); box-shadow: 0 2px 8px #0008; }
-    .hp-short { font-size: 9.5px; font-weight: 800; line-height: 1.05; padding: 0 2px; overflow-wrap: anywhere; }
-    .hp-name { margin-top: 2px; font-size: 9px; font-weight: 700; color: #fff; background: #000000aa; border-radius: 3px; padding: 1px 4px; display: inline-block; max-width: 74px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .hp-short { font-size: 9.5px; font-weight: 800; line-height: 1.05; padding: 0 1px; white-space: nowrap; }
+    .hp-name { margin-top: 2px; font-size: 9px; font-weight: 700; color: #fff; background: #000000aa; border-radius: 3px; padding: 1px 5px; display: inline-block; white-space: nowrap; }
     .hp-ovr { position: absolute; top: -4px; inset-inline-end: 8px; font-size: 9px; font-weight: 900; color: #111; background: #FFD700; border-radius: 6px; padding: 0 3px; }
     /* table side */
     .hist-tableside .hts-title { font-weight: 900; color: #FFD700; margin-bottom: 8px; font-size: 14px; }
@@ -133,6 +135,8 @@
     .haw-card { background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 8px 16px; text-align: center; min-width: 130px; }
     .haw-card .haw-title { font-size: 12px; font-weight: 800; color: #FFD700; }
     .haw-card .haw-val { font-size: 14px; font-weight: 700; color: #e6edf3; margin-top: 2px; }
+    .haw-card.league { border-color: #FFD70066; background: #1c1a10; }
+    .haw-card.league .haw-title { color: #f0a500; }
     /* awards edit rows */
     .hist-awards-edit { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 8px; margin-top: 10px; }
     .haw-row { display: flex; gap: 6px; align-items: center; }
@@ -164,6 +168,7 @@
         <label>עונה</label><select id="hist-season" class="tp-select" style="max-width:150px"></select>
         <label>קבוצה</label><select id="hist-team" class="tp-select" style="max-width:180px"></select>
         <label>מערך</label><select id="hist-formation" class="tp-select" style="max-width:120px"></select>
+        <label class="hist-check"><input type="checkbox" id="hist-league-kings"> הצג מלכי הליגה בעונה</label>
       </div>
       <div class="hist-stage" id="hist-stage">
         <div class="hist-pitch" id="hist-pitch"></div>
@@ -631,7 +636,7 @@ const HT_POS_HE = { GK:'שוער', RB:'מגן ימני', LB:'מגן שמאלי',
   CM:'קשר', CAM:'קשר התקפי', RM:'קשר ימני', LM:'קשר שמאלי', RW:'כנף ימני', LW:'כנף שמאלי',
   CF:'חלוץ מקושר', ST:'חלוץ' };
 
-const HIST = { season: null, teamId: null, formationId: '4-3-3', picks: {}, awards: [] };  // picks: slotId -> player name
+const HIST = { season: null, teamId: null, formationId: '4-3-3', picks: {}, awards: [], showLeagueKings: false };  // picks: slotId -> player name
 const DEFAULT_AWARDS = [
   { title: '⚽ מלך השערים',  value: '' },
   { title: '🎯 מלך הבישולים', value: '' },
@@ -657,6 +662,10 @@ function initHistViewer() {
   formSel.onchange   = () => { HIST.formationId = formSel.value; autoAssign(); renderStage(); };
 
   document.getElementById('hist-share').onclick = e => captureHistImage(e.currentTarget);
+
+  const kingsChk = document.getElementById('hist-league-kings');
+  kingsChk.checked = HIST.showLeagueKings;
+  kingsChk.onchange = () => { HIST.showLeagueKings = kingsChk.checked; renderAwards(); };
 
   HIST.season = seasons[0];
   fillTeamsForSeason();
@@ -763,9 +772,9 @@ function loadAwards() {
   const sc = (typeof LEAGUE_SCORERS !== 'undefined') ? bestLeaderFor(LEAGUE_SCORERS[HIST.season], HIST.teamId) : null;
   const as = (typeof LEAGUE_ASSISTS !== 'undefined') ? bestLeaderFor(LEAGUE_ASSISTS[HIST.season], HIST.teamId) : null;
   HIST.awards = [
-    { title: sc ? (sc.r === 1 ? '⚽ מלך השערים' : '⚽ מבקיע הקבוצה') : '⚽ מלך השערים',
+    { title: sc ? (sc.r === 1 ? '⚽ מלך השערים' : '⚽ מלך השערים של הקבוצה') : '⚽ מלך השערים',
       value: sc ? `${sc.name} (${sc.n})` : '' },
-    { title: as ? (as.r === 1 ? '🎯 מלך הבישולים' : '🎯 בשל הקבוצה') : '🎯 מלך הבישולים',
+    { title: as ? (as.r === 1 ? '🎯 מלך הבישולים' : '🎯 מלך הבישולים של הקבוצה') : '🎯 מלך הבישולים',
       value: as ? `${as.name} (${as.n})` : '' },
     { title: '🧤 כפפת הזהב',  value: '' },
     { title: '🏅 שחקן העונה', value: '' },
@@ -778,14 +787,31 @@ function saveAwards() {
     else localStorage.removeItem(awardsKey());
   } catch (e) {}
 }
+// league leader(s) for a season (rank 1, joining any ties)
+function leagueKings(list) {
+  if (!Array.isArray(list) || !list.length) return null;
+  const top = list.filter(e => e.r === 1);
+  if (!top.length) return null;
+  return { names: top.map(e => e.name).join(' / '), n: top[0].n };
+}
+function hawCard(title, value, cls) {
+  return `<div class="haw-card${cls ? ' ' + cls : ''}">
+      <div class="haw-title">${htEsc(title)}</div>
+      <div class="haw-val">${htEsc(value)}</div>
+    </div>`;
+}
 function renderAwards() {
   const box = document.getElementById('hist-awards');
-  const shown = (HIST.awards || []).filter(a => a.value.trim());
-  box.innerHTML = shown.map(a => `
-    <div class="haw-card">
-      <div class="haw-title">${htEsc(a.title)}</div>
-      <div class="haw-val">${htEsc(a.value)}</div>
-    </div>`).join('');
+  let html = (HIST.awards || []).filter(a => a.value.trim())
+    .map(a => hawCard(a.title, a.value)).join('');
+  // optional: the whole league's top scorer / assist king that season
+  if (HIST.showLeagueKings) {
+    const sc = (typeof LEAGUE_SCORERS !== 'undefined') ? leagueKings(LEAGUE_SCORERS[HIST.season]) : null;
+    const as = (typeof LEAGUE_ASSISTS !== 'undefined') ? leagueKings(LEAGUE_ASSISTS[HIST.season]) : null;
+    if (sc) html += hawCard('👑 מלך השערים בליגה', `${sc.names} (${sc.n})`, 'league');
+    if (as) html += hawCard('👑 מלך הבישולים בליגה', `${as.names} (${as.n})`, 'league');
+  }
+  box.innerHTML = html;
 }
 function renderAwardsEdit() {
   const box = document.getElementById('hist-awards-edit');
@@ -840,12 +866,15 @@ function renderPitch() {
     const name = HIST.picks[slot.id];
     const p = name ? byName[name] : null;
     const short = p ? (typeof playerShortName === 'function' ? playerShortName(p.name) : p.name) : slot.pos;
+    // shrink long names to one line instead of wrapping (badge) / truncating (name)
+    const shortFs = Math.max(6, Math.min(9.5, 58 / Math.max(1, short.length)));
+    const nameFs = p ? Math.max(6.5, Math.min(9, 78 / Math.max(1, p.name.length))) : 9;
     html += `<div class="hp-token" style="left:${slot.x}%;top:${slot.y}%">
       <div class="hp-circle" style="background:${tc};--ts:${ts};color:${tx};position:relative">
         ${p ? `<span class="hp-ovr">${p.ovr}</span>` : ''}
-        <span class="hp-short">${htEsc(short)}</span>
+        <span class="hp-short" style="font-size:${shortFs.toFixed(2)}px">${htEsc(short)}</span>
       </div>
-      ${p ? `<span class="hp-name">${htEsc(p.name)}</span>` : ''}
+      ${p ? `<span class="hp-name" style="font-size:${nameFs.toFixed(2)}px">${htEsc(p.name)}</span>` : ''}
     </div>`;
   });
   box.innerHTML = html;
