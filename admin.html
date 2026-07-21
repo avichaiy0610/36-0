@@ -139,6 +139,11 @@
     .haw-row input { background: #21262d; border: 1px solid #30363d; color: #e6edf3; border-radius: 6px; padding: 6px 8px; font-family: inherit; font-size: 12.5px; }
     .haw-row .haw-t { width: 130px; flex: none; color: #FFD700; font-weight: 700; }
     .haw-row .haw-v { flex: 1; }
+    .hist-brand { grid-column: 1 / -1; text-align: center; font-weight: 900; letter-spacing: 1px; color: #FFD700cc; font-size: 13px; }
+    .hist-share-row { margin-top: 12px; display: flex; align-items: center; gap: 12px; }
+    .hist-share-btn { background: linear-gradient(135deg, #FFD700, #f0a500); color: #111; border: none; border-radius: 50px; padding: 11px 30px; font-family: inherit; font-size: 15px; font-weight: 800; cursor: pointer; }
+    .hist-share-btn:disabled { opacity: .6; cursor: default; }
+    .hist-share-note { font-size: 12.5px; color: #8b949e; }
   </style>
 </head>
 <body>
@@ -164,6 +169,11 @@
         <div class="hist-pitch" id="hist-pitch"></div>
         <div class="hist-tableside" id="hist-tableside"></div>
         <div class="hist-awards" id="hist-awards"></div>
+        <div class="hist-brand">36-0.co.il</div>
+      </div>
+      <div class="hist-share-row">
+        <button id="hist-share" class="hist-share-btn">📸 שתף / שמור כתמונה</button>
+        <span id="hist-share-note" class="hist-share-note"></span>
       </div>
       <details class="hist-editwrap" open>
         <summary>✏️ עריכת ההרכב</summary>
@@ -646,9 +656,81 @@ function initHistViewer() {
   teamSel.onchange   = () => { HIST.teamId = teamSel.value; autoAssign(); loadAwards(); renderStage(); };
   formSel.onchange   = () => { HIST.formationId = formSel.value; autoAssign(); renderStage(); };
 
+  document.getElementById('hist-share').onclick = e => captureHistImage(e.currentTarget);
+
   HIST.season = seasons[0];
   fillTeamsForSeason();
   renderStage();
+}
+
+// Export the stage (pitch + table + awards) as a PNG — share on mobile, else download.
+async function captureHistImage(btn) {
+  const stage = document.getElementById('hist-stage');
+  const note = document.getElementById('hist-share-note');
+  const orig = btn.textContent;
+  btn.disabled = true; btn.textContent = '…מכין תמונה'; if (note) note.textContent = '';
+
+  const ensureLib = async () => {
+    if (typeof html2canvas !== 'undefined') return true;
+    if (typeof loadHtml2Canvas === 'function') { try { await loadHtml2Canvas(); } catch (e) {} }
+    if (typeof html2canvas !== 'undefined') return true;
+    return await new Promise(res => {
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+      s.onload = () => res(true); s.onerror = () => res(false);
+      document.head.appendChild(s);
+    });
+  };
+
+  try {
+    if (!(await ensureLib())) throw new Error('html2canvas failed to load');
+    const canvas = await html2canvas(stage, {
+      scale: 2, backgroundColor: '#0d1117', useCORS: true, logging: false,
+      onclone: (doc) => {
+        // aspect-ratio can collapse in html2canvas's clone — pin the pitch height
+        const live = document.getElementById('hist-pitch');
+        const clone = doc.getElementById('hist-pitch');
+        if (live && clone) { clone.style.height = live.offsetHeight + 'px'; clone.style.aspectRatio = 'auto'; }
+      },
+    });
+    const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
+    const team = ((typeof TEAMS !== 'undefined' && TEAMS[HIST.teamId]?.name) || HIST.teamId || 'team').replace(/[\s"']/g, '-');
+    const fname = `36-0-${team}-${(HIST.season || '').replace('/', '-')}.png`;
+    const file = new File([blob], fname, { type: 'image/png' });
+
+    // mobile: native share sheet with the image; desktop: plain download
+    // (navigator.share opens the OS share UI and can hang/annoy on desktop, so
+    //  it's used only on touch devices where it's the natural flow)
+    const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    let canShareFiles = false;
+    try { canShareFiles = isMobile && !!navigator.share && !!navigator.canShare && navigator.canShare({ files: [file] }); } catch (e) {}
+
+    if (canShareFiles) {
+      try {
+        await navigator.share({ files: [file] });
+        btn.textContent = '✓ שותף!';
+      } catch (e) {
+        if (e && e.name === 'AbortError') { btn.textContent = orig; btn.disabled = false; return; }
+        downloadHistBlob(blob, fname); btn.textContent = '✓ הורד';
+      }
+    } else {
+      downloadHistBlob(blob, fname);
+      btn.textContent = '✓ הורד!';
+      if (note) note.textContent = 'התמונה נשמרה בהורדות';
+    }
+  } catch (e) {
+    btn.textContent = '⚠ נכשל';
+    if (note) note.textContent = 'נסה שוב';
+  }
+  setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 2600);
+}
+
+function downloadHistBlob(blob, filename) {
+  if (typeof downloadBlobAs === 'function') { downloadBlobAs(blob, filename); return; }
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 // teams in this season's table that we have a squad for
