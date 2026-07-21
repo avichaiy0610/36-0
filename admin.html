@@ -127,6 +127,18 @@
     .he-slot select { flex: 1; background: #21262d; border: 1px solid #30363d; color: #e6edf3; border-radius: 6px; padding: 5px 6px; font-family: inherit; font-size: 12px; }
     .hist-copyrow { margin-top: 12px; display: flex; gap: 8px; align-items: center; }
     .ht-copy { background: #21262d; border: 1px solid #30363d; color: #ccc; border-radius: 8px; padding: 7px 16px; cursor: pointer; font-family: inherit; font-size: 12.5px; }
+    /* awards strip on the stage (only filled ones show) */
+    .hist-awards { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+    .hist-awards:empty { display: none; }
+    .haw-card { background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 8px 16px; text-align: center; min-width: 130px; }
+    .haw-card .haw-title { font-size: 12px; font-weight: 800; color: #FFD700; }
+    .haw-card .haw-val { font-size: 14px; font-weight: 700; color: #e6edf3; margin-top: 2px; }
+    /* awards edit rows */
+    .hist-awards-edit { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 8px; margin-top: 10px; }
+    .haw-row { display: flex; gap: 6px; align-items: center; }
+    .haw-row input { background: #21262d; border: 1px solid #30363d; color: #e6edf3; border-radius: 6px; padding: 6px 8px; font-family: inherit; font-size: 12.5px; }
+    .haw-row .haw-t { width: 130px; flex: none; color: #FFD700; font-weight: 700; }
+    .haw-row .haw-v { flex: 1; }
   </style>
 </head>
 <body>
@@ -151,10 +163,15 @@
       <div class="hist-stage" id="hist-stage">
         <div class="hist-pitch" id="hist-pitch"></div>
         <div class="hist-tableside" id="hist-tableside"></div>
+        <div class="hist-awards" id="hist-awards"></div>
       </div>
-      <details class="hist-editwrap">
-        <summary>✏️ עריכת ההרכב (החלף שחקנים כדי שיתאים למציאות)</summary>
+      <details class="hist-editwrap" open>
+        <summary>✏️ עריכת ההרכב</summary>
         <div class="hist-edit" id="hist-edit"></div>
+      </details>
+      <details class="hist-editwrap" open>
+        <summary>🏅 פרסים (מלא מה שתרצה — יופיע בתמונה; מה שתשאיר ריק — לא יופיע)</summary>
+        <div class="hist-awards-edit" id="hist-awards-edit"></div>
       </details>
     </div>
 
@@ -604,7 +621,13 @@ const HT_POS_HE = { GK:'שוער', RB:'מגן ימני', LB:'מגן שמאלי',
   CM:'קשר', CAM:'קשר התקפי', RM:'קשר ימני', LM:'קשר שמאלי', RW:'כנף ימני', LW:'כנף שמאלי',
   CF:'חלוץ מקושר', ST:'חלוץ' };
 
-const HIST = { season: null, teamId: null, formationId: '4-3-3', picks: {} };  // picks: slotId -> player name
+const HIST = { season: null, teamId: null, formationId: '4-3-3', picks: {}, awards: [] };  // picks: slotId -> player name
+const DEFAULT_AWARDS = [
+  { title: '⚽ מלך השערים',  value: '' },
+  { title: '🎯 מלך הבישולים', value: '' },
+  { title: '🧤 כפפת הזהב',    value: '' },
+  { title: '🏅 שחקן העונה',   value: '' },
+];
 
 function initHistViewer() {
   if (typeof LEAGUE_TABLES === 'undefined' || typeof FORMATIONS === 'undefined') {
@@ -620,7 +643,7 @@ function initHistViewer() {
   formSel.innerHTML = Object.keys(FORMATIONS).map(f => `<option value="${f}">${FORMATIONS[f].label}</option>`).join('');
 
   seasonSel.onchange = () => { HIST.season = seasonSel.value; fillTeamsForSeason(); renderStage(); };
-  teamSel.onchange   = () => { HIST.teamId = teamSel.value; autoAssign(); renderStage(); };
+  teamSel.onchange   = () => { HIST.teamId = teamSel.value; autoAssign(); loadAwards(); renderStage(); };
   formSel.onchange   = () => { HIST.formationId = formSel.value; autoAssign(); renderStage(); };
 
   HIST.season = seasons[0];
@@ -635,6 +658,47 @@ function fillTeamsForSeason() {
   teamSel.innerHTML = rows.map(r => `<option value="${r.teamId}">${htEsc(r.name)} (#${r.pos})</option>`).join('');
   HIST.teamId = rows.length ? rows[0].teamId : null;
   autoAssign();
+  loadAwards();
+}
+
+// awards are free text the admin types; saved per team+season so they persist
+function awardsKey() { return `36-0-hist-awards|${HIST.teamId}|${HIST.season}`; }
+function loadAwards() {
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem(awardsKey()) || 'null'); } catch (e) {}
+  HIST.awards = (Array.isArray(saved) && saved.length)
+    ? saved : DEFAULT_AWARDS.map(a => ({ ...a }));
+}
+function saveAwards() {
+  try {
+    const hasAny = HIST.awards.some(a => a.value.trim());
+    if (hasAny) localStorage.setItem(awardsKey(), JSON.stringify(HIST.awards));
+    else localStorage.removeItem(awardsKey());
+  } catch (e) {}
+}
+function renderAwards() {
+  const box = document.getElementById('hist-awards');
+  const shown = (HIST.awards || []).filter(a => a.value.trim());
+  box.innerHTML = shown.map(a => `
+    <div class="haw-card">
+      <div class="haw-title">${htEsc(a.title)}</div>
+      <div class="haw-val">${htEsc(a.value)}</div>
+    </div>`).join('');
+}
+function renderAwardsEdit() {
+  const box = document.getElementById('hist-awards-edit');
+  box.innerHTML = (HIST.awards || []).map((a, i) => `
+    <div class="haw-row">
+      <input class="haw-t" data-i="${i}" data-f="title" value="${htEsc(a.title)}" placeholder="כותרת">
+      <input class="haw-v" data-i="${i}" data-f="value" value="${htEsc(a.value)}" placeholder="שם השחקן / ערך (ריק = לא יופיע)">
+    </div>`).join('');
+  box.querySelectorAll('input').forEach(inp => {
+    inp.oninput = () => {
+      HIST.awards[+inp.dataset.i][inp.dataset.f] = inp.value;
+      saveAwards();
+      renderAwards();
+    };
+  });
 }
 
 // greedily fill the formation slots with the best-fitting squad players
@@ -656,7 +720,9 @@ function autoAssign() {
 function renderStage() {
   renderPitch();
   renderTableSide();
+  renderAwards();
   renderEdit();
+  renderAwardsEdit();
 }
 
 function renderPitch() {
