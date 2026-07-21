@@ -4,6 +4,7 @@
 *.txt
 !robots.txt
 *.log
+__pycache__/
 scraped_squads.json
 squads_review.json
 hebrew_names_cache.json
@@ -16,6 +17,9 @@ supabase/.temp/
 backups/
 nationalities_cache.json
 
-# league-tables data pipeline (local only; js/league_tables.js is the output)
+# league-tables data pipeline (local only; js/league_tables.js is the output).
+# fetch_wiki_tables.py scrapes the real FINAL (post-playoff) tables from Hebrew
+# Wikipedia; the old Transfermarkt pipeline below only had the regular season.
 league_tables_raw.json
 build_league_tables.js
+wiki_tables_cache.json
