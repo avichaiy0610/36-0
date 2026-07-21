@@ -15,3 +15,7 @@ supabase/.temp/
 # DB backups (local only)
 backups/
 nationalities_cache.json
+
+# league-tables data pipeline (local only; js/league_tables.js is the output)
+league_tables_raw.json
+build_league_tables.js

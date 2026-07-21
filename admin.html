@@ -82,6 +82,32 @@
     .cm-actions button { background: #21262d; border: 1px solid #30363d; color: #ccc; border-radius: 8px; padding: 5px 12px; cursor: pointer; font-family: inherit; font-size: 12.5px; }
     .cm-actions button.done { color: #22c55e; border-color: #22c55e55; }
     .cm-empty { color: #8b949e; font-size: 13px; padding: 8px 0; }
+
+    /* ── real squads + tables viewer ── */
+    .hist-controls { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+    .hist-controls label { font-size: 13px; color: #8b949e; font-weight: 700; }
+    .ht-table { background: #161b22; border: 1px solid #30363d; border-radius: 10px; overflow: hidden; }
+    .ht-row { display: grid; grid-template-columns: 34px 1fr 54px 90px 70px 44px; align-items: center; gap: 8px; padding: 9px 12px; border-bottom: 1px solid #21262d; cursor: pointer; }
+    .ht-row:last-child { border-bottom: none; }
+    .ht-row.head { cursor: default; background: #0d1117; color: #8b949e; font-size: 12px; font-weight: 700; }
+    .ht-row:not(.head):hover { background: #1c2333; }
+    .ht-row.open { background: #1a2a1a; }
+    .ht-pos { font-weight: 900; text-align: center; color: #8b949e; }
+    .ht-pos.c1 { color: #FFD700; } .ht-pos.c2 { color: #C0C0C0; } .ht-pos.c3 { color: #cd7f32; }
+    .ht-name { font-weight: 700; color: #e6edf3; }
+    .ht-name .arrow { color: #8b949e; font-size: 11px; margin-inline-start: 6px; }
+    .ht-num { text-align: center; font-size: 13px; color: #c2cbd6; }
+    .ht-pts { text-align: center; font-weight: 800; color: #22c55e; }
+    .ht-sep { text-align: center; font-size: 11px; color: #8b949e; background: #0d1117; padding: 4px; letter-spacing: 1px; }
+    .ht-squad { background: #0d1117; border: 1px solid #30363d; border-top: none; padding: 10px 14px; }
+    .ht-squad .sq-title { font-weight: 800; color: #FFD700; margin-bottom: 8px; }
+    .ht-squad .sq-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 4px 14px; }
+    .ht-squad .sq-p { display: flex; align-items: center; gap: 8px; font-size: 13.5px; padding: 2px 0; }
+    .ht-squad .sq-pos { display: inline-block; min-width: 34px; text-align: center; font-size: 11px; font-weight: 700; color: #8b949e; background: #21262d; border-radius: 4px; padding: 1px 4px; }
+    .ht-squad .sq-name { flex: 1; color: #e6edf3; }
+    .ht-squad .sq-ovr { font-weight: 800; color: #FFD700; }
+    .ht-squad .sq-none { color: #8b949e; font-size: 13px; }
+    .ht-copy { margin-top: 8px; background: #21262d; border: 1px solid #30363d; color: #ccc; border-radius: 8px; padding: 6px 14px; cursor: pointer; font-family: inherit; font-size: 12.5px; }
   </style>
 </head>
 <body>
@@ -95,6 +121,17 @@
   </div>
 
   <div id="editor" style="display:none">
+    <div id="hist-section" style="display:none">
+      <h2>🏆 סגלים וטבלאות אמיתיות (לשיווק)</h2>
+      <div class="chal-note">בחר עונה כדי לראות את טבלת הליגה <b>האמיתית</b> (הדירוג הסופי כפי שהיה) — ולחץ על קבוצה כדי לראות את הסגל שלה. נתונים אמיתיים מ-Transfermarkt (הדירוגים בסגל הם שלנו).</div>
+      <div class="hist-controls">
+        <label>עונה</label>
+        <select id="hist-season" class="tp-select" style="max-width:200px"></select>
+      </div>
+      <div id="hist-table"></div>
+      <div id="hist-squad"></div>
+    </div>
+
     <h2>📨 הודעות יצירת קשר <span id="cm-unread" class="cm-badge" style="display:none"></span></h2>
     <div class="chal-note">כל הודעה שנשלחה דרך עמוד "צור קשר" מגיעה לכאן. אין תיבת מייל — הכל כאן.</div>
     <div id="cm-list"><div class="chal-note">טוען…</div></div>
@@ -133,6 +170,7 @@
 <script src="js/data.js"></script>
 <script src="js/game.js"></script>
 <script src="js/player_nats.js"></script>
+<script src="js/league_tables.js"></script>
 <script src="js/challenges.js"></script>
 <script>
 const statusEl = document.getElementById('status');
@@ -516,6 +554,99 @@ async function init() {
   document.getElementById('btn-save').onclick = saveAll;
   initChallengesEditor();
   loadContactMessages();
+  // real squads/tables viewer — admin account only
+  if (session.user && session.user.email === 'avichaiy0610@outlook.com') {
+    document.getElementById('hist-section').style.display = 'block';
+    initHistViewer();
+  }
+}
+
+/* ─── Real squads + league tables viewer (admin only) ─────────────────────── */
+function htEsc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+let _squadByKey = null;
+function squadFor(teamId, season) {
+  if (!_squadByKey) {
+    _squadByKey = {};
+    (typeof SQUADS !== 'undefined' ? SQUADS : []).forEach(sq => { _squadByKey[sq.teamId + '|' + sq.season] = sq; });
+  }
+  return _squadByKey[teamId + '|' + season] || null;
+}
+const HT_POS_HE = { GK:'שוער', RB:'מגן ימני', LB:'מגן שמאלי', CB:'בלם', CDM:'קשר הגנתי',
+  CM:'קשר', CAM:'קשר התקפי', RM:'קשר ימני', LM:'קשר שמאלי', RW:'כנף ימני', LW:'כנף שמאלי',
+  CF:'חלוץ מקושר', ST:'חלוץ' };
+
+function initHistViewer() {
+  if (typeof LEAGUE_TABLES === 'undefined') {
+    document.getElementById('hist-table').innerHTML = '<div class="cm-empty">קובץ הטבלאות לא נטען</div>';
+    return;
+  }
+  const sel = document.getElementById('hist-season');
+  const seasons = Object.keys(LEAGUE_TABLES).sort().reverse();   // newest first
+  sel.innerHTML = seasons.map(s => `<option value="${s}">${s}</option>`).join('');
+  sel.onchange = () => renderHistTable(sel.value);
+  renderHistTable(seasons[0]);
+}
+
+function renderHistTable(season) {
+  document.getElementById('hist-squad').innerHTML = '';
+  const rows = LEAGUE_TABLES[season] || [];
+  const total = rows.length;
+  // championship playoff usually top 6 (or top half) — a light separator
+  const champCut = total >= 12 ? 6 : Math.ceil(total / 2);
+  let html = `<div class="ht-table">
+    <div class="ht-row head"><span class="ht-pos">#</span><span>קבוצה</span>
+      <span class="ht-num">מש׳</span><span class="ht-num">נ-ת-ה</span><span class="ht-num">שערים</span><span class="ht-pts">נק׳</span></div>`;
+  rows.forEach((r, i) => {
+    if (i === champCut) html += `<div class="ht-sep">── פלייאוף תחתון ──</div>`;
+    const hasSquad = !!(r.teamId && squadFor(r.teamId, season));
+    html += `<div class="ht-row${hasSquad ? '' : ' no-squad'}" data-team="${htEsc(r.teamId || '')}" data-season="${htEsc(season)}">
+      <span class="ht-pos c${r.pos}">${r.pos}</span>
+      <span class="ht-name">${htEsc(r.name)}${hasSquad ? '<span class="arrow">▾ סגל</span>' : ''}</span>
+      <span class="ht-num">${r.mp}</span>
+      <span class="ht-num" dir="ltr">${r.w}-${r.d}-${r.l}</span>
+      <span class="ht-num" dir="ltr">${r.gf}:${r.ga}</span>
+      <span class="ht-pts">${r.pts}</span>
+    </div>`;
+  });
+  html += '</div>';
+  const box = document.getElementById('hist-table');
+  box.innerHTML = html;
+  box.querySelectorAll('.ht-row:not(.head)').forEach(row => {
+    const teamId = row.dataset.team;
+    if (!teamId || !squadFor(teamId, season)) return;
+    row.onclick = () => toggleHistSquad(row, teamId, season);
+  });
+}
+
+function toggleHistSquad(row, teamId, season) {
+  const holder = document.getElementById('hist-squad');
+  const open = row.classList.contains('open');
+  document.querySelectorAll('.ht-row.open').forEach(r => r.classList.remove('open'));
+  holder.innerHTML = '';
+  if (open) return;
+  row.classList.add('open');
+  const sq = squadFor(teamId, season);
+  const team = (typeof TEAMS !== 'undefined' && TEAMS[teamId]) ? TEAMS[teamId].name : teamId;
+  const players = [...sq.players].sort((a, b) => (b.ovr || 0) - (a.ovr || 0));
+  const rowsHtml = players.map(p =>
+    `<div class="sq-p"><span class="sq-pos" title="${htEsc(HT_POS_HE[p.position] || p.position)}">${htEsc(p.position)}</span>` +
+    `<span class="sq-name">${htEsc(p.name)}</span><span class="sq-ovr">${p.ovr}</span></div>`).join('');
+  const plain = players.map(p => `${p.position}  ${p.name}  (${p.ovr})`).join('\n');
+  holder.innerHTML = `
+    <div class="ht-squad">
+      <div class="sq-title">${htEsc(team)} — ${htEsc(season)} · סגל (${players.length} שחקנים)</div>
+      <div class="sq-grid">${rowsHtml}</div>
+      <button class="ht-copy">📋 העתק רשימה</button>
+    </div>`;
+  holder.querySelector('.ht-copy').onclick = () => {
+    navigator.clipboard?.writeText(`${team} ${season}\n${plain}`).then(() => {
+      holder.querySelector('.ht-copy').textContent = '✓ הועתק';
+    }, () => {});
+  };
+  holder.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 /* ─── Contact messages ────────────────────────────────────────────────────── */
