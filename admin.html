@@ -831,14 +831,25 @@ function renderPitch() {
   box.innerHTML = html;
 }
 
+// Championship/relegation playoff labels — the standings are drawn with the
+// split(s) the league actually used that season (none / 2-way / 3-way), read
+// from LEAGUE_FORMATS, so a 2003 table looks flat and a 2010 one shows three
+// groups exactly as they were.
+const HT_GROUP_LABEL = { upper: 'פלייאוף האליפות', middle: 'פלייאוף האמצע', lower: 'פלייאוף הירידה' };
+
 function renderTableSide() {
   const box = document.getElementById('hist-tableside');
   const rows = LEAGUE_TABLES[HIST.season] || [];
-  const champCut = rows.length >= 12 ? 6 : Math.ceil(rows.length / 2);
+  const fmt = (typeof LEAGUE_FORMATS !== 'undefined' && LEAGUE_FORMATS[HIST.season]) || null;
+  // position -> separator label at the start of each playoff group
+  const sepAt = {};
+  if (fmt && fmt.playoff !== 'none') {
+    fmt.groups.forEach(g => { sepAt[g.from] = HT_GROUP_LABEL[g.g] || ''; });
+  }
   let html = `<div class="hts-title">טבלת הליגה ${htEsc(HIST.season)}</div><div class="ht-table">
     <div class="ht-row head"><span class="ht-pos">#</span><span>קבוצה</span><span class="ht-num">מש׳</span><span class="ht-num">נ-ת-ה</span><span class="ht-pts">נק׳</span></div>`;
-  rows.forEach((r, i) => {
-    if (i === champCut) html += `<div class="ht-sep">── תחתון ──</div>`;
+  rows.forEach((r) => {
+    if (sepAt[r.pos]) html += `<div class="ht-sep">── ${htEsc(sepAt[r.pos])} ──</div>`;
     html += `<div class="ht-row${r.teamId === HIST.teamId ? ' me' : ''}">
       <span class="ht-pos c${r.pos}">${r.pos}</span>
       <span class="ht-name">${htEsc(r.name)}</span>
