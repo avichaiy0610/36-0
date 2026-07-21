@@ -745,11 +745,31 @@ function fillTeamsForSeason() {
 
 // awards are free text the admin types; saved per team+season so they persist
 function awardsKey() { return `36-0-hist-awards|${HIST.teamId}|${HIST.season}`; }
+
+// best (lowest-ranked) entry for this team in a real scorers/assists list
+function bestLeaderFor(list, teamId) {
+  if (!Array.isArray(list)) return null;
+  let best = null;
+  for (const e of list) if (e.teamId === teamId && (!best || e.r < best.r)) best = e;
+  return best;
+}
 function loadAwards() {
   let saved = null;
   try { saved = JSON.parse(localStorage.getItem(awardsKey()) || 'null'); } catch (e) {}
-  HIST.awards = (Array.isArray(saved) && saved.length)
-    ? saved : DEFAULT_AWARDS.map(a => ({ ...a }));
+  if (Array.isArray(saved) && saved.length) { HIST.awards = saved; return; }
+  // Pre-fill from the real Wikipedia top-scorers / assists for this team+season.
+  // If the team's man led the whole league it's titled the league crown, else
+  // it's the team's own leader. Editable/clearable like any award.
+  const sc = (typeof LEAGUE_SCORERS !== 'undefined') ? bestLeaderFor(LEAGUE_SCORERS[HIST.season], HIST.teamId) : null;
+  const as = (typeof LEAGUE_ASSISTS !== 'undefined') ? bestLeaderFor(LEAGUE_ASSISTS[HIST.season], HIST.teamId) : null;
+  HIST.awards = [
+    { title: sc ? (sc.r === 1 ? '⚽ מלך השערים' : '⚽ מבקיע הקבוצה') : '⚽ מלך השערים',
+      value: sc ? `${sc.name} (${sc.n})` : '' },
+    { title: as ? (as.r === 1 ? '🎯 מלך הבישולים' : '🎯 בשל הקבוצה') : '🎯 מלך הבישולים',
+      value: as ? `${as.name} (${as.n})` : '' },
+    { title: '🧤 כפפת הזהב',  value: '' },
+    { title: '🏅 שחקן העונה', value: '' },
+  ];
 }
 function saveAwards() {
   try {
