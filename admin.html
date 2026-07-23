@@ -133,6 +133,15 @@
     .seo-actions { margin-top: 12px; display: flex; align-items: center; gap: 10px; }
     .seo-btn { background: linear-gradient(135deg, #FFD700, #f0a500); color: #111; border: none; border-radius: 8px; padding: 9px 20px; font-family: inherit; font-weight: 800; cursor: pointer; }
     .seo-btn.ghost { background: #21262d; color: #e6edf3; }
+    .pq-card { background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; }
+    .pq-head { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: #8b949e; margin-bottom: 6px; }
+    .pq-head a { color: #58a6ff; text-decoration: none; }
+    .pq-card textarea { width: 100%; min-height: 84px; background: #0d1117; color: #e6edf3; border: 1px solid #30363d; border-radius: 8px; padding: 9px; font-family: inherit; font-size: 13.5px; line-height: 1.6; resize: vertical; }
+    .pq-actions { margin-top: 8px; display: flex; gap: 8px; align-items: center; }
+    .pq-btn { border: none; border-radius: 8px; padding: 8px 18px; font-family: inherit; font-weight: 800; cursor: pointer; font-size: 13px; }
+    .pq-btn.ok { background: linear-gradient(135deg, #3fb950, #2ea043); color: #fff; }
+    .pq-btn.no { background: #21262d; color: #f85149; }
+    .pq-msg { font-size: 12px; color: #8b949e; }
     .hist-editwrap { margin-top: 12px; }
     .hist-editwrap summary { cursor: pointer; color: #FFD700; font-weight: 700; font-size: 13px; }
     .hist-edit { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 8px; margin-top: 10px; }
@@ -213,6 +222,12 @@
         <button id="seo-reset" class="seo-btn ghost">↺ אפס לאוטומטי</button>
         <span id="seo-status" class="chal-status"></span>
       </div>
+    </div>
+
+    <div id="pq-section" style="display:none">
+      <h2>📣 תור פוסטים לאישור <span id="pq-count" class="cm-badge" style="display:none"></span></h2>
+      <div class="chal-note">המנוע מנסח טיוטות פוסטים מחדשות הכדורגל. כאן אתה עורך, מאשר (יתפרסם בעמוד הפייסבוק) או דוחה. מה שתשאיר — לא יתפרסם עד אישור.</div>
+      <div id="pq-list"><div class="chal-note">טוען…</div></div>
     </div>
 
     <h2>📨 הודעות יצירת קשר <span id="cm-unread" class="cm-badge" style="display:none"></span></h2>
@@ -642,6 +657,8 @@ async function init() {
     document.getElementById('hist-section').style.display = 'block';
     initHistViewer();
     initSeoEditor();
+    document.getElementById('pq-section').style.display = 'block';
+    loadPostQueue();
   }
 }
 
@@ -1087,6 +1104,47 @@ async function seoReset() {
   if (error) { st.textContent = 'שגיאה: ' + error.message; return; }
   st.textContent = '✓ אופס לאוטומטי';
   seoLoad();
+}
+
+/* ─── Post queue (news engine B) ──────────────────────────────────────────── */
+async function loadPostQueue() {
+  const box = document.getElementById('pq-list');
+  const { data, error } = await _supabase.from('post_queue')
+    .select('id, source_url, headline, draft_text, status, created_at')
+    .in('status', ['pending', 'approved']).order('created_at', { ascending: false }).limit(100);
+  if (error) { box.innerHTML = '<div class="chal-note">טעינה נכשלה: ' + cmEsc(error.message) + '</div>'; return; }
+  const badge = document.getElementById('pq-count');
+  const pending = (data || []).filter(r => r.status === 'pending').length;
+  if (badge) { badge.textContent = pending + ' ממתינים'; badge.style.display = pending ? '' : 'none'; }
+  if (!data || !data.length) { box.innerHTML = '<div class="chal-note">אין טיוטות בתור. ברגע שהמנוע ירוץ, פוסטים חדשים יופיעו כאן ותקבל התראה בטלגרם.</div>'; return; }
+  box.innerHTML = '';
+  data.forEach(m => {
+    const card = document.createElement('div');
+    card.className = 'pq-card';
+    const when = new Date(m.created_at).toLocaleString('he-IL');
+    card.innerHTML =
+      `<div class="pq-head"><span>${m.status === 'approved' ? '✅ אושר — ממתין לפרסום' : '🕒 ' + when}</span>` +
+      `${m.source_url ? `<a href="${cmEsc(m.source_url)}" target="_blank" rel="noopener">מקור ↗</a>` : ''}</div>` +
+      `<textarea>${cmEsc(m.draft_text)}</textarea>` +
+      `<div class="pq-actions">` +
+      `<button class="pq-btn ok">✅ אשר ופרסם</button>` +
+      `<button class="pq-btn no">🗑️ דחה</button>` +
+      `<span class="pq-msg"></span></div>`;
+    const ta = card.querySelector('textarea'), msg = card.querySelector('.pq-msg');
+    card.querySelector('.ok').onclick = async () => {
+      msg.textContent = 'שומר…';
+      const { error } = await _supabase.from('post_queue')
+        .update({ draft_text: ta.value.trim(), status: 'approved' }).eq('id', m.id);
+      msg.textContent = error ? ('שגיאה: ' + error.message) : '✅ אושר — יתפרסם בהרצה הקרובה';
+      if (!error) setTimeout(loadPostQueue, 900);
+    };
+    card.querySelector('.no').onclick = async () => {
+      msg.textContent = 'דוחה…';
+      const { error } = await _supabase.from('post_queue').update({ status: 'rejected' }).eq('id', m.id);
+      if (error) { msg.textContent = 'שגיאה: ' + error.message; return; }
+      card.style.opacity = '.4'; setTimeout(loadPostQueue, 700);
+    };
+  });
 }
 
 /* ─── Contact messages ────────────────────────────────────────────────────── */
