@@ -121,6 +121,18 @@
     .ht-pts { text-align: center; font-weight: 800; color: #22c55e; }
     .ht-sep { text-align: center; font-size: 10px; color: #8b949e; background: #0d1117; padding: 3px; letter-spacing: 1px; }
     /* edit panel */
+    .seo-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 8px 0 12px; }
+    .seo-controls label { font-size: 13px; color: #8b949e; font-weight: 700; }
+    .seo-slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px; }
+    .seo-slot { display: flex; align-items: center; gap: 6px; }
+    .seo-slot span { font-size: 12px; color: #8b949e; min-width: 64px; }
+    .seo-slot select { flex: 1; background: #161b22; color: #e6edf3; border: 1px solid #30363d; border-radius: 7px; padding: 6px; font-family: inherit; font-size: 12.5px; }
+    .seo-texts { margin-top: 12px; display: grid; gap: 8px; max-width: 520px; }
+    .seo-texts label { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: #8b949e; }
+    .seo-texts input { background: #161b22; color: #e6edf3; border: 1px solid #30363d; border-radius: 7px; padding: 8px; font-family: inherit; font-size: 13px; }
+    .seo-actions { margin-top: 12px; display: flex; align-items: center; gap: 10px; }
+    .seo-btn { background: linear-gradient(135deg, #FFD700, #f0a500); color: #111; border: none; border-radius: 8px; padding: 9px 20px; font-family: inherit; font-weight: 800; cursor: pointer; }
+    .seo-btn.ghost { background: #21262d; color: #e6edf3; }
     .hist-editwrap { margin-top: 12px; }
     .hist-editwrap summary { cursor: pointer; color: #FFD700; font-weight: 700; font-size: 13px; }
     .hist-edit { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 8px; margin-top: 10px; }
@@ -188,6 +200,19 @@
         <summary>🏅 פרסים (מלא מה שתרצה — יופיע בתמונה; מה שתשאיר ריק — לא יופיע)</summary>
         <div class="hist-awards-edit" id="hist-awards-edit"></div>
       </details>
+
+      <h2 style="margin-top:34px">🌐 עריכת עמודי הקבוצות (SEO)</h2>
+      <div class="chal-note">תיקון הרכבים (כל הזמנים או עונה ספציפית), מילוי מבקיע מוביל חסר, ועריכת כותרות. נשמר ב-Supabase ומופיע אוטומטית בעמוד הציבורי <span dir="ltr">/team/…</span></div>
+      <div class="seo-controls">
+        <label>קבוצה</label><select id="seo-team" class="tp-select" style="max-width:180px"></select>
+        <label>עונה</label><select id="seo-season" class="tp-select" style="max-width:150px"></select>
+      </div>
+      <div id="seo-editor"></div>
+      <div class="seo-actions">
+        <button id="seo-save" class="seo-btn">💾 שמור</button>
+        <button id="seo-reset" class="seo-btn ghost">↺ אפס לאוטומטי</button>
+        <span id="seo-status" class="chal-status"></span>
+      </div>
     </div>
 
     <h2>📨 הודעות יצירת קשר <span id="cm-unread" class="cm-badge" style="display:none"></span></h2>
@@ -616,6 +641,7 @@ async function init() {
   if (session.user && session.user.email === 'avichaiy0610@outlook.com') {
     document.getElementById('hist-section').style.display = 'block';
     initHistViewer();
+    initSeoEditor();
   }
 }
 
@@ -938,6 +964,129 @@ function renderEdit() {
       copyRow.querySelector('.ht-copy').textContent = '✓ הועתק';
     }, () => {});
   };
+}
+
+/* ─── SEO team-page overrides ─────────────────────────────────────────────── */
+// Mirrors build_seo_pages.js so the editor's auto lineup matches the live page.
+const SEO_SLOTS = [['gk', 1], ['def', 4], ['mid', 3], ['att', 3]];
+const SEO = { teamId: null, season: 'all', players: [], lineup: null, scorer: '', texts: {} };
+function seoClean(s) { return String(s || '').replace(/‎|‏/g, '').trim(); }
+function seoLineOf(pos) {
+  const p = String(pos || '').toUpperCase();
+  if (/GK/.test(p)) return 'gk';
+  if (/WB|CB|RB|LB/.test(p)) return 'def';
+  if (/W|ST|CF|SS/.test(p)) return 'att';
+  return 'mid';
+}
+function seoPlayers(teamId, season) {
+  const squads = SQUADS.filter(s => s.teamId === teamId);
+  if (season === 'all') {
+    const peak = {};
+    squads.forEach(s => s.players.forEach(p => {
+      const nm = seoClean(p.name);
+      if (!peak[nm] || p.ovr > peak[nm].ovr) peak[nm] = { name: nm, position: p.position, ovr: p.ovr };
+    }));
+    return Object.values(peak).sort((a, b) => b.ovr - a.ovr);
+  }
+  const sq = squads.find(s => s.season === season);
+  return sq ? sq.players.map(p => ({ name: seoClean(p.name), position: p.position, ovr: p.ovr }))
+    .sort((a, b) => b.ovr - a.ovr) : [];
+}
+function seoBestXI(players) {
+  const used = new Set(), xi = {};
+  for (const [line, n] of SEO_SLOTS) {
+    xi[line] = [];
+    const pool = players.filter(p => seoLineOf(p.position) === line && !used.has(p.name));
+    for (let i = 0; i < n; i++) {
+      const pick = pool[i] || players.find(p => !used.has(p.name));
+      if (pick) { xi[line].push({ name: pick.name, o: pick.ovr }); used.add(pick.name); }
+    }
+  }
+  return xi;
+}
+function initSeoEditor() {
+  const teamSel = document.getElementById('seo-team'), seasonSel = document.getElementById('seo-season');
+  const teams = Object.keys(TEAMS).filter(id => SQUADS.some(s => s.teamId === id))
+    .sort((a, b) => TEAMS[a].name.localeCompare(TEAMS[b].name, 'he'));
+  teamSel.innerHTML = teams.map(id => `<option value="${id}">${htEsc(TEAMS[id].name)}</option>`).join('');
+  SEO.teamId = teams[0];
+  const fillSeasons = () => {
+    const ss = SQUADS.filter(s => s.teamId === SEO.teamId).map(s => s.season).sort().reverse();
+    seasonSel.innerHTML = '<option value="all">כל הזמנים</option>' + ss.map(s => `<option value="${s}">${s}</option>`).join('');
+  };
+  fillSeasons();
+  teamSel.onchange = () => { SEO.teamId = teamSel.value; fillSeasons(); SEO.season = seasonSel.value = 'all'; seoLoad(); };
+  seasonSel.onchange = () => { SEO.season = seasonSel.value; seoLoad(); };
+  document.getElementById('seo-save').onclick = seoSave;
+  document.getElementById('seo-reset').onclick = seoReset;
+  seoLoad();
+}
+async function seoLoad() {
+  const dbSeason = SEO.season === 'all' ? '' : SEO.season;
+  let row = null;
+  try {
+    const { data } = await _supabase.from('seo_overrides')
+      .select('lineup,top_scorer,texts').eq('team_id', SEO.teamId).eq('season', dbSeason).maybeSingle();
+    row = data;
+  } catch (e) {}
+  SEO.players = seoPlayers(SEO.teamId, SEO.season);
+  SEO.lineup = (row && row.lineup) || seoBestXI(SEO.players);
+  SEO.scorer = (row && row.top_scorer) || '';
+  SEO.texts = (row && row.texts) || {};
+  renderSeoEditor();
+}
+function renderSeoEditor() {
+  const box = document.getElementById('seo-editor');
+  const opts = sel => ['<option value="">— ריק —</option>'].concat(SEO.players.map(p =>
+    `<option value="${htEsc(p.name)}"${p.name === sel ? ' selected' : ''}>${htEsc(p.name)} (${p.ovr}) · ${htEsc(p.position)}</option>`)).join('');
+  const labels = { gk: 'שוער', def: 'הגנה', mid: 'קישור', att: 'התקפה' };
+  let html = '<div class="seo-slots">';
+  for (const [line, n] of SEO_SLOTS) for (let i = 0; i < n; i++) {
+    const cur = (SEO.lineup[line] && SEO.lineup[line][i]) ? SEO.lineup[line][i].name : '';
+    html += `<div class="seo-slot"><span>${labels[line]} ${n > 1 ? i + 1 : ''}</span><select data-line="${line}" data-i="${i}">${opts(cur)}</select></div>`;
+  }
+  html += '</div>';
+  if (SEO.season === 'all') {
+    const t = SEO.texts || {}, tn = htEsc(TEAMS[SEO.teamId].name);
+    html += `<div class="seo-texts">
+      <label>כותרת ראשית<input data-text="h1" value="${htEsc(t.h1 || '')}" placeholder="הרכב כל הזמנים של ${tn}"></label>
+      <label>כותרת הסגל<input data-text="pool_heading" value="${htEsc(t.pool_heading || '')}" placeholder="סגל כל הזמנים — השחקנים המובילים"></label>
+      <label>כותרת הטבלה<input data-text="table_heading" value="${htEsc(t.table_heading || '')}" placeholder="${tn} עונה אחר עונה"></label>
+    </div>`;
+  } else {
+    html += `<div class="seo-texts"><label>המבקיע המוביל של הקבוצה (מלא/תקן ידנית)<input data-scorer value="${htEsc(SEO.scorer || '')}" placeholder="למשל: שם השחקן (12)"></label></div>`;
+  }
+  box.innerHTML = html;
+}
+async function seoSave() {
+  const st = document.getElementById('seo-status');
+  const xi = { gk: [], def: [], mid: [], att: [] };
+  document.querySelectorAll('#seo-editor select[data-line]').forEach(sel => {
+    const nm = sel.value; if (!nm) return;
+    const p = SEO.players.find(x => x.name === nm);
+    xi[sel.dataset.line].push({ name: nm, o: p ? p.ovr : 0 });
+  });
+  const rec = { team_id: SEO.teamId, season: SEO.season === 'all' ? '' : SEO.season, lineup: xi, updated_at: new Date().toISOString() };
+  if (SEO.season === 'all') {
+    const texts = {};
+    document.querySelectorAll('#seo-editor input[data-text]').forEach(inp => { if (inp.value.trim()) texts[inp.dataset.text] = inp.value.trim(); });
+    rec.texts = Object.keys(texts).length ? texts : null;
+  } else {
+    const sc = document.querySelector('#seo-editor input[data-scorer]');
+    rec.top_scorer = sc && sc.value.trim() ? sc.value.trim() : null;
+  }
+  st.textContent = 'שומר…';
+  const { error } = await _supabase.from('seo_overrides').upsert(rec, { onConflict: 'team_id,season' });
+  st.textContent = error ? ('שגיאה: ' + error.message) : '✓ נשמר — יופיע בעמוד הציבורי';
+}
+async function seoReset() {
+  const st = document.getElementById('seo-status');
+  st.textContent = 'מאפס…';
+  const { error } = await _supabase.from('seo_overrides').delete()
+    .eq('team_id', SEO.teamId).eq('season', SEO.season === 'all' ? '' : SEO.season);
+  if (error) { st.textContent = 'שגיאה: ' + error.message; return; }
+  st.textContent = '✓ אופס לאוטומטי';
+  seoLoad();
 }
 
 /* ─── Contact messages ────────────────────────────────────────────────────── */
