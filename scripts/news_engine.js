@@ -194,7 +194,10 @@ async function draftNew() {
     added++;
     await tg('sendMessage', {
       chat_id: TELEGRAM_CHAT_ID,
-      text: `📰 ${item.title}\n\n━━ 💬 תגובה להדבקה (על פוסטים של אתרי הספורט על הסיפור) ━━\n${d.comment}\n\n━━ 📄 פוסט לעמוד שלנו ━━\n${d.post}`,
+      text: `📰 ${item.title}\n\n` +
+        `💬 תגובה — רק בשבילך (העתק והדבק ידנית על פוסטים של אתרי הספורט). לא מתפרסמת אוטומטית:\n${d.comment}\n\n` +
+        `📄 פוסט לעמוד שלנו — זה מה שהכפתור "פרסם את הפוסט" מפרסם:\n${d.post}\n\n` +
+        `✏️ לעריכה: פאנל האדמין ← "📣 תור פוסטים לאישור"`,
       reply_markup: { inline_keyboard: [[
         { text: '✅ פרסם את הפוסט', callback_data: 'a:' + id },
         { text: '🗑️ דחה', callback_data: 'r:' + id },

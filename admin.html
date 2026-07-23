@@ -145,6 +145,8 @@
     .pq-comment { background: #0d1f17; border: 1px solid #238636; border-radius: 8px; padding: 8px 10px; margin-bottom: 8px; font-size: 13.5px; line-height: 1.6; }
     .pq-comment b { color: #3fb950; font-size: 12px; }
     .pq-lbl { font-size: 12px; color: #8b949e; margin-bottom: 4px; }
+    .pq-btn.copy { background: #21262d; color: #e6edf3; margin: 6px 0 2px; padding: 6px 14px; }
+    .pq-c { border-color: #238636 !important; }
     .hist-editwrap { margin-top: 12px; }
     .hist-editwrap summary { cursor: pointer; color: #FFD700; font-weight: 700; font-size: 13px; }
     .hist-edit { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 8px; margin-top: 10px; }
@@ -1125,25 +1127,30 @@ async function loadPostQueue() {
     const card = document.createElement('div');
     card.className = 'pq-card';
     const when = new Date(m.created_at).toLocaleString('he-IL');
-    const typeLbl = (m.publish_type === 'comment' ? '💬 תגובה' : '📄 פוסט בעמוד') +
-      ' · ' + (m.platform === 'facebook' ? 'פייסבוק' : cmEsc(m.platform || ''));
     card.innerHTML =
-      `<div class="pq-head"><span>${m.status === 'approved' ? '✅ אושר — ממתין לפרסום' : '🕒 ' + when} · ${typeLbl}</span>` +
+      `<div class="pq-head"><span>${m.status === 'approved' ? '✅ אושר — ממתין לפרסום' : '🕒 ' + when} · פייסבוק</span>` +
       `${m.source_url ? `<a href="${cmEsc(m.source_url)}" target="_blank" rel="noopener">מקור ↗</a>` : ''}</div>` +
-      (m.comment_text ? `<div class="pq-comment"><b>💬 תגובה להדבקה ידנית (על פוסטים של אתרי הספורט):</b><br>${cmEsc(m.comment_text)}</div>` : '') +
-      `<div class="pq-lbl">📄 פוסט לעמוד (ניתן לעריכה):</div>` +
-      `<textarea>${cmEsc(m.draft_text)}</textarea>` +
+      (m.comment_text ? `<div class="pq-lbl">💬 תגובה — להעתיק ולהדביק ידנית על פוסטים של אתרי הספורט (לא מתפרסמת אוטומטית):</div>` +
+        `<textarea class="pq-c">${cmEsc(m.comment_text)}</textarea><button class="pq-btn copy">📋 העתק תגובה</button>` : '') +
+      `<div class="pq-lbl" style="margin-top:8px">📄 פוסט לעמוד — זה מה שיתפרסם בלחיצה על "פרסם את הפוסט":</div>` +
+      `<textarea class="pq-p">${cmEsc(m.draft_text)}</textarea>` +
       `<div class="pq-actions">` +
-      `<button class="pq-btn ok">✅ אשר ופרסם</button>` +
+      `<button class="pq-btn ok">✅ פרסם את הפוסט</button>` +
       `<button class="pq-btn no">🗑️ דחה</button>` +
       `<span class="pq-msg"></span></div>`;
-    const ta = card.querySelector('textarea'), msg = card.querySelector('.pq-msg');
+    const postTa = card.querySelector('.pq-p'), cTa = card.querySelector('.pq-c'), msg = card.querySelector('.pq-msg');
+    const copyBtn = card.querySelector('.copy');
+    if (copyBtn) copyBtn.onclick = () => {
+      navigator.clipboard?.writeText(cTa.value);
+      copyBtn.textContent = '✓ הועתק'; setTimeout(() => copyBtn.textContent = '📋 העתק תגובה', 1500);
+    };
     card.querySelector('.ok').onclick = async () => {
-      msg.textContent = 'שומר…';
-      const { error } = await _supabase.from('post_queue')
-        .update({ draft_text: ta.value.trim(), status: 'approved' }).eq('id', m.id);
-      msg.textContent = error ? ('שגיאה: ' + error.message) : '✅ אושר — יתפרסם בהרצה הקרובה';
-      if (!error) setTimeout(loadPostQueue, 900);
+      msg.textContent = 'שומר ומפרסם…';
+      const upd = { draft_text: postTa.value.trim(), status: 'approved' };
+      if (cTa) upd.comment_text = cTa.value.trim();
+      const { error } = await _supabase.from('post_queue').update(upd).eq('id', m.id);
+      msg.textContent = error ? ('שגיאה: ' + error.message) : '✅ אושר — יתפרסם בהרצה הקרובה (עד 30 דק׳)';
+      if (!error) setTimeout(loadPostQueue, 1200);
     };
     card.querySelector('.no').onclick = async () => {
       msg.textContent = 'דוחה…';
