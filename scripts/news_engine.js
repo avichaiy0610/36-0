@@ -32,6 +32,12 @@ const TEAMS = new Function(fs.readFileSync(path.join(__dirname, '..', 'js', 'dat
   '\n;return TEAMS;')();
 
 /* ── helpers ──────────────────────────────────────────────────────────────── */
+// fetch with a hard timeout so a stalled server can't hang the whole run
+function fetchT(url, opts = {}, ms = 20000) {
+  const c = new AbortController();
+  const t = setTimeout(() => c.abort(), ms);
+  return fetch(url, { ...opts, signal: c.signal }).finally(() => clearTimeout(t));
+}
 const dec = s => String(s || '')
   .replace(/<!\[CDATA\[|\]\]>/g, '')
   .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"')
@@ -39,7 +45,7 @@ const dec = s => String(s || '')
   .replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
 
 async function sb(method, pathq, body, extraHeaders) {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/${pathq}`, {
+  const res = await fetchT(`${SUPABASE_URL}/rest/v1/${pathq}`, {
     method,
     headers: {
       apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
@@ -59,7 +65,7 @@ async function stateSet(key, value) {
   await sb('POST', 'engine_state', { key, value: String(value) }, { Prefer: 'resolution=merge-duplicates' });
 }
 async function tg(method, payload) {
-  const res = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/${method}`, {
+  const res = await fetchT(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/${method}`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
   });
   return res.json();
@@ -121,7 +127,7 @@ async function fetchNews() {
     const url = 'https://news.google.com/rss/search?' +
       new URLSearchParams({ q, hl: 'he', gl: 'IL', ceid: 'IL:he' });
     let raw;
-    try { raw = await (await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } })).text(); }
+    try { raw = await (await fetchT(url, { headers: { 'User-Agent': 'Mozilla/5.0' } })).text(); }
     catch (e) { console.error('feed fail', q, e.message); continue; }
     for (const block of raw.split('<item>').slice(1)) {
       const title = dec((block.match(/<title>(.*?)<\/title>/s) || [])[1]);
@@ -138,7 +144,7 @@ async function fetchNews() {
 /* ── publishing ───────────────────────────────────────────────────────────── */
 async function fbPublish(text) {
   const body = new URLSearchParams({ message: text, access_token: FB_PAGE_TOKEN });
-  const res = await fetch(`https://graph.facebook.com/v21.0/${FB_PAGE_ID}/feed`, { method: 'POST', body });
+  const res = await fetchT(`https://graph.facebook.com/v21.0/${FB_PAGE_ID}/feed`, { method: 'POST', body });
   const j = await res.json();
   if (!res.ok || j.error) throw new Error('fb: ' + JSON.stringify(j.error || j));
   return j.id;
