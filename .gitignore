@@ -23,3 +23,6 @@ nationalities_cache.json
 league_tables_raw.json
 build_league_tables.js
 wiki_tables_cache.json
+
+# SEO pages pipeline (local; seo/ output is the deploy artifact)
+build_seo_pages.js

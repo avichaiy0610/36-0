@@ -18,3 +18,5 @@
 !manifest.json
 !robots.txt
 !sitemap.xml
+!team
+!team/**
