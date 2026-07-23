@@ -3,7 +3,12 @@ name: news-engine
 on:
   schedule:
     - cron: '*/30 * * * *'   # every 30 minutes (drafts news + processes approvals + publishes)
-  workflow_dispatch: {}       # lets you run it manually from the Actions tab
+  workflow_dispatch:          # lets you run it manually from the Actions tab
+    inputs:
+      test:
+        description: 'שלח הודעת בדיקה לטלגרם (לוודא שהמנוע עובד)'
+        type: boolean
+        default: false
 
 # don't let overlapping runs step on each other
 concurrency:
@@ -26,3 +31,4 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           FB_PAGE_ID: ${{ secrets.FB_PAGE_ID }}
           FB_PAGE_TOKEN: ${{ secrets.FB_PAGE_TOKEN }}
+          TEST_PING: ${{ inputs.test }}

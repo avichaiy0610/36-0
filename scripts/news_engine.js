@@ -214,6 +214,20 @@ async function draftNew() {
 }
 
 async function main() {
+  // on-demand health check: proves news + DB + Telegram are all wired up
+  if (process.env.TEST_PING === 'true') {
+    const news = await fetchNews().catch(() => []);
+    let dbOk = false;
+    try { await sb('GET', 'post_queue?select=id&limit=1'); dbOk = true; } catch (e) {}
+    await tg('sendMessage', {
+      chat_id: TELEGRAM_CHAT_ID,
+      text: `✅ בדיקת מנוע 36-0\n\n📰 חדשות: מצא ${news.length} כתבות רלוונטיות\n` +
+        `🗄️ מסד נתונים: ${dbOk ? 'מחובר ✓' : 'שגיאה ✗'}\n💬 טלגרם: עובד (קיבלת את זה ✓)\n\n` +
+        `${dbOk && news.length ? 'הכל תקין 🎉' : 'יש בעיה — תגיד לי'}`,
+    });
+    console.log(`health check: news=${news.length} db=${dbOk}`);
+    return;
+  }
   if (DRY_RUN) {
     const news = await fetchNews();
     console.log(`DRY RUN — ${news.length} relevant items:\n`);
