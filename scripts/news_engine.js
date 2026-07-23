@@ -87,19 +87,33 @@ function detectClub(title) {
   }
   return null;
 }
+// pull position + transfer direction out of a Hebrew headline for a contextual hook
+const POSITIONS = [['שוער', 'שוער'], ['בלם', 'בלם'], ['מגן', 'מגן'], ['קשר', 'קשר'], ['מקשר', 'קשר'],
+  ['חלוץ', 'חלוץ'], ['חלוצן', 'חלוץ'], ['כנף', 'שחקן כנף'], ['אגף', 'שחקן אגף']];
+const DIR_IN = /מגיע|חתמ|הצטרף|סגר|רשמי|יחתו|בדרך ל|נחת|רוכשת?|צירפ|קלט|יצטרף/;
+const DIR_OUT = /עזב|נמכר|עובר מ|נפרד|מסיים|בדרך מ|שוחרר|הושאל|מכר/;
+function detectPosition(t) { for (const [k, v] of POSITIONS) if (t.includes(k)) return v; return null; }
+function detectDirection(t) { return DIR_IN.test(t) ? 'in' : DIR_OUT.test(t) ? 'out' : null; }
+
+// returns a page POST (auto-publishable, with link) and a natural COMMENT
+// (no link, mentions the game — to paste manually on sports outlets' posts)
 function draft(item) {
-  const club = detectClub(item.title);
-  const link = club ? `${SITE}/team/${club.id}/` : `${SITE}/`;
+  const t = item.title, club = detectClub(t), pos = detectPosition(t), dir = detectDirection(t);
+  const cn = club ? club.name : null, link = club ? `${SITE}/team/${club.id}/` : `${SITE}/`;
   const tags = '#ליגת_העל #כדורגל_ישראלי';
-  let text;
-  if (club && TRANSFER.test(item.title)) {
-    text = `⚽ ${item.title}\n\nמי ההרכב הכי חזק של ${club.name} בכל הזמנים? בנו אותו עכשיו 👇\n${link}\n\n${tags} #${club.name.replace(/[ "]/g, '_')}`;
-  } else if (club) {
-    text = `⚽ ${item.title}\n\nהרכב כל הזמנים של ${club.name} — בנו את שלכם 👇\n${link}\n\n${tags}`;
-  } else {
-    text = `⚽ ${item.title}\n\nבנו את הרכב החלומות שלכם מכל תולדות ליגת העל 👇\n${link}\n\n${tags}`;
-  }
-  return { text, club };
+
+  const post = club
+    ? `⚽ ${t}\n\n${pos && dir === 'in' ? `${pos} חדש ל${cn}. ` : ''}מי ההרכב הכי חזק של ${cn} בכל הזמנים? בנו אותו 👇\n${link}\n\n${tags}`
+    : `⚽ ${t}\n\nבנו את הרכב החלומות שלכם מכל תולדות ליגת העל 👇\n${SITE}/\n\n${tags}`;
+
+  let comment;
+  if (club && pos && dir === 'in') comment = `מגיע ${pos} ל${cn} 👀 הוא נכנס לכם לנבחרת כל הזמנים של הקבוצה? (בניתי את שלי ב-36-0 ולא הצלחתי להחליט 😅)`;
+  else if (club && dir === 'in') comment = `חתימה חדשה ב${cn}. את מי מנבחרת כל הזמנים של הקבוצה הוא בכלל יכול להדיח? (התחלתי לשחק עם זה ב-36-0, קשה 😅)`;
+  else if (club && dir === 'out') comment = `${cn} מתפרקת לנו מול העיניים... מי אצלכם בנבחרת כל הזמנים של הקבוצה אף אחד לא נוגע בו? (ב-36-0 בניתי הרכב מטורף)`;
+  else if (club) comment = `מדברים על ${cn}. בניתם כבר את נבחרת כל הזמנים שלה? יש משחק חינמי (36-0) שנתקעתי עליו שעה 😅`;
+  else comment = `חלון ההעברות בליגת העל רותח 🔥 בניתם כבר את נבחרת החלומות שלכם מכל הדורות? (יש משחק חינמי, 36-0, ממכר)`;
+
+  return { post, comment, club };
 }
 async function fetchNews() {
   const items = [], seen = new Set();
@@ -174,16 +188,15 @@ async function draftNew() {
     if (seen.has(item.title)) continue;
     const d = draft(item);
     const rows = await sb('POST', 'post_queue',
-      { headline: item.title, source_url: item.link, draft_text: d.text, publish_type: 'post', platform: 'facebook' },
+      { headline: item.title, source_url: item.link, draft_text: d.post, comment_text: d.comment, publish_type: 'post', platform: 'facebook' },
       { Prefer: 'return=representation' });
     const id = rows[0].id;
     added++;
     await tg('sendMessage', {
       chat_id: TELEGRAM_CHAT_ID,
-      text: `📝 טיוטת פוסט חדשה (פרסום כ*פוסט* בעמוד):\n\n${d.text}`,
-      parse_mode: 'Markdown',
+      text: `📰 ${item.title}\n\n━━ 💬 תגובה להדבקה (על פוסטים של אתרי הספורט על הסיפור) ━━\n${d.comment}\n\n━━ 📄 פוסט לעמוד שלנו ━━\n${d.post}`,
       reply_markup: { inline_keyboard: [[
-        { text: '✅ אשר ופרסם', callback_data: 'a:' + id },
+        { text: '✅ פרסם את הפוסט', callback_data: 'a:' + id },
         { text: '🗑️ דחה', callback_data: 'r:' + id },
       ]] },
     });
@@ -195,7 +208,7 @@ async function main() {
   if (DRY_RUN) {
     const news = await fetchNews();
     console.log(`DRY RUN — ${news.length} relevant items:\n`);
-    news.slice(0, 6).forEach(i => console.log('────\n' + draft(i).text + '\n'));
+    news.slice(0, 8).forEach(i => { const d = draft(i); console.log('──── ' + i.title + '\n💬 ' + d.comment + '\n📄 ' + d.post + '\n'); });
     return;
   }
   for (const [name, fn] of [['callbacks', processCallbacks], ['publish', publishApproved], ['draft', draftNew]]) {

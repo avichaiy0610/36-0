@@ -142,6 +142,9 @@
     .pq-btn.ok { background: linear-gradient(135deg, #3fb950, #2ea043); color: #fff; }
     .pq-btn.no { background: #21262d; color: #f85149; }
     .pq-msg { font-size: 12px; color: #8b949e; }
+    .pq-comment { background: #0d1f17; border: 1px solid #238636; border-radius: 8px; padding: 8px 10px; margin-bottom: 8px; font-size: 13.5px; line-height: 1.6; }
+    .pq-comment b { color: #3fb950; font-size: 12px; }
+    .pq-lbl { font-size: 12px; color: #8b949e; margin-bottom: 4px; }
     .hist-editwrap { margin-top: 12px; }
     .hist-editwrap summary { cursor: pointer; color: #FFD700; font-weight: 700; font-size: 13px; }
     .hist-edit { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 8px; margin-top: 10px; }
@@ -1110,7 +1113,7 @@ async function seoReset() {
 async function loadPostQueue() {
   const box = document.getElementById('pq-list');
   const { data, error } = await _supabase.from('post_queue')
-    .select('id, source_url, headline, draft_text, status, created_at, publish_type, platform')
+    .select('id, source_url, headline, draft_text, comment_text, status, created_at, publish_type, platform')
     .in('status', ['pending', 'approved']).order('created_at', { ascending: false }).limit(100);
   if (error) { box.innerHTML = '<div class="chal-note">טעינה נכשלה: ' + cmEsc(error.message) + '</div>'; return; }
   const badge = document.getElementById('pq-count');
@@ -1127,6 +1130,8 @@ async function loadPostQueue() {
     card.innerHTML =
       `<div class="pq-head"><span>${m.status === 'approved' ? '✅ אושר — ממתין לפרסום' : '🕒 ' + when} · ${typeLbl}</span>` +
       `${m.source_url ? `<a href="${cmEsc(m.source_url)}" target="_blank" rel="noopener">מקור ↗</a>` : ''}</div>` +
+      (m.comment_text ? `<div class="pq-comment"><b>💬 תגובה להדבקה ידנית (על פוסטים של אתרי הספורט):</b><br>${cmEsc(m.comment_text)}</div>` : '') +
+      `<div class="pq-lbl">📄 פוסט לעמוד (ניתן לעריכה):</div>` +
       `<textarea>${cmEsc(m.draft_text)}</textarea>` +
       `<div class="pq-actions">` +
       `<button class="pq-btn ok">✅ אשר ופרסם</button>` +
