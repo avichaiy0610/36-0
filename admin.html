@@ -1110,7 +1110,7 @@ async function seoReset() {
 async function loadPostQueue() {
   const box = document.getElementById('pq-list');
   const { data, error } = await _supabase.from('post_queue')
-    .select('id, source_url, headline, draft_text, status, created_at')
+    .select('id, source_url, headline, draft_text, status, created_at, publish_type, platform')
     .in('status', ['pending', 'approved']).order('created_at', { ascending: false }).limit(100);
   if (error) { box.innerHTML = '<div class="chal-note">טעינה נכשלה: ' + cmEsc(error.message) + '</div>'; return; }
   const badge = document.getElementById('pq-count');
@@ -1122,8 +1122,10 @@ async function loadPostQueue() {
     const card = document.createElement('div');
     card.className = 'pq-card';
     const when = new Date(m.created_at).toLocaleString('he-IL');
+    const typeLbl = (m.publish_type === 'comment' ? '💬 תגובה' : '📄 פוסט בעמוד') +
+      ' · ' + (m.platform === 'facebook' ? 'פייסבוק' : cmEsc(m.platform || ''));
     card.innerHTML =
-      `<div class="pq-head"><span>${m.status === 'approved' ? '✅ אושר — ממתין לפרסום' : '🕒 ' + when}</span>` +
+      `<div class="pq-head"><span>${m.status === 'approved' ? '✅ אושר — ממתין לפרסום' : '🕒 ' + when} · ${typeLbl}</span>` +
       `${m.source_url ? `<a href="${cmEsc(m.source_url)}" target="_blank" rel="noopener">מקור ↗</a>` : ''}</div>` +
       `<textarea>${cmEsc(m.draft_text)}</textarea>` +
       `<div class="pq-actions">` +
