@@ -22,6 +22,7 @@ const {
 } = process.env;
 const SITE = 'https://www.36-0.co.il';
 const MAX_NEW_PER_RUN = 3;          // keep the queue/Telegram from flooding
+const MAX_AGE_HOURS = 24;           // only fresh news — nothing older than a day
 const QUERIES = [
   'ליגת העל כדורגל העברות',
   'כדורגל ישראלי חתם שחקן',
@@ -122,22 +123,25 @@ function draft(item) {
   return { post, comment, club };
 }
 async function fetchNews() {
-  const items = [], seen = new Set();
+  const items = [], seen = new Set(), now = Date.now();
   for (const q of QUERIES) {
     const url = 'https://news.google.com/rss/search?' +
-      new URLSearchParams({ q, hl: 'he', gl: 'IL', ceid: 'IL:he' });
+      new URLSearchParams({ q: q + ' when:1d', hl: 'he', gl: 'IL', ceid: 'IL:he' });
     let raw;
     try { raw = await (await fetchT(url, { headers: { 'User-Agent': 'Mozilla/5.0' } })).text(); }
     catch (e) { console.error('feed fail', q, e.message); continue; }
     for (const block of raw.split('<item>').slice(1)) {
       const title = dec((block.match(/<title>(.*?)<\/title>/s) || [])[1]);
       const link = dec((block.match(/<link>(.*?)<\/link>/s) || [])[1]);
+      const ts = Date.parse((block.match(/<pubDate>(.*?)<\/pubDate>/s) || [])[1] || '');
       if (!title || !link || seen.has(title)) continue;
+      if (!ts || (now - ts) > MAX_AGE_HOURS * 3600e3) continue;   // fresh only — drop old news
       seen.add(title);
       // keep only clearly-relevant items (a club named, or a transfer verb)
-      if (detectClub(title) || TRANSFER.test(title)) items.push({ title, link });
+      if (detectClub(title) || TRANSFER.test(title)) items.push({ title, link, ts });
     }
   }
+  items.sort((a, b) => b.ts - a.ts);   // newest first
   return items;
 }
 
