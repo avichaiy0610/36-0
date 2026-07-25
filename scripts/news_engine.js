@@ -221,10 +221,10 @@ async function draftNew() {
 }
 
 // true while it's Shabbat — candle-lighting to havdalah, fetched weekly from
-// Hebcal (Jerusalem, earliest candle-lighting) so the varying times self-update.
+// Hebcal (Haifa) so the varying times self-update.
 async function isShabbat() {
   try {
-    const r = await (await fetchT('https://www.hebcal.com/shabbat?cfg=json&geonameid=281184&b=40&M=on')).json();
+    const r = await (await fetchT('https://www.hebcal.com/shabbat?cfg=json&geonameid=294801&b=40&M=on')).json();
     const items = r.items || [];
     const candles = items.find(i => i.category === 'candles');
     const havdalah = items.find(i => i.category === 'havdalah');
