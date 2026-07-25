@@ -1,9 +1,10 @@
 name: news-engine
 
 on:
-  schedule:
-    - cron: '*/30 * * * *'   # every 30 minutes (drafts news + processes approvals + publishes)
-  workflow_dispatch:          # lets you run it manually from the Actions tab
+  # Fired every 30 min by an external scheduler (cron-job.org) that hits the
+  # workflow_dispatch API. GitHub's built-in cron was unreliable AND double-fired
+  # alongside the external one ("No jobs were run"), so it's intentionally gone.
+  workflow_dispatch:
     inputs:
       test:
         description: 'שלח הודעת בדיקה לטלגרם (לוודא שהמנוע עובד)'

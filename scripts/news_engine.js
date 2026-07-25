@@ -28,6 +28,8 @@ const QUERIES = [
   'כדורגל ישראלי חתם שחקן',
 ];
 const TRANSFER = /חתמ|חתימ|יחתו|עבר ל|עבר אל|הצטרף|עזב|נמכר|רכש|רוכשת?|השאל|סגר|רשמי|חדש ב/;
+const FOOTBALL = /כדורגל|ליגת העל|ליגה לאומית/;                      // must be football
+const NOT_FOOTBALL = /כדורסל|יורוליג|יורוקאפ|NBA|כדורעף|הוקי|כדוריד|טניס|שחייה|אתלטיקה/;  // drop other sports
 
 const TEAMS = new Function(fs.readFileSync(path.join(__dirname, '..', 'js', 'data.js'), 'utf8') +
   '\n;return TEAMS;')();
@@ -136,9 +138,10 @@ async function fetchNews() {
       const ts = Date.parse((block.match(/<pubDate>(.*?)<\/pubDate>/s) || [])[1] || '');
       if (!title || !link || seen.has(title)) continue;
       if (!ts || (now - ts) > MAX_AGE_HOURS * 3600e3) continue;   // fresh only — drop old news
+      if (NOT_FOOTBALL.test(title)) continue;                    // drop basketball etc.
+      if (!detectClub(title) && !FOOTBALL.test(title)) continue; // must be football
       seen.add(title);
-      // keep only clearly-relevant items (a club named, or a transfer verb)
-      if (detectClub(title) || TRANSFER.test(title)) items.push({ title, link, ts });
+      items.push({ title, link, ts });
     }
   }
   items.sort((a, b) => b.ts - a.ts);   // newest first
@@ -217,6 +220,20 @@ async function draftNew() {
   console.log(`drafted ${added} new post(s) from ${news.length} news item(s)`);
 }
 
+// true while it's Shabbat — candle-lighting to havdalah, fetched weekly from
+// Hebcal (Jerusalem, earliest candle-lighting) so the varying times self-update.
+async function isShabbat() {
+  try {
+    const r = await (await fetchT('https://www.hebcal.com/shabbat?cfg=json&geonameid=281184&b=40&M=on')).json();
+    const items = r.items || [];
+    const candles = items.find(i => i.category === 'candles');
+    const havdalah = items.find(i => i.category === 'havdalah');
+    if (!candles || !havdalah) return false;
+    const now = Date.now();
+    return now >= Date.parse(candles.date) && now <= Date.parse(havdalah.date);
+  } catch (e) { return false; }   // on error, don't block the run
+}
+
 async function main() {
   // on-demand health check: proves news + DB + Telegram are all wired up
   if (process.env.TEST_PING === 'true') {
@@ -238,6 +255,7 @@ async function main() {
     news.slice(0, 8).forEach(i => { const d = draft(i); console.log('──── ' + i.title + '\n💬 ' + d.comment + '\n📄 ' + d.post + '\n'); });
     return;
   }
+  if (await isShabbat()) { console.log('Shabbat — skipping run'); return; }
   for (const [name, fn] of [['callbacks', processCallbacks], ['publish', publishApproved], ['draft', draftNew]]) {
     try { await fn(); } catch (e) { console.error(name, 'failed:', e.message); }
   }
