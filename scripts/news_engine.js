@@ -23,13 +23,16 @@ const {
 const SITE = 'https://www.36-0.co.il';
 const MAX_NEW_PER_RUN = 3;          // keep the queue/Telegram from flooding
 const MAX_AGE_HOURS = 24;           // only fresh news — nothing older than a day
-const QUERIES = [
-  'ליגת העל כדורגל העברות',
-  'כדורגל ישראלי חתם שחקן',
+const QUERIES = [           // all Israeli football, not just transfers
+  'ליגת העל בכדורגל',
+  'כדורגל ישראלי',
+  'נבחרת ישראל בכדורגל',
 ];
 const TRANSFER = /חתמ|חתימ|יחתו|עבר ל|עבר אל|הצטרף|עזב|נמכר|רכש|רוכשת?|השאל|סגר|רשמי|חדש ב/;
 const FOOTBALL = /כדורגל|ליגת העל|ליגה לאומית/;                      // must be football
 const NOT_FOOTBALL = /כדורסל|יורוליג|יורוקאפ|NBA|כדורעף|הוקי|כדוריד|טניס|שחייה|אתלטיקה/;  // drop other sports
+// never make a playful "build your dream team" post under a sensitive story
+const NEG_TOPIC = /אלימ|מוות|נהרג|נפטר|הרוג|אסון|טרגד|פיגוע|גזענ|מעצר|נעצר|נאסר|חקיר|שחיתות|אונס|הטרד|התאבד|גופ[תה]|פשיט[ת]?.רגל/;
 
 const TEAMS = new Function(fs.readFileSync(path.join(__dirname, '..', 'js', 'data.js'), 'utf8') +
   '\n;return TEAMS;')();
@@ -120,7 +123,7 @@ function draft(item) {
   else if (club && dir === 'in') comment = `חתימה חדשה ב${cn}. את מי מנבחרת כל הזמנים של הקבוצה הוא בכלל יכול להדיח? (התחלתי לשחק עם זה ב-36-0, קשה 😅)`;
   else if (club && dir === 'out') comment = `${cn} מתפרקת לנו מול העיניים... מי אצלכם בנבחרת כל הזמנים של הקבוצה אף אחד לא נוגע בו? (ב-36-0 בניתי הרכב מטורף)`;
   else if (club) comment = `מדברים על ${cn}. בניתם כבר את נבחרת כל הזמנים שלה? יש משחק חינמי (36-0) שנתקעתי עליו שעה 😅`;
-  else comment = `חלון ההעברות בליגת העל רותח 🔥 בניתם כבר את נבחרת החלומות שלכם מכל הדורות? (יש משחק חינמי, 36-0, ממכר)`;
+  else comment = `כדורגל ישראלי על הבר 🔥 בניתם כבר את נבחרת החלומות שלכם מכל תולדות ליגת העל? (יש משחק חינמי, 36-0, ממכר)`;
 
   return { post, comment, club };
 }
@@ -138,8 +141,8 @@ async function fetchNews() {
       const ts = Date.parse((block.match(/<pubDate>(.*?)<\/pubDate>/s) || [])[1] || '');
       if (!title || !link || seen.has(title)) continue;
       if (!ts || (now - ts) > MAX_AGE_HOURS * 3600e3) continue;   // fresh only — drop old news
-      if (NOT_FOOTBALL.test(title)) continue;                    // drop basketball etc.
-      if (!detectClub(title) && !FOOTBALL.test(title)) continue; // must be football
+      if (NOT_FOOTBALL.test(title) || NEG_TOPIC.test(title)) continue;  // other sports / sensitive
+      if (!detectClub(title) && !FOOTBALL.test(title)) continue;        // must be football
       seen.add(title);
       items.push({ title, link, ts });
     }
