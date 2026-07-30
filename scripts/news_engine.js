@@ -37,6 +37,16 @@ const NEG_TOPIC = /אלימ|מוות|נהרג|נפטר|הרוג|אסון|טרג�
 const TEAMS = new Function(fs.readFileSync(path.join(__dirname, '..', 'js', 'data.js'), 'utf8') +
   '\n;return TEAMS;')();
 
+// player database (newsjacking SEO): index of every Ligat ha'Al player's career.
+// Match on full multi-word names, normalised (drop apostrophes/gershayim/quotes)
+// so "ניר דוידוביץ'" still matches a headline that writes "ניר דוידוביץ".
+const PP = require('./player_pages.js');
+const PLAYER_IDX = PP.buildIndex(PP.load().SQUADS);
+const stripQ = s => String(s).replace(/['׳״"]/g, '').replace(/\s+/g, ' ').trim();
+const NORM_TO_NAME = {};
+Object.keys(PLAYER_IDX).forEach(n => { if (n.trim().split(/\s+/).length >= 2) NORM_TO_NAME[stripQ(n)] = n; });
+const NORM_NAMES = Object.keys(NORM_TO_NAME);
+
 /* ── helpers ──────────────────────────────────────────────────────────────── */
 // fetch with a hard timeout so a stalled server can't hang the whole run
 function fetchT(url, opts = {}, ms = 20000) {
@@ -99,6 +109,12 @@ function detectClub(title) {
   }
   return null;
 }
+// known players named in a headline (full multi-word names → few false positives)
+function detectPlayers(title) {
+  const t = stripQ(title);
+  return NORM_NAMES.filter(n => t.includes(n)).map(n => NORM_TO_NAME[n]).sort((a, b) => b.length - a.length);
+}
+
 // pull position + transfer direction out of a Hebrew headline for a contextual hook
 const POSITIONS = [['שוער', 'שוער'], ['בלם', 'בלם'], ['מגן', 'מגן'], ['קשר', 'קשר'], ['מקשר', 'קשר'],
   ['חלוץ', 'חלוץ'], ['חלוצן', 'חלוץ'], ['כנף', 'שחקן כנף'], ['אגף', 'שחקן אגף']];
@@ -193,8 +209,7 @@ async function publishApproved() {
     }
   }
 }
-async function draftNew() {
-  const news = await fetchNews();
+async function draftNew(news) {
   // dedupe against anything already queued (any status), by headline
   const existing = await sb('GET', 'post_queue?select=headline&order=created_at.desc&limit=500');
   const seen = new Set((existing || []).map(r => r.headline));
@@ -221,6 +236,31 @@ async function draftNew() {
     });
   }
   console.log(`drafted ${added} new post(s) from ${news.length} news item(s)`);
+}
+
+// newsjacking SEO: create evergreen player pages — prioritised by who's in the
+// news, plus a gated backfill so the library keeps growing on quiet days.
+async function generatePlayerPages(news) {
+  const hasPage = e => fs.existsSync(path.join(PP.BASE, 'player', PP.slugFor(e.name), 'index.html'));
+  const make = e => (e && !hasPage(e) && PP.writePlayer(TEAMS, e).created);
+  const created = [];
+
+  // 1. players named in fresh headlines
+  const named = new Set();
+  news.forEach(item => detectPlayers(item.title).forEach(n => named.add(n)));
+  for (const n of named) { if (created.length >= 5) break; if (make(PLAYER_IDX[n])) created.push(n); }
+
+  // 2. backfill top-rated players, at most once every 2h (keeps deploys modest)
+  const last = +(await stateGet('last_backfill') || 0);
+  if (Date.now() - last > 2 * 3600e3) {
+    const pool = Object.values(PLAYER_IDX).filter(e => e.career.length >= 2).sort((a, b) => b.peak - a.peak);
+    let n = 0;
+    for (const e of pool) { if (n >= 6) break; if (make(e)) { created.push(e.name); n++; } }
+    await stateSet('last_backfill', Date.now());
+  }
+
+  if (created.length) PP.writeSitemap();
+  console.log(`player pages created: ${created.length}${created.length ? ' — ' + created.join(', ') : ''}`);
 }
 
 // true while it's Shabbat — candle-lighting to havdalah, fetched weekly from
@@ -259,8 +299,12 @@ async function main() {
     return;
   }
   if (await isShabbat()) { console.log('Shabbat — skipping run'); return; }
-  for (const [name, fn] of [['callbacks', processCallbacks], ['publish', publishApproved], ['draft', draftNew]]) {
-    try { await fn(); } catch (e) { console.error(name, 'failed:', e.message); }
-  }
+  const step = async (name, fn) => { try { await fn(); } catch (e) { console.error(name, 'failed:', e.message); } };
+  await step('callbacks', processCallbacks);
+  await step('publish', publishApproved);
+  let news = [];
+  try { news = await fetchNews(); } catch (e) { console.error('fetchNews failed:', e.message); }
+  await step('draft', () => draftNew(news));
+  await step('pages', () => generatePlayerPages(news));
 }
 main().catch(e => { console.error(e); process.exit(1); });

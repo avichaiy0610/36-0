@@ -16,6 +16,10 @@ concurrency:
   group: news-engine
   cancel-in-progress: false
 
+# the engine generates player SEO pages and commits them back to the repo
+permissions:
+  contents: write
+
 jobs:
   run:
     runs-on: ubuntu-latest
@@ -33,3 +37,11 @@ jobs:
           FB_PAGE_ID: ${{ secrets.FB_PAGE_ID }}
           FB_PAGE_TOKEN: ${{ secrets.FB_PAGE_TOKEN }}
           TEST_PING: ${{ inputs.test }}
+      # publish any newly generated player pages (Vercel auto-deploys on push)
+      - name: commit new pages
+        run: |
+          git config user.name "36-0-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add sitemap.xml
+          [ -d player ] && git add player || true
+          git diff --staged --quiet || (git commit -m "auto: player SEO pages" && git push)
