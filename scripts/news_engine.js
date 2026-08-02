@@ -281,7 +281,7 @@ async function generatePlayerPages(news) {
     await stateSet('last_backfill', Date.now());
   }
 
-  if (created.length) PP.writeSitemap();
+  if (created.length) { PP.writeSitemap(); PP.writeIndex(); }
   console.log(`player pages created: ${created.length}${created.length ? ' — ' + created.join(', ') : ''}`);
 }
 

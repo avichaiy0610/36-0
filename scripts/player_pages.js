@@ -135,7 +135,7 @@ function pageHtml(TEAMS, e) {
 
     <div class="foot">
       36-0 — משחק דראפט חינמי לחובבי הכדורגל הישראלי · הנתונים למטרות מידע ובידור בלבד ואינם רשמיים ·
-      <a href="/about.html">אודות</a> · <a href="/">משחק</a>
+      <a href="/players/">כל השחקנים</a> · <a href="/about.html">אודות</a> · <a href="/">משחק</a>
     </div>
   </div>
 </body>
@@ -162,6 +162,7 @@ function writeSitemap() {
     u(`${SITE}/about.html`, 'monthly', '0.4'),
     u(`${SITE}/privacy.html`, 'yearly', '0.2'),
     u(`${SITE}/contact.html`, 'yearly', '0.2'),
+    u(`${SITE}/players/`, 'weekly', '0.5'),
     ...dirsIn('team').map(id => u(`${SITE}/team/${id}/`, 'monthly', '0.7')),
     ...dirsIn('player').map(s => u(`${SITE}/player/${encodeURI(s)}/`, 'monthly', '0.6')),
   ];
@@ -169,28 +170,98 @@ function writeSitemap() {
     `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.join('\n')}\n</urlset>\n`);
 }
 
-module.exports = { load, buildIndex, slugFor, pageHtml, writePlayer, writeSitemap, BASE };
+// browsable hub at /players/ — lists every player that has a page (best-rated
+// first) + links to every team page. Human-browsable AND an internal-link boost
+// that helps Google discover and rank the player pages faster.
+function writeIndex() {
+  const { TEAMS, SQUADS } = load();
+  const idx = buildIndex(SQUADS);
+  const onDisk = new Set();
+  try { for (const d of fs.readdirSync(path.join(BASE, 'player'), { withFileTypes: true })) if (d.isDirectory()) onDisk.add(d.name); } catch {}
+  const players = Object.values(idx).filter(e => onDisk.has(slugFor(e.name))).sort((a, b) => b.peak - a.peak);
+  const teams = Object.keys(TEAMS).filter(id => fs.existsSync(path.join(BASE, 'team', id, 'index.html')))
+    .sort((a, b) => TEAMS[a].name.localeCompare(TEAMS[b].name, 'he'));
+  const url = `${SITE}/players/`;
+  const title = 'כל שחקני ליגת העל — אינדקס | 36-0';
+  const desc = `אינדקס שחקני ליגת העל בכדורגל (1999–2025): ${players.length} שחקנים עם הקריירה, המועדונים והדירוגים. בנה את הרכב החלומות במשחק 36-0.`;
+  const list = players.map(e =>
+    `<li><a href="/player/${slugFor(e.name)}/">${esc(e.name)}</a> <span>${e.peak} · ${TEAMS[e.mainTeam] ? esc(TEAMS[e.mainTeam].name) : ''}</span></li>`).join('');
+  const chips = teams.map(id => `<a class="chip" href="/team/${id}/">${esc(TEAMS[id].name)}</a>`).join('');
+
+  const html = `<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${esc(title)}</title>
+  <meta name="description" content="${esc(desc)}" />
+  <link rel="canonical" href="${url}" />
+  <meta property="og:title" content="${esc(title)}" /><meta property="og:description" content="${esc(desc)}" />
+  <meta property="og:type" content="website" /><meta property="og:url" content="${url}" /><meta property="og:image" content="${SITE}/og-image.png" />
+  <link rel="icon" href="/favicon.ico" sizes="any" />
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #0d1117; color: #e6edf3; font-family: 'Heebo', Arial, sans-serif; direction: rtl; line-height: 1.7; }
+    .wrap { max-width: 900px; margin: 0 auto; padding: 28px 18px 80px; }
+    .back { display: inline-block; margin-bottom: 14px; color: #8b949e; text-decoration: none; font-size: 14px; }
+    .logo { font-size: 30px; font-weight: 900; background: linear-gradient(135deg,#FFD700,#ff9500 55%,#FFD700); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+    .logo a { text-decoration: none; }
+    h1 { font-size: 27px; margin: 18px 0 6px; color: #fff; }
+    .sub { color: #8b949e; margin-bottom: 18px; font-size: 15px; }
+    h2 { font-size: 19px; margin: 26px 0 12px; color: #FFD700; }
+    ul.players { list-style: none; columns: 3; column-gap: 20px; }
+    ul.players li { font-size: 14px; padding: 3px 0; break-inside: avoid; }
+    ul.players a { color: #58a6ff; text-decoration: none; font-weight: 700; }
+    ul.players span { color: #6b7684; font-size: 11.5px; }
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+    .chip { background: #161b22; border: 1px solid #30363d; border-radius: 50px; padding: 6px 14px; font-size: 13.5px; color: #e6edf3; text-decoration: none; }
+    .cta { display: inline-block; background: linear-gradient(135deg,#FFD700,#f0a500); color: #111; font-weight: 900; font-size: 16px; padding: 13px 30px; border-radius: 50px; text-decoration: none; margin: 18px 0; }
+    .foot { margin-top: 40px; border-top: 1px solid #30363d; padding-top: 16px; font-size: 12px; color: #5a6472; } .foot a { color: #8b949e; }
+    @media (max-width:720px){ ul.players{columns:2;} } @media (max-width:460px){ ul.players{columns:1;} }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <a class="back" href="/">← המשחק</a>
+    <div class="logo"><a href="/"><span dir="ltr">36–0</span></a></div>
+    <h1>כל שחקני ליגת העל</h1>
+    <p class="sub">${players.length} שחקנים מכל תולדות ליגת העל (1999–2025) — הקריירה, המועדונים והדירוגים.</p>
+    <div style="text-align:center"><a class="cta" href="/">בנה את הרכב החלומות שלך ←</a></div>
+    <h2>הקבוצות</h2>
+    <div class="chips">${chips}</div>
+    <h2>שחקנים (לפי דירוג שיא)</h2>
+    <ul class="players">${list}</ul>
+    <div class="foot">36-0 — משחק דראפט חינמי לחובבי הכדורגל הישראלי · הנתונים למטרות מידע ובידור בלבד · <a href="/about.html">אודות</a> · <a href="/">משחק</a></div>
+  </div>
+</body>
+</html>`;
+  fs.mkdirSync(path.join(BASE, 'players'), { recursive: true });
+  fs.writeFileSync(path.join(BASE, 'players', 'index.html'), html);
+}
+
+module.exports = { load, buildIndex, slugFor, pageHtml, writePlayer, writeSitemap, writeIndex, BASE };
 
 // ── CLI ──────────────────────────────────────────────────────────────────────
 if (require.main === module) {
   const { TEAMS, SQUADS } = load();
   const idx = buildIndex(SQUADS);
   const arg = process.argv[2];
-  if (arg === '--sitemap') { writeSitemap(); console.log('wrote sitemap.xml'); }
+  if (arg === '--sitemap' || arg === '--index') { writeSitemap(); writeIndex(); console.log('wrote sitemap.xml + players/'); }
   else if (arg === '--backfill') {
     const n = parseInt(process.argv[3] || '5', 10);
     const missing = Object.values(idx).filter(e => e.career.length >= 2)
       .sort((a, b) => b.peak - a.peak);
     let made = 0;
     for (const e of missing) { if (made >= n) break; if (writePlayer(TEAMS, e).created) made++; }
-    writeSitemap();
-    console.log(`backfilled ${made} player page(s) + sitemap`);
+    writeSitemap(); writeIndex();
+    console.log(`backfilled ${made} player page(s) + sitemap + index`);
   } else if (arg) {
     const e = idx[clean(arg)];
     if (!e) { console.error('unknown player:', arg); process.exit(1); }
-    const r = writePlayer(TEAMS, e); writeSitemap();
+    const r = writePlayer(TEAMS, e); writeSitemap(); writeIndex();
     console.log(`${r.created ? 'wrote' : 'exists'}: player/${r.slug}/index.html`);
   } else {
-    console.log(`players: ${Object.keys(idx).length}. usage: <name> | --backfill N | --sitemap`);
+    console.log(`players: ${Object.keys(idx).length}. usage: <name> | --backfill N | --index`);
   }
 }

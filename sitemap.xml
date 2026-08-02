@@ -21,6 +21,11 @@
     <priority>0.2</priority>
   </url>
   <url>
+    <loc>https://www.36-0.co.il/players/</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
     <loc>https://www.36-0.co.il/team/beitar-jerusalem/</loc>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
