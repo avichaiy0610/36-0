@@ -21,7 +21,8 @@ const {
   FB_PAGE_ID, FB_PAGE_TOKEN, DRY_RUN,
 } = process.env;
 const SITE = 'https://www.36-0.co.il';
-const MAX_NEW_PER_RUN = 3;          // keep the queue/Telegram from flooding
+const MAX_NEW_PER_RUN = 2;          // at most 2 Telegram drafts per run
+const MIN_SCORE = 4;                // only high-traffic-potential stories get drafted
 const MAX_AGE_HOURS = 24;           // only fresh news — nothing older than a day
 const QUERIES = [           // all Israeli football, not just transfers
   'ליגת העל בכדורגל',
@@ -32,7 +33,10 @@ const TRANSFER = /חתמ|חתימ|יחתו|עבר ל|עבר אל|הצטרף|עז
 const FOOTBALL = /כדורגל|ליגת העל|ליגה לאומית/;                      // must be football
 const NOT_FOOTBALL = /כדורסל|יורוליג|יורוקאפ|NBA|כדורעף|הוקי|כדוריד|טניס|שחייה|אתלטיקה/;  // drop other sports
 // never make a playful "build your dream team" post under a sensitive story
-const NEG_TOPIC = /אלימ|מוות|נהרג|נפטר|הרוג|אסון|טרגד|פיגוע|גזענ|מעצר|נעצר|נאסר|חקיר|שחיתות|אונס|הטרד|התאבד|גופ[תה]|פשיט[ת]?.רגל/;
+const NEG_TOPIC = /אלימ|מוות|נהרג|נפטר|הרוג|עולמו|לוויה|ז"ל|אסון|טרגד|פיגוע|גזענ|מעצר|נעצר|נאסר|חקיר|שחיתות|אונס|הטרד|התאבד|גופ[תה]|פשיט[ת]?.רגל/;
+// high-traffic signals: the big-fanbase clubs, and a real "event" (not routine news)
+const BIG_CLUBS = new Set(['maccabi-haifa', 'maccabi-tlv', 'hapoel-tlv', 'beitar-jerusalem', 'hapoel-beersheba', 'maccabi-netanya', 'hapoel-jerusalem']);
+const EVENT = /רשמי|חתמ|חתימ|יחתו|עובר|מגיע|בדרך|סגר|מכר|רכש|קנ|עסק|החזר|חוזר|דרבי|אלוף|אליפות|שיא|כוכב|סנסצי|הודיע|פריד|מודח|מפוטר|מונה/;
 
 const TEAMS = new Function(fs.readFileSync(path.join(__dirname, '..', 'js', 'data.js'), 'utf8') +
   '\n;return TEAMS;')();
@@ -43,6 +47,8 @@ const TEAMS = new Function(fs.readFileSync(path.join(__dirname, '..', 'js', 'dat
 const PP = require('./player_pages.js');
 const PLAYER_IDX = PP.buildIndex(PP.load().SQUADS);
 const stripQ = s => String(s).replace(/['׳״"]/g, '').replace(/\s+/g, ' ').trim();
+// fold Hebrew final letters so keyword regexes match e.g. "חתם" (final mem) too
+const deFinal = s => String(s).replace(/[ךםןףץ]/g, c => ({ 'ך': 'כ', 'ם': 'מ', 'ן': 'נ', 'ף': 'פ', 'ץ': 'צ' }[c]));
 const NORM_TO_NAME = {};
 Object.keys(PLAYER_IDX).forEach(n => { if (n.trim().split(/\s+/).length >= 2) NORM_TO_NAME[stripQ(n)] = n; });
 const NORM_NAMES = Object.keys(NORM_TO_NAME);
@@ -115,13 +121,25 @@ function detectPlayers(title) {
   return NORM_NAMES.filter(n => t.includes(n)).map(n => NORM_TO_NAME[n]).sort((a, b) => b.length - a.length);
 }
 
+// how much traffic potential a story has — big club and/or star player + an event
+function storyScore(title) {
+  const club = detectClub(title);
+  const ovrs = detectPlayers(title).map(n => PLAYER_IDX[n] && PLAYER_IDX[n].peak).filter(Boolean);
+  const bestOvr = ovrs.length ? Math.max(...ovrs) : 0;
+  let s = 0;
+  if (club && BIG_CLUBS.has(club.id)) s += 3; else if (club) s += 1;
+  if (bestOvr >= 88) s += 3; else if (bestOvr >= 84) s += 2; else if (bestOvr >= 80) s += 1; else if (ovrs.length) s += 0.5;
+  s += EVENT.test(deFinal(title)) ? 1 : -1;   // reward a real event, punish routine news
+  return s;
+}
+
 // pull position + transfer direction out of a Hebrew headline for a contextual hook
 const POSITIONS = [['שוער', 'שוער'], ['בלם', 'בלם'], ['מגן', 'מגן'], ['קשר', 'קשר'], ['מקשר', 'קשר'],
   ['חלוץ', 'חלוץ'], ['חלוצן', 'חלוץ'], ['כנף', 'שחקן כנף'], ['אגף', 'שחקן אגף']];
 const DIR_IN = /מגיע|חתמ|הצטרף|סגר|רשמי|יחתו|בדרך ל|נחת|רוכשת?|צירפ|קלט|יצטרף/;
 const DIR_OUT = /עזב|נמכר|עובר מ|נפרד|מסיים|בדרך מ|שוחרר|הושאל|מכר/;
 function detectPosition(t) { for (const [k, v] of POSITIONS) if (t.includes(k)) return v; return null; }
-function detectDirection(t) { return DIR_IN.test(t) ? 'in' : DIR_OUT.test(t) ? 'out' : null; }
+function detectDirection(t) { const d = deFinal(t); return DIR_IN.test(d) ? 'in' : DIR_OUT.test(d) ? 'out' : null; }
 
 // returns a page POST (auto-publishable, with link) and a natural COMMENT
 // (no link, mentions the game — to paste manually on sports outlets' posts)
@@ -157,8 +175,9 @@ async function fetchNews() {
       const ts = Date.parse((block.match(/<pubDate>(.*?)<\/pubDate>/s) || [])[1] || '');
       if (!title || !link || seen.has(title)) continue;
       if (!ts || (now - ts) > MAX_AGE_HOURS * 3600e3) continue;   // fresh only — drop old news
-      if (NOT_FOOTBALL.test(title) || NEG_TOPIC.test(title)) continue;  // other sports / sensitive
-      if (!detectClub(title) && !FOOTBALL.test(title)) continue;        // must be football
+      const dt = deFinal(title);
+      if (NOT_FOOTBALL.test(dt) || NEG_TOPIC.test(dt)) continue;        // other sports / sensitive
+      if (!detectClub(title) && !FOOTBALL.test(dt)) continue;           // must be football
       seen.add(title);
       items.push({ title, link, ts });
     }
@@ -213,8 +232,11 @@ async function draftNew(news) {
   // dedupe against anything already queued (any status), by headline
   const existing = await sb('GET', 'post_queue?select=headline&order=created_at.desc&limit=500');
   const seen = new Set((existing || []).map(r => r.headline));
+  // only high-traffic-potential stories, best first
+  const notable = news.map(item => ({ item, score: storyScore(item.title) }))
+    .filter(x => x.score >= MIN_SCORE).sort((a, b) => b.score - a.score);
   let added = 0;
-  for (const item of news) {
+  for (const { item } of notable) {
     if (added >= MAX_NEW_PER_RUN) break;
     if (seen.has(item.title)) continue;
     const d = draft(item);
@@ -294,8 +316,9 @@ async function main() {
   }
   if (DRY_RUN) {
     const news = await fetchNews();
-    console.log(`DRY RUN — ${news.length} relevant items:\n`);
-    news.slice(0, 8).forEach(i => { const d = draft(i); console.log('──── ' + i.title + '\n💬 ' + d.comment + '\n📄 ' + d.post + '\n'); });
+    const scored = news.map(i => ({ i, s: storyScore(i.title) })).sort((a, b) => b.s - a.s);
+    console.log(`DRY RUN — ${news.length} items; ${scored.filter(x => x.s >= MIN_SCORE).length} pass the traffic bar (>=${MIN_SCORE}):\n`);
+    scored.slice(0, 12).forEach(({ i, s }) => console.log(`[${s}]${s >= MIN_SCORE ? ' ✅' : ' ⬜'} ${i.title}`));
     return;
   }
   if (await isShabbat()) { console.log('Shabbat — skipping run'); return; }
