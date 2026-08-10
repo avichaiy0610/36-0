@@ -245,16 +245,20 @@ async function draftNew(news) {
       { Prefer: 'return=representation' });
     const id = rows[0].id;
     added++;
+    // "comment here" link: FB post-search for the story's subject (player > club)
+    const subject = detectPlayers(item.title)[0] || (detectClub(item.title) || {}).name || item.title;
+    const fbSearch = 'https://www.facebook.com/search/posts/?q=' + encodeURIComponent(subject);
     await tg('sendMessage', {
       chat_id: TELEGRAM_CHAT_ID,
       text: `📰 ${item.title}\n\n` +
         `💬 תגובה — רק בשבילך (העתק והדבק ידנית על פוסטים של אתרי הספורט). לא מתפרסמת אוטומטית:\n${d.comment}\n\n` +
+        `🔎 להגיב על הפוסטים של אתרי הספורט על הסיפור — הכפתור למטה מוצא אותם 👇\n\n` +
         `📄 פוסט לעמוד שלנו — זה מה שהכפתור "פרסם את הפוסט" מפרסם:\n${d.post}\n\n` +
         `✏️ לעריכה: פאנל האדמין ← "📣 תור פוסטים לאישור"`,
-      reply_markup: { inline_keyboard: [[
-        { text: '✅ פרסם את הפוסט', callback_data: 'a:' + id },
-        { text: '🗑️ דחה', callback_data: 'r:' + id },
-      ]] },
+      reply_markup: { inline_keyboard: [
+        [{ text: '✅ פרסם את הפוסט', callback_data: 'a:' + id }, { text: '🗑️ דחה', callback_data: 'r:' + id }],
+        [{ text: '🔎 מצא פוסטים להגיב עליהם', url: fbSearch }],
+      ] },
     });
   }
   console.log(`drafted ${added} new post(s) from ${news.length} news item(s)`);
