@@ -1971,3 +1971,30 @@ body {
 .lb-season-note { font-size: 12px; color: var(--muted); margin: 0; text-align: center; }
 .lb-fmt-badge { font-size: 11px; color: var(--muted); }
 .save-retro-note { text-align: center; font-size: 13px; color: var(--muted); margin: 4px 0 0; }
+
+/* ── Pitch tokens: rating badge + club/season line (results & pre-season) ──── */
+.slot-circle { position: relative; overflow: visible; }
+.slot-ovr {
+  position: absolute; top: -3px; inset-inline-end: -3px;
+  min-width: 15px; height: 15px; padding: 0 3px;
+  border-radius: 8px; background: #0d1117; color: #ffd700;
+  border: 1.5px solid var(--ts, #ffd700);
+  font-size: 8px; font-weight: 800; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+}
+[data-theme="light"] .slot-ovr { background: #ffffff; color: #8a6d00; }
+.slot-meta {
+  font-size: 6.5px; color: #dfe6ee; background: #00000077;
+  padding: 0 4px; border-radius: 3px; white-space: nowrap;
+  font-weight: 600; max-width: 86px; overflow: hidden; text-overflow: ellipsis;
+  direction: rtl;
+}
+.slot-meta-season { color: #ffd700; font-weight: 800; }
+@media (max-width: 340px) { .slot-meta { max-width: 60px; } }
+
+/* Share card: club + season under each name, and the years-spanned line */
+.sc-p-meta { display: block; font-size: 8px; color: #8b949e; font-weight: 600; margin-top: 1px; }
+.sc-span-line {
+  margin-top: 6px; text-align: center; font-size: 10px;
+  color: #ffd700; font-weight: 700;
+}

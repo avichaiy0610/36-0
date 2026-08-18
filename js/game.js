@@ -2056,10 +2056,32 @@ function showResults() {
   setTimeout(() => animateResults(ovr), 400);
 }
 
+// Club names on the pitch have ~80px to live in. Long ones are abbreviated the
+// way fans write them, so the SEASON — the thing that shows the era mix — never
+// gets clipped away.
+const CLUB_SHORT_FIXES = [
+  ['הפועל פתח תקווה', 'הפועל פ"ת'], ['מכבי פתח תקווה', 'מכבי פ"ת'],
+  ['הפועל תל אביב', 'הפועל ת"א'],   ['מכבי תל אביב', 'מכבי ת"א'],
+  ['בית"ר ירושלים', 'בית"ר י-ם'],   ['הפועל ירושלים', 'הפועל י-ם'],
+  ['הכח עמידר רמת גן', 'הכח ר"ג'],   ['הפועל רמת גן', 'הפועל ר"ג'],
+  ['הפועל באר שבע', 'הפועל ב"ש'],   ['הפועל כפר סבא', 'הפועל כ"ס'],
+  ['עירוני קריית שמונה', 'עירוני ק"ש'], ['מכבי אחי נצרת', 'מכבי נצרת'],
+  ['הפועל ראשון לציון', 'הפועל ראשל"צ'], ['מכבי בני ריינה', 'מכבי בני ריינה'],
+  ['הפועל רמת השרון', 'הפועל רמה"ש'], ['הפועל ניר רמת השרון', 'הפועל רמה"ש'],
+];
+function clubShortName(name) {
+  const hit = CLUB_SHORT_FIXES.find(([full]) => full === name);
+  return hit ? hit[1] : name;
+}
+
 function buildPitchInContainer(containerId) {
   const container = document.getElementById(containerId);
   if (!container) return;
   container.innerHTML = '';
+  // The OVR badge is hidden wherever hiding ratings IS the challenge — the draft
+  // and the pre-season screen. On the results screen the season is over, and the
+  // squad's OVR is on display anyway, so every player shows his rating.
+  const showOvr = state.showRatings || containerId === 'results-pitch-slots';
   state.slots.forEach((slot, idx) => {
     const pick = state.picks[idx];
     const token = document.createElement('div');
@@ -2071,11 +2093,17 @@ function buildPitchInContainer(containerId) {
       token.style.setProperty('--tc', team.primaryColor);
       token.style.setProperty('--ts', team.secondaryColor);
       token.style.setProperty('--tx', textColorFor(team.primaryColor));
+      // ⚡ marks a peak-mode rating, exactly like the draft cards do
+      const peakTag = state.peakMode && pick.player.peak_ovr && pick.player.peak_ovr > pick.player.ovr ? '⚡' : '';
+      const ovrHTML = showOvr
+        ? `<span class="slot-ovr">${peakTag}${playerOVR(pick.player)}</span>` : '';
       token.innerHTML = `
         <div class="slot-circle filled-circle">
+          ${ovrHTML}
           <span class="slot-player-short">${playerShortName(pick.player.name)}</span>
         </div>
         <div class="slot-name-label">${pick.player.name}</div>
+        <div class="slot-meta"><span class="slot-meta-season">${pick.squad.season}</span> · ${clubShortName(team.name)}</div>
       `;
     } else {
       token.innerHTML = `
@@ -2586,13 +2614,26 @@ function populateShareCard() {
     const lastName = playerShortName(pick.player.name);
     const row = document.createElement('div');
     row.className = 'sc-player-row';
+    const team = getTeam(pick.squad.teamId);
     row.innerHTML = `
       <span class="sc-p-pos" style="color:${c};background:${c}18;border-color:${c}50">${slot.pos}</span>
-      <span class="sc-p-name">${lastName}</span>
+      <span class="sc-p-name">${lastName}<span class="sc-p-meta">${team.name} · ${pick.squad.season}</span></span>
       ${state.showRatings ? `<span class="sc-p-ovr" style="color:${c}">${ovr}</span>` : ''}
     `;
     lineup.appendChild(row);
   });
+
+  // The line that makes the concept visible: how many years this XI spans
+  const years = state.picks.filter(Boolean).map(pk => parseSeasonYear(pk.squad.season));
+  if (years.length) {
+    const lo = Math.min(...years), hi = Math.max(...years);
+    if (hi > lo) {
+      const span = document.createElement('div');
+      span.className = 'sc-span-line';
+      span.textContent = `⏳ הרכב שחוצה ${hi - lo + 1} שנים · ${yearToSeason(lo)}–${yearToSeason(hi)}`;
+      lineup.appendChild(span);
+    }
+  }
 
   // Awards
   const awardsEl = document.getElementById('sc-share-awards');
@@ -2632,6 +2673,15 @@ function generateShareText() {
     (r.spec && !isModernSpec(r.spec))
       ? fillTemplate(st('share-line-format', '🏛 פורמט אותנטי — {games} מחזורים'), { ...vars, games: r.wins + r.draws + r.losses })
       : null,
+    (() => {
+      const ys = state.picks.filter(Boolean).map(pk => parseSeasonYear(pk.squad.season));
+      if (!ys.length) return null;
+      const lo = Math.min(...ys), hi = Math.max(...ys);
+      return hi > lo
+        ? fillTemplate(st('share-line-span', '⏳ הרכב שחוצה {years} שנים: {from}–{to}'),
+            { ...vars, years: hi - lo + 1, from: yearToSeason(lo), to: yearToSeason(hi) })
+        : null;
+    })(),
     fillTemplate(st('share-line-record', '{wins}נ-{draws}ת-{losses}ה | {points} נקודות'), vars),
     tierDisplay(t).name,
     grid,
