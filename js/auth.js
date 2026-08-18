@@ -59,6 +59,7 @@ async function initAuth() {
   document.getElementById('username-submit').addEventListener('click', saveUsername);
   document.getElementById('nav-leaderboard').addEventListener('click', () => typeof showLeaderboard === 'function' && showLeaderboard());
   document.getElementById('nav-achievements').addEventListener('click', () => typeof showAchievements === 'function' && showAchievements());
+  document.getElementById('nav-profile')?.addEventListener('click', () => typeof showProfile === 'function' && showProfile());
   document.getElementById('nav-leagues')?.addEventListener('click', () => typeof showLeagues === 'function' && showLeagues());
   document.getElementById('nav-duel')?.addEventListener('click', () => typeof showDuel === 'function' && showDuel());
   document.getElementById('nav-username')?.addEventListener('click', openUsernameEditor);

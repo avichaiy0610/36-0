@@ -2000,3 +2000,27 @@ body {
   margin-top: 6px; text-align: center; font-size: 10px;
   color: #ffd700; font-weight: 700;
 }
+
+/* ── Personal profile / lifetime stats ────────────────────────────────────── */
+.pf-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 14px; }
+.pf-tile { background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+           padding: 12px 6px; text-align: center; }
+.pf-val { display: block; font-size: 24px; font-weight: 900; color: var(--text); }
+.pf-val.gold { color: var(--accent); }
+.pf-lbl { display: block; font-size: 11px; color: var(--muted); margin-top: 2px; }
+.pf-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+           padding: 14px; margin-bottom: 12px; }
+.pf-card-title { font-weight: 800; margin-bottom: 10px; color: var(--text); }
+.pf-record { display: flex; gap: 18px; justify-content: center; font-size: 26px; font-weight: 900; }
+.pf-record small { font-size: 11px; font-weight: 700; margin-inline-start: 3px; color: var(--muted); }
+.pf-rec-w { color: #22c55e; } .pf-rec-d { color: #eab308; } .pf-rec-l { color: #ef4444; }
+.pf-bar { height: 8px; border-radius: 4px; background: #ef444455; overflow: hidden; margin: 10px 0 6px; }
+.pf-bar span { display: block; height: 100%; background: #22c55e; }
+.pf-sub { font-size: 12px; color: var(--muted); text-align: center; }
+.pf-line { display: flex; justify-content: space-between; gap: 10px; padding: 7px 0;
+           border-bottom: 1px solid var(--border); font-size: 14px; }
+.pf-line:last-child { border-bottom: 0; }
+.pf-line-l { color: var(--muted); }
+.pf-line-v { font-weight: 700; color: var(--text); }
+.pf-note { font-size: 12px; color: var(--muted); text-align: center; }
+@media (max-width: 380px) { .pf-grid { grid-template-columns: repeat(2, 1fr); } }
