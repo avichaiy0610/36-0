@@ -72,14 +72,14 @@ function gmCrestSVG(x, y, teamId, { size = 1, state = 'locked', elite = false } 
   return `
     <g class="gm-stadium gm-${state}${elite ? ' gm-elite' : ''}" opacity="${dim}">
       ${glow}
-      <ellipse cx="${x}" cy="${y + r * 0.75}" rx="${r * 0.8}" ry="${r * 0.3}" fill="#000" opacity=".45"/>
-      <circle cx="${x}" cy="${y}" r="${r + 2}" fill="${ring}"/>
-      <path d="M ${x - r} ${y - r * 0.8} h ${r * 2} v ${r * 0.7} a ${r} ${r} 0 0 1 -${r} ${r * 1.1}
-               a ${r} ${r} 0 0 1 -${r} -${r * 1.1} Z" fill="${t.primaryColor}"/>
-      <path d="M ${x - r} ${y - r * 0.8} h ${r} v ${r * 1.8} a ${r} ${r} 0 0 1 -${r} -${r * 1.1} Z"
-            fill="${t.secondaryColor}" opacity=".92"/>
-      <image class="gm-crest-img" href="crests/${teamId}.png" x="${x - r}" y="${y - r}"
-             width="${r * 2}" height="${r * 2}" preserveAspectRatio="xMidYMid slice"
+      <circle cx="${x}" cy="${y}" r="${r + 3.5}" fill="#0b0f14" opacity=".92"/>
+      <circle cx="${x}" cy="${y}" r="${r + 2}" fill="none" stroke="${ring}" stroke-width="2"/>
+      <circle cx="${x}" cy="${y}" r="${r}" fill="#f2f4f7" opacity=".96"/>
+      <path d="M ${x - r * 0.8} ${y - r * 0.7} h ${r * 1.6} v ${r * 0.5}
+               a ${r * 0.8} ${r * 0.8} 0 0 1 -${r * 0.8} ${r * 0.95}
+               a ${r * 0.8} ${r * 0.8} 0 0 1 -${r * 0.8} -${r * 0.95} Z" fill="${t.primaryColor}"/>
+      <image class="gm-crest-img" href="crests/${teamId}.png" x="${x - r * 0.92}" y="${y - r * 0.92}"
+             width="${r * 1.84}" height="${r * 1.84}" preserveAspectRatio="xMidYMid meet"
              onerror="this.remove()"/>
     </g>`;
 }
@@ -123,6 +123,9 @@ function renderGauntletMap(container, stations, at = 0) {
       x = hit.x + Math.cos(ang) * MIN;
       y = hit.y + Math.sin(ang) * MIN;
     }
+    // a ground pinned near the coast (or pushed there by the spread above) can
+    // end up in the sea — pull it back onto land before drawing
+    ({ x, y } = gmClampInside(x, y, 15));
     placed.push({ x, y });
     return { x, y, home: city };
   });
@@ -146,13 +149,18 @@ function renderGauntletMap(container, stations, at = 0) {
     <svg class="gm-svg" viewBox="0 0 ${GM_VIEW.w} ${GM_VIEW.h}" xmlns="http://www.w3.org/2000/svg">
       <defs>
         <linearGradient id="gm-land" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="#1c3d2a"/>
-          <stop offset="55%" stop-color="#17311f"/>
-          <stop offset="100%" stop-color="#2a2a1c"/>
+          <stop offset="0%" stop-color="#0e1f18"/>
+          <stop offset="55%" stop-color="#0b1a14"/>
+          <stop offset="100%" stop-color="#12160f"/>
         </linearGradient>
         <!-- The border is drawn by dilating the FILLED silhouette, not by
              stroking the path: a stroke would trace every sub-polygon and put
              internal lines across the country. This traces only the outer edge. -->
+        <radialGradient id="gm-glow">
+          <stop offset="0%" stop-color="#ffcf6b" stop-opacity=".38"/>
+          <stop offset="60%" stop-color="#ffb347" stop-opacity=".10"/>
+          <stop offset="100%" stop-color="#ffb347" stop-opacity="0"/>
+        </radialGradient>
         <filter id="gm-edge" x="-10%" y="-6%" width="120%" height="112%">
           <feMorphology in="SourceAlpha" operator="dilate" radius="1.2" result="fat"/>
           <feFlood flood-color="#4ea36a"/>
@@ -178,24 +186,87 @@ function renderGauntletMap(container, stations, at = 0) {
 }
 
 
-// Night lights — the country as it looks from above after dark. Real places,
-// sized by how big they are, so the coastal strip glows and the Negev doesn't.
-const GM_LIGHTS = [
-  [32.085, 34.781, 3.4], [32.070, 34.824, 2.6], [32.015, 34.779, 2.2], [31.971, 34.789, 2.2],
-  [32.166, 34.843, 1.8], [32.146, 34.839, 1.6], [32.087, 34.887, 2.4], [32.175, 34.907, 1.8],
-  [31.929, 34.799, 1.4], [31.802, 34.656, 2.2], [31.669, 34.574, 1.8], [31.610, 34.764, 1.2],
-  [32.328, 34.856, 2.0], [32.434, 34.919, 1.6], [32.794, 34.990, 3.0], [32.928, 35.082, 1.6],
-  [32.865, 35.298, 1.2], [32.700, 35.303, 1.8], [32.795, 35.530, 1.2], [33.207, 35.569, 1.0],
-  [32.960, 35.492, 1.0], [31.768, 35.214, 3.2], [31.890, 35.010, 1.4], [31.252, 34.791, 2.4],
-  [30.610, 34.800, 1.0], [29.557, 34.952, 1.2], [31.418, 34.598, 1.4], [32.640, 35.290, 1.2],
-  [32.500, 35.500, 1.0], [31.500, 34.750, 1.0], [31.350, 34.650, 0.9], [32.250, 34.950, 1.2],
+
+/* ── geometry: what counts as "inside the country" ────────────────────────── */
+// The path is already numeric viewBox coordinates, so it can be parsed straight
+// into polygons and used for hit-testing — that is how the lights know where to
+// fall and how a crest is kept from drifting into the sea.
+const GM_POLYS = (() => {
+  return ISRAEL_PATH.trim().split('M ').filter(Boolean).map(chunk =>
+    chunk.replace('Z', '').trim().split(' L ').map(pair => pair.trim().split(/\s+/).map(Number))
+  );
+})();
+function gmInside(x, y) {
+  let inside = false;
+  for (const poly of GM_POLYS) {
+    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      const [xi, yi] = poly[i], [xj, yj] = poly[j];
+      if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+    }
+  }
+  return inside;
+}
+const GM_CENTER = (() => {
+  const pts = GM_POLYS.flat();
+  return [pts.reduce((s, p) => s + p[0], 0) / pts.length, pts.reduce((s, p) => s + p[1], 0) / pts.length];
+})();
+// pulls a point back onto land, with room to spare for the marker itself
+function gmClampInside(x, y, margin = 12) {
+  const ok = (px, py) => gmInside(px, py) &&
+    gmInside(px + margin, py) && gmInside(px - margin, py) &&
+    gmInside(px, py + margin) && gmInside(px, py - margin);
+  if (ok(x, y)) return { x, y };
+  for (let t = 0.06; t <= 1; t += 0.06) {
+    const nx = x + (GM_CENTER[0] - x) * t, ny = y + (GM_CENTER[1] - y) * t;
+    if (ok(nx, ny)) return { x: nx, y: ny };
+  }
+  return { x: GM_CENTER[0], y: GM_CENTER[1] };
+}
+
+// Night lights. Not a handful of dots — a field of them, scattered inside the
+// country and weighted towards where people actually live, so the coastal strip
+// and Jerusalem burn bright and the Negev fades to almost nothing.
+const GM_HUBS = [   // [lat, lon, pull] — pull is roughly how big the place is
+  [32.085, 34.781, 30], [32.070, 34.824, 22], [32.015, 34.779, 16], [31.971, 34.789, 16],
+  [32.166, 34.843, 12], [32.087, 34.887, 18], [32.175, 34.907, 12], [31.929, 34.799, 10],
+  [31.802, 34.656, 15], [31.669, 34.574, 12], [31.610, 34.764,  8], [32.328, 34.856, 14],
+  [32.434, 34.919, 10], [32.794, 34.990, 24], [32.928, 35.082, 10], [32.865, 35.298,  8],
+  [32.700, 35.303, 12], [32.795, 35.530,  8], [33.207, 35.569,  6], [31.768, 35.214, 28],
+  [31.890, 35.010, 10], [31.252, 34.791, 18], [30.610, 34.800,  5], [29.557, 34.952,  6],
+  [31.418, 34.598,  8], [32.640, 35.290,  8], [31.500, 34.900,  6], [32.500, 35.470,  6],
 ];
+// a tiny deterministic PRNG — the sky must look the same on every render
+function gmRand(seed) {
+  let t = seed >>> 0;
+  return () => { t += 0x6D2B79F5; let r = Math.imul(t ^ (t >>> 15), 1 | t);
+    r ^= r + Math.imul(r ^ (r >>> 7), 61 | r); return ((r ^ (r >>> 14)) >>> 0) / 4294967296; };
+}
+let _gmSky = null;
 function gmLightsSVG() {
-  return GM_LIGHTS.map(([lat, lon, r]) => {
-    const x = gmX(lon).toFixed(1), y = gmY(lat).toFixed(1);
-    return `<circle cx="${x}" cy="${y}" r="${(r * 1.9).toFixed(1)}" fill="#ffd88a" opacity=".10"/>
-            <circle cx="${x}" cy="${y}" r="${r.toFixed(1)}" fill="#ffe9b0" opacity=".55"/>`;
-  }).join('');
+  if (_gmSky) return _gmSky;
+  const hubs = GM_HUBS.map(([lat, lon, pull]) => ({ x: gmX(lon), y: gmY(lat), pull }));
+  const rnd = gmRand(20260819);
+  const out = [];
+  for (let tries = 0; tries < 9000 && out.length < 1100; tries++) {
+    const x = rnd() * GM_VIEW.w, y = rnd() * GM_VIEW.h;
+    if (!gmInside(x, y)) continue;
+    // brightness falls off with distance from the nearest population centre
+    let best = 0;
+    for (const h of hubs) {
+      const d = Math.hypot(h.x - x, h.y - y);
+      best = Math.max(best, h.pull / (1 + d * d / 90));
+    }
+    const lum = Math.min(1, best / 12);
+    if (rnd() > 0.06 + lum * 0.94) continue;          // sparse where it is empty
+    const r = (0.45 + lum * 1.15).toFixed(2);
+    const o = (0.18 + lum * 0.75).toFixed(2);
+    const warm = lum > 0.55;
+    out.push(`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r}" fill="${warm ? '#ffd27a' : '#8fe3c2'}" opacity="${o}"/>`);
+  }
+  // a soft halo over the big cities, so clusters glow rather than just dot
+  const halos = hubs.filter(h => h.pull >= 14).map(h =>
+    `<circle cx="${h.x.toFixed(1)}" cy="${h.y.toFixed(1)}" r="${(h.pull * 0.9).toFixed(1)}" fill="url(#gm-glow)"/>`).join('');
+  return (_gmSky = halos + out.join(''));
 }
 
 /* ── station picking ──────────────────────────────────────────────────────── */
