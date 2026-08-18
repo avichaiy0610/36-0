@@ -749,6 +749,9 @@ async function startChallenge(period) {
   state.eraMax      = s.eraMax;
   state.oppSeason   = s.oppSeason ?? null;
   state.oppSeasonChoice = s.oppSeason ? String(s.oppSeason) : 'latest';
+  // Challenges are always the modern 36/33 format for now — an authentic-format
+  // challenge will arrive with its own settings field + generator gate.
+  state.leagueFormat = 'modern';
   state.challengeReqs = challengeRequirements(period, key, s);
   state.challengeDeck = challengeDeckFor(period, key, s.eraMin, s.eraMax, state.challengeReqs);
 

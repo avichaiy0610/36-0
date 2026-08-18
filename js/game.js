@@ -255,9 +255,29 @@ function simTeamsForSeason(year) {
   return (_simTeamsCache[y] = clubs.slice(0, 13));
 }
 const IL_TEAMS_SIM = simTeamsForSeason(LATEST_SEASON_YEAR);
+
+// ─── Classic format ("33 הקלאסי") ─────────────────────────────────────────────
+// 2001/02–2008/09 ran a 12-club league, three rounds, no playoff = 33 games.
+// That format needs 11 opponents instead of 13 — same padding rule, one club
+// fewer, so any season can be played in it.
+const CLASSIC_SEASONS = { from: 2001, to: 2008 };   // seasons that really ran 12×3
+const _classicTeamsCache = {};
+function classicTeamsForSeason(year) {
+  const y = year ?? LATEST_SEASON_YEAR;
+  if (_classicTeamsCache[y]) return _classicTeamsCache[y];
+  return (_classicTeamsCache[y] = simTeamsForSeason(y).slice(0, 11));
+}
+
+function formatOf(fmt) { return fmt === 'classic33' ? 'classic33' : 'modern'; }
+function isClassic(fmt) { return formatOf(fmt) === 'classic33'; }
+function formatTotalGames(fmt) { return isClassic(fmt) ? 33 : 36; }
+
 // The opponents for the CURRENT run. null oppSeason = latest, so squad-data
 // updates roll the default league forward automatically.
-function oppTeamsForState() { return simTeamsForSeason(state.oppSeason ?? LATEST_SEASON_YEAR); }
+function oppTeamsForState() {
+  const y = state.oppSeason ?? LATEST_SEASON_YEAR;
+  return isClassic(state.leagueFormat) ? classicTeamsForSeason(y) : simTeamsForSeason(y);
+}
 
 // ─── Era helpers ──────────────────────────────────────────────────────────────
 function parseSeasonYear(s) { return parseInt(s.split('/')[0]); }
@@ -275,6 +295,7 @@ const state = {
   peakMode: false,
   eraMin: YEAR_MIN, eraMax: YEAR_MAX,
   oppSeason: null, oppSeasonChoice: 'latest',   // null = the latest season's league
+  leagueFormat: 'modern',                       // 'modern' = 26+playoff (36/33) · 'classic33' = 3 rounds, no playoff
   formationId: null, slots: [], picks: [], currentRound: 0,
   usedSquadIds: new Set(), usedPlayerKeys: new Set(), currentSquad: null,
   selectedPlayer: null, selectedSlotIdx: null,
@@ -606,9 +627,36 @@ function initOppSeasonSelect() {
     [...ALL_SEASON_YEARS].reverse().forEach(y => {
       if (y !== LATEST_SEASON_YEAR) add(String(y), `ליגת ${yearToSeason(y)}`);
     });
-    sel.onchange = updateOppSeasonNote;
+    sel.onchange = () => { updateOppSeasonNote(); updateLeagueFormatNote(); };
   }
   updateOppSeasonNote();
+  initLeagueFormatSelect();
+}
+
+// ─── League-format selector ───────────────────────────────────────────────────
+function initLeagueFormatSelect() {
+  const sel = document.getElementById('league-format-sel');
+  if (!sel) return;
+  if (!sel.onchange) sel.onchange = updateLeagueFormatNote;
+  updateLeagueFormatNote();
+}
+
+function updateLeagueFormatNote() {
+  const sel  = document.getElementById('league-format-sel');
+  const note = document.getElementById('league-format-note');
+  if (!sel || !note) return;
+  const t = (typeof siteText === 'function') ? siteText : (_k, d) => d;
+  if (!isClassic(sel.value)) {
+    note.textContent = t('fmt-note-modern', 'הפורמט של היום: 26 מחזורים ואז פלייאוף עליון/תחתון');
+    return;
+  }
+  const oppSel = document.getElementById('opp-season-sel');
+  const y = oppSel && oppSel.value !== 'latest' && oppSel.value !== 'random'
+    ? parseInt(oppSel.value) : null;
+  const authentic = y !== null && y >= CLASSIC_SEASONS.from && y <= CLASSIC_SEASONS.to;
+  note.textContent = authentic
+    ? `${t('fmt-note-authentic', 'הפורמט האותנטי של עונת')} ${yearToSeason(y)} · 33 משחקים, בלי פלייאוף`
+    : t('fmt-note-classic', 'כך שיחקה הליגה ב-2001/02–2008/09: 12 קבוצות, 3 סיבובים, בלי פלייאוף');
 }
 
 function updateOppSeasonNote() {
@@ -641,6 +689,10 @@ function beginDraft() {
     : (document.getElementById('opp-season-sel')?.value ?? 'latest');
   state.oppSeasonChoice = oppChoice;
   state.oppSeason = resolveOppSeason(oppChoice);
+  // League/duel drafts stay on the modern format so every member plays the same
+  // 36-game season; free play may pick the classic 33.
+  state.leagueFormat = (state.leagueCode || state.duelCode) ? 'modern'
+    : formatOf(document.getElementById('league-format-sel')?.value);
 
   beginDraftWithState();
 }
@@ -697,6 +749,7 @@ function saveDraftState() {
       eraMax: state.eraMax,
       oppSeason: state.oppSeason,
       oppSeasonChoice: state.oppSeasonChoice,
+      leagueFormat: state.leagueFormat,
       currentRound: state.currentRound,
       teamRerollsLeft: state.teamRerollsLeft,
       seasonRerollsLeft: state.seasonRerollsLeft,
@@ -725,6 +778,7 @@ function saveSeasonState(season) {
       ovr: season.ovr,
       matches: season.matches,
       inTopSix: season.inTopSix,
+      format: season.format ?? 'modern',
       leagueTable: season.leagueTable,
       playerStats: season.playerStats.map(({ squad, ...rest }) => rest),
     };
@@ -764,6 +818,7 @@ function restoreDraftState() {
     draftMode: d.draftMode, peakMode: d.peakMode,
     eraMin: d.eraMin, eraMax: d.eraMax,
     oppSeason: d.oppSeason ?? null, oppSeasonChoice: d.oppSeasonChoice ?? 'latest',
+    leagueFormat: formatOf(d.leagueFormat),
     currentRound: d.currentRound,
     teamRerollsLeft: d.teamRerollsLeft, seasonRerollsLeft: d.seasonRerollsLeft,
     usedSquadIds: new Set(d.usedSquadIds), usedPlayerKeys: new Set(d.usedPlayerKeys),
@@ -1476,7 +1531,8 @@ function simulateMatch(myOvr, opp, homeOverride = null) {
   return { outcome, gf, ga, opponent: opp.name, home };
 }
 
-function generateMatches(ovr, oppTeams = IL_TEAMS_SIM) {
+function generateMatches(ovr, oppTeams = IL_TEAMS_SIM, fmt = 'modern') {
+  if (isClassic(fmt)) return generateClassicMatches(ovr, oppTeams);
   // ── שלב הליגה: 26 משחקים (13 יריבים × בית + חוץ) ───────────────────────────
   const regPool    = shuffleArr([...oppTeams, ...oppTeams]);
   const regMatches = regPool.map(opp => simulateMatch(ovr, opp));
@@ -1516,7 +1572,37 @@ function generateMatches(ovr, oppTeams = IL_TEAMS_SIM) {
   const champOpponents = inTopSix ? sortedTeams.slice(0, 5) : sortedTeams.slice(0, 6);
   const relegOpponents = inTopSix ? sortedTeams.slice(5)    : sortedTeams.slice(6);
 
-  return { matches: [...regMatches, ...playoffMatches], inTopSix, champOpponents, relegOpponents };
+  return { matches: [...regMatches, ...playoffMatches], inTopSix, champOpponents, relegOpponents, format: 'modern' };
+}
+
+// ─── Classic league: 12 clubs × 3 rounds, no playoff = 33 games ────────────────
+// Each of the 11 opponents is met three times, so home advantage can't split
+// evenly: six opponents give two home games, five give one (drawn at random,
+// exactly like the real fixture list alternated it year to year).
+function generateClassicMatches(ovr, oppTeams) {
+  const teams  = oppTeams.slice(0, 11);
+  // 11 opponents × 3 meetings can't split home/away evenly: five or six of them
+  // (drawn per season, like the real fixture list) give a second home game.
+  const twoHome = Math.random() < 0.5 ? 5 : 6;
+  const extraH  = shuffleArr(teams.map((_, i) => i < twoHome));
+  const fixtures = [];
+  teams.forEach((opp, i) => {
+    const homes = extraH[i] ? [true, true, false] : [true, false, false];
+    homes.forEach(h => fixtures.push({ opp, home: h }));
+  });
+  const matches = shuffleArr(fixtures).map(f => simulateMatch(ovr, f.opp, f.home));
+
+  // No playoff — one 12-row table, every club plays all 33 games.
+  const avgOppOvr = Math.round(teams.reduce((s, t) => s + t.ovr, 0) / teams.length);
+  const tableOpponents = teams.map(t => {
+    const diff  = t.ovr - avgOppOvr;
+    const winP  = Math.max(0.1, Math.min(0.85, 0.47 + diff * WINP_SLOPE));
+    const drawP = Math.max(0.05, 0.22 - Math.abs(diff) * 0.005);
+    const pts   = Math.max(5, Math.round((winP * 3 + drawP) * 33 + rand(-5, 5)));
+    return { ...t, pts };
+  });
+
+  return { matches, inTopSix: null, champOpponents: tableOpponents, relegOpponents: [], format: 'classic33' };
 }
 
 // ─── Player stats simulation ───────────────────────────────────────────────────
@@ -1567,13 +1653,15 @@ function calcHighlights(matches) {
 }
 
 // ─── League table generator ────────────────────────────────────────────────────
-function generateLeagueTable(wins, draws, losses, inTopSix, champOpponents, relegOpponents) {
-  const fakeRow = (opp, totalGames) => {
+function generateLeagueTable(wins, draws, losses, inTopSix, champOpponents, relegOpponents, fmt = 'modern') {
+  const fakeRow = (opp, totalGames, alreadyFullSeason = false) => {
     // Extrapolate the opponent's simulated regular-season points to the full
     // season so the final table stays consistent with the bracket split.
     const regPts = opp.pts ??
       Math.round((Math.max(0.1, Math.min(0.85, 0.47 + (opp.ovr - 78) * WINP_SLOPE)) * 3 + 0.15) * 26);
-    const estPts = Math.max(3, Math.round(regPts * totalGames / 26) + rand(-3, 3));
+    const estPts = alreadyFullSeason
+      ? Math.max(3, regPts)
+      : Math.max(3, Math.round(regPts * totalGames / 26) + rand(-3, 3));
     const d = rand(3, 8);
     const w = Math.max(0, Math.min(totalGames - d, Math.round((estPts - d) / 3)));
     const l = Math.max(0, totalGames - w - d);
@@ -1583,6 +1671,11 @@ function generateLeagueTable(wins, draws, losses, inTopSix, champOpponents, rele
                       gf: wins*2+draws+rand(0,8), ga: losses*2+draws+rand(0,6), us: true };
   const addPts = r => ({ ...r, pts: r.w*3+r.d });
   const sort   = rows => rows.map(addPts).sort((a,b) => b.pts-a.pts || b.w-a.w);
+
+  // Classic 33: one table, 12 rows, no bracket split and no cross-bracket fixing
+  if (isClassic(fmt)) {
+    return sort([playerRow, ...champOpponents.map(opp => fakeRow(opp, 33, true))]);
+  }
 
   // Championship playoff (6 teams, 36 games) — sorted independently
   const champRows = sort([
@@ -1688,13 +1781,14 @@ function buildPlayerStatsTable(ps) {
   });
 }
 
-function buildLeagueTable(table) {
+function buildLeagueTable(table, fmt = 'modern') {
   const container = document.getElementById('league-table');
   if (!container) return;
   container.innerHTML = '';
+  const bracketSplit = isClassic(fmt) ? -1 : 6;   // classic = one undivided table
   table.forEach((t, idx) => {
     // Separator between championship (1–6) and relegation (7–14) brackets
-    if (idx === 6) {
+    if (idx === bracketSplit) {
       const sep = document.createElement('div');
       sep.className = 'lt-bracket-sep';
       container.appendChild(sep);
@@ -1716,8 +1810,21 @@ function buildLeagueTable(table) {
 // ─── Tier ─────────────────────────────────────────────────────────────────────
 // tier.name is canonical (achievements on the server match it) — the DISPLAYED
 // name/sub go through tierDisplay(), which allows admin overrides per tier id.
-function getTier(wins, draws, losses, rank, n, totalGames) {
+function getTier(wins, draws, losses, rank, n, totalGames, fmt = 'modern') {
   const pts = wins * 3 + draws;
+  // Classic 33 has no playoff, so the bracket-named tiers don't exist there.
+  if (isClassic(fmt)) {
+    if (losses===0 && draws===0 && totalGames===33) return { id:'perfect33', name:'33–0 🏛', sub:'הליגה הקלאסית — מושלמת',        color:'#FFD700' };
+    if (losses===0)              return { id:'unbeaten',   name:'בלתי מנוצחים ✨',  sub:'עונה שלמה ללא תבוסה',            color:'#C8A800' };
+    if (rank === 1 && pts >= 82) return { id:'champ-gap',  name:'אלופים בפער 🥇',   sub:'שיא הליגה — תיתכן שושלת',        color:'#FFD700' };
+    if (rank === 1)              return { id:'champ',      name:'אלופים 🏆',         sub:'זוכי ליגת העל',                 color:'#d4af37' };
+    if (rank === 2)              return { id:'runner-up',  name:'מקום שני 🥈',       sub:'עונה מבריקה — עד כמה היה קרוב?', color:'#C0C0C0' };
+    if (rank === 3)              return { id:'third',      name:'מקום שלישי 🥉',     sub:'על הפודיום',                    color:'#cd7f32' };
+    if (rank <= 6)               return { id:'top-half',   name:'מחצית עליונה',      sub:'עונה מכובדת בליגה הקלאסית',      color:'#4CAF50' };
+    if (rank <= n - 3)           return { id:'mid-table',  name:'אמצע הטבלה',        sub:'עונה שקטה',                     color:'#2196F3' };
+    if (rank <= n - 1)           return { id:'survivor',   name:'שורדים בליגה ⚠',   sub:'מאבק הישרדות — ניצחון בשניות',   color:'#FF9800' };
+    return                              { id:'relegated',  name:'ירידת ליגה ⬇',      sub:'ירידה לליגה הלאומית',            color:'#F44336' };
+  }
   if (losses===0 && draws===0 && totalGames===36) return { id:'perfect36', name:'36–0 🏆',   sub:'הבלתי אפשרי הפך למציאות',         color:'#FFD700' };
   if (losses===0)              return { id:'unbeaten',  name:'בלתי מנוצחים ✨',    sub:'עונה שלמה ללא תבוסה',              color:'#C8A800' };
   if (rank === 1 && pts >= 90) return { id:'champ-gap', name:'אלופים בפער 🥇',     sub:'שיא הליגה — תיתכן שושלת',          color:'#FFD700' };
@@ -1742,11 +1849,12 @@ function tierDisplay(tier) {
 function calcPreseasonOdds(ovr, simCount = 300) {
   let ranks = [], totalPts = 0;
   for (let i = 0; i < simCount; i++) {
-    const { matches, inTopSix, champOpponents, relegOpponents } = generateMatches(ovr, oppTeamsForState());
+    const fmt = formatOf(state.leagueFormat);
+    const { matches, inTopSix, champOpponents, relegOpponents } = generateMatches(ovr, oppTeamsForState(), fmt);
     const w = matches.filter(m => m.outcome === 'W').length;
     const d = matches.filter(m => m.outcome === 'D').length;
     const l = matches.filter(m => m.outcome === 'L').length;
-    const table = generateLeagueTable(w, d, l, inTopSix, champOpponents, relegOpponents);
+    const table = generateLeagueTable(w, d, l, inTopSix, champOpponents, relegOpponents, fmt);
     ranks.push(table.findIndex(t => t.us) + 1);
     totalPts += w * 3 + d;
   }
@@ -1866,7 +1974,8 @@ function animateResults(ovr) {
   if (!season) {
     const projected = window._preseasonProjected ?? calcPreseasonOdds(ovr).projectedFinish;
     const simulate = () => {
-      const g = generateMatches(ovr, oppTeamsForState());
+      const fmt = formatOf(state.leagueFormat);
+      const g = generateMatches(ovr, oppTeamsForState(), fmt);
       let w = 0, d = 0;
       g.matches.forEach(m => { if (m.outcome === 'W') w++; else if (m.outcome === 'D') d++; });
       const l = g.matches.length - w - d;
@@ -1874,7 +1983,8 @@ function animateResults(ovr) {
         ovr,
         matches: g.matches,
         inTopSix: g.inTopSix,
-        leagueTable: generateLeagueTable(w, d, l, g.inTopSix, g.champOpponents, g.relegOpponents),
+        format: fmt,
+        leagueTable: generateLeagueTable(w, d, l, g.inTopSix, g.champOpponents, g.relegOpponents, fmt),
         playerStats: simulatePlayerStats(g.matches),
         projectedFinish: projected,
       };
@@ -1895,6 +2005,9 @@ function animateResults(ovr) {
   const { matches, inTopSix, leagueTable, playerStats } = season;
   ovr = season.ovr;
   const totalGames = matches.length;
+  // A restored/preset season carries its own format — never re-read state, or a
+  // refresh after changing the setting would re-label an already-played season.
+  const seasonFmt = formatOf(season.format ?? (matches.length === 33 && inTopSix == null ? 'classic33' : 'modern'));
   const grid = document.getElementById('matches-grid');
   grid.innerHTML = '';
 
@@ -1931,6 +2044,8 @@ function animateResults(ovr) {
     sep.textContent = inTopSix ? '── 🏆 פלייאוף עליון ──' : '── פלייאוף תחתון ──';
     return sep;
   }
+  // Classic 33 has no playoff, so the fixture list gets no separator at all.
+  const splitAt = isClassic(seasonFmt) ? -1 : 26;
 
   // Fills the summary cards, stats and story — WITHOUT revealing the tier/finish
   // (those stay hidden until revealSummary(), so the reveal isn't spoiled).
@@ -1938,11 +2053,11 @@ function animateResults(ovr) {
     setEl('res-wins', wins); setEl('res-draws', draws); setEl('res-losses', losses);
     setEl('res-points', wins*3+draws); setEl('res-gf', gfTotal); setEl('res-ga', gaTotal);
 
-    const tier = getTier(wins, draws, losses, myRank, leagueTable.length, totalGames);
+    const tier = getTier(wins, draws, losses, myRank, leagueTable.length, totalGames, seasonFmt);
     const td = tierDisplay(tier);
     setEl('res-tier', td.name, tier.color);
     setEl('res-tier-sub', td.sub);
-    window._lastResult = { wins, draws, losses, gfTotal, gaTotal, matches, ovr, inTopSix };
+    window._lastResult = { wins, draws, losses, gfTotal, gaTotal, matches, ovr, inTopSix, format: seasonFmt };
     window._lastTier   = tier;
     const diffMapR = {
       easy:   siteText('label-diff-easy', 'קל'),
@@ -1954,6 +2069,7 @@ function animateResults(ovr) {
     if (!state.showRatings) modeParts.push(siteText('label-hidden-ratings', '🙈 דירוגים מוסתרים'));
     if (state.oppSeason)
       modeParts.push(siteText('label-opp-league', '🆚 ליגת {season}').replace('{season}', yearToSeason(state.oppSeason)));
+    if (isClassic(seasonFmt)) modeParts.push(siteText('label-format-classic33', '🏛 ליגה קלאסית — 33 מחזורים'));
     if (state.challenge && typeof challengeLabel === 'function')
       modeParts.unshift(`${CHAL_PERIODS[state.challenge.period]?.icon ?? '🗓️'} ${challengeLabel(state.challenge.period)} #${challengeNumber(state.challenge.period, state.challenge.key)}`);
     const modeInfoEl = document.getElementById('res-mode-info');
@@ -1974,7 +2090,7 @@ function animateResults(ovr) {
         ? `<span dir="ltr">${hi.bigWin.gf}-${hi.bigWin.ga}</span> נגד ${hi.bigWin.opponent}`
         : '—';
     }
-    buildLeagueTable(leagueTable);
+    buildLeagueTable(leagueTable, seasonFmt);
     renderSeasonStory({ wins, draws, losses, gfTotal, gaTotal, ovr, myRank,
                         projectedFinish: season.projectedFinish, ps: playerStats, tier });
     return tier;
@@ -1991,7 +2107,7 @@ function animateResults(ovr) {
   // ── Restored season (page refresh): render everything instantly, no suspense ──
   if (seasonWasRestored) {
     matches.forEach((m, idx) => {
-      if (idx === 26) grid.appendChild(separatorRow());
+      if (idx === splitAt) grid.appendChild(separatorRow());
       grid.appendChild(makeMatchRow(m));
     });
     fillResults();
@@ -2010,7 +2126,7 @@ function animateResults(ovr) {
 
   let idx = 0, timer = null;
   function revealOne() {
-    if (idx === 26) grid.appendChild(separatorRow());
+    if (idx === splitAt) grid.appendChild(separatorRow());
     const m = matches[idx];
     grid.appendChild(makeMatchRow(m));
     if (m.outcome === 'W') rw++; else if (m.outcome === 'D') rd++; else rl++;
@@ -2023,7 +2139,7 @@ function animateResults(ovr) {
     clearTimeout(timer);
     // append any not-yet-shown matches (skip path)
     for (; idx < matches.length; idx++) {
-      if (idx === 26) grid.appendChild(separatorRow());
+      if (idx === splitAt) grid.appendChild(separatorRow());
       grid.appendChild(makeMatchRow(matches[idx]));
     }
     if (skipBtn) skipBtn.style.display = 'none';
@@ -2291,6 +2407,7 @@ function populateShareCard() {
   if (state.peakMode) modeParts.push('⚡ שיא');
   if (!state.showRatings) modeParts.push('🙈 סמוי');
   if (state.oppSeason) modeParts.push('🆚 ליגת ' + yearToSeason(state.oppSeason));
+  if (isClassic(r.format)) modeParts.push('🏛 קלאסי 33');
   const modeEl = document.getElementById('sc-p-mode');
   modeEl.textContent = modeParts.join(' · ');
   modeEl.style.display = 'inline-block';
@@ -2358,6 +2475,7 @@ function generateShareText() {
     state.oppSeason
       ? fillTemplate(st('share-line-opp', '🆚 מול ליגת {opp}'), { ...vars, opp: yearToSeason(state.oppSeason) })
       : null,
+    isClassic(r.format) ? st('share-line-classic33', '🏛 ליגה קלאסית — 3 סיבובים, 33 מחזורים') : null,
     fillTemplate(st('share-line-record', '{wins}נ-{draws}ת-{losses}ה | {points} נקודות'), vars),
     tierDisplay(t).name,
     grid,
@@ -2524,6 +2642,7 @@ async function submitResult() {
       peak_mode:       state.peakMode,
       ratings_visible: state.showRatings,
       ...(state.oppSeason ? { opp_season: state.oppSeason } : {}),
+      ...(isClassic(r.format) ? { league_format: 'classic33' } : {}),
       ...(state.challenge ? { challenge: state.challenge.period + '|' + state.challenge.key } : {}),
     },
     players: state.picks.flatMap((pick, i) => {
