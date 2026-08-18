@@ -165,19 +165,18 @@ async function loadLeaderboard() {
   });
 }
 
-async function openSquadModal(resultId, username) {
-  const { data: squad } = await _supabase
-    .from('squads')
-    .select('players')
-    .eq('result_id', resultId)
-    .eq('is_public', true)
-    .single();
+// own = your own season from the profile, where the squad is readable whether or
+// not you chose to share it (RLS already limits this to the owner).
+async function openSquadModal(resultId, username, own = false) {
+  let q = _supabase.from('squads').select('players').eq('result_id', resultId);
+  if (!own) q = q.eq('is_public', true);
+  const { data: squad } = await q.single();
 
-  document.getElementById('squad-modal-title').textContent = `הרכב של ${username}`;
+  document.getElementById('squad-modal-title').textContent = own ? 'ההרכב שלך' : `הרכב של ${username}`;
   const pitch = document.getElementById('squad-modal-pitch');
 
   if (!squad?.players?.length) {
-    pitch.innerHTML = '<p class="page-note">המשתמש לא שיתף את ההרכב</p>';
+    pitch.innerHTML = `<p class="page-note">${own ? 'ההרכב של העונה הזאת לא נשמר' : 'המשתמש לא שיתף את ההרכב'}</p>`;
   } else {
     const list = document.createElement('div');
     list.className = 'squad-player-list';

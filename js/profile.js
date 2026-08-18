@@ -40,6 +40,27 @@ async function showProfile() {
   renderProfile(body, s);
 }
 
+// The season worth bragging about, with the XI that did it one tap away.
+function bestCardHTML(s) {
+  const b = s.best;
+  if (!b) return '';
+  const when = b.created_at ? new Date(b.created_at).toLocaleDateString('he-IL', { day: 'numeric', month: 'numeric', year: '2-digit' }) : '';
+  const opp = b.settings && b.settings.opp_season ? ` · 🆚 ליגת ${profEsc(b.settings.opp_season)}/${profEsc(String(+b.settings.opp_season + 1).slice(-2))}` : '';
+  const retro = b.settings && b.settings.league_format === 'authentic' ? ' · 🏛 פורמט אותנטי' : '';
+  return `
+    <div class="pf-card pf-best">
+      <div class="pf-card-title">🏆 העונה הכי טובה שלך</div>
+      <div class="pf-best-head">
+        <span class="pf-best-tier">${profEsc(b.tier || '')}</span>
+        <span class="pf-best-pts">${profEsc(b.points)} נק׳</span>
+      </div>
+      <div class="pf-sub">${profEsc(b.wins)}נ׳ ${profEsc(b.draws)}ת׳ ${profEsc(b.losses)}ה׳ · OVR ${profEsc(b.ovr)} · ${profEsc(b.formation || '')}${opp}${retro}${when ? ' · ' + profEsc(when) : ''}</div>
+      ${b.has_squad
+        ? `<button class="btn-primary btn-full pf-best-btn" id="pf-view-squad">👕 צפה בהרכב</button>`
+        : `<p class="pf-note">ההרכב של העונה הזאת לא נשמר</p>`}
+    </div>`;
+}
+
 function renderProfile(body, s) {
   const teamName = id => (typeof TEAMS === 'object' && TEAMS[id] ? TEAMS[id].name : id);
   const games = (s.wins || 0) + (s.draws || 0) + (s.losses || 0);
@@ -60,6 +81,8 @@ function renderProfile(body, s) {
       ${tile(s.best_ovr ?? '—', 'ההרכב הכי חזק')}
       ${tile(s.achievements || 0, 'הישגים')}
     </div>
+
+    ${bestCardHTML(s)}
 
     <div class="pf-card">
       <div class="pf-card-title">📊 המאזן שלך</div>
@@ -91,4 +114,13 @@ function renderProfile(body, s) {
       ? `<p class="pf-note">שיחקת ${profEsc(s.seasons_played)} עונות, מתוכן ${profEsc(s.seasons_saved)} נשמרו ללוח השיאים. עונות שלא שמרת נספרות כאן אבל אין להן פירוט.</p>`
       : ''}
   `;
+
+  const btn = document.getElementById('pf-view-squad');
+  if (btn && s.best) {
+    btn.onclick = () => {
+      if (typeof openSquadModal !== 'function') return;
+      openSquadModal(s.best.result_id, s.username || 'אני', true);
+      document.getElementById('squad-modal').style.display = 'flex';
+    };
+  }
 }
