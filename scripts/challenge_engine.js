@@ -181,6 +181,7 @@ async function fixtures() {
       if (!home || !away || !date) return;
       out.push({
         id: '365-' + g.id, kind: 'league', date, time: String(g.startTime || '').slice(11, 16),
+        round: g.roundNum ?? null,
         home, away, homeId: clubIdHeb(home), awayId: clubIdHeb(away), league: 'ליגת העל',
       });
     });
@@ -228,6 +229,7 @@ function derbyOf(a, b) {
 // better hung on a derby than on one evening — so its weight fades by period.
 function score(f, period) {
   if (f.kind === 'nt') return period === 'daily' ? 100 : period === 'weekly' ? 60 : 30;
+  if (f.kind === 'round' && period === 'daily') return 0;   // no date → can't be today's
   if (!f.homeId || !f.awayId) return 0;          // unmapped club — never guess
   // The size of a fixture is set by its WEAKER side: a giant against a minnow is
   // not a big night, two mid-size rivals can be. So the smaller prestige counts
@@ -262,14 +264,63 @@ function compose(period, f) {
   const big = prestige(f.homeId) >= prestige(f.awayId) ? f.homeId : f.awayId;
   const other = big === f.homeId ? f.awayId : f.homeId;
   const n = period === 'daily' ? 2 : 3;
-  const reqs = [clubMission(big, n), period !== 'daily' ? clubMission(other, 1) : null].filter(Boolean);
+  const reqs = f.undated
+    ? [clubMission(f.homeId, 2), clubMission(f.awayId, 2)].filter(Boolean)
+    : [clubMission(big, n), period !== 'daily' ? clubMission(other, 1) : null].filter(Boolean);
   if (!reqs.length) return null;
   const when = period === 'daily' ? 'ערב' : period === 'weekly' ? 'שבוע' : 'חודש';
-  const label = derby ? `🔥 ${when} ה${derby}` : `⚽ ${heb(f.homeId)} נגד ${heb(f.awayId)}`;
-  const s = { label, requirements: reqs, note: `${f.date} ${f.time} · ${f.home} vs ${f.away}` };
+  const rivalry = f.undated ? derbyOf(f.homeId, f.awayId) : null;
+  const label = f.undated
+    ? (rivalry ? `🔥 ${rivalry}` : `🔥 המשחקים הגדולים של המחזור`)
+    : (derby ? `🔥 ${when} ה${derby}` : `⚽ ${heb(f.homeId)} נגד ${heb(f.awayId)}`);
+  const note = f.undated
+    ? `מחזור ${f.round}: ${heb(f.homeId)} ו${heb(f.awayId)} עדיין בלי שעת פתיחה`
+    : `${f.date} ${f.time} · ${f.home} vs ${f.away}`;
+  const s = { label, requirements: reqs, note };
   if (period !== 'daily') s.difficulty = 'hard';
   if (period === 'monthly') s.requirements.push({ type: 'max_team_ovr', ovr: 84 });
   return s;
+}
+
+// Every club plays every round. So a club with no dated game in the window is
+// still playing that round — the kickoff simply hasn't been set (European ties
+// hold up the Israeli schedule every August). For the WEEKLY and MONTHLY
+// challenge the date is irrelevant, so those clubs are still fair game; only
+// the DAILY challenge truly needs a date.
+function roundsInWindow(inRange) {
+  return [...new Set(inRange.filter(f => f.kind === 'league' && f.round != null).map(f => f.round))];
+}
+// clubs of a round that have no kickoff yet = every club in the league minus the
+// ones already listed in that round's fixtures
+function undatedClubs(round, all) {
+  const inRound = new Set();
+  all.forEach(f => {
+    if (f.round !== round) return;
+    if (f.homeId) inRound.add(f.homeId);
+    if (f.awayId) inRound.add(f.awayId);
+  });
+  if (!inRound.size) return [];
+  const league = new Set();
+  all.forEach(f => { if (f.kind === 'league') { if (f.homeId) league.add(f.homeId); if (f.awayId) league.add(f.awayId); } });
+  return [...league].filter(id => !inRound.has(id)).sort((a, b) => prestige(b) - prestige(a));
+}
+// a stand-in "fixture" for the two biggest clubs of this round with no date yet
+function undatedPair(inRange, all) {
+  for (const r of roundsInWindow(inRange)) {
+    const g = undatedClubs(r, all).filter(id => (FANBASE[id] || 0) >= 8);
+    if (g.length < 2) continue;
+    // Several giants can be unscheduled at once and their prestige often ties.
+    // If two of them are known rivals, that is almost certainly the pairing the
+    // league held back — so prefer it over an arbitrary top-two.
+    let pick = [g[0], g[1]];
+    outer: for (let i = 0; i < g.length; i++)
+      for (let j = i + 1; j < g.length; j++)
+        if (derbyOf(g[i], g[j])) { pick = [g[i], g[j]]; break outer; }
+    return { kind: 'round', round: r, homeId: pick[0], awayId: pick[1],
+             home: heb(pick[0]), away: heb(pick[1]), date: '', time: '', undated: true,
+             id: 'round-' + r + '-' + pick[0] + '-' + pick[1] };
+  }
+  return null;
 }
 
 /* ── periods that are still safe to write ─────────────────────────────────── */
@@ -290,16 +341,15 @@ const inWindow = (f, t) => f.date >= dailyKey(t.from) && f.date <= dailyKey(t.to
 // Which prominent clubs have no scheduled game in this window. In Israel the
 // round is often published in pieces — clubs playing in Europe get their game
 // dated late — so a missing giant is a real signal, not a bug.
-function unscheduledNote(inRange, all, t) {
-  const playing = new Set();
-  inRange.forEach(f => { if (f.homeId) playing.add(f.homeId); if (f.awayId) playing.add(f.awayId); });
-  const known = new Set();
-  all.forEach(f => { if (f.homeId) known.add(f.homeId); if (f.awayId) known.add(f.awayId); });
-  const missing = [...known].filter(id => !playing.has(id) && (FANBASE[id] || 0) >= 8);
-  if (!missing.length) return '';
-  return `
+function unscheduledNote(inRange, all) {
+  const notes = [];
+  for (const r of roundsInWindow(inRange)) {
+    const missing = undatedClubs(r, all);
+    if (missing.length) notes.push(`מחזור ${r}: ${missing.map(heb).join(', ')}`);
+  }
+  return notes.length ? `
 
-📌 עדיין בלי תאריך בתקופה הזאת: ${missing.map(heb).join(', ')}.`;
+📌 עדיין בלי שעת פתיחה — ${notes.join(' · ')}.` : '';
 }
 
 /* ── Telegram approvals from the previous run ─────────────────────────────── */
@@ -325,6 +375,7 @@ async function processTaps() {
         msg = `✅ נשמר: ${period} ${key}`;
       } else {
         msg = `🗑️ נדחה: ${period} ${key}`;
+        try { await stateSet(`chal_rejected|${period}|${key}`, JSON.parse(raw).label || ''); } catch (e) {}
       }
       await stateSet(`chal_pending|${period}|${key}`, '');
     }
@@ -345,7 +396,12 @@ async function processTaps() {
 
   for (const t of targets(now)) {
     const inRange = all.filter(f => inWindow(f, t));
-    const best = pickBest(inRange, t.period);
+    const candidates = [...inRange];
+    if (t.period !== 'daily') {
+      const pair = undatedPair(inRange, all);
+      if (pair) candidates.push(pair);
+    }
+    const best = pickBest(candidates, t.period);
     if (!best) { console.log(`${t.period} ${t.key}: no notable fixture`); continue; }
 
     const proposal = compose(t.period, best);
@@ -365,6 +421,10 @@ async function processTaps() {
     // Never say the same thing twice. A proposal is only worth a message if its
     // headline or its missions actually changed — force re-evaluates, it does
     // not re-send.
+    const rejected = await stateGet(`chal_rejected|${t.period}|${t.key}`);
+    if (rejected && rejected === proposal.label) {
+      console.log(`${t.period} ${t.key}: you already rejected "${rejected}" — not re-offering`); continue;
+    }
     const same = prev && prev.label === proposal.label &&
       JSON.stringify(prev.requirements) === JSON.stringify(proposal.requirements);
     if (same) { console.log(`${t.period} ${t.key}: unchanged — not re-sending`); continue; }
@@ -385,7 +445,7 @@ async function processTaps() {
       text: (prev ? `🔄 עדכון להצעה · ` : `🎯 אתגר ${periodHe} מוצע · `) + t.key + `\n\n`
           + `${proposal.label}\n${proposal.note}\n\n${reqLines}`
           + (proposal.difficulty ? `\n· קושי: קשה` : '')
-          + unscheduledNote(inRange, all, t)
+          + unscheduledNote(inRange, all)
           + (best.kind === 'league' && leagueCount < 7
               ? `\n\n⚠️ רק ${leagueCount} משחקים פורסמו למחזור — אם יתפרסם משחק גדול יותר, תגיע הצעה מעודכנת.`
               : ''),
