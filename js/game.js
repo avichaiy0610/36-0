@@ -3006,6 +3006,16 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.target.id === 'share-modal') closeShareModal();
   });
 
+  // The squad viewer is opened from the leaderboard, from a league AND from the
+  // profile, so its close button is wired once here — wiring it inside each
+  // screen left the ✕ dead for whoever reached it another way.
+  const squadModal = document.getElementById('squad-modal');
+  if (squadModal) {
+    const closeSquad = () => { squadModal.style.display = 'none'; };
+    document.getElementById('squad-modal-close')?.addEventListener('click', closeSquad);
+    squadModal.addEventListener('click', e => { if (e.target.id === 'squad-modal') closeSquad(); });
+  }
+
   document.querySelectorAll('.opt-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       const row = btn.closest('.option-row');
