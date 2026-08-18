@@ -666,6 +666,16 @@ function initOppSeasonSelect() {
   initLeagueFormatSelect();
 }
 
+function updateOppSeasonNote() {
+  const sel = document.getElementById('opp-season-sel');
+  const note = document.getElementById('opp-season-note');
+  if (!sel || !note) return;
+  const t = (typeof siteText === 'function') ? siteText : (_k, d) => d;
+  if (sel.value === 'random') { note.textContent = t('opp-note-random', 'כל עונה חדשה מגרילה ליגת יריבות אחרת'); return; }
+  const y = sel.value === 'latest' ? LATEST_SEASON_YEAR : parseInt(sel.value);
+  note.textContent = `${t('opp-note-strength', 'עוצמת הליגה')}: ${oppLeagueStrength(y).toFixed(1)} · ${oppStrengthTag(y)}`;
+}
+
 // ─── League-format selector ───────────────────────────────────────────────────
 function initLeagueFormatSelect() {
   const sel = document.getElementById('league-format-sel');
