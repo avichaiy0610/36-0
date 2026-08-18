@@ -318,7 +318,7 @@ async function processTaps() {
     if (raw) {
       if (action === 'ca') {
         const s = JSON.parse(raw);
-        delete s.note; delete s.score;
+        delete s.note; delete s.score; delete s.message_id;
         await sb('POST', 'challenge_overrides',
           { period, challenge_key: key, settings: s },
           { Prefer: 'resolution=merge-duplicates' });
@@ -359,30 +359,50 @@ async function processTaps() {
     if (existing && existing.length) { console.log(`${t.period} ${t.key}: already overridden, skipping`); continue; }
     const pendingRaw = await stateGet(`chal_pending|${t.period}|${t.key}`);
     const bestScore = score(best, t.period);
-    if (pendingRaw && !force) {
-      let prev = 0;
-      try { prev = JSON.parse(pendingRaw).score || 0; } catch (e) {}
-      if (bestScore <= prev) { console.log(`${t.period} ${t.key}: already proposed (score ${prev})`); continue; }
-      console.log(`${t.period} ${t.key}: better fixture found (${prev} → ${bestScore}), re-proposing`);
+    let prev = null;
+    try { prev = pendingRaw ? JSON.parse(pendingRaw) : null; } catch (e) {}
+
+    // Never say the same thing twice. A proposal is only worth a message if its
+    // headline or its missions actually changed — force re-evaluates, it does
+    // not re-send.
+    const same = prev && prev.label === proposal.label &&
+      JSON.stringify(prev.requirements) === JSON.stringify(proposal.requirements);
+    if (same) { console.log(`${t.period} ${t.key}: unchanged — not re-sending`); continue; }
+    if (prev && !force && bestScore <= (prev.score || 0)) {
+      console.log(`${t.period} ${t.key}: already proposed (score ${prev.score || 0})`); continue;
     }
+    if (prev) console.log(`${t.period} ${t.key}: proposal changed (${prev.score || 0} → ${bestScore})`);
 
     proposal.score = bestScore;
-    await stateSet(`chal_pending|${t.period}|${t.key}`, JSON.stringify(proposal));
     const periodHe = { daily: 'יומי', weekly: 'שבועי', monthly: 'חודשי' }[t.period];
     const reqLines = proposal.requirements.map(r =>
       r.type === 'club_count' ? `· לפחות ${r.n} מ${heb(r.teamId)}`
       : r.type === 'nat_count' ? `· לפחות ${r.n} שחקנים מישראל`
       : `· דירוג הרכב עד ${r.ovr}`).join('\n');
-    await tg('sendMessage', {
+    const leagueCount = inRange.filter(x => x.kind === 'league').length;
+    const body = {
       chat_id: TELEGRAM_CHAT_ID,
-      text: `🎯 אתגר ${periodHe} מוצע · ${t.key}\n\n`
+      text: (prev ? `🔄 עדכון להצעה · ` : `🎯 אתגר ${periodHe} מוצע · `) + t.key + `\n\n`
           + `${proposal.label}\n${proposal.note}\n\n${reqLines}`
-          + (proposal.difficulty ? `\n· קושי: קשה` : ''),
+          + (proposal.difficulty ? `\n· קושי: קשה` : '')
+          + unscheduledNote(inRange, all, t)
+          + (best.kind === 'league' && leagueCount < 7
+              ? `\n\n⚠️ רק ${leagueCount} משחקים פורסמו למחזור — אם יתפרסם משחק גדול יותר, תגיע הצעה מעודכנת.`
+              : ''),
       reply_markup: { inline_keyboard: [[
         { text: '✅ אשר', callback_data: `ca:${t.period}:${t.key}` },
         { text: '🗑️ דחה', callback_data: `cr:${t.period}:${t.key}` },
       ]] },
-    });
-    console.log(`${t.period} ${t.key}: proposed "${proposal.label}"`);
+    };
+    let sent;
+    if (prev && prev.message_id) {                       // replace, don't repeat
+      sent = await tg('editMessageText', { ...body, message_id: prev.message_id });
+      if (!sent || !sent.ok) sent = await tg('sendMessage', body);
+    } else {
+      sent = await tg('sendMessage', body);
+    }
+    proposal.message_id = (sent && sent.result && sent.result.message_id) || (prev && prev.message_id) || null;
+    await stateSet(`chal_pending|${t.period}|${t.key}`, JSON.stringify(proposal));
+    console.log(`${t.period} ${t.key}: ${prev ? 'updated' : 'proposed'} "${proposal.label}"`);
   }
 })().catch(e => { console.error(e); process.exit(1); });
