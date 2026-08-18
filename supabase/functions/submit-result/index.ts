@@ -35,7 +35,10 @@ interface Settings {
   era_max: number;
   peak_mode: boolean;
   ratings_visible: boolean;
+  opp_season?: number;
+  league_format?: string;   // 'modern' (26+playoff) | 'authentic' (that season's real format)
 }
+
 interface Player { teamId: string; season: string; name: string; pos: string; ovr: number; slotId: string; }
 
 interface Payload {
@@ -54,6 +57,12 @@ interface Payload {
 
 // Challenge boundaries follow Israel time. Returns the CURRENT key for a
 // period: daily 'YYYY-MM-DD' · weekly the week's Sunday date · monthly 'YYYY-MM'.
+// Total games a season can legally have. 36/33 = today's format; the rest are
+// the historical formats a player can pick: 39 (1999/00), 38 (2000/01),
+// 37 (2011/12), 35 (2009/10-2010/11 upper/lower playoff).
+const VALID_TOTALS = [33, 35, 36, 37, 38, 39];
+const isAuthentic = (p: Payload) => p.settings?.league_format === 'authentic';
+
 function currentChallengeKey(period: string): string | null {
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone: 'Asia/Jerusalem', year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'short',
@@ -72,9 +81,11 @@ function currentChallengeKey(period: string): string | null {
 }
 
 function validate(p: Payload): string | null {
-  // 36 games = championship playoff season, 33 = relegation playoff season
+  // 36 = championship playoff, 33 = relegation playoff (or the classic 12x3
+  // league); 35/37/38/39 only exist in the historical formats.
   const total = p.wins + p.draws + p.losses;
-  if (total !== 36 && total !== 33) return 'total games must equal 33 or 36';
+  if (!VALID_TOTALS.includes(total)) return 'total games must be one of ' + VALID_TOTALS.join('/');
+  if (total !== 33 && total !== 36 && !isAuthentic(p)) return 'that game count requires the authentic format';
   if (p.points !== p.wins * 3 + p.draws) return 'points mismatch';
   if (p.ovr < 0 || p.ovr > 99) return 'ovr out of range';
   if (!Array.isArray(p.matches) || p.matches.length !== total) return 'matches count mismatch';
@@ -87,6 +98,7 @@ function computeAchievements(
   gamesPlayed: number,
   usedFormations: string[],
   usedClubs: string[],
+  usedLeagues: string[] = [],
 ): string[] {
   const earned: string[] = [];
   const uniqueTeams = [...new Set(p.players.map(pl => pl.teamId))];
@@ -118,6 +130,26 @@ function computeAchievements(
   if (ALL_FORMATIONS.every(f => allFormationsUsed.includes(f)))                  earned.push('all_formations');
   const allClubsUsed = [...new Set([...usedClubs, ...p.players.map(pl => pl.teamId)])];
   if (ALL_CLUB_IDS.every(c => allClubsUsed.includes(c)))                        earned.push('all_clubs');
+
+  // ── Historical formats — achievements only reachable there ──────────────────
+  // The 36-0 ones above stay exclusive to the modern format: they are gated on
+  // exactly 36 games, which no historical season produces.
+  if (isAuthentic(p)) {
+    const total  = p.wins + p.draws + p.losses;
+    const season = Number(p.settings.opp_season);
+    const isChamp = CHAMPION_TIERS.includes(p.tier);
+    earned.push('retro_season');                                                  // played one at all
+    if (isChamp)                                    earned.push('retro_champ');
+    if (p.losses === 0 && p.draws === 0)            earned.push('retro_perfect');  // 39-0/38-0/37-0/35-0/33-0
+    if (isChamp && (season === 2009 || season === 2010)) earned.push('halved_champ');   // שיטת הקיזוז
+    if (isChamp && season === 1999)                 earned.push('champ_39');       // the only 39-game season
+    if (isChamp && season >= 2001 && season <= 2008) earned.push('classic_champ'); // 12 clubs, 3 rounds
+    // one season in every historical format
+    const eraOf = (y: number) => y === 1999 ? 'a' : y === 2000 ? 'b'
+      : y <= 2008 ? 'c' : y <= 2010 ? 'd' : y === 2011 ? 'e' : '';
+    const eras = new Set([...usedLeagues, String(season)].map(y => eraOf(Number(y))).filter(Boolean));
+    if (['a','b','c','d','e'].every(e => eras.has(e)))                            earned.push('era_tour');
+  }
   if (p.wins === 36 && p.settings.difficulty === 'hard' && p.settings.ratings_visible === false) earned.push('secret_perfect_hard');
   if (maxMatchGf >= 10)                                                            earned.push('secret_big_score');
   if (p.wins === 36 && p.settings.peak_mode && p.settings.ratings_visible === false) earned.push('secret_peak_blind');
@@ -176,7 +208,7 @@ Deno.serve(async (req) => {
     // Query history BEFORE insert so counts reflect prior games only
     const { data: pastResults } = await supabase
       .from('game_results')
-      .select('formation')
+      .select('formation, settings')
       .eq('user_id', user.id);
 
     const { data: pastSquads } = await supabase
@@ -196,6 +228,10 @@ Deno.serve(async (req) => {
     const usedClubs = (pastSquads ?? []).flatMap(
       (s: { players: Player[] }) => s.players.map(p => p.teamId)
     );
+    // seasons already played in their authentic format (for the era_tour badge)
+    const usedLeagues = (pastResults ?? [])
+      .filter((r: { settings?: Settings }) => r.settings?.league_format === 'authentic')
+      .map((r: { settings?: Settings }) => String(r.settings?.opp_season ?? ''));
 
     const { data: result, error: resultError } = await supabase
       .from('game_results')
@@ -276,7 +312,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    const earned = computeAchievements(payload, gamesPlayed, usedFormations, usedClubs);
+    const earned = computeAchievements(payload, gamesPlayed, usedFormations, usedClubs, usedLeagues);
 
     const { data: existing } = await supabase
       .from('user_achievements')
@@ -287,7 +323,7 @@ Deno.serve(async (req) => {
     const newAchievements = earned.filter(k => !alreadyHas.has(k));
     // Cumulative one-time milestones (play N games, use all formations/clubs) are
     // unlocked once and never "repeated" — don't bump their times_earned counter.
-    const isCumulative = (k: string) => /^games_\d+$/.test(k) || k === 'all_formations' || k === 'all_clubs';
+    const isCumulative = (k: string) => /^games_\d+$/.test(k) || k === 'all_formations' || k === 'all_clubs' || k === 'era_tour';
     const repeatedAchievements = earned.filter(k => alreadyHas.has(k) && !isCumulative(k));
 
     if (newAchievements.length > 0) {

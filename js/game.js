@@ -2798,7 +2798,7 @@ async function submitResult() {
       peak_mode:       state.peakMode,
       ratings_visible: state.showRatings,
       ...(state.oppSeason ? { opp_season: state.oppSeason } : {}),
-      ...(r.spec && !isModernSpec(r.spec) ? { league_format: 'authentic' } : {}),
+      league_format: (r.spec && !isModernSpec(r.spec)) ? 'authentic' : 'modern',
       ...(state.challenge ? { challenge: state.challenge.period + '|' + state.challenge.key } : {}),
     },
     players: state.picks.flatMap((pick, i) => {
@@ -2820,6 +2820,7 @@ async function submitResult() {
   // headers, which the browser surfaces as a fetch error) so a season isn't lost.
   const sleep = ms => new Promise(res => setTimeout(res, ms));
   let ok = false;
+  window._lastSubmitError = null;
   try {
     for (let attempt = 0; attempt < 3 && !ok; attempt++) {
       try {
@@ -2840,8 +2841,13 @@ async function submitResult() {
         } else if (res.status >= 500) {
           await sleep(700 * (attempt + 1));    // cold start — back off and retry
         } else {
-          console.error('submit-result rejected:', res.status);
-          break;                                // 4xx — client error, don't retry
+          // 4xx — client error, don't retry. Keep the reason so the results
+          // screen can say what went wrong instead of a bare "try again".
+          let reason = 'שגיאה ' + res.status;
+          try { const j = await res.json(); if (j?.error) reason = j.error; } catch (e) {}
+          window._lastSubmitError = reason;
+          console.error('submit-result rejected:', res.status, reason);
+          break;
         }
       } catch (err) {
         await sleep(700 * (attempt + 1));        // network/CORS-on-crash — retry
@@ -2863,25 +2869,23 @@ function setupSaveSection() {
   // Reviewing a league/duel season — nothing to save (it isn't a fresh single-player draft).
   if (window._leagueReviewMode || window._duelReviewMode) { saveSection.style.display = 'none'; loginPrompt.style.display = 'none'; return; }
 
-  // A season played in a historical format isn't comparable to a modern one —
-  // different number of games, different playoff, sometimes halved points. Those
-  // runs are for fun and never reach the leaderboard (the 2012+ format, which is
-  // what "authentic" resolves to for recent seasons, saves normally).
+  // A historical-format season is saved to ITS OWN board (the season's table),
+  // never to the general one — the general board only compares modern seasons.
   const r = window._lastResult;
-  if (r && r.spec && !isModernSpec(r.spec)) {
-    saveSection.style.display = 'none';
-    loginPrompt.style.display = 'flex';
-    const msg = document.getElementById('save-login-msg');
-    if (msg) msg.textContent = siteText('save-format-note',
-      'עונה בפורמט ההיסטורי של אותה עונה — לא נשמרת בלוח השיאים (הטבלה משווה עונות של 36 משחקים).');
-    const btn = document.getElementById('save-login-btn');
-    if (btn) btn.style.display = 'none';
-    return;
-  }
+  const retro = !!(r && r.spec && !isModernSpec(r.spec));
   const loginBtn = document.getElementById('save-login-btn');
   if (loginBtn) loginBtn.style.display = '';
   const loginMsg = document.getElementById('save-login-msg');
   if (loginMsg) loginMsg.textContent = siteText('save-login-msg', 'התחבר כדי לשמור את התוצאה');
+  const retroNote = document.getElementById('save-retro-note');
+  if (retroNote) {
+    retroNote.style.display = retro ? 'block' : 'none';
+    if (retro && state.oppSeason) {
+      retroNote.textContent = fillTemplate(
+        siteText('save-retro-note', '🏛 עונה בפורמט המקורי — התוצאה נשמרת בטבלה של {season}, לא בטבלה הכללית.'),
+        { season: yearToSeason(state.oppSeason) });
+    }
+  }
 
   if (user) {
     saveSection.style.display = 'flex';
@@ -2902,7 +2906,15 @@ function setupSaveSection() {
     saveBtn.textContent = 'שומר...';
     const ok = await submitResult();
     if (ok) { saveBtn.textContent = '✓ נשמר!'; }
-    else    { saveBtn.textContent = 'נסה שוב'; saveBtn.disabled = false; }
+    else {
+      saveBtn.textContent = 'נסה שוב';
+      saveBtn.disabled = false;
+      const note = document.getElementById('save-retro-note');
+      if (note && window._lastSubmitError) {
+        note.style.display = 'block';
+        note.textContent = 'השמירה נכשלה: ' + window._lastSubmitError;
+      }
+    }
   };
 }
 

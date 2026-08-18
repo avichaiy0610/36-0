@@ -9,6 +9,37 @@ function esc(s) {
   ));
 }
 let lbMode   = 'all';   // all | season | peak
+// 'modern' = the general board: today's 36/33 format only, so every record on it
+// is comparable. Any other value is a season year — its own board, where everyone
+// played that season's authentic format.
+let lbLeague = 'modern';
+
+function lbInitSeasonSelect() {
+  const sel = document.getElementById('lb-season-sel');
+  if (!sel) return;
+  if (!sel.options.length) {
+    const add = (v, label) => { const o = document.createElement('option'); o.value = v; o.textContent = label; sel.appendChild(o); };
+    add('modern', 'כללי — פורמט מודרני (36/33)');
+    [...ALL_SEASON_YEARS].reverse().forEach(y => {
+      if (isModernSpec(seasonFormat(y))) return;   // 2012+ IS the modern format
+      add(String(y), `🏛 ליגת ${yearToSeason(y)} — ${totalGamesFor(seasonFormat(y), 0)} מחזורים`);
+    });
+    sel.onchange = () => { lbLeague = sel.value; loadLeaderboard(); };
+  }
+  sel.value = lbLeague;
+  lbUpdateSeasonNote();
+}
+
+function lbUpdateSeasonNote() {
+  const note = document.getElementById('lb-season-note');
+  if (!note) return;
+  if (lbLeague === 'modern') {
+    note.textContent = 'הטבלה הכללית — רק עונות בפורמט של היום, כדי שההשוואה תהיה הוגנת';
+    return;
+  }
+  const y = parseInt(lbLeague);
+  note.textContent = `כל מי ששיחק את ${yearToSeason(y)} בפורמט המקורי: ${formatLabel(seasonFormat(y))}`;
+}
 
 async function showLeaderboard() {
   showScreen('leaderboard');
@@ -48,6 +79,7 @@ async function showLeaderboard() {
     document.getElementById('squad-modal').style.display = 'none';
   };
 
+  lbInitSeasonSelect();
   loadLeaderboard();
 }
 
@@ -74,6 +106,17 @@ async function loadLeaderboard() {
   if (lbMode === 'peak')   query = query.eq('settings->>peak_mode', 'true');
   if (lbMode === 'season') query = query.neq('settings->>peak_mode', 'true');
 
+  // League board: the general one excludes historical formats entirely; a season
+  // board shows only runs played in that season's own format.
+  if (lbLeague === 'modern') {
+    // rows saved before the format setting existed were all modern
+    query = query.or('settings->>league_format.is.null,settings->>league_format.eq.modern');
+  } else {
+    query = query.eq('settings->>opp_season', lbLeague).eq('settings->>league_format', 'authentic');
+  }
+
+  lbUpdateSeasonNote();
+
   const { data: rows, error } = await query;
   if (error || !rows?.length) {
     table.innerHTML = '<div class="page-loading">אין תוצאות עדיין</div>';
@@ -99,7 +142,11 @@ async function loadLeaderboard() {
     const date     = new Date(row.created_at).toLocaleDateString('he-IL', { day: 'numeric', month: 'numeric', year: '2-digit' });
     // Isolate each segment with <bdi> so the mixed Hebrew/Latin pieces keep a
     // stable order regardless of which stat leads (OVR vs points).
-    const subStat  = [other, row.formation, record, date]
+    const oppSeason = row.settings?.opp_season;
+    const isAuthentic = row.settings?.league_format === 'authentic';
+    const leagueTag = isAuthentic && oppSeason ? `🏛 ${yearToSeason(+oppSeason)}`
+                    : oppSeason ? `🆚 ${yearToSeason(+oppSeason)}` : null;
+    const subStat  = [other, row.formation, record, leagueTag, date].filter(Boolean)
       .map(x => `<bdi>${esc(x)}</bdi>`).join(' · ');
 
     const tr = document.createElement('div');

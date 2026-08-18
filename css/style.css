@@ -1963,3 +1963,11 @@ body {
 .social-links a.social-tt:hover { color: var(--text); }
 .social-links a.social-x:hover  { color: var(--text); }
 .social-links a.social-yt:hover { color: #FF0000; }
+
+/* Leaderboard: season/format selector */
+.lb-season-row { display: flex; flex-direction: column; align-items: center; gap: 4px; margin: 6px 0 10px; }
+.lb-season-label { font-size: 13px; color: var(--muted); font-weight: 700; }
+.lb-season-sel { max-width: 320px; width: 100%; }
+.lb-season-note { font-size: 12px; color: var(--muted); margin: 0; text-align: center; }
+.lb-fmt-badge { font-size: 11px; color: var(--muted); }
+.save-retro-note { text-align: center; font-size: 13px; color: var(--muted); margin: 4px 0 0; }

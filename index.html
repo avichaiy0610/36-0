@@ -601,6 +601,7 @@
         </label>
         <button class="btn-primary" id="btn-save-result">שמור ב-Leaderboard</button>
       </div>
+      <p id="save-retro-note" class="page-note save-retro-note" style="display:none"></p>
       <div id="save-login-prompt" class="save-login-prompt" style="display:none">
         <span id="save-login-msg">התחבר כדי לשמור את התוצאה</span>
         <button class="nav-btn nav-btn-primary" id="save-login-btn">התחבר</button>
@@ -708,6 +709,11 @@
         <button class="lb-mode selected" data-mode="all">כל המצבים</button>
         <button class="lb-mode" data-mode="season">מצב עונה</button>
         <button class="lb-mode" data-mode="peak">⚡ מצב שיא</button>
+      </div>
+      <div class="lb-season-row">
+        <label class="lb-season-label" for="lb-season-sel">🏛 ליגה</label>
+        <select id="lb-season-sel" class="opp-season-sel lb-season-sel"></select>
+        <p class="lb-season-note" id="lb-season-note"></p>
       </div>
       <div id="leaderboard-table" class="lb-table"></div>
     </div>
