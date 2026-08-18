@@ -12,6 +12,10 @@ on:
         description: 'הרצה יבשה — רק מדפיס מה היה מוצע, בלי טלגרם ובלי DB'
         type: boolean
         default: false
+      force:
+        description: 'הצע מחדש גם אם כבר יש הצעה ממתינה'
+        type: boolean
+        default: false
 
 concurrency:
   group: challenge-engine
@@ -32,3 +36,4 @@ jobs:
           TELEGRAM_CHAL_BOT_TOKEN: ${{ secrets.TELEGRAM_CHAL_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           DRY_RUN: ${{ inputs.dry_run && '1' || '' }}
+          FORCE: ${{ inputs.force && '1' || '' }}

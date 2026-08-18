@@ -70,10 +70,35 @@ const DERBIES = [
   ['beitar-jerusalem', 'hapoel-jerusalem', 'דרבי ירושלים'],
   ['maccabi-pt', 'hapoel-pt', 'דרבי פתח תקווה'],
   ['maccabi-haifa', 'maccabi-tlv', 'קלאסיקו'],
+  ['hapoel-tlv', 'beitar-jerusalem', 'קלאסיקו הפועל–בית"ר'],
+  ['maccabi-tlv', 'beitar-jerusalem', 'משחק ענק'],
+  ['maccabi-haifa', 'beitar-jerusalem', 'משחק ענק'],
+  ['maccabi-haifa', 'hapoel-tlv', 'משחק ענק'],
   ['maccabi-haifa', 'hapoel-beersheba', 'פסגת הליגה'],
+  ['maccabi-tlv', 'hapoel-beersheba', 'פסגת הליגה'],
 ];
-const BIG = new Set(['maccabi-haifa', 'maccabi-tlv', 'hapoel-tlv', 'beitar-jerusalem',
-  'hapoel-beersheba', 'hapoel-jerusalem', 'maccabi-netanya']);
+// How big a fixture feels = titles won since 1999 (straight from our own
+// LEAGUE_TABLES) + the size of the crowd behind the club. Titles alone would
+// under-rate Hapoel TA and Beitar, who fill stadiums without filling a trophy
+// cabinet; fanbase alone would ignore what Be'er Sheva did in the last decade.
+const TITLES = (() => {
+  try {
+    const ctx = {};
+    new Function('ctx', 'with(ctx){' + fs.readFileSync(path.join(__dirname, '..', 'js', 'league_tables.js'), 'utf8') +
+      '; ctx.T = LEAGUE_TABLES;}')(ctx);
+    const w = {};
+    Object.keys(ctx.T).forEach(season => {
+      const champ = ctx.T[season].find(r => r.pos === 1);
+      if (champ) w[champ.teamId] = (w[champ.teamId] || 0) + 1;
+    });
+    return w;
+  } catch (e) { console.error('titles load failed:', e.message); return {}; }
+})();
+const FANBASE = {
+  'maccabi-haifa': 12, 'maccabi-tlv': 12, 'hapoel-tlv': 12, 'beitar-jerusalem': 12,
+  'hapoel-beersheba': 8, 'hapoel-jerusalem': 5, 'maccabi-netanya': 5, 'bnei-sakhnin': 5,
+};
+const prestige = id => 2 * (TITLES[id] || 0) + (FANBASE[id] || 0);
 
 /* ── helpers ──────────────────────────────────────────────────────────────── */
 function fetchT(url, opts = {}, ms = 20000) {
@@ -172,11 +197,11 @@ function derbyOf(a, b) {
 function score(f, period) {
   if (f.kind === 'nt') return period === 'daily' ? 100 : period === 'weekly' ? 60 : 30;
   if (!f.homeId || !f.awayId) return 0;          // unmapped club — never guess
-  let s = 10;
-  if (derbyOf(f.homeId, f.awayId)) s += 40;
-  if (BIG.has(f.homeId)) s += 8;
-  if (BIG.has(f.awayId)) s += 8;
-  return s;
+  // The size of a fixture is set by its WEAKER side: a giant against a minnow is
+  // not a big night, two mid-size rivals can be. So the smaller prestige counts
+  // double, and the larger one only once.
+  const a = prestige(f.homeId), b = prestige(f.awayId);
+  return 10 + Math.max(a, b) + 2 * Math.min(a, b) + (derbyOf(f.homeId, f.awayId) ? 25 : 0);
 }
 function pickBest(list, period) {
   return list.map(f => ({ f, s: score(f, period) })).filter(x => x.s > 0)
@@ -202,7 +227,7 @@ function compose(period, f) {
     };
   }
   const derby = derbyOf(f.homeId, f.awayId);
-  const big = BIG.has(f.homeId) ? f.homeId : (BIG.has(f.awayId) ? f.awayId : f.homeId);
+  const big = prestige(f.homeId) >= prestige(f.awayId) ? f.homeId : f.awayId;
   const other = big === f.homeId ? f.awayId : f.homeId;
   const n = period === 'daily' ? 2 : 3;
   const reqs = [clubMission(big, n), period !== 'daily' ? clubMission(other, 1) : null].filter(Boolean);
@@ -246,7 +271,7 @@ async function processTaps() {
     if (raw) {
       if (action === 'ca') {
         const s = JSON.parse(raw);
-        delete s.note;
+        delete s.note; delete s.score;
         await sb('POST', 'challenge_overrides',
           { period, challenge_key: key, settings: s },
           { Prefer: 'resolution=merge-duplicates' });
@@ -264,6 +289,7 @@ async function processTaps() {
 /* ── main ─────────────────────────────────────────────────────────────────── */
 (async () => {
   const dry = DRY_RUN === '1';
+  const force = process.env.FORCE === '1';   // re-propose even if one is pending
   if (!dry) await processTaps().catch(e => console.error('taps failed:', e.message));
 
   const all = await fixtures();
@@ -284,8 +310,16 @@ async function processTaps() {
     const existing = await sb('GET',
       `challenge_overrides?period=eq.${t.period}&challenge_key=eq.${encodeURIComponent(t.key)}&select=challenge_key`);
     if (existing && existing.length) { console.log(`${t.period} ${t.key}: already overridden, skipping`); continue; }
-    if (await stateGet(`chal_pending|${t.period}|${t.key}`)) { console.log(`${t.period} ${t.key}: already proposed`); continue; }
+    const pendingRaw = await stateGet(`chal_pending|${t.period}|${t.key}`);
+    const bestScore = score(best, t.period);
+    if (pendingRaw && !force) {
+      let prev = 0;
+      try { prev = JSON.parse(pendingRaw).score || 0; } catch (e) {}
+      if (bestScore <= prev) { console.log(`${t.period} ${t.key}: already proposed (score ${prev})`); continue; }
+      console.log(`${t.period} ${t.key}: better fixture found (${prev} → ${bestScore}), re-proposing`);
+    }
 
+    proposal.score = bestScore;
     await stateSet(`chal_pending|${t.period}|${t.key}`, JSON.stringify(proposal));
     const periodHe = { daily: 'יומי', weekly: 'שבועי', monthly: 'חודשי' }[t.period];
     const reqLines = proposal.requirements.map(r =>
