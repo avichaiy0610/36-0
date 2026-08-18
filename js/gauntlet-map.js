@@ -59,6 +59,31 @@ function gmCityFor(teamId) {
   return c ? { ...c, x: gmX(c.lon), y: gmY(c.lat) } : null;
 }
 
+// A club marker in the club's real colours. If you ever decide to add actual
+// crests, drop <teamId>.png into /crests/ and it is used automatically — the
+// colours stay as the fallback, so nothing breaks when a file is missing.
+// (Real crests are trademarks; that call is the owner's, not the code's.)
+function gmCrestSVG(x, y, teamId, { size = 1, state = 'locked', elite = false } = {}) {
+  const t = (typeof TEAMS === 'object' && TEAMS[teamId]) || { primaryColor: '#4b5563', secondaryColor: '#fff' };
+  const r = 11 * size;
+  const dim = state === 'locked' ? '.55' : '1';
+  const ring = elite ? '#8b5cf6' : state === 'next' ? '#d4af37' : state === 'done' ? '#3f6f4a' : '#20262e';
+  const glow = state === 'next' ? `<circle cx="${x}" cy="${y}" r="${r * 1.9}" fill="#d4af37" opacity=".20"/>` : '';
+  return `
+    <g class="gm-stadium gm-${state}${elite ? ' gm-elite' : ''}" opacity="${dim}">
+      ${glow}
+      <ellipse cx="${x}" cy="${y + r * 0.75}" rx="${r * 0.8}" ry="${r * 0.3}" fill="#000" opacity=".45"/>
+      <circle cx="${x}" cy="${y}" r="${r + 2}" fill="${ring}"/>
+      <path d="M ${x - r} ${y - r * 0.8} h ${r * 2} v ${r * 0.7} a ${r} ${r} 0 0 1 -${r} ${r * 1.1}
+               a ${r} ${r} 0 0 1 -${r} -${r * 1.1} Z" fill="${t.primaryColor}"/>
+      <path d="M ${x - r} ${y - r * 0.8} h ${r} v ${r * 1.8} a ${r} ${r} 0 0 1 -${r} -${r * 1.1} Z"
+            fill="${t.secondaryColor}" opacity=".92"/>
+      <image class="gm-crest-img" href="crests/${teamId}.png" x="${x - r}" y="${y - r}"
+             width="${r * 2}" height="${r * 2}" preserveAspectRatio="xMidYMid slice"
+             onerror="this.remove()"/>
+    </g>`;
+}
+
 // A small isometric ground: an ellipse for the bowl, a lighter pitch inside,
 // and a shadow so it sits on the map instead of floating over it.
 function gmStadiumSVG(x, y, { size = 1, state = 'locked', elite = false } = {}) {
@@ -109,7 +134,7 @@ function renderGauntletMap(container, stations, at = 0) {
     // below: four Gush Dan clubs in one run made overlapping labels unreadable.
     return `
       <g class="gm-station" data-station="${i}">
-        ${gmStadiumSVG(city.x, city.y, { size: i === at ? 1.3 : 1, state, elite: !!st.elite })}
+        ${gmCrestSVG(city.x, city.y, st.teamId, { size: i === at ? 1.3 : 1, state, elite: !!st.elite })}
         <text class="gm-num" x="${city.x}" y="${city.y + 2}" text-anchor="middle">${i + 1}</text>
       </g>`;
   }).join('');
@@ -136,6 +161,7 @@ function renderGauntletMap(container, stations, at = 0) {
         </filter>
       </defs>
       <path class="gm-land" d="${ISRAEL_PATH}" fill="url(#gm-land)" fill-rule="nonzero" filter="url(#gm-edge)"/>
+      <g class="gm-lights">${gmLightsSVG()}</g>
       <polyline class="gm-road" points="${road}" fill="none" stroke="#d4af3766" stroke-width="1.6" stroke-dasharray="4 4"/>
       ${marks}
     </svg>
@@ -149,6 +175,27 @@ function renderGauntletMap(container, stations, at = 0) {
         <span class="gm-li-ovr">${st.ovr}</span>
       </li>`;
     }).join('')}</ol>`;
+}
+
+
+// Night lights — the country as it looks from above after dark. Real places,
+// sized by how big they are, so the coastal strip glows and the Negev doesn't.
+const GM_LIGHTS = [
+  [32.085, 34.781, 3.4], [32.070, 34.824, 2.6], [32.015, 34.779, 2.2], [31.971, 34.789, 2.2],
+  [32.166, 34.843, 1.8], [32.146, 34.839, 1.6], [32.087, 34.887, 2.4], [32.175, 34.907, 1.8],
+  [31.929, 34.799, 1.4], [31.802, 34.656, 2.2], [31.669, 34.574, 1.8], [31.610, 34.764, 1.2],
+  [32.328, 34.856, 2.0], [32.434, 34.919, 1.6], [32.794, 34.990, 3.0], [32.928, 35.082, 1.6],
+  [32.865, 35.298, 1.2], [32.700, 35.303, 1.8], [32.795, 35.530, 1.2], [33.207, 35.569, 1.0],
+  [32.960, 35.492, 1.0], [31.768, 35.214, 3.2], [31.890, 35.010, 1.4], [31.252, 34.791, 2.4],
+  [30.610, 34.800, 1.0], [29.557, 34.952, 1.2], [31.418, 34.598, 1.4], [32.640, 35.290, 1.2],
+  [32.500, 35.500, 1.0], [31.500, 34.750, 1.0], [31.350, 34.650, 0.9], [32.250, 34.950, 1.2],
+];
+function gmLightsSVG() {
+  return GM_LIGHTS.map(([lat, lon, r]) => {
+    const x = gmX(lon).toFixed(1), y = gmY(lat).toFixed(1);
+    return `<circle cx="${x}" cy="${y}" r="${(r * 1.9).toFixed(1)}" fill="#ffd88a" opacity=".10"/>
+            <circle cx="${x}" cy="${y}" r="${r.toFixed(1)}" fill="#ffe9b0" opacity=".55"/>`;
+  }).join('');
 }
 
 /* ── station picking ──────────────────────────────────────────────────────── */
