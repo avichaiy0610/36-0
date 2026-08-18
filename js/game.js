@@ -228,9 +228,10 @@ const ASSIST_W = {
 // up with the strongest not-already-present clubs of the nearest seasons.
 const LATEST_SEASON_YEAR = Math.max(...SQUADS.map(s => parseInt(s.season)));
 const _simTeamsCache = {};
-function simTeamsForSeason(year) {
+function simTeamsForSeason(year, count = 13) {
   const y = year ?? LATEST_SEASON_YEAR;
-  if (_simTeamsCache[y]) return _simTeamsCache[y];
+  const ck = y + '|' + count;
+  if (_simTeamsCache[ck]) return _simTeamsCache[ck];
   const clubOf = sq => {
     const top = [...sq.players].sort((a, b) => b.ovr - a.ovr).slice(0, 11);
     return {
@@ -242,41 +243,73 @@ function simTeamsForSeason(year) {
   const clubs = SQUADS.filter(s => parseInt(s.season) === y).map(clubOf)
     .sort((a, b) => b.ovr - a.ovr);
   const have = new Set(clubs.map(c => c.teamId));
-  for (let d = 1; clubs.length < 13 && d < 30; d++) {
+  for (let d = 1; clubs.length < count && d < 30; d++) {
     for (const ny of [y + d, y - d]) {
       const extra = SQUADS.filter(s => parseInt(s.season) === ny && !have.has(s.teamId))
         .map(clubOf).sort((a, b) => b.ovr - a.ovr);
       for (const c of extra) {
-        if (clubs.length >= 13) break;
+        if (clubs.length >= count) break;
         clubs.push(c); have.add(c.teamId);
       }
     }
   }
-  return (_simTeamsCache[y] = clubs.slice(0, 13));
+  return (_simTeamsCache[ck] = clubs.slice(0, count));
 }
 const IL_TEAMS_SIM = simTeamsForSeason(LATEST_SEASON_YEAR);
 
-// ─── Classic format ("33 הקלאסי") ─────────────────────────────────────────────
-// 2001/02–2008/09 ran a 12-club league, three rounds, no playoff = 33 games.
-// That format needs 11 opponents instead of 13 — same padding rule, one club
-// fewer, so any season can be played in it.
-const CLASSIC_SEASONS = { from: 2001, to: 2008 };   // seasons that really ran 12×3
-const _classicTeamsCache = {};
-function classicTeamsForSeason(year) {
-  const y = year ?? LATEST_SEASON_YEAR;
-  if (_classicTeamsCache[y]) return _classicTeamsCache[y];
-  return (_classicTeamsCache[y] = simTeamsForSeason(y).slice(0, 11));
-}
+// ─── Authentic league formats, season by season ───────────────────────────────
+// Israel changed its league format six times since 1999, and picking a season
+// now plays it as it really was:
+//   games = (teams-1)*rounds + (groupSize-1)*playoffRounds
+// Verified against Wikipedia — 1999/00: 39 · 2000/01: 38 · 2001-2008: 33 ·
+// 2009/10-2010/11: 35/33/35 with the regular-season points halved ·
+// 2011/12: 37 · 2012/13-today: 36/33.
+const SEASON_FORMATS = [
+  { from: 1999, to: 1999, teams: 14, rounds: 3, groups: null },
+  { from: 2000, to: 2000, teams: 12, rounds: 3, groups: [6, 6],    poRounds: [1, 1] },
+  { from: 2001, to: 2008, teams: 12, rounds: 3, groups: null },
+  { from: 2009, to: 2010, teams: 16, rounds: 2, groups: [6, 4, 6], poRounds: [1, 1, 1], halve: true },
+  { from: 2011, to: 2011, teams: 16, rounds: 2, groups: [8, 8],    poRounds: [1, 1] },
+  { from: 2012, to: 9999, teams: 14, rounds: 2, groups: [6, 8],    poRounds: [2, 1], modern: true },
+];
+const MODERN_FORMAT = SEASON_FORMATS[SEASON_FORMATS.length - 1];
 
-function formatOf(fmt) { return fmt === 'classic33' ? 'classic33' : 'modern'; }
-function isClassic(fmt) { return formatOf(fmt) === 'classic33'; }
-function formatTotalGames(fmt) { return isClassic(fmt) ? 33 : 36; }
+function seasonFormat(year) {
+  const y = year ?? LATEST_SEASON_YEAR;
+  return SEASON_FORMATS.find(f => y >= f.from && y <= f.to) ?? MODERN_FORMAT;
+}
+// 'authentic' = that season's real format · 'modern' = today's 26+playoff (36/33)
+function formatOf(mode) { return mode === 'modern' ? 'modern' : 'authentic'; }
+function formatSpecFor(mode, year) {
+  return formatOf(mode) === 'modern' ? MODERN_FORMAT : seasonFormat(year);
+}
+function specForState() { return formatSpecFor(state.leagueFormat, state.oppSeason); }
+function isModernSpec(spec) { return !!spec && !!spec.modern; }
+function regularGames(spec) { return (spec.teams - 1) * spec.rounds; }
+// total games a team plays, by playoff group index (groups=null → no playoff)
+function totalGamesFor(spec, groupIdx = 0) {
+  if (!spec.groups) return regularGames(spec);
+  return regularGames(spec) + (spec.groups[groupIdx] - 1) * spec.poRounds[groupIdx];
+}
+function groupNames(spec) {
+  if (!spec.groups) return [];
+  return spec.groups.length === 3
+    ? ['פלייאוף עליון', 'פלייאוף אמצעי', 'פלייאוף תחתון']
+    : ['פלייאוף עליון', 'פלייאוף תחתון'];
+}
+function formatLabel(spec) {
+  const games = spec.groups
+    ? [...new Set(spec.groups.map((_, i) => totalGamesFor(spec, i)))].join('/')
+    : regularGames(spec);
+  const po = !spec.groups ? 'בלי פלייאוף' : `פלייאוף ${spec.groups.join('/')}`;
+  const halve = spec.halve ? ' · נקודות נחצות' : '';
+  return `${spec.teams} קבוצות · ${spec.rounds} סיבובים · ${po}${halve} · ${games} משחקים`;
+}
 
 // The opponents for the CURRENT run. null oppSeason = latest, so squad-data
 // updates roll the default league forward automatically.
 function oppTeamsForState() {
-  const y = state.oppSeason ?? LATEST_SEASON_YEAR;
-  return isClassic(state.leagueFormat) ? classicTeamsForSeason(y) : simTeamsForSeason(y);
+  return simTeamsForSeason(state.oppSeason ?? LATEST_SEASON_YEAR, specForState().teams - 1);
 }
 
 // ─── Era helpers ──────────────────────────────────────────────────────────────
@@ -295,7 +328,7 @@ const state = {
   peakMode: false,
   eraMin: YEAR_MIN, eraMax: YEAR_MAX,
   oppSeason: null, oppSeasonChoice: 'latest',   // null = the latest season's league
-  leagueFormat: 'modern',                       // 'modern' = 26+playoff (36/33) · 'classic33' = 3 rounds, no playoff
+  leagueFormat: 'authentic',                    // 'authentic' = the chosen season's real format · 'modern' = today's
   formationId: null, slots: [], picks: [], currentRound: 0,
   usedSquadIds: new Set(), usedPlayerKeys: new Set(), currentSquad: null,
   selectedPlayer: null, selectedSlotIdx: null,
@@ -645,28 +678,16 @@ function updateLeagueFormatNote() {
   const sel  = document.getElementById('league-format-sel');
   const note = document.getElementById('league-format-note');
   if (!sel || !note) return;
-  const t = (typeof siteText === 'function') ? siteText : (_k, d) => d;
-  if (!isClassic(sel.value)) {
-    note.textContent = t('fmt-note-modern', 'הפורמט של היום: 26 מחזורים ואז פלייאוף עליון/תחתון');
+  const oppSel = document.getElementById('opp-season-sel');
+  const raw = oppSel ? oppSel.value : 'latest';
+  const y = (raw === 'latest' || raw === 'random') ? null : parseInt(raw);
+  const spec = formatSpecFor(sel.value, y ?? LATEST_SEASON_YEAR);
+  if (raw === 'random' && sel.value !== 'modern') {
+    note.textContent = 'כל עונה שתוגרל תשוחק בפורמט שהיה בה באמת';
     return;
   }
-  const oppSel = document.getElementById('opp-season-sel');
-  const y = oppSel && oppSel.value !== 'latest' && oppSel.value !== 'random'
-    ? parseInt(oppSel.value) : null;
-  const authentic = y !== null && y >= CLASSIC_SEASONS.from && y <= CLASSIC_SEASONS.to;
-  note.textContent = authentic
-    ? `${t('fmt-note-authentic', 'הפורמט האותנטי של עונת')} ${yearToSeason(y)} · 33 משחקים, בלי פלייאוף`
-    : t('fmt-note-classic', 'כך שיחקה הליגה ב-2001/02–2008/09: 12 קבוצות, 3 סיבובים, בלי פלייאוף');
-}
-
-function updateOppSeasonNote() {
-  const sel = document.getElementById('opp-season-sel');
-  const note = document.getElementById('opp-season-note');
-  if (!sel || !note) return;
-  const t = (typeof siteText === 'function') ? siteText : (_k, d) => d;
-  if (sel.value === 'random') { note.textContent = t('opp-note-random', 'כל עונה חדשה מגרילה ליגת יריבות אחרת'); return; }
-  const y = sel.value === 'latest' ? LATEST_SEASON_YEAR : parseInt(sel.value);
-  note.textContent = `${t('opp-note-strength', 'עוצמת הליגה')}: ${oppLeagueStrength(y).toFixed(1)} · ${oppStrengthTag(y)}`;
+  const season = yearToSeason(y ?? LATEST_SEASON_YEAR);
+  note.textContent = (sel.value === 'modern' ? 'הפורמט של היום: ' : `הפורמט של ${season}: `) + formatLabel(spec);
 }
 
 function beginDraft() {
@@ -779,6 +800,8 @@ function saveSeasonState(season) {
       matches: season.matches,
       inTopSix: season.inTopSix,
       format: season.format ?? 'modern',
+      formatSpec: season.formatSpec ?? null,   // {year, mode} — replays in the right format
+      groupIdx: season.groupIdx ?? null,
       leagueTable: season.leagueTable,
       playerStats: season.playerStats.map(({ squad, ...rest }) => rest),
     };
@@ -1531,8 +1554,8 @@ function simulateMatch(myOvr, opp, homeOverride = null) {
   return { outcome, gf, ga, opponent: opp.name, home };
 }
 
-function generateMatches(ovr, oppTeams = IL_TEAMS_SIM, fmt = 'modern') {
-  if (isClassic(fmt)) return generateClassicMatches(ovr, oppTeams);
+function generateMatches(ovr, oppTeams = IL_TEAMS_SIM, spec = MODERN_FORMAT) {
+  if (!isModernSpec(spec)) return generateAuthenticMatches(ovr, oppTeams, spec);
   // ── שלב הליגה: 26 משחקים (13 יריבים × בית + חוץ) ───────────────────────────
   const regPool    = shuffleArr([...oppTeams, ...oppTeams]);
   const regMatches = regPool.map(opp => simulateMatch(ovr, opp));
@@ -1575,34 +1598,71 @@ function generateMatches(ovr, oppTeams = IL_TEAMS_SIM, fmt = 'modern') {
   return { matches: [...regMatches, ...playoffMatches], inTopSix, champOpponents, relegOpponents, format: 'modern' };
 }
 
-// ─── Classic league: 12 clubs × 3 rounds, no playoff = 33 games ────────────────
-// Each of the 11 opponents is met three times, so home advantage can't split
-// evenly: six opponents give two home games, five give one (drawn at random,
-// exactly like the real fixture list alternated it year to year).
-function generateClassicMatches(ovr, oppTeams) {
-  const teams  = oppTeams.slice(0, 11);
-  // 11 opponents × 3 meetings can't split home/away evenly: five or six of them
-  // (drawn per season, like the real fixture list) give a second home game.
-  const twoHome = Math.random() < 0.5 ? 5 : 6;
-  const extraH  = shuffleArr(teams.map((_, i) => i < twoHome));
-  const fixtures = [];
-  teams.forEach((opp, i) => {
-    const homes = extraH[i] ? [true, true, false] : [true, false, false];
-    homes.forEach(h => fixtures.push({ opp, home: h }));
-  });
-  const matches = shuffleArr(fixtures).map(f => simulateMatch(ovr, f.opp, f.home));
+// ─── Authentic historical formats ─────────────────────────────────────────────
+// One generic engine for every pre-2012 format: N-1 opponents met `rounds`
+// times, then (if the season had one) a playoff inside the group the regular
+// season put you in. 2009/10–2010/11 also halve the regular-season points.
+function generateAuthenticMatches(ovr, oppTeams, spec) {
+  const teams   = oppTeams.slice(0, spec.teams - 1);
+  const regG    = regularGames(spec);
 
-  // No playoff — one 12-row table, every club plays all 33 games.
+  // Regular season — home/away as even as the round count allows. An odd number
+  // of meetings can't split evenly, so about half the rivals give an extra home
+  // game (drawn per season, like the real fixture list).
+  const fixtures = [];
+  const baseHome = Math.floor(spec.rounds / 2);
+  const extraCnt = spec.rounds % 2 === 0 ? 0
+    : (Math.random() < 0.5 ? Math.floor(teams.length / 2) : Math.ceil(teams.length / 2));
+  const extraH = shuffleArr(teams.map((_, i) => i < extraCnt));
+  teams.forEach((opp, i) => {
+    const homeCount = baseHome + (extraH[i] ? 1 : 0);
+    for (let r = 0; r < spec.rounds; r++) fixtures.push({ opp, home: r < homeCount });
+  });
+  const regMatches = shuffleArr(fixtures).map(f => simulateMatch(ovr, f.opp, f.home));
+  const regPts = regMatches.reduce((s, m) => s + (m.outcome === 'W' ? 3 : m.outcome === 'D' ? 1 : 0), 0);
+
+  // Opponents' regular season, scaled to this format's number of games
   const avgOppOvr = Math.round(teams.reduce((s, t) => s + t.ovr, 0) / teams.length);
-  const tableOpponents = teams.map(t => {
+  const simTeamPts = teams.map(t => {
     const diff  = t.ovr - avgOppOvr;
     const winP  = Math.max(0.1, Math.min(0.85, 0.47 + diff * WINP_SLOPE));
     const drawP = Math.max(0.05, 0.22 - Math.abs(diff) * 0.005);
-    const pts   = Math.max(5, Math.round((winP * 3 + drawP) * 33 + rand(-5, 5)));
+    const pts   = Math.max(3, Math.round((winP * 3 + drawP) * regG + rand(-4, 4)));
     return { ...t, pts };
   });
+  const myRegRank = simTeamPts.filter(t => t.pts > regPts).length + 1;   // ties favour the player
+  const sorted    = [...simTeamPts].sort((a, b) => b.pts - a.pts);
 
-  return { matches, inTopSix: null, champOpponents: tableOpponents, relegOpponents: [], format: 'classic33' };
+  // The full standings order, with the player slotted in at his rank
+  const ordered = [...sorted];
+  ordered.splice(myRegRank - 1, 0, { us: true, pts: regPts, name: 'הקבוצה שלי' });
+
+  // No playoff → the regular table IS the final table
+  if (!spec.groups) {
+    return { matches: regMatches, inTopSix: null, groupIdx: 0, myRegRank,
+             groups: [ordered], myRegPts: regPts, regGames: regG, spec, format: 'authentic' };
+  }
+
+  // Split into the season's playoff groups
+  const groups = [];
+  let cut = 0;
+  spec.groups.forEach(size => { groups.push(ordered.slice(cut, cut + size)); cut += size; });
+  const groupIdx = groups.findIndex(g => g.some(t => t.us));
+  const poRounds = spec.poRounds[groupIdx];
+  const rivals   = groups[groupIdx].filter(t => !t.us);
+
+  const poFixtures = [];
+  if (poRounds % 2 === 0) {
+    rivals.forEach(opp => { for (let r = 0; r < poRounds / 2; r++) { poFixtures.push({ opp, home: true }); poFixtures.push({ opp, home: false }); } });
+  } else {
+    const half  = Math.random() < 0.5 ? Math.floor(rivals.length / 2) : Math.ceil(rivals.length / 2);
+    const homes = shuffleArr(rivals.map((_, i) => i < half));
+    rivals.forEach((opp, i) => { for (let r = 0; r < poRounds; r++) poFixtures.push({ opp, home: r === 0 ? homes[i] : !homes[i] }); });
+  }
+  const poMatches = shuffleArr(poFixtures).map(f => simulateMatch(ovr, f.opp, f.home));
+
+  return { matches: [...regMatches, ...poMatches], inTopSix: groupIdx === 0, groupIdx, myRegRank,
+           groups, myRegPts: regPts, regGames: regG, spec, format: 'authentic' };
 }
 
 // ─── Player stats simulation ───────────────────────────────────────────────────
@@ -1653,15 +1713,13 @@ function calcHighlights(matches) {
 }
 
 // ─── League table generator ────────────────────────────────────────────────────
-function generateLeagueTable(wins, draws, losses, inTopSix, champOpponents, relegOpponents, fmt = 'modern') {
-  const fakeRow = (opp, totalGames, alreadyFullSeason = false) => {
+function generateLeagueTable(wins, draws, losses, inTopSix, champOpponents, relegOpponents) {
+  const fakeRow = (opp, totalGames) => {
     // Extrapolate the opponent's simulated regular-season points to the full
     // season so the final table stays consistent with the bracket split.
     const regPts = opp.pts ??
       Math.round((Math.max(0.1, Math.min(0.85, 0.47 + (opp.ovr - 78) * WINP_SLOPE)) * 3 + 0.15) * 26);
-    const estPts = alreadyFullSeason
-      ? Math.max(3, regPts)
-      : Math.max(3, Math.round(regPts * totalGames / 26) + rand(-3, 3));
+    const estPts = Math.max(3, Math.round(regPts * totalGames / 26) + rand(-3, 3));
     const d = rand(3, 8);
     const w = Math.max(0, Math.min(totalGames - d, Math.round((estPts - d) / 3)));
     const l = Math.max(0, totalGames - w - d);
@@ -1671,11 +1729,6 @@ function generateLeagueTable(wins, draws, losses, inTopSix, champOpponents, rele
                       gf: wins*2+draws+rand(0,8), ga: losses*2+draws+rand(0,6), us: true };
   const addPts = r => ({ ...r, pts: r.w*3+r.d });
   const sort   = rows => rows.map(addPts).sort((a,b) => b.pts-a.pts || b.w-a.w);
-
-  // Classic 33: one table, 12 rows, no bracket split and no cross-bracket fixing
-  if (isClassic(fmt)) {
-    return sort([playerRow, ...champOpponents.map(opp => fakeRow(opp, 33, true))]);
-  }
 
   // Championship playoff (6 teams, 36 games) — sorted independently
   const champRows = sort([
@@ -1711,6 +1764,52 @@ function generateLeagueTable(wins, draws, losses, inTopSix, champOpponents, rele
 
   // Combine: champ bracket always occupies positions 1–6, releg 7–14
   return [...champRows, ...relegRows];
+}
+
+// ─── Authentic-format league table ────────────────────────────────────────────
+// Rows carry only a name and points on screen, so the table needs points only:
+// each club's regular-season points (halved in 2009/10–2010/11, as the real
+// league did) plus its playoff points, group by group.
+function generateAuthenticTable(wins, draws, losses, g) {
+  const spec  = g.spec;
+  const regG  = g.regGames ?? regularGames(spec);
+  const halve = !!spec.halve;
+  const base  = pts => halve ? Math.ceil(pts / 2) : pts;
+
+  // the player's own regular/playoff split — his record is never invented
+  const myMatches = g.matches;
+  const ptsOf = arr => arr.reduce((s, m) => s + (m.outcome === 'W' ? 3 : m.outcome === 'D' ? 1 : 0), 0);
+  const myRegPts = g.myRegPts ?? ptsOf(myMatches.slice(0, regG));
+  const myPoPts  = ptsOf(myMatches.slice(regG));
+
+  const rowsFor = (group, gi) => {
+    const poGames = spec.groups ? (spec.groups[gi] - 1) * spec.poRounds[gi] : 0;
+    return group.map(t => {
+      if (t.us) return { name: 'הקבוצה שלי', us: true, pts: base(myRegPts) + myPoPts };
+      const rate  = t.pts / regG;
+      const poPts = poGames ? Math.max(0, Math.round(rate * poGames + rand(-2, 2))) : 0;
+      return { name: t.name, us: false, pts: base(t.pts) + poPts };
+    }).sort((a, b) => b.pts - a.pts);
+  };
+
+  const groupRows = g.groups.map(rowsFor);
+
+  // Groups are listed in order (that's how the real tables looked). For the
+  // formats WITHOUT halved points, a lower group must not out-point a higher
+  // one — only invented rows are nudged, never the player's.
+  if (!halve && groupRows.length > 1) {
+    for (let i = 1; i < groupRows.length; i++) {
+      const floor = Math.min(...groupRows[i - 1].map(r => r.pts));
+      groupRows[i].forEach(r => { if (!r.us && r.pts >= floor) r.pts = Math.max(1, floor - rand(1, 3)); });
+      const myPts = groupRows[i].find(r => r.us)?.pts;
+      if (myPts != null && myPts >= floor) {
+        groupRows[i - 1].forEach(r => { if (!r.us && r.pts <= myPts) r.pts = myPts + rand(1, 3); });
+        groupRows[i - 1].sort((a, b) => b.pts - a.pts);
+      }
+      groupRows[i].sort((a, b) => b.pts - a.pts);
+    }
+  }
+  return groupRows.flat();
 }
 
 // ─── Results: builders ────────────────────────────────────────────────────────
@@ -1781,14 +1880,16 @@ function buildPlayerStatsTable(ps) {
   });
 }
 
-function buildLeagueTable(table, fmt = 'modern') {
+function buildLeagueTable(table, spec = MODERN_FORMAT) {
   const container = document.getElementById('league-table');
   if (!container) return;
   container.innerHTML = '';
-  const bracketSplit = isClassic(fmt) ? -1 : 6;   // classic = one undivided table
+  // Separator wherever a playoff group ends (none at all in a season without one)
+  const bounds = new Set();
+  if (spec.groups) spec.groups.slice(0, -1).reduce((acc, size) => { bounds.add(acc + size); return acc + size; }, 0);
   table.forEach((t, idx) => {
     // Separator between championship (1–6) and relegation (7–14) brackets
-    if (idx === bracketSplit) {
+    if (bounds.has(idx)) {
       const sep = document.createElement('div');
       sep.className = 'lt-bracket-sep';
       container.appendChild(sep);
@@ -1810,20 +1911,32 @@ function buildLeagueTable(table, fmt = 'modern') {
 // ─── Tier ─────────────────────────────────────────────────────────────────────
 // tier.name is canonical (achievements on the server match it) — the DISPLAYED
 // name/sub go through tierDisplay(), which allows admin overrides per tier id.
-function getTier(wins, draws, losses, rank, n, totalGames, fmt = 'modern') {
+function getTier(wins, draws, losses, rank, n, totalGames, spec = MODERN_FORMAT) {
   const pts = wins * 3 + draws;
-  // Classic 33 has no playoff, so the bracket-named tiers don't exist there.
-  if (isClassic(fmt)) {
-    if (losses===0 && draws===0 && totalGames===33) return { id:'perfect33', name:'33–0 🏛', sub:'הליגה הקלאסית — מושלמת',        color:'#FFD700' };
-    if (losses===0)              return { id:'unbeaten',   name:'בלתי מנוצחים ✨',  sub:'עונה שלמה ללא תבוסה',            color:'#C8A800' };
-    if (rank === 1 && pts >= 82) return { id:'champ-gap',  name:'אלופים בפער 🥇',   sub:'שיא הליגה — תיתכן שושלת',        color:'#FFD700' };
-    if (rank === 1)              return { id:'champ',      name:'אלופים 🏆',         sub:'זוכי ליגת העל',                 color:'#d4af37' };
-    if (rank === 2)              return { id:'runner-up',  name:'מקום שני 🥈',       sub:'עונה מבריקה — עד כמה היה קרוב?', color:'#C0C0C0' };
-    if (rank === 3)              return { id:'third',      name:'מקום שלישי 🥉',     sub:'על הפודיום',                    color:'#cd7f32' };
-    if (rank <= 6)               return { id:'top-half',   name:'מחצית עליונה',      sub:'עונה מכובדת בליגה הקלאסית',      color:'#4CAF50' };
-    if (rank <= n - 3)           return { id:'mid-table',  name:'אמצע הטבלה',        sub:'עונה שקטה',                     color:'#2196F3' };
-    if (rank <= n - 1)           return { id:'survivor',   name:'שורדים בליגה ⚠',   sub:'מאבק הישרדות — ניצחון בשניות',   color:'#FF9800' };
-    return                              { id:'relegated',  name:'ירידת ליגה ⬇',      sub:'ירידה לליגה הלאומית',            color:'#F44336' };
+  // Historical formats: no 36-game season, and often no playoff at all — so the
+  // bracket-named tiers are replaced by ones that fit the league as it was.
+  if (spec && !isModernSpec(spec)) {
+    const groups   = spec.groups;
+    const gNames   = groupNames(spec);
+    // which playoff group the finishing rank falls in
+    let gi = 0, cut = 0;
+    if (groups) { for (let i = 0; i < groups.length; i++) { cut += groups[i]; if (rank <= cut) { gi = i; break; } } }
+    const gapPts = Math.round(90 * totalGames / 36);
+    if (losses === 0 && draws === 0) return { id: 'perfect' + totalGames, name: totalGames + '–0 🏛', sub: 'עונה מושלמת בפורמט של אז', color: '#FFD700' };
+    if (losses === 0)                return { id: 'unbeaten',  name: 'בלתי מנוצחים ✨', sub: 'עונה שלמה ללא תבוסה',            color: '#C8A800' };
+    if (rank === 1 && pts >= gapPts) return { id: 'champ-gap', name: 'אלופים בפער 🥇',  sub: 'שיא הליגה — תיתכן שושלת',       color: '#FFD700' };
+    if (rank === 1)                  return { id: 'champ',     name: 'אלופים 🏆',        sub: 'זוכי ליגת העל',                color: '#d4af37' };
+    if (rank === 2)                  return { id: 'runner-up', name: 'מקום שני 🥈',      sub: 'עונה מבריקה — עד כמה היה קרוב?', color: '#C0C0C0' };
+    if (rank === 3)                  return { id: 'third',     name: 'מקום שלישי 🥉',    sub: 'על הפודיום',                   color: '#cd7f32' };
+    if (rank >= n)                   return { id: 'relegated', name: 'ירידת ליגה ⬇',     sub: 'ירידה לליגה הלאומית',           color: '#F44336' };
+    if (rank >= n - 1)               return { id: 'survivor',  name: 'שורדים בליגה ⚠',  sub: 'מאבק הישרדות — ניצחון בשניות',  color: '#FF9800' };
+    if (!groups) {
+      if (rank <= Math.ceil(n / 2))  return { id: 'top-half',  name: 'מחצית עליונה',     sub: 'עונה מכובדת',                  color: '#4CAF50' };
+      return                                { id: 'mid-table', name: 'אמצע הטבלה',       sub: 'עונה שקטה',                    color: '#2196F3' };
+    }
+    return { id: 'group-' + gi, name: gNames[gi] ?? 'אמצע הטבלה',
+             sub: gi === 0 ? 'סיימת בפלייאוף האליפות' : 'כך נראתה הליגה באותה עונה',
+             color: gi === 0 ? '#4CAF50' : '#2196F3' };
   }
   if (losses===0 && draws===0 && totalGames===36) return { id:'perfect36', name:'36–0 🏆',   sub:'הבלתי אפשרי הפך למציאות',         color:'#FFD700' };
   if (losses===0)              return { id:'unbeaten',  name:'בלתי מנוצחים ✨',    sub:'עונה שלמה ללא תבוסה',              color:'#C8A800' };
@@ -1849,12 +1962,15 @@ function tierDisplay(tier) {
 function calcPreseasonOdds(ovr, simCount = 300) {
   let ranks = [], totalPts = 0;
   for (let i = 0; i < simCount; i++) {
-    const fmt = formatOf(state.leagueFormat);
-    const { matches, inTopSix, champOpponents, relegOpponents } = generateMatches(ovr, oppTeamsForState(), fmt);
+    const spec = specForState();
+    const g0 = generateMatches(ovr, oppTeamsForState(), spec);
+    const { matches, inTopSix, champOpponents, relegOpponents } = g0;
     const w = matches.filter(m => m.outcome === 'W').length;
     const d = matches.filter(m => m.outcome === 'D').length;
     const l = matches.filter(m => m.outcome === 'L').length;
-    const table = generateLeagueTable(w, d, l, inTopSix, champOpponents, relegOpponents, fmt);
+    const table = isModernSpec(spec)
+      ? generateLeagueTable(w, d, l, inTopSix, champOpponents, relegOpponents)
+      : generateAuthenticTable(w, d, l, g0);
     ranks.push(table.findIndex(t => t.us) + 1);
     totalPts += w * 3 + d;
   }
@@ -1974,8 +2090,8 @@ function animateResults(ovr) {
   if (!season) {
     const projected = window._preseasonProjected ?? calcPreseasonOdds(ovr).projectedFinish;
     const simulate = () => {
-      const fmt = formatOf(state.leagueFormat);
-      const g = generateMatches(ovr, oppTeamsForState(), fmt);
+      const spec = specForState();
+      const g = generateMatches(ovr, oppTeamsForState(), spec);
       let w = 0, d = 0;
       g.matches.forEach(m => { if (m.outcome === 'W') w++; else if (m.outcome === 'D') d++; });
       const l = g.matches.length - w - d;
@@ -1983,8 +2099,12 @@ function animateResults(ovr) {
         ovr,
         matches: g.matches,
         inTopSix: g.inTopSix,
-        format: fmt,
-        leagueTable: generateLeagueTable(w, d, l, g.inTopSix, g.champOpponents, g.relegOpponents, fmt),
+        format: isModernSpec(spec) ? 'modern' : 'authentic',
+        formatSpec: { year: state.oppSeason ?? LATEST_SEASON_YEAR, mode: formatOf(state.leagueFormat) },
+        groupIdx: g.groupIdx ?? (g.inTopSix ? 0 : 1),
+        leagueTable: isModernSpec(spec)
+          ? generateLeagueTable(w, d, l, g.inTopSix, g.champOpponents, g.relegOpponents)
+          : generateAuthenticTable(w, d, l, g),
         playerStats: simulatePlayerStats(g.matches),
         projectedFinish: projected,
       };
@@ -2007,7 +2127,12 @@ function animateResults(ovr) {
   const totalGames = matches.length;
   // A restored/preset season carries its own format — never re-read state, or a
   // refresh after changing the setting would re-label an already-played season.
-  const seasonFmt = formatOf(season.format ?? (matches.length === 33 && inTopSix == null ? 'classic33' : 'modern'));
+  // A restored/preset season carries its own format — never re-read the setting,
+  // or a refresh after changing it would re-label an already-played season.
+  const seasonSpec = season.formatSpec
+    ? formatSpecFor(season.formatSpec.mode, season.formatSpec.year)
+    : MODERN_FORMAT;
+  const seasonGroupIdx = season.groupIdx ?? (inTopSix ? 0 : 1);
   const grid = document.getElementById('matches-grid');
   grid.innerHTML = '';
 
@@ -2041,11 +2166,15 @@ function animateResults(ovr) {
   function separatorRow() {
     const sep = document.createElement('div');
     sep.className = 'playoff-separator';
-    sep.textContent = inTopSix ? '── 🏆 פלייאוף עליון ──' : '── פלייאוף תחתון ──';
+    const names = groupNames(seasonSpec);
+    const label = isModernSpec(seasonSpec)
+      ? (inTopSix ? '🏆 פלייאוף עליון' : 'פלייאוף תחתון')
+      : (seasonGroupIdx === 0 ? '🏆 ' : '') + (names[seasonGroupIdx] ?? 'פלייאוף');
+    sep.textContent = '── ' + label + ' ──';
     return sep;
   }
-  // Classic 33 has no playoff, so the fixture list gets no separator at all.
-  const splitAt = isClassic(seasonFmt) ? -1 : 26;
+  // Seasons without a playoff (1999/00, 2001-2009) get no separator at all.
+  const splitAt = seasonSpec.groups ? regularGames(seasonSpec) : -1;
 
   // Fills the summary cards, stats and story — WITHOUT revealing the tier/finish
   // (those stay hidden until revealSummary(), so the reveal isn't spoiled).
@@ -2053,11 +2182,11 @@ function animateResults(ovr) {
     setEl('res-wins', wins); setEl('res-draws', draws); setEl('res-losses', losses);
     setEl('res-points', wins*3+draws); setEl('res-gf', gfTotal); setEl('res-ga', gaTotal);
 
-    const tier = getTier(wins, draws, losses, myRank, leagueTable.length, totalGames, seasonFmt);
+    const tier = getTier(wins, draws, losses, myRank, leagueTable.length, totalGames, seasonSpec);
     const td = tierDisplay(tier);
     setEl('res-tier', td.name, tier.color);
     setEl('res-tier-sub', td.sub);
-    window._lastResult = { wins, draws, losses, gfTotal, gaTotal, matches, ovr, inTopSix, format: seasonFmt };
+    window._lastResult = { wins, draws, losses, gfTotal, gaTotal, matches, ovr, inTopSix, spec: seasonSpec };
     window._lastTier   = tier;
     const diffMapR = {
       easy:   siteText('label-diff-easy', 'קל'),
@@ -2069,7 +2198,8 @@ function animateResults(ovr) {
     if (!state.showRatings) modeParts.push(siteText('label-hidden-ratings', '🙈 דירוגים מוסתרים'));
     if (state.oppSeason)
       modeParts.push(siteText('label-opp-league', '🆚 ליגת {season}').replace('{season}', yearToSeason(state.oppSeason)));
-    if (isClassic(seasonFmt)) modeParts.push(siteText('label-format-classic33', '🏛 ליגה קלאסית — 33 מחזורים'));
+    if (!isModernSpec(seasonSpec))
+      modeParts.push('🏛 ' + siteText('label-format-authentic', 'פורמט {games} מחזורים').replace('{games}', totalGames));
     if (state.challenge && typeof challengeLabel === 'function')
       modeParts.unshift(`${CHAL_PERIODS[state.challenge.period]?.icon ?? '🗓️'} ${challengeLabel(state.challenge.period)} #${challengeNumber(state.challenge.period, state.challenge.key)}`);
     const modeInfoEl = document.getElementById('res-mode-info');
@@ -2090,7 +2220,7 @@ function animateResults(ovr) {
         ? `<span dir="ltr">${hi.bigWin.gf}-${hi.bigWin.ga}</span> נגד ${hi.bigWin.opponent}`
         : '—';
     }
-    buildLeagueTable(leagueTable, seasonFmt);
+    buildLeagueTable(leagueTable, seasonSpec);
     renderSeasonStory({ wins, draws, losses, gfTotal, gaTotal, ovr, myRank,
                         projectedFinish: season.projectedFinish, ps: playerStats, tier });
     return tier;
@@ -2407,7 +2537,7 @@ function populateShareCard() {
   if (state.peakMode) modeParts.push('⚡ שיא');
   if (!state.showRatings) modeParts.push('🙈 סמוי');
   if (state.oppSeason) modeParts.push('🆚 ליגת ' + yearToSeason(state.oppSeason));
-  if (isClassic(r.format)) modeParts.push('🏛 קלאסי 33');
+  if (r.spec && !isModernSpec(r.spec)) modeParts.push('🏛 ' + (r.wins + r.draws + r.losses) + ' מחזורים');
   const modeEl = document.getElementById('sc-p-mode');
   modeEl.textContent = modeParts.join(' · ');
   modeEl.style.display = 'inline-block';
@@ -2475,7 +2605,9 @@ function generateShareText() {
     state.oppSeason
       ? fillTemplate(st('share-line-opp', '🆚 מול ליגת {opp}'), { ...vars, opp: yearToSeason(state.oppSeason) })
       : null,
-    isClassic(r.format) ? st('share-line-classic33', '🏛 ליגה קלאסית — 3 סיבובים, 33 מחזורים') : null,
+    (r.spec && !isModernSpec(r.spec))
+      ? fillTemplate(st('share-line-format', '🏛 פורמט אותנטי — {games} מחזורים'), { ...vars, games: r.wins + r.draws + r.losses })
+      : null,
     fillTemplate(st('share-line-record', '{wins}נ-{draws}ת-{losses}ה | {points} נקודות'), vars),
     tierDisplay(t).name,
     grid,
@@ -2642,7 +2774,7 @@ async function submitResult() {
       peak_mode:       state.peakMode,
       ratings_visible: state.showRatings,
       ...(state.oppSeason ? { opp_season: state.oppSeason } : {}),
-      ...(isClassic(r.format) ? { league_format: 'classic33' } : {}),
+      ...(r.spec && !isModernSpec(r.spec) ? { league_format: 'authentic' } : {}),
       ...(state.challenge ? { challenge: state.challenge.period + '|' + state.challenge.key } : {}),
     },
     players: state.picks.flatMap((pick, i) => {
