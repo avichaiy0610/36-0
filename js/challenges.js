@@ -97,7 +97,11 @@ function chalText(key, def) {
   return (typeof siteText === 'function') ? siteText(key, def) : def;
 }
 
-function challengeLabel(period) {
+function challengeLabel(period, key) {
+  // A themed challenge (real fixture / national-team night) carries its own
+  // headline in the override; everything else uses the editable generic label.
+  const themed = challengeSettings(period, key)?.label;
+  if (themed) return themed;
   return chalText('chal-label-' + period, CHAL_PERIODS[period]?.label ?? period);
 }
 
@@ -245,6 +249,9 @@ function challengeSettings(period, key) {
     if (ov.difficulty) s.difficulty = ov.difficulty;
     if (typeof ov.ratings_visible === 'boolean') s.ratingsVisible = ov.ratings_visible;
     if (typeof ov.peak_mode === 'boolean') s.peakMode = ov.peak_mode;
+    // A themed challenge (a real fixture, a national-team night) gets its own
+    // headline instead of the generic "האתגר היומי".
+    if (ov.label) s.label = String(ov.label).slice(0, 60);
     if (ov.opp_season != null)   // a year, or 'latest' to force the default league
       s.oppSeason = ov.opp_season === 'latest' ? null : (+ov.opp_season || null);
     if (ov.era_min || ov.era_max) {
@@ -882,7 +889,7 @@ async function renderChallengeHome(period) {
     period === 'daily' ? 'טבלת היום' : period === 'weekly' ? 'טבלת השבוע' : 'טבלת החודש');
   box.innerHTML = `
     <div class="lg-card daily-hero">
-      <div class="daily-hero-title">${P.icon} ${lgEsc(challengeLabel(period))} <span dir="ltr">#${challengeNumber(period, key)}</span></div>
+      <div class="daily-hero-title">${P.icon} ${lgEsc(challengeLabel(period, key))} <span dir="ltr">#${challengeNumber(period, key)}</span></div>
       <div class="daily-hero-sub">${lgEsc(chalText('chal-hero-sub', 'כולם מקבלים את אותם תנאים ואת אותן הקבוצות בהגרלה — מי בונה את ההרכב הכי טוב?'))}</div>
       <div class="daily-chips">${chipsHtml}</div>
       ${reqsHtml}
@@ -994,7 +1001,7 @@ function setupChallengeResultsUI() {
   wrap.innerHTML = `
     ${reqsHtml}
     <div class="daily-result-note" id="daily-result-note"></div>
-    <button class="btn-primary" id="daily-retry">${lgEsc(chalText('chal-retry-btn', '🔁 עוד ניסיון ב{challenge}').replace('{challenge}', challengeLabel(period)))}</button>
+    <button class="btn-primary" id="daily-retry">${lgEsc(chalText('chal-retry-btn', '🔁 עוד ניסיון ב{challenge}').replace('{challenge}', challengeLabel(period, key)))}</button>
     <button class="btn-secondary" id="daily-to-board">${lgEsc(chalText('chal-to-board-btn', '📊 לטבלת האתגר'))}</button>`;
   actions.parentNode.insertBefore(wrap, actions);
   wrap.querySelector('#daily-retry').onclick = () => { clearDraftState(); startChallenge(period); };
@@ -1021,6 +1028,8 @@ function fillChallengeWelcomeCard() {
   const key = challengeKey('daily');
   const s = challengeSettings('daily', key);
   numEl.textContent = '#' + challengeNumber('daily', key);
+  const labelEl = document.getElementById('dw-label');
+  if (labelEl) labelEl.textContent = challengeLabel('daily', key);
   const reqs = challengeRequirements('daily', key, s);
   condEl.textContent = reqs.length
     ? '🎯 ' + reqs.map(challengeReqText).join(' · ')

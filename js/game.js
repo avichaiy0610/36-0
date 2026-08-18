@@ -2236,7 +2236,7 @@ function animateResults(ovr) {
     if (!isModernSpec(seasonSpec))
       modeParts.push('🏛 ' + siteText('label-format-authentic', 'פורמט {games} מחזורים').replace('{games}', totalGames));
     if (state.challenge && typeof challengeLabel === 'function')
-      modeParts.unshift(`${CHAL_PERIODS[state.challenge.period]?.icon ?? '🗓️'} ${challengeLabel(state.challenge.period)} #${challengeNumber(state.challenge.period, state.challenge.key)}`);
+      modeParts.unshift(`${CHAL_PERIODS[state.challenge.period]?.icon ?? '🗓️'} ${challengeLabel(state.challenge.period, state.challenge.key)} #${challengeNumber(state.challenge.period, state.challenge.key)}`);
     const modeInfoEl = document.getElementById('res-mode-info');
     if (modeInfoEl) modeInfoEl.textContent = modeParts.join(' · ');
     setupSaveSection();
@@ -2658,7 +2658,7 @@ function generateShareText() {
   const vars = { formation, ovr: r.ovr, wins: r.wins, draws: r.draws, losses: r.losses,
                  points: pts, tier: tierDisplay(t).name };
   const title = state.challenge && typeof challengeLabel === 'function'
-    ? `${CHAL_PERIODS[state.challenge.period]?.icon ?? '🗓️'} 36–0 | ${challengeLabel(state.challenge.period)} #${challengeNumber(state.challenge.period, state.challenge.key)}`
+    ? `${CHAL_PERIODS[state.challenge.period]?.icon ?? '🗓️'} 36–0 | ${challengeLabel(state.challenge.period, state.challenge.key)} #${challengeNumber(state.challenge.period, state.challenge.key)}`
     : fillTemplate(st('share-title', '🇮🇱 36–0 | ליגת העל'), vars);
   return [
     title,

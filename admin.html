@@ -518,6 +518,8 @@ function renderChalList() {
             <input data-f="era_min" type="number" min="${chalYearMin()}" max="${chalYearMax()}" value="${ov.era_min ?? ''}" placeholder="${s.eraMin}"></div>
           <div><label>עידן עד (ריק = אוטומטי)</label>
             <input data-f="era_max" type="number" min="${chalYearMin()}" max="${chalYearMax()}" value="${ov.era_max ?? ''}" placeholder="${s.eraMax}"></div>
+          <div class="chal-label-cell"><label>🏷 כותרת מותאמת (ריק = רגילה)</label>
+            <input data-f="label" type="text" maxlength="60" value="${(ov.label ?? '').replace(/"/g, '&quot;')}" placeholder="למשל: 🇮🇱 ערב נבחרת · 🔥 ערב דרבי"></div>
           <div><label>🆚 בחר עונה</label>
             <select data-f="opp_season">${CHAL_SEL([
               ['auto', 'אוטומטי (' + (s.oppSeason ? 'ליגת ' + chalSeasonLabel(s.oppSeason) : 'עדכנית') + ')'],
@@ -529,6 +531,7 @@ function renderChalList() {
           <div class="chal-req-head">
             <label>🎯 משימות</label>
             <select class="req-mode">${CHAL_SEL([['auto', 'אוטומטי (נגזר מהתאריך)'], ['custom', 'מותאם אישית'], ['none', 'בלי משימות']], reqMode)}</select>
+            <button class="req-preset-nt" title="ממלא משימת נבחרת וכותרת מתאימה">🇮🇱 אתגר נבחרת</button>
           </div>
           <div class="req-auto-preview" ${reqMode !== 'auto' ? 'style="display:none"' : ''}>
             ${reqs.length ? reqs.map(r => `<div class="req-auto-line">· ${challengeReqText(r)}</div>`).join('') : '<div class="req-auto-line">אין משימות אוטומטיות לאתגר הזה</div>'}
@@ -564,6 +567,20 @@ function renderChalList() {
       wireReqRow(rowsEl.lastElementChild);
     };
 
+    // One click builds a national-team night: N Israelis + a matching headline.
+    // Uses the nationality data we already have for all 2,721 players.
+    row.querySelector('.req-preset-nt').onclick = () => {
+      modeSel.value = 'custom';
+      row.querySelector('.req-auto-preview').style.display = 'none';
+      row.querySelector('.req-custom').style.display = '';
+      const n = chalPeriod === 'daily' ? 6 : chalPeriod === 'weekly' ? 8 : 11;
+      rowsEl.innerHTML = reqRowHTML({ type: 'nat_count', nat: 'ישראל', n });
+      wireReqRow(rowsEl.lastElementChild);
+      const labelEl = row.querySelector('[data-f="label"]');
+      if (!labelEl.value.trim()) labelEl.value = n === 11 ? '🇮🇱 כולם כחול-לבן' : '🇮🇱 ערב נבחרת';
+      chalStatus('פריסט נבחרת מולא — בדוק ולחץ שמור', true);
+    };
+
     row.querySelector('.save').onclick = async () => {
       const val = f => row.querySelector(`[data-f="${f}"]`).value;
       const settings = {};
@@ -573,6 +590,7 @@ function renderChalList() {
       if (val('peak_mode') !== 'auto') settings.peak_mode = val('peak_mode') === 'true';
       if (val('era_min')) settings.era_min = +val('era_min');
       if (val('era_max')) settings.era_max = +val('era_max');
+      if (val('label').trim()) settings.label = val('label').trim().slice(0, 60);
       if (val('opp_season') !== 'auto')
         settings.opp_season = val('opp_season') === 'latest' ? 'latest' : +val('opp_season');
       if (settings.era_min && settings.era_max && settings.era_min > settings.era_max) {
