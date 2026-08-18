@@ -11,7 +11,9 @@
 //     must never change under a player mid-run,
 //   · it never touches the deterministic generator, only the override table.
 //
-// Source: TheSportsDB free tier (no key needed for the public v1 endpoints).
+// Sources, in order of trust:
+//   · 365Scores (Israeli, Hebrew club names, publishes rounds ahead) — primary
+//   · TheSportsDB free v1 — fallback for the league, and the national team
 // API-Football was evaluated and rejected: its free plan excludes the current
 // season and blocks the next/last parameters.
 //
@@ -26,6 +28,7 @@ const {
 } = process.env;
 
 const TSDB = 'https://www.thesportsdb.com/api/v1/json/3';
+const S365 = 'https://webws.365scores.com/web/games/fixtures/?appTypeId=5&langId=2&timezoneName=Asia/Jerusalem&competitions=42';
 const LEAGUE_ID = 4644;        // Israeli Premier League
 const ISRAEL_NT = 135931;      // Israel national team
 const TZ = 'Asia/Jerusalem';
@@ -59,6 +62,23 @@ const CLUB_MAP = {
   'hapoel nir ramat hasharon': 'hapoel-rhs', 'hapoel acre': 'hapoel-aco',
   'hapoel ironi acre': 'hapoel-aco', 'maccabi kiryat gat': 'maccabi-kg',
 };
+// Hebrew spelling drifts between sources (תקוה/תקווה, קרית/קריית), so both
+// sides are normalised before matching.
+const hebNorm = s => String(s || '')
+  .replace(/['׳״"]/g, '')
+  .replace(/תקוה/g, 'תקווה').replace(/קרית/g, 'קריית')
+  .replace(/\s+/g, ' ').trim();
+const HEB_TO_ID = (() => {
+  const m = {};
+  Object.keys(TEAMS).forEach(id => { m[hebNorm(TEAMS[id].name)] = id; });
+  m[hebNorm('הפועל ניר רמת השרון')] = 'hapoel-rhs';
+  m[hebNorm('סקציה נס ציונה')] = 'sakhnina-ns';
+  m[hebNorm('מ.ס. אשדוד')] = 'ms-ashdod';
+  m[hebNorm('אשדוד')] = 'ms-ashdod';
+  return m;
+})();
+const clubIdHeb = name => HEB_TO_ID[hebNorm(name)] || null;
+
 const norm = s => String(s || '').toLowerCase()
   .replace(/f\.?c\.?/g, ' ').replace(/[^a-z ]/g, ' ').replace(/\s+/g, ' ').trim();
 function clubIdOf(name) { return CLUB_MAP[norm(name)] || null; }
@@ -153,6 +173,18 @@ const DAY = 86400000;
 /* ── fixtures ─────────────────────────────────────────────────────────────── */
 async function fixtures() {
   const out = [];
+  try {                                       // primary: 365Scores
+    const d = await (await fetchT(S365, { headers: { 'User-Agent': 'Mozilla/5.0' } })).json();
+    (d.games || []).forEach(g => {
+      const home = (g.homeCompetitor || {}).name, away = (g.awayCompetitor || {}).name;
+      const date = String(g.startTime || '').slice(0, 10);
+      if (!home || !away || !date) return;
+      out.push({
+        id: '365-' + g.id, kind: 'league', date, time: String(g.startTime || '').slice(11, 16),
+        home, away, homeId: clubIdHeb(home), awayId: clubIdHeb(away), league: 'ליגת העל',
+      });
+    });
+  } catch (e) { console.error('365 fetch failed', e.message); }
   const seasons = [seasonLabel(new Date()), seasonLabel(new Date(Date.now() + 120 * DAY))];
   for (const s of [...new Set(seasons)]) {
     try {
@@ -254,6 +286,21 @@ function targets(now) {
   return out;
 }
 const inWindow = (f, t) => f.date >= dailyKey(t.from) && f.date <= dailyKey(t.to);
+
+// Which prominent clubs have no scheduled game in this window. In Israel the
+// round is often published in pieces — clubs playing in Europe get their game
+// dated late — so a missing giant is a real signal, not a bug.
+function unscheduledNote(inRange, all, t) {
+  const playing = new Set();
+  inRange.forEach(f => { if (f.homeId) playing.add(f.homeId); if (f.awayId) playing.add(f.awayId); });
+  const known = new Set();
+  all.forEach(f => { if (f.homeId) known.add(f.homeId); if (f.awayId) known.add(f.awayId); });
+  const missing = [...known].filter(id => !playing.has(id) && (FANBASE[id] || 0) >= 8);
+  if (!missing.length) return '';
+  return `
+
+📌 עדיין בלי תאריך בתקופה הזאת: ${missing.map(heb).join(', ')}.`;
+}
 
 /* ── Telegram approvals from the previous run ─────────────────────────────── */
 async function processTaps() {
