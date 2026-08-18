@@ -2029,3 +2029,27 @@ body {
 .pf-best-pts { font-size: 20px; font-weight: 900; color: var(--text); }
 .pf-best .pf-sub { text-align: start; margin-top: 4px; }
 .pf-best-btn { margin-top: 12px; }
+
+/* ── Gauntlet map ─────────────────────────────────────────────────────────── */
+#gauntlet-map { margin: 6px 0 14px; }
+/* the country is tall and narrow — cap by height so the whole run fits a screen */
+.gm-svg { display: block; margin: 0 auto; height: min(78vh, 780px); width: auto; max-width: 100%; }
+.gm-num   { font: 800 9px Heebo, Arial, sans-serif; fill: #fff; }
+.gm-label { font: 700 8.5px Heebo, Arial, sans-serif; fill: #e6edf3; paint-order: stroke;
+            stroke: #0d1117; stroke-width: 2.5px; stroke-linejoin: round; }
+.gm-ovr   { font: 800 10px Heebo, Arial, sans-serif; fill: var(--accent); paint-order: stroke;
+            stroke: #0d1117; stroke-width: 2.5px; stroke-linejoin: round; }
+.gm-station { cursor: pointer; }
+.gm-station:hover .gm-stadium { filter: brightness(1.25); }
+.gm-list { list-style: none; padding: 0; margin: 10px 0 0; }
+.gm-li { display: flex; align-items: center; gap: 8px; padding: 7px 10px; margin-bottom: 5px;
+         background: var(--card); border: 1px solid var(--border); border-radius: 8px; font-size: 13px; }
+.gm-li-n { min-width: 20px; height: 20px; border-radius: 50%; background: #4b5563; color: #fff;
+           font-weight: 800; font-size: 11px; display: flex; align-items: center; justify-content: center; }
+.gm-li.done .gm-li-n { background: #3f6f4a; }
+.gm-li.next { border-color: var(--accent); }
+.gm-li.next .gm-li-n { background: var(--accent); color: #1a1a1a; }
+.gm-li.elite { border-color: #8b5cf6; }
+.gm-li-club { flex: 1; font-weight: 700; }
+.gm-li-elite { font-size: 10px; font-weight: 900; color: #8b5cf6; letter-spacing: .5px; }
+.gm-li-ovr { font-weight: 900; color: var(--accent); }

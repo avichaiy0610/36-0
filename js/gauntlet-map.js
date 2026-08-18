@@ -62,7 +62,7 @@ function gmCityFor(teamId) {
 // A small isometric ground: an ellipse for the bowl, a lighter pitch inside,
 // and a shadow so it sits on the map instead of floating over it.
 function gmStadiumSVG(x, y, { size = 1, state = 'locked', elite = false } = {}) {
-  const w = 22 * size, h = 11 * size;
+  const w = 26 * size, h = 13 * size;
   const stand = elite ? '#8b5cf6' : state === 'done' ? '#3f6f4a' : state === 'next' ? '#d4af37' : '#4b5563';
   const pitch = state === 'done' ? '#2b4a33' : '#2f7d4a';
   const glow  = state === 'next' ? `<ellipse cx="${x}" cy="${y + h * 0.35}" rx="${w * 0.95}" ry="${h * 0.95}" fill="#d4af37" opacity=".22"/>` : '';
@@ -82,23 +82,40 @@ function gmStadiumSVG(x, y, { size = 1, state = 'locked', elite = false } = {}) 
 // `at` = the index you are standing on.
 function renderGauntletMap(container, stations, at = 0) {
   if (!container) return;
+
+  // Half the league lives in Gush Dan, so grounds land on top of each other.
+  // Place them one by one and push each new one away from whatever is already
+  // there — the pin moves, the country doesn't.
+  const placed = [];
+  const spots = stations.map((st, i) => {
+    const city = gmCityFor(st.teamId) || { x: 150, y: 120 + i * 70 };
+    let { x, y } = city;
+    const MIN = 34;
+    for (let guard = 0; guard < 60; guard++) {
+      const hit = placed.find(p => Math.hypot(p.x - x, p.y - y) < MIN);
+      if (!hit) break;
+      const ang = Math.atan2(y - hit.y || 0.01, x - hit.x || 0.01);
+      x = hit.x + Math.cos(ang) * MIN;
+      y = hit.y + Math.sin(ang) * MIN;
+    }
+    placed.push({ x, y });
+    return { x, y, home: city };
+  });
+
   const marks = stations.map((st, i) => {
-    const city = gmCityFor(st.teamId) || { x: 100 + (i % 3) * 20, y: 60 + i * 70, name: '' };
+    const city = spots[i];
     const state = i < at ? 'done' : i === at ? 'next' : 'locked';
-    const label = `${st.season} · ${(typeof TEAMS === 'object' && TEAMS[st.teamId] ? TEAMS[st.teamId].name : st.teamId)}`;
+    // Only the number rides on the map. Names and ratings live in the list
+    // below: four Gush Dan clubs in one run made overlapping labels unreadable.
     return `
       <g class="gm-station" data-station="${i}">
-        ${gmStadiumSVG(city.x, city.y, { size: i === at ? 1.25 : 1, state, elite: !!st.elite })}
+        ${gmStadiumSVG(city.x, city.y, { size: i === at ? 1.3 : 1, state, elite: !!st.elite })}
         <text class="gm-num" x="${city.x}" y="${city.y + 2}" text-anchor="middle">${i + 1}</text>
-        <text class="gm-label" x="${city.x}" y="${city.y + (i % 2 ? -16 : 20)}" text-anchor="middle">${label}</text>
-        <text class="gm-ovr" x="${city.x}" y="${city.y + (i % 2 ? -8 : 29)}" text-anchor="middle">${st.ovr}</text>
       </g>`;
   }).join('');
 
   // the road between grounds, drawn behind them
-  const road = stations.map((st, i) => {
-    const c = gmCityFor(st.teamId); return c ? `${c.x},${c.y}` : null;
-  }).filter(Boolean).join(' ');
+  const road = spots.map(s => `${s.x.toFixed(1)},${s.y.toFixed(1)}`).join(' ');
 
   container.innerHTML = `
     <svg class="gm-svg" viewBox="0 0 ${GM_VIEW.w} ${GM_VIEW.h}" xmlns="http://www.w3.org/2000/svg">
@@ -121,5 +138,69 @@ function renderGauntletMap(container, stations, at = 0) {
       <path class="gm-land" d="${ISRAEL_PATH}" fill="url(#gm-land)" fill-rule="nonzero" filter="url(#gm-edge)"/>
       <polyline class="gm-road" points="${road}" fill="none" stroke="#d4af3766" stroke-width="1.6" stroke-dasharray="4 4"/>
       ${marks}
-    </svg>`;
+    </svg>
+    <ol class="gm-list">${stations.map((st, i) => {
+      const club = (typeof TEAMS === 'object' && TEAMS[st.teamId] ? TEAMS[st.teamId].name : st.teamId);
+      const cls = i < at ? 'done' : i === at ? 'next' : '';
+      return `<li class="gm-li ${cls}${st.elite ? ' elite' : ''}">
+        <span class="gm-li-n">${i + 1}</span>
+        <span class="gm-li-club">${club} · ${st.season}</span>
+        ${st.elite ? '<span class="gm-li-elite">ELITE</span>' : ''}
+        <span class="gm-li-ovr">${st.ovr}</span>
+      </li>`;
+    }).join('')}</ol>`;
+}
+
+/* ── station picking ──────────────────────────────────────────────────────── */
+// Every club-season we hold, rated by its top-11 average — the same measure the
+// game already uses for opponents. That list IS the difficulty ladder.
+let _gmLadder = null;
+function gmLadder() {
+  if (_gmLadder) return _gmLadder;
+  const rate = sq => {
+    const top = [...sq.players].sort((a, b) => b.ovr - a.ovr).slice(0, 11);
+    return Math.round(top.reduce((s, p) => s + p.ovr, 0) / top.length);
+  };
+  return (_gmLadder = SQUADS
+    .filter(sq => gmCityFor(sq.teamId))          // only clubs we can place on the map
+    .map(sq => ({ teamId: sq.teamId, season: sq.season, ovr: rate(sq) }))
+    .sort((a, b) => a.ovr - b.ovr));
+}
+
+// Eight stations of rising difficulty. The last two are drawn from the very top
+// (the bosses); the rest are spread across bands so a run climbs steadily.
+// One mid-run station is marked ELITE — harder, richer spoils, always skippable.
+function gmPickStations(rng = Math.random) {
+  const ladder = gmLadder();                   // already sorted weakest → strongest
+  const n = ladder.length;
+  // Slice by POSITION in the ladder, not by hardcoded rating bands: fixed bands
+  // left the top ones nearly empty, the pick fell back to the whole list, and a
+  // run could end on a station weaker than the one before it.
+  const used = new Set();
+  const out = [];
+  for (let i = 0; i < 8; i++) {
+    const lo = Math.floor((i / 8) * n);
+    const hi = i === 7 ? n : Math.floor(((i + 1) / 8) * n);
+    const slice = ladder.slice(i === 7 ? Math.floor(n * 0.94) : lo, hi);   // boss = top 6%
+    let s, guard = 0;
+    do { s = slice[Math.floor(rng() * slice.length)]; guard++; }
+    while (s && used.has(s.teamId + s.season) && guard < 40);
+    if (!s) continue;
+    used.add(s.teamId + s.season);
+    out.push({ ...s, station: i, elite: false });
+  }
+  const eliteIdx = 3 + Math.floor(rng() * 3);          // somewhere in the middle
+  if (out[eliteIdx]) { out[eliteIdx].elite = true; out[eliteIdx].ovr += 4; }
+  return out;
+}
+
+/* ── screen ───────────────────────────────────────────────────────────────── */
+function showGauntlet() {
+  showScreen('gauntlet');
+  const back = document.getElementById('gauntlet-back');
+  if (back) back.onclick = () => showScreen('welcome');
+  const reroll = document.getElementById('gauntlet-reroll');
+  const draw = () => renderGauntletMap(document.getElementById('gauntlet-map'), gmPickStations(), 0);
+  if (reroll) reroll.onclick = draw;
+  draw();
 }

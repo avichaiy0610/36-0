@@ -88,6 +88,7 @@
       <button class="nav-btn" id="nav-leaderboard">לוח שיאים</button>
       <button class="nav-btn" id="nav-achievements">הישגים</button>
       <button class="nav-btn" id="nav-profile">👤 פרופיל</button>
+      <button class="nav-btn" id="nav-gauntlet">🗺 גאונטלט <span class="nav-beta">בטא</span></button>
       <button class="nav-btn nav-btn-icon" id="nav-theme" title="עיצוב" aria-label="עיצוב">⚙️</button>
       <div class="nav-user" id="nav-user" style="display:none">
         <img class="nav-avatar" id="nav-avatar" src="" alt="" style="display:none">
@@ -696,6 +697,19 @@
   </div>
 
   <!-- ══ LEADERBOARD SCREEN ════════════════════════════════════════════════════ -->
+  <!-- ══ GAUNTLET (in development) ═════════════════════════════════════════════ -->
+  <div id="screen-gauntlet" class="screen screen-page">
+    <div class="page-inner">
+      <div class="page-header">
+        <button class="back-btn" id="gauntlet-back">→ חזרה</button>
+        <h2 class="page-title">🗺 גאונטלט</h2>
+      </div>
+      <p class="page-note" id="gauntlet-note">מצב בפיתוח — זו תצוגה מקדימה של המפה. שמונה תחנות בקושי עולה, מהחלשה לחזקה, עם תחנת ELITE אחת באמצע.</p>
+      <div id="gauntlet-map"></div>
+      <button class="btn-primary btn-full" id="gauntlet-reroll">🎲 הגרל מפה חדשה</button>
+    </div>
+  </div>
+
   <!-- ══ PROFILE / LIFETIME STATS ══════════════════════════════════════════════ -->
   <div id="screen-profile" class="screen screen-page">
     <div class="page-inner">
@@ -794,6 +808,7 @@
   <script src="js/achievements.js"></script>
   <script src="js/leaderboard.js"></script>
   <script src="js/profile.js"></script>
+  <script src="js/gauntlet-map.js"></script>
   <script src="js/leagues.js"></script>
   <script src="js/duel.js"></script>
   <script src="js/data.js"></script>
