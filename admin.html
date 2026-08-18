@@ -518,7 +518,7 @@ function renderChalList() {
             <input data-f="era_min" type="number" min="${chalYearMin()}" max="${chalYearMax()}" value="${ov.era_min ?? ''}" placeholder="${s.eraMin}"></div>
           <div><label>עידן עד (ריק = אוטומטי)</label>
             <input data-f="era_max" type="number" min="${chalYearMin()}" max="${chalYearMax()}" value="${ov.era_max ?? ''}" placeholder="${s.eraMax}"></div>
-          <div><label>🆚 ליגת היריבות</label>
+          <div><label>🆚 בחר עונה</label>
             <select data-f="opp_season">${CHAL_SEL([
               ['auto', 'אוטומטי (' + (s.oppSeason ? 'ליגת ' + chalSeasonLabel(s.oppSeason) : 'עדכנית') + ')'],
               ['latest', 'עדכנית'],
