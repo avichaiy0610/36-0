@@ -907,6 +907,23 @@ function restoreDraftState() {
 }
 
 // ─── Pitch builder ─────────────────────────────────────────────────────────────
+// Markup shared by every filled token (draft pitch, pre-season, results) so the
+// three surfaces can't drift apart. showOvr is false wherever hiding ratings is
+// the point of the run.
+function filledTokenHTML(player, squad, showOvr) {
+  const team    = getTeam(squad.teamId);
+  const peakTag = state.peakMode && player.peak_ovr && player.peak_ovr > player.ovr ? '⚡' : '';
+  const ovrHTML = showOvr ? `<span class="slot-ovr">${peakTag}${playerOVR(player)}</span>` : '';
+  return `
+    <div class="slot-circle filled-circle">
+      ${ovrHTML}
+      <span class="slot-player-short">${playerShortName(player.name)}</span>
+    </div>
+    <div class="slot-name-label">${player.name}</div>
+    <div class="slot-meta"><span class="slot-meta-season">${squad.season}</span> · ${clubShortName(team.name)}</div>
+  `;
+}
+
 function buildPitch(containerId, clickable) {
   const container = document.getElementById(containerId);
   container.innerHTML = '';
@@ -940,12 +957,7 @@ function fillToken(idx, player, squad) {
   token.style.setProperty('--tc', team.primaryColor);
   token.style.setProperty('--ts', team.secondaryColor);
   token.style.setProperty('--tx', textColorFor(team.primaryColor));
-  token.innerHTML = `
-    <div class="slot-circle filled-circle">
-      <span class="slot-player-short">${playerShortName(player.name)}</span>
-    </div>
-    <div class="slot-name-label">${player.name}</div>
-  `;
+  token.innerHTML = filledTokenHTML(player, squad, state.showRatings);
   fitShortNames(token);
 }
 
@@ -1110,12 +1122,7 @@ function refreshAllTokens() {
       token.style.setProperty('--tc', team.primaryColor);
       token.style.setProperty('--ts', team.secondaryColor);
       token.style.setProperty('--tx', textColorFor(team.primaryColor));
-      token.innerHTML = `
-        <div class="slot-circle filled-circle">
-          <span class="slot-player-short">${playerShortName(player.name)}</span>
-        </div>
-        <div class="slot-name-label">${player.name}</div>
-      `;
+      token.innerHTML = filledTokenHTML(player, squad, state.showRatings);
     } else {
       token.className = 'slot-token empty';
       token.style.removeProperty('--tc');
@@ -2093,18 +2100,7 @@ function buildPitchInContainer(containerId) {
       token.style.setProperty('--tc', team.primaryColor);
       token.style.setProperty('--ts', team.secondaryColor);
       token.style.setProperty('--tx', textColorFor(team.primaryColor));
-      // ⚡ marks a peak-mode rating, exactly like the draft cards do
-      const peakTag = state.peakMode && pick.player.peak_ovr && pick.player.peak_ovr > pick.player.ovr ? '⚡' : '';
-      const ovrHTML = showOvr
-        ? `<span class="slot-ovr">${peakTag}${playerOVR(pick.player)}</span>` : '';
-      token.innerHTML = `
-        <div class="slot-circle filled-circle">
-          ${ovrHTML}
-          <span class="slot-player-short">${playerShortName(pick.player.name)}</span>
-        </div>
-        <div class="slot-name-label">${pick.player.name}</div>
-        <div class="slot-meta"><span class="slot-meta-season">${pick.squad.season}</span> · ${clubShortName(team.name)}</div>
-      `;
+      token.innerHTML = filledTokenHTML(pick.player, pick.squad, showOvr);
     } else {
       token.innerHTML = `
         <div class="slot-circle"><span class="slot-pos-label">${slot.pos}</span></div>
