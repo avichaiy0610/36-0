@@ -37,3 +37,16 @@ Gotchas:
   diff after any generator edit.
 - Generator is versioned by `CHAL_GEN2_FROM` key cutoffs; to see a future
   generator live in the UI, patch the cutoff in a scratchpad COPY only.
+
+## 3. Admin panel offline (auth-gated UI)
+
+`admin.html` is gated on `session.user.email`, so it renders nothing in a
+headless run. To drive it, copy the site to the scratchpad and REPLACE
+`js/supabase-client.js` with a stub that exports `_supabase` (auth.getSession →
+the admin email, `from()` → a chainable that resolves `{data: [], error: null}`,
+`rpc`/`channel` no-ops) plus `getCurrentUser()`. The whole panel then renders and
+buttons can be clicked.
+
+Learned the hard way twice: parsing the inline script proves nothing. Both the
+dead "play" button and the dead preset button were runtime ReferenceErrors that
+a syntax check passed happily. Always click the thing.

@@ -573,6 +573,7 @@ function renderChalList() {
       modeSel.value = 'custom';
       row.querySelector('.req-auto-preview').style.display = 'none';
       row.querySelector('.req-custom').style.display = '';
+      const rowsEl = row.querySelector('.req-rows');   // scoped per handler, like the others
       const n = chalPeriod === 'daily' ? 6 : chalPeriod === 'weekly' ? 8 : 11;
       rowsEl.innerHTML = reqRowHTML({ type: 'nat_count', nat: 'ישראל', n });
       wireReqRow(rowsEl.lastElementChild);
