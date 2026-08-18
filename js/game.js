@@ -690,7 +690,8 @@ function updateLeagueFormatNote() {
   if (!sel || !note) return;
   const oppSel = document.getElementById('opp-season-sel');
   const raw = oppSel ? oppSel.value : 'latest';
-  const y = (raw === 'latest' || raw === 'random') ? null : parseInt(raw);
+  const parsed = parseInt(raw);
+  const y = Number.isFinite(parsed) ? parsed : null;   // 'latest'/'random'/empty → current season
   const spec = formatSpecFor(sel.value, y ?? LATEST_SEASON_YEAR);
   if (raw === 'random' && sel.value !== 'modern') {
     note.textContent = 'כל עונה שתוגרל תשוחק בפורמט שהיה בה באמת';
@@ -851,7 +852,7 @@ function restoreDraftState() {
     draftMode: d.draftMode, peakMode: d.peakMode,
     eraMin: d.eraMin, eraMax: d.eraMax,
     oppSeason: d.oppSeason ?? null, oppSeasonChoice: d.oppSeasonChoice ?? 'latest',
-    leagueFormat: formatOf(d.leagueFormat),
+    leagueFormat: formatOf(d.leagueFormat ?? 'modern'),   // saves from before formats existed were all modern
     currentRound: d.currentRound,
     teamRerollsLeft: d.teamRerollsLeft, seasonRerollsLeft: d.seasonRerollsLeft,
     usedSquadIds: new Set(d.usedSquadIds), usedPlayerKeys: new Set(d.usedPlayerKeys),
@@ -2232,6 +2233,7 @@ function animateResults(ovr) {
     }
     buildLeagueTable(leagueTable, seasonSpec);
     renderSeasonStory({ wins, draws, losses, gfTotal, gaTotal, ovr, myRank,
+                        n: leagueTable.length, spec: seasonSpec,
                         projectedFinish: season.projectedFinish, ps: playerStats, tier });
     return tier;
   }
@@ -2468,7 +2470,12 @@ function renderSeasonStory(r) {
   // 3) Narrative recap — template chosen by outcome
   const pts = r.wins * 3 + r.draws;
   const champ = r.myRank === 1;
-  const top6  = r.myRank <= 6;
+  // Table size and playoff shape change with the season's format: "top six" and
+  // "bottom of the table" mean different ranks in a 12/14/16-club league.
+  const n      = r.n ?? 14;
+  const spec   = r.spec ?? MODERN_FORMAT;
+  const topCut = spec.groups ? spec.groups[0] : Math.ceil(n / 2);
+  const top6   = r.myRank <= topCut;
   let titleKey, bodyKey, titleDef, bodyDef;
   if (r.wins === (r.wins + r.draws + r.losses)) { // perfect season
     titleKey = 'story-perfect-title'; titleDef = 'מושלם. בלתי אפשרי הפך למציאות. 🏆';
@@ -2477,9 +2484,16 @@ function renderSeasonStory(r) {
     titleKey = 'story-champ-title'; titleDef = 'אלופים! 🏆';
     bodyKey  = 'story-champ-body';  bodyDef  = 'הם המשיכו לדפוק בדלת, והפעם היא נפתחה. {pts} נקודות בקופה, {wins} ניצחונות, ואליפות שאף אחד לא יכול לקחת.';
   } else if (top6) {
-    titleKey = 'story-top6-title'; titleDef = 'עונה גדולה 🥈';
-    bodyKey  = 'story-top6-body';  bodyDef  = 'מקום {rank} וכרטיס לפלייאוף האליפות. {pts} נקודות ועונה שכמעט נגעה בזהב — עד כמה זה היה קרוב?';
-  } else if (r.myRank <= 12) {
+    // Separate keys, not just a different default: 'story-top6-body' may carry an
+    // admin override that mentions a playoff the old formats never had.
+    if (spec.groups) {
+      titleKey = 'story-top6-title'; titleDef = 'עונה גדולה 🥈';
+      bodyKey  = 'story-top6-body';  bodyDef  = 'מקום {rank} וכרטיס לפלייאוף האליפות. {pts} נקודות ועונה שכמעט נגעה בזהב — עד כמה זה היה קרוב?';
+    } else {
+      titleKey = 'story-tophalf-title'; titleDef = 'עונה גדולה 🥈';
+      bodyKey  = 'story-tophalf-body';  bodyDef  = 'מקום {rank} בצמרת הטבלה. {pts} נקודות ועונה שכמעט נגעה בזהב — עד כמה זה היה קרוב?';
+    }
+  } else if (r.myRank <= n - 2) {
     titleKey = 'story-mid-title'; titleDef = 'עונה של ביסוס';
     bodyKey  = 'story-mid-body';  bodyDef  = 'מקום {rank}. לא הכל הלך חלק, אבל {wins} ניצחונות ו-{pts} נקודות מספרים על קבוצה עם אופי. יש על מה לבנות.';
   } else {
@@ -2848,6 +2862,26 @@ function setupSaveSection() {
 
   // Reviewing a league/duel season — nothing to save (it isn't a fresh single-player draft).
   if (window._leagueReviewMode || window._duelReviewMode) { saveSection.style.display = 'none'; loginPrompt.style.display = 'none'; return; }
+
+  // A season played in a historical format isn't comparable to a modern one —
+  // different number of games, different playoff, sometimes halved points. Those
+  // runs are for fun and never reach the leaderboard (the 2012+ format, which is
+  // what "authentic" resolves to for recent seasons, saves normally).
+  const r = window._lastResult;
+  if (r && r.spec && !isModernSpec(r.spec)) {
+    saveSection.style.display = 'none';
+    loginPrompt.style.display = 'flex';
+    const msg = document.getElementById('save-login-msg');
+    if (msg) msg.textContent = siteText('save-format-note',
+      'עונה בפורמט ההיסטורי של אותה עונה — לא נשמרת בלוח השיאים (הטבלה משווה עונות של 36 משחקים).');
+    const btn = document.getElementById('save-login-btn');
+    if (btn) btn.style.display = 'none';
+    return;
+  }
+  const loginBtn = document.getElementById('save-login-btn');
+  if (loginBtn) loginBtn.style.display = '';
+  const loginMsg = document.getElementById('save-login-msg');
+  if (loginMsg) loginMsg.textContent = siteText('save-login-msg', 'התחבר כדי לשמור את התוצאה');
 
   if (user) {
     saveSection.style.display = 'flex';
