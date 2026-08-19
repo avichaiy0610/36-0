@@ -39,7 +39,10 @@ interface Settings {
   league_format?: string;   // 'modern' (26+playoff) | 'authentic' (that season's real format)
 }
 
-interface Player { teamId: string; season: string; name: string; pos: string; ovr: number; slotId: string; }
+interface Player {
+  teamId: string; season: string; name: string; pos: string; ovr: number; slotId: string;
+  goals?: number; assists?: number;   // absent on seasons submitted before 2026-08-19
+}
 
 interface Payload {
   ovr: number;
@@ -93,6 +96,21 @@ function validate(p: Payload): string | null {
   return null;
 }
 
+// Eran Zahavi's 35 for Maccabi Tel Aviv in 2018/19 is the Israeli top-flight
+// single-season record. Beating it means 36.
+const ZAHAVI_RECORD = 35;
+
+// The season's leading scorer, but only when the numbers are internally
+// consistent: every goal the team scored has to be accounted for by exactly one
+// player. Seasons submitted before per-player goals existed carry none, and sum
+// to zero, so they simply never qualify rather than being wrongly credited.
+function topScorerGoals(p: Payload): number {
+  const goals = p.players.map(pl => pl.goals ?? 0);
+  if (goals.some(g => !Number.isInteger(g) || g < 0)) return 0;
+  if (goals.reduce((s, g) => s + g, 0) !== p.gf) return 0;
+  return Math.max(0, ...goals);
+}
+
 function computeAchievements(
   p: Payload,
   gamesPlayed: number,
@@ -114,6 +132,7 @@ function computeAchievements(
   if (p.ovr >= 90)                                                                earned.push('ovr_90');
   if (p.ga <= 15)                                                                 earned.push('clean_season');
   if (p.gf >= 100)                                                                earned.push('century');
+  if (topScorerGoals(p) > ZAHAVI_RECORD)                                          earned.push('golden_boot');
   if (p.points >= 100)                                                            earned.push('record_breaker');
   if (CHAMPION_TIERS.includes(p.tier) && p.settings.difficulty === 'hard')       earned.push('hard_win');
   if (CHAMPION_TIERS.includes(p.tier) && p.settings.ratings_visible === false)   earned.push('blind_win');
