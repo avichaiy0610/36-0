@@ -234,10 +234,14 @@ function simTeamsForSeason(year, count = 13) {
   if (_simTeamsCache[ck]) return _simTeamsCache[ck];
   const clubOf = sq => {
     const top = [...sq.players].sort((a, b) => b.ovr - a.ovr).slice(0, 11);
+    const ovr = Math.round(top.reduce((sum, p) => sum + p.ovr, 0) / top.length);
     return {
       teamId: sq.teamId,
       name: (TEAMS[sq.teamId] ?? { name: sq.teamId }).name,
-      ovr: Math.round(top.reduce((sum, p) => sum + p.ovr, 0) / top.length),
+      ovr,
+      // V2 line ratings, from the club's real squad. V1 ignores these entirely,
+      // so adding them cannot change any existing result.
+      ...simLineRatingsForSquad(sq.players, ovr),
     };
   };
   const clubs = SQUADS.filter(s => parseInt(s.season) === y).map(clubOf)
