@@ -860,6 +860,10 @@ function saveDraftState() {
       seasonRerollsLeft: state.seasonRerollsLeft,
       awaitingSlotPick: state.awaitingSlotPick,
       selectedSlotIdx: state.selectedSlotIdx,
+      // The challenge deck is drawn fresh per attempt, so it can no longer be
+      // rebuilt from the key — it has to be stored, or a refresh mid-draft would
+      // deal a different remaining eleven.
+      challengeDeckIds: state.challengeDeck ? state.challengeDeck.map(sq => sq.id) : null,
       usedSquadIds: [...state.usedSquadIds],
       usedPlayerKeys: [...state.usedPlayerKeys],
       currentSquadId: state.currentSquad?.id ?? null,
@@ -939,11 +943,20 @@ function restoreDraftState() {
     isAnimating: false, awaitingSlotPick: false,
     moveMode: false, movingFromIdx: null,
   });
-  // the challenge deck is derived from the key (and the missions snapshot taken
-  // at start — overrides may change later), so a restore rebuilds it exactly
+  // Resume the exact deck this attempt was dealt. Drafts saved before the deck
+  // was stored carry no ids, so those fall back to rebuilding it from the key —
+  // which is what dealt them in the first place, so they resume correctly too.
   state.challengeReqs = d.challengeReqs ?? null;
-  state.challengeDeck = (state.challenge && typeof challengeDeckFor === 'function')
-    ? challengeDeckFor(state.challenge.period, state.challenge.key, state.eraMin, state.eraMax, state.challengeReqs) : null;
+  if (!state.challenge || typeof challengeDeckFor !== 'function') {
+    state.challengeDeck = null;
+  } else if (Array.isArray(d.challengeDeckIds)) {
+    const byId = new Map(SQUADS.map(sq => [sq.id, sq]));
+    state.challengeDeck = d.challengeDeckIds.map(id => byId.get(id)).filter(Boolean);
+  } else {
+    state.challengeDeck = challengeDeckFor(
+      state.challenge.period, state.challenge.key, state.eraMin, state.eraMax,
+      state.challengeReqs, chalRng(`chal|${state.challenge.period}|${state.challenge.key}|deck`));
+  }
 
   const banner = document.getElementById('peak-mode-banner');
   if (banner) banner.style.display = state.peakMode ? 'block' : 'none';
