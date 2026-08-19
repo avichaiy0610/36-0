@@ -1,0 +1,170 @@
+{
+  "seededSeasons": [
+    {
+      "seed": "ABCD|avi",
+      "ovr": 78,
+      "n": 36,
+      "inTopSix": true,
+      "matches": "W1-0A,W2-0H,W4-3A,W4-3H,W3-2H,L0-3A,W1-0A,L2-3H,D2-2A,L0-1H,D1-1A,L0-3H,W4-3A,W2-0A,D1-1H,W3-2H,L1-3H,L0-1A,W3-2A,D1-1A,W2-1A,W1-0A,L1-2A,L0-1A,L0-1A,W2-1H,W2-0A,W2-1A,L0-1A,L2-3A,L1-3H,W4-0A,W1-0H,W3-0A,L1-3A,D1-1H"
+    },
+    {
+      "seed": "ABCD|avi",
+      "ovr": 84,
+      "n": 36,
+      "inTopSix": true,
+      "matches": "W3-0A,W4-0H,D0-0A,W1-0H,W2-1A,D1-1A,W1-0A,D0-0H,D1-1H,W3-1A,D0-0A,W3-2H,L0-2A,L0-2H,D1-1H,W1-0A,W3-0H,W2-0H,W4-2A,W1-0H,W2-0A,W3-0H,W2-1H,L1-3H,L0-1A,W3-0A,W1-0A,L2-3A,W3-0A,W1-0H,W1-0H,D0-0A,W2-0A,W1-0A,W2-1H,W4-2H"
+    },
+    {
+      "seed": "ABCD|avi",
+      "ovr": 88,
+      "n": 36,
+      "inTopSix": true,
+      "matches": "W2-0A,D1-1H,L0-1H,W3-2H,W2-1A,W4-3H,W3-1H,W1-0A,W3-1H,D2-2H,W3-1A,W1-0H,D0-0A,D1-1A,W2-0A,D0-0H,W2-1A,W4-3A,D0-0H,W4-0H,W4-1A,W1-0H,L1-3A,W4-1A,W3-0H,W3-0A,D1-1H,W4-2H,W1-0H,W1-0H,W4-1A,W4-1A,W4-2A,W2-0H,D0-0A,L1-2H"
+    },
+    {
+      "seed": "ABCD|dana",
+      "ovr": 78,
+      "n": 36,
+      "inTopSix": true,
+      "matches": "L0-1H,D2-2A,L0-1A,D1-1H,W1-0A,W2-1H,D1-1A,L1-2A,W4-3A,W2-0H,W1-0H,W1-0A,W2-1A,W1-0A,W3-2A,W4-1H,L0-2A,W4-3H,W2-1H,L1-2H,D1-1H,W4-0A,W2-0H,W4-1H,L0-1A,D1-1H,W4-2H,L0-1H,W4-3H,W1-0H,L1-2H,W4-3A,L0-3A,D2-2H,L1-2H,L0-3A"
+    },
+    {
+      "seed": "ABCD|dana",
+      "ovr": 84,
+      "n": 36,
+      "inTopSix": true,
+      "matches": "W3-0A,D0-0A,W4-0A,W3-1H,L0-1H,L0-2A,W2-1H,W2-1H,L0-1H,D2-2H,D0-0A,L1-3H,W2-1H,D1-1H,W3-0A,D0-0H,W3-0A,D0-0H,W3-1H,D1-1A,W4-1A,W3-2H,W2-1H,D0-0A,D1-1A,D1-1A,L2-3H,W4-2H,W1-0H,W3-2H,W1-0H,L0-3H,W3-0H,L0-3H,D0-0A,W2-0H"
+    },
+    {
+      "seed": "ABCD|dana",
+      "ovr": 88,
+      "n": 36,
+      "inTopSix": true,
+      "matches": "L0-1A,W1-0H,W3-1A,W1-0H,D1-1A,W2-1A,W3-0H,W1-0A,W1-0A,W4-2H,W4-3H,W3-2H,W3-0A,W1-0H,D2-2A,W1-0A,D1-1A,L1-3H,D0-0A,W3-2H,W2-1A,L1-2H,W2-0H,W2-1H,W2-0A,D1-1A,W4-3A,L0-3A,W1-0A,D0-0A,W4-3A,W4-1H,W4-3H,D2-2H,W4-2A,W2-0H"
+    },
+    {
+      "seed": "chal|daily|2026-08-01|sim|x",
+      "ovr": 78,
+      "n": 36,
+      "inTopSix": true,
+      "matches": "W1-0A,W2-1H,L0-2H,D1-1H,W2-1A,D0-0H,D0-0A,L0-1H,W3-0A,L0-2A,W1-0H,L1-2A,W1-0A,L0-2A,L0-2A,W3-1H,W4-1H,W4-2H,W1-0A,D1-1H,W1-0A,W2-0H,L1-2H,W3-0A,W1-0A,L0-3H,L0-2A,L0-1H,L2-3H,D0-0H,W3-1A,W4-0A,D2-2H,L1-2A,L2-3H,W1-0H"
+    },
+    {
+      "seed": "chal|daily|2026-08-01|sim|x",
+      "ovr": 84,
+      "n": 36,
+      "inTopSix": true,
+      "matches": "W2-0A,W3-1A,W1-0H,D1-1H,W1-0H,W3-2A,W4-0A,W4-0H,D1-1A,W4-3A,L0-1A,W1-0H,W1-0H,W3-2A,W4-3H,W1-0H,W4-3A,W4-1A,W3-0A,W3-0A,W3-1H,L1-3H,L1-2A,W2-0H,W4-1H,D1-1A,L0-3H,W3-1H,L1-3H,W4-1A,W1-0A,L1-2A,W2-0H,W4-0H,W4-0H,W1-0H"
+    },
+    {
+      "seed": "chal|daily|2026-08-01|sim|x",
+      "ovr": 88,
+      "n": 36,
+      "inTopSix": true,
+      "matches": "L0-2A,W3-2H,W3-1A,W2-1A,W2-0H,W3-1H,D0-0H,W4-3H,D2-2H,W3-2H,W1-0A,W4-2A,W3-1H,W2-0H,W3-2A,W4-1H,W2-0H,W4-0H,W3-1A,W4-3A,L0-1H,W4-3H,W3-1H,W1-0H,W2-1A,W2-0H,W3-1H,L0-1A,W3-0A,W1-0A,L0-3A,W3-1H,W4-0H,D1-1H,D2-2H,W2-0H"
+    }
+  ],
+  "aiRatings": {
+    "1999": [
+      "maccabi-haifa:87",
+      "hapoel-tlv:86",
+      "beitar-jerusalem:84",
+      "hapoel-haifa:84",
+      "maccabi-tlv:84",
+      "hapoel-pt:81",
+      "maccabi-pt:81",
+      "maccabi-netanya:80",
+      "hapoel-kfar-saba:79",
+      "hapoel-rishonim:79",
+      "ms-ashdod:79",
+      "bnei-yehuda:78",
+      "hapoel-jerusalem:77"
+    ],
+    "2005": [
+      "maccabi-haifa:86",
+      "hapoel-tlv:84",
+      "beitar-jerusalem:83",
+      "maccabi-pt:82",
+      "maccabi-tlv:82",
+      "bnei-sakhnin:80",
+      "bnei-yehuda:80",
+      "hapoel-kfar-saba:79",
+      "maccabi-netanya:79",
+      "ms-ashdod:79",
+      "hapoel-galil:77",
+      "hapoel-pt:77",
+      "hakoah-rg:78"
+    ],
+    "2012": [
+      "maccabi-tlv:86",
+      "hapoel-tlv:83",
+      "beitar-jerusalem:82",
+      "maccabi-haifa:82",
+      "ironi-ks:81",
+      "bnei-yehuda:80",
+      "hapoel-beersheba:80",
+      "ms-ashdod:80",
+      "bnei-sakhnin:79",
+      "hapoel-haifa:79",
+      "maccabi-netanya:79",
+      "hapoel-aco:78",
+      "hapoel-rg:78"
+    ],
+    "2020": [
+      "maccabi-haifa:86",
+      "maccabi-tlv:84",
+      "beitar-jerusalem:82",
+      "hapoel-beersheba:82",
+      "ms-ashdod:81",
+      "hapoel-tlv:80",
+      "maccabi-netanya:80",
+      "maccabi-pt:80",
+      "hapoel-haifa:79",
+      "ironi-ks:79",
+      "bnei-sakhnin:78",
+      "bnei-yehuda:78",
+      "hapoel-hadera:78"
+    ],
+    "2025": [
+      "hapoel-beersheba:85",
+      "beitar-jerusalem:83",
+      "maccabi-haifa:82",
+      "maccabi-tlv:82",
+      "hapoel-tlv:81",
+      "hapoel-haifa:79",
+      "hapoel-pt:79",
+      "ironi-tiberias:79",
+      "maccabi-netanya:79",
+      "bnei-sakhnin:78",
+      "hapoel-jerusalem:78",
+      "ironi-ks:78",
+      "ms-ashdod:78"
+    ]
+  },
+  "formats": [
+    {
+      "from": 1999,
+      "games": 39
+    },
+    {
+      "from": 2000,
+      "games": 38
+    },
+    {
+      "from": 2001,
+      "games": 33
+    },
+    {
+      "from": 2009,
+      "games": 35
+    },
+    {
+      "from": 2011,
+      "games": 37
+    },
+    {
+      "from": 2012,
+      "games": 36
+    }
+  ]
+}
