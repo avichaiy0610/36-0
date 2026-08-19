@@ -2015,11 +2015,25 @@ function tierDisplay(tier) {
 }
 
 // ─── Results screen ────────────────────────────────────────────────────────────
-function calcPreseasonOdds(ovr, simCount = 300) {
+// The engine this run should use: challenges whose key predates the cutoff stay
+// on V1 so a run already in progress keeps producing the season it produced
+// yesterday. Lives in game.js but reads chalSimEngine from challenges.js, which
+// loads AFTER this file — safe only because nothing calls it before a draft.
+function currentSimEngine() {
+  return state.challenge
+    ? chalSimEngine(state.challenge.period, state.challenge.key)
+    : SIM_ENGINE_CURRENT;
+}
+
+// `engine` defaults to 1 because the callers outside this file (the league
+// reveal and the duel card) go on to generate a V1 season, and the card has to
+// predict the season the player is actually about to get.
+function calcPreseasonOdds(ovr, simCount = 300, engine = 1) {
+  const me = engine >= 2 ? myLineRatings() : ovr;
   let ranks = [], totalPts = 0;
   for (let i = 0; i < simCount; i++) {
     const spec = specForState();
-    const g0 = generateMatches(myLineRatings(), oppTeamsForState(), spec, SIM_ENGINE_CURRENT);
+    const g0 = generateMatches(me, oppTeamsForState(), spec, engine);
     const { matches, inTopSix, champOpponents, relegOpponents } = g0;
     const w = matches.filter(m => m.outcome === 'W').length;
     const d = matches.filter(m => m.outcome === 'D').length;
@@ -2059,7 +2073,7 @@ function showPreseason(ovr) {
 
 
   setTimeout(() => {
-    const odds = calcPreseasonOdds(ovr);
+    const odds = calcPreseasonOdds(ovr, 300, currentSimEngine());
     window._preseasonProjected = odds.projectedFinish;  // reused by the results story
     document.getElementById('pre-finish').textContent = `מקום ${odds.projectedFinish}`;
     document.getElementById('pre-pts').textContent    = odds.expectedPoints;
@@ -2161,14 +2175,13 @@ function animateResults(ovr) {
   const seasonWasRestored = !!window._restoredSeason;
   window._restoredSeason = null; window._presetSeason = null;
   if (!season) {
-    const projected = window._preseasonProjected ?? calcPreseasonOdds(ovr).projectedFinish;
+    const projected = window._preseasonProjected
+      ?? calcPreseasonOdds(ovr, 300, currentSimEngine()).projectedFinish;
     const simulate = () => {
       const spec = specForState();
       // A challenge already in progress must keep the engine it started on, or
       // its scores stop being comparable — chalSimEngine gates that by key.
-      const engine = state.challenge
-        ? chalSimEngine(state.challenge.period, state.challenge.key)
-        : SIM_ENGINE_CURRENT;
+      const engine = currentSimEngine();
       const g = generateMatches(myLineRatings(), oppTeamsForState(), spec, engine);
       let w = 0, d = 0;
       g.matches.forEach(m => { if (m.outcome === 'W') w++; else if (m.outcome === 'D') d++; });
