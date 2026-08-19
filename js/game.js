@@ -423,6 +423,22 @@ function calcGroupOVR(positions) {
   return ovrs.length ? Math.round(ovrs.reduce((a,b) => a+b, 0) / ovrs.length) : null;
 }
 
+// The player's XI as the V2 engine wants it. Lines come from the same helper
+// that draws the four bars on the results card, so what the player sees is
+// literally what the simulation uses. An unfilled line falls back to the
+// overall rating.
+function myLineRatings() {
+  const ovr = teamOVR();
+  const line = (positions) => calcGroupOVR(positions) ?? ovr;
+  return {
+    ovr,
+    atk: line(SIM2_LINES.atk.pos),
+    mid: line(SIM2_LINES.mid.pos),
+    def: line(SIM2_LINES.def.pos),
+    gk:  line(SIM2_LINES.gk.pos),
+  };
+}
+
 function pickWeightedIdx(weights) {
   const total = weights.reduce((a,b) => a+b, 0);
   if (total <= 0) return -1;
