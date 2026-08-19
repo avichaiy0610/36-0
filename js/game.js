@@ -2953,8 +2953,12 @@ async function submitResult() {
       league_format: (r.spec && !isModernSpec(r.spec)) ? 'authentic' : 'modern',
       ...(state.challenge ? { challenge: state.challenge.period + '|' + state.challenge.key } : {}),
     },
+    // Per-player goals ride along so the server can award the golden boot without
+    // taking the client's word for it: the same payload carries gf, and the two
+    // have to agree. A squad never repeats a player, so matching by name is safe.
     players: state.picks.flatMap((pick, i) => {
       if (!pick) return [];
+      const stat = (window._lastPlayerStats ?? []).find(s => s.name === pick.player.name);
       return [{
         teamId: pick.squad.teamId,
         season: pick.squad.season,
@@ -2962,6 +2966,8 @@ async function submitResult() {
         pos:    state.slots[i].pos,
         ovr:    playerOVR(pick.player),
         slotId: state.slots[i].id,
+        goals:   stat?.goals   ?? 0,
+        assists: stat?.assists ?? 0,
       }];
     }),
     matches:   r.matches.map(m => ({ gf: m.gf, ga: m.ga, venue: m.home ? 'home' : 'away' })),
