@@ -7,7 +7,7 @@
 const GT_KEY = '36-0-gauntlet';
 
 function gtBlank() {
-  return { v: 1, at: 0, formationId: null, picks: null, log: [], over: false };
+  return { v: 1, at: 0, started: false, locked: null, formationId: null, picks: null, log: [], over: false };
 }
 let _gtRun = null;
 function gtRun() {
@@ -59,9 +59,15 @@ function gtNodeAt(row, node) {
 // fights reuse the one you already have.
 function gtChoose(row, node) {
   const run = gtRun();
-  if (run.over || row !== run.at) return;
+  if (run.over) return;
+  // A road already taken cannot be swapped: if a fight was entered and left
+  // unfinished (a refresh mid-draft), you go back to that same opponent.
+  if (run.locked && run.locked.row === run.at) { row = run.locked.row; node = run.locked.node; }
+  else if (row !== run.at) return;
   const opp = gtNodeAt(row, node);
   if (!opp) return;
+  run.locked = { row, node };
+  gtSave();
   state.gauntlet = { row, node };
 
   if (gtRestoreSquad()) { gtFight(); return; }
@@ -109,6 +115,47 @@ function gtPlayMatch(me, opp) {
            home, decidedBy: 'פנדלים', pens: true };
 }
 
+/* ── the match as it happens ──────────────────────────────────────────────── */
+// Goals need minutes and scorers, not just a scoreline. Scorers are drawn with
+// the same position weights the season simulation uses, so a centre-back
+// scoring stays as rare here as it is there.
+function gtPickScorer(candidates) {
+  const weights = candidates.map(c => GOAL_W[c.pos] ?? 0.5);
+  const idx = pickWeightedIdx(weights);
+  return idx >= 0 ? candidates[idx] : null;
+}
+function gtMyScorers() {
+  return state.picks.map((p, i) => p && { name: p.player.name, pos: state.slots[i].pos }).filter(Boolean);
+}
+function gtTheirScorers(node) {
+  const sq = SQUADS.find(s => s.teamId === node.teamId && s.season === node.season);
+  if (!sq) return [{ name: (TEAMS[node.teamId] || {}).name || 'היריבה', pos: 'ST' }];
+  return [...sq.players].sort((a, b) => b.ovr - a.ovr).slice(0, 16)
+    .map(p => ({ name: p.name, pos: p.position }));
+}
+function gtTimeline(res, node) {
+  const mine = gtMyScorers(), theirs = gtTheirScorers(node);
+  const last = res.decidedBy === 'זמן רגיל' ? 90 : 120;
+  const events = [];
+  const minutes = new Set();
+  const minute = () => {
+    let m;
+    do { m = 1 + Math.floor(Math.random() * last); } while (minutes.has(m));
+    minutes.add(m);
+    return m;
+  };
+  for (let i = 0; i < res.gf; i++) {
+    const s = gtPickScorer(mine);
+    events.push({ min: minute(), side: 'me', name: s ? playerShortName(s.name) : '' });
+  }
+  for (let i = 0; i < res.ga; i++) {
+    const s = gtPickScorer(theirs);
+    events.push({ min: minute(), side: 'them', name: s ? playerShortName(s.name) : '' });
+  }
+  events.sort((a, b) => a.min - b.min);
+  return { events, last };
+}
+
 function gtFight() {
   const run = gtRun();
   const { row, node } = state.gauntlet || {};
@@ -122,6 +169,7 @@ function gtFight() {
 
   run.log.push({ row, teamId: nodeData.teamId, season: nodeData.season,
                  ovr: nodeData.ovr, gf: res.gf, ga: res.ga, outcome: res.outcome });
+  run.locked = null;                    // the road is done, the next one opens
   if (res.outcome === 'W') {
     run.at = row + 1;
     while (GM_RUN[run.at] && GM_RUN[run.at].kind === 'shop') run.at++;   // shops are scenery for now
@@ -130,37 +178,94 @@ function gtFight() {
   }
   gtSave();
   state.gauntlet = null;
-  gtShowResult(nodeData, opp, res, me);
+  gtPlayLive(nodeData, opp, res, me);
 }
 
-/* ── result screen ────────────────────────────────────────────────────────── */
-function gtShowResult(nodeData, opp, res, me) {
+/* ── live playback ────────────────────────────────────────────────────────── */
+// The match is played out on a clock instead of being handed over as a final
+// score: goals arrive when they were scored, and you can skip to the whistle.
+let _gtTimer = null;
+function gtPlayLive(nodeData, opp, res, me) {
   showScreen('gauntlet-fight');
   const back = document.getElementById('gt-fight-back');
-  if (back) back.onclick = () => showGauntlet();
+  if (back) back.onclick = () => { gtStopClock(); showGauntlet(); };
+  const el = document.getElementById('gt-fight-body');
+  if (!el) return;
+
+  const { events, last } = gtTimeline(res, nodeData);
+  const club = (TEAMS[nodeData.teamId] || {}).name || nodeData.teamId;
+  el.innerHTML = `
+    <div class="gt-live">
+      <div class="gt-live-top">
+        <span class="gt-live-side">ההרכב שלך<b>${me.ovr}</b></span>
+        <span class="gt-live-score" dir="ltr"><span id="gt-sc-me">0</span> – <span id="gt-sc-them">0</span></span>
+        <span class="gt-live-side">${club} ${nodeData.season}<b>${nodeData.ovr}</b></span>
+      </div>
+      <div class="gt-clock"><span id="gt-min">0</span>'</div>
+      <div class="gt-bar"><span id="gt-bar-fill"></span></div>
+      <div class="gt-feed" id="gt-feed"></div>
+      <button class="btn-secondary btn-full" id="gt-skip">⏩ דלג לסיום</button>
+    </div>
+    <div id="gt-after"></div>`;
+
+  let min = 0, gf = 0, ga = 0, i = 0;
+  const feed = document.getElementById('gt-feed');
+  const paint = () => {
+    document.getElementById('gt-min').textContent = min;
+    document.getElementById('gt-sc-me').textContent = gf;
+    document.getElementById('gt-sc-them').textContent = ga;
+    document.getElementById('gt-bar-fill').style.width = Math.round((min / last) * 100) + '%';
+  };
+  const emit = ev => {
+    if (ev.side === 'me') gf++; else ga++;
+    const row = document.createElement('div');
+    row.className = 'gt-ev ' + ev.side;
+    row.innerHTML = `<span class="gt-ev-min">${ev.min}'</span>
+      <span class="gt-ev-txt">⚽ ${ev.name}</span>
+      <span class="gt-ev-score" dir="ltr">${ev.side === 'me' ? gf : ga}</span>`;
+    feed.prepend(row);
+  };
+  const finish = () => {
+    gtStopClock();
+    min = last; gf = res.gf; ga = res.ga; paint();
+    const skip = document.getElementById('gt-skip');
+    if (skip) skip.style.display = 'none';
+    gtShowResult(nodeData, opp, res, me, document.getElementById('gt-after'));
+  };
+  const step = () => {
+    min++;
+    while (i < events.length && events[i].min <= min) emit(events[i++]);
+    paint();
+    if (min >= last) finish();
+  };
+  _gtTimer = setInterval(step, 45);
+  const skip = document.getElementById('gt-skip');
+  if (skip) skip.onclick = () => { while (i < events.length) emit(events[i++]); finish(); };
+}
+function gtStopClock() { if (_gtTimer) { clearInterval(_gtTimer); _gtTimer = null; } }
+
+/* ── result screen ────────────────────────────────────────────────────────── */
+function gtShowResult(nodeData, opp, res, me, target) {
   const run = gtRun();
   const won = res.outcome === 'W';
   const cleared = run.log.filter(l => l.outcome === 'W').length;
-  const el = document.getElementById('gt-fight-body');
+  const el = target || document.getElementById('gt-fight-body');
   if (!el) return;
 
   el.innerHTML = `
     <div class="gt-res ${won ? 'win' : 'loss'}">
       <div class="gt-res-title">${won ? '✅ ניצחת' : '❌ הפסדת'}</div>
-      <div class="gt-res-teams">
-        <span class="gt-res-side">ההרכב שלך <b>${me.ovr}</b></span>
-        <span class="gt-res-score" dir="ltr">${res.gf} – ${res.ga}</span>
-        <span class="gt-res-side">${opp.name} ${nodeData.season} <b>${nodeData.ovr}</b></span>
-      </div>
       <div class="gt-res-sub">הוכרע ב${res.decidedBy} · ${res.home ? 'בבית' : 'בחוץ'}</div>
     </div>
     ${won
       ? `<p class="page-note">עברת ${cleared} מתוך 8. הדרך צפונה נפתחה.</p>
          <button class="btn-primary btn-full" id="gt-continue">← המשך במפה</button>`
-      : `<p class="page-note">הריצה נגמרה אחרי ${cleared} ניצחונות. חיים אחד, זוכר?</p>
+      : `<p class="page-note">הריצה נגמרה אחרי ${cleared} ניצחונות.</p>
          <button class="btn-primary btn-full" id="gt-restart">🔁 ריצה חדשה</button>`}
     <button class="btn-secondary btn-full" id="gt-tomap">🗺 חזרה למפה</button>
   `;
+  // a win first offers the spoils; the map waits until that is settled
+  if (won) gtOfferSpoils(nodeData, el);
   const cont = document.getElementById('gt-continue');
   if (cont) cont.onclick = () => showGauntlet();
   const again = document.getElementById('gt-restart');

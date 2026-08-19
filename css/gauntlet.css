@@ -1,0 +1,47 @@
+/* Gauntlet: live match, and the victory spoils wheel. */
+
+.gt-live { background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+           padding: 14px; margin-bottom: 12px; }
+.gt-live-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.gt-live-side { flex: 1; font-size: 12px; color: var(--muted); text-align: center; }
+.gt-live-side b { display: block; font-size: 15px; color: var(--text); }
+.gt-live-score { font-size: 34px; font-weight: 900; color: var(--accent); }
+.gt-clock { text-align: center; font-size: 13px; font-weight: 800; color: var(--muted); margin-top: 6px; }
+.gt-bar { height: 5px; background: #ffffff14; border-radius: 3px; overflow: hidden; margin: 8px 0 10px; }
+.gt-bar span { display: block; height: 100%; width: 0; background: var(--accent); transition: width .12s linear; }
+.gt-feed { min-height: 44px; max-height: 200px; overflow-y: auto; }
+.gt-ev { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 6px;
+         font-size: 13px; margin-bottom: 4px; }
+.gt-ev.me { background: #22c55e18; }
+.gt-ev.them { background: #ef444418; }
+.gt-ev-min { font-weight: 800; color: var(--muted); min-width: 30px; }
+.gt-ev-txt { flex: 1; font-weight: 700; }
+.gt-ev-score { font-weight: 900; color: var(--accent); }
+
+.gt-spoils { background: var(--card); border: 1px solid #8b5cf655; border-radius: 12px;
+             padding: 14px; margin-bottom: 12px; }
+.gt-spoils-kicker { text-align: center; font-size: 11px; font-weight: 800; letter-spacing: .6px; color: #a78bfa; }
+.gt-spoils-title { text-align: center; font-size: 19px; font-weight: 900; margin: 2px 0 4px; }
+.gt-spoils-sub { text-align: center; font-size: 12px; color: var(--muted); margin: 0 0 10px; }
+.gt-reel-wrap { position: relative; }
+.gt-reel-mark { position: absolute; inset-inline-start: 50%; top: -2px; bottom: -2px; width: 2px;
+                background: var(--accent); opacity: .8; z-index: 2; }
+.gt-reel { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding: 8px 0 10px;
+           border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.gt-reel::-webkit-scrollbar { display: none; }
+.gt-reel-card { flex: 0 0 84px; background: #0d1117; border: 1px solid var(--border);
+                border-radius: 10px; padding: 8px 4px; text-align: center; transition: border-color .2s; }
+.gt-reel-card.won { border-color: var(--accent); box-shadow: 0 0 0 2px #d4af3755; }
+.gt-reel-ovr { display: block; font-size: 19px; font-weight: 900; color: var(--accent); }
+.gt-reel-name { display: block; font-size: 11px; font-weight: 700; }
+.gt-reel-pos { display: block; font-size: 10px; color: var(--muted); }
+
+.gt-sign-q { font-size: 14px; margin: 12px 0 8px; }
+.gt-sign-opt { display: flex; justify-content: space-between; align-items: center; width: 100%;
+               background: #0d1117; border: 1px solid var(--border); border-radius: 8px;
+               padding: 9px 10px; margin-bottom: 6px; color: var(--text); font-size: 13px; cursor: pointer; }
+.gt-sign-opt:hover { border-color: var(--accent); }
+.gt-delta { font-weight: 900; }
+.gt-delta.up { color: #22c55e; }
+.gt-delta.down { color: #ef4444; }
+.gt-sign-done { text-align: center; font-size: 14px; font-weight: 700; margin: 10px 0 0; }

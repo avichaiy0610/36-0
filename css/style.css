@@ -2097,3 +2097,30 @@ body {
 .gt-res-side b { display: block; font-size: 16px; color: var(--text); }
 .gt-res-score { font-size: 30px; font-weight: 900; color: var(--accent); }
 .gt-res-sub { margin-top: 10px; font-size: 12px; color: var(--muted); }
+
+/* gauntlet: intro gate */
+.gt-intro { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 18px; }
+.gt-intro-title { font-size: 20px; font-weight: 900; text-align: center; margin-bottom: 10px; }
+.gt-intro p { color: var(--muted); font-size: 14px; line-height: 1.6; margin: 0 0 12px; }
+.gt-intro-list { margin: 0 0 16px; padding-inline-start: 18px; color: var(--text); font-size: 14px; line-height: 1.9; }
+.gt-intro-list b { color: var(--accent); }
+
+/* gauntlet: pick your road */
+.gm-picker { margin-top: 14px; }
+.gm-picker-round { text-align: center; font-size: 11px; font-weight: 800; letter-spacing: .5px; color: var(--accent); }
+.gm-picker-head { text-align: center; font-size: 19px; font-weight: 900; margin: 2px 0 4px; }
+.gm-picker-sub { text-align: center; font-size: 12px; color: var(--muted); margin: 0 0 12px; }
+.gm-road { display: flex; align-items: center; gap: 10px; width: 100%; text-align: start;
+           background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+           padding: 10px; margin-bottom: 8px; cursor: pointer; color: var(--text);
+           transition: border-color .15s, transform .1s; }
+.gm-road:hover { border-color: var(--accent); transform: translateY(-1px); }
+.gm-road.elite { border-color: #8b5cf655; }
+.gm-road.elite:hover { border-color: #8b5cf6; }
+.gm-road-crest { width: 34px; height: 34px; object-fit: contain; flex: 0 0 34px; }
+.gm-road-main { flex: 1; min-width: 0; }
+.gm-road-club { display: block; font-weight: 800; font-size: 15px; }
+.gm-road-season { color: var(--muted); font-weight: 700; font-size: 12px; }
+.gm-road-desc { display: block; font-size: 12px; color: var(--muted); line-height: 1.45; margin-top: 2px; }
+.gm-road-elite { font-size: 10px; font-weight: 900; color: #a78bfa; letter-spacing: .5px; }
+.gm-road-ovr { font-size: 22px; font-weight: 900; color: var(--accent); }

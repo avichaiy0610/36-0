@@ -189,20 +189,49 @@ function renderGauntletMap(container, at = 0, over = false) {
       <g class="gm-roads">${roads.join('')}</g>
       ${nodes}
     </svg>
-    <ol class="gm-list">${GM_RUN.map((row, ri) => {
-      if (row.kind === 'shop') {
-        return `<li class="gm-li shop ${ri < at ? 'done' : ''}"><span class="gm-li-n">🛒</span>
-          <span class="gm-li-club">חנות</span></li>`;
-      }
-      const cls = ri < at ? 'done' : (ri === at && !over) ? 'next' : '';
-      const names = row.nodes.map(n =>
-        `${(TEAMS[n.teamId] || {}).name || n.teamId} ${n.season} (${n.ovr})`).join('  ·  ');
-      return `<li class="gm-li ${cls}${row.nodes.some(n => n.elite) ? ' elite' : ''}">
-        <span class="gm-li-n">${row.round}</span>
-        <span class="gm-li-club">${names}</span>
-        ${row.boss ? '<span class="gm-li-elite">בוס</span>' : ''}
-      </li>`;
-    }).join('')}</ol>`;
+    ${gmRoadPicker(at, over)}`;
+}
+
+// "Pick your road": the row you are standing on, as tappable cards under the
+// map — a 17-node map is hard to aim at on a phone, and the description only
+// fits down here anyway.
+function gmRoadPicker(at, over) {
+  const row = GM_RUN[at];
+  if (over) {
+    return `<p class="gm-picker-head">הריצה נגמרה</p>`;
+  }
+  if (!row) {
+    return `<p class="gm-picker-head">🏆 עברת את כל המסלול</p>`;
+  }
+  if (row.kind === 'shop') return '<p class="gm-picker-head">🛒 חנות (בקרוב)</p>';
+
+  const title = row.boss
+    ? (at === GM_RUN.length - 1 ? '⚔️ הבוס הסופי' : '⚔️ בוס')
+    : row.nodes.length > 1 ? 'בחר את הדרך' : 'הקרב הבא';
+  const sub = row.nodes.length > 1
+    ? 'אפשר ללחוץ על כרטיס למטה או על המגרש במפה. יריבה קשה יותר — שלל טוב יותר.'
+    : 'אין מסלול עוקף.';
+  return `
+    <div class="gm-picker">
+      <div class="gm-picker-round">קרב ${row.round} מתוך 8</div>
+      <div class="gm-picker-head">${title}</div>
+      <p class="gm-picker-sub">${sub}</p>
+      ${row.nodes.map((n, ni) => {
+        const club = (TEAMS[n.teamId] || {}).name || n.teamId;
+        const desc = (typeof siteText === 'function'
+          ? siteText('gt-desc-' + n.teamId + '-' + n.season.replace('/', '-'), n.desc) : n.desc) || '';
+        return `
+        <button class="gm-road ${n.elite ? 'elite' : ''}" data-row="${at}" data-node="${ni}">
+          <img class="gm-road-crest" src="crests/${n.teamId}.png" alt="" onerror="this.style.visibility='hidden'">
+          <span class="gm-road-main">
+            <span class="gm-road-club">${club} <span class="gm-road-season">${n.season}</span></span>
+            <span class="gm-road-desc">${desc}</span>
+          </span>
+          ${n.elite ? '<span class="gm-road-elite">ELITE</span>' : ''}
+          <span class="gm-road-ovr">${n.ovr}</span>
+        </button>`;
+      }).join('')}
+    </div>`;
 }
 
 /* ── geometry: what counts as "inside the country" ────────────────────────── */
@@ -296,39 +325,39 @@ function gmLightsSVG() {
 //   two bosses, no choice.
 const GM_RUN = [
   { kind: 'fight', round: 1, nodes: [
-    { teamId: 'hapoel-aco',        season: '2009/10', ovr: 77 },
-    { teamId: 'bnei-sakhnin',      season: '2007/08', ovr: 77 },
-    { teamId: 'hapoel-hadera',     season: '2021/22', ovr: 78 },
+    { teamId: 'hapoel-aco',        season: '2009/10', ovr: 77, desc: 'עונת הבכורה בליגת העל — מקום 12 ומאבק הישרדות עד המחזור האחרון.' },
+    { teamId: 'bnei-sakhnin',      season: '2007/08', ovr: 77, desc: 'מקום רביעי מפתיע עם 15 ניצחונות — מהעונות הגדולות של סכנין.' },
+    { teamId: 'hapoel-hadera',     season: '2021/22', ovr: 78, desc: 'מקום 8 בעונה שבה מכבי חיפה לקחה אליפות — חדרה מבססת מקום בליגה.' },
   ] },
   { kind: 'fight', round: 2, nodes: [
-    { teamId: 'hapoel-pt',         season: '2003/04', ovr: 79 },
-    { teamId: 'bnei-yehuda',       season: '2005/06', ovr: 80 },
-    { teamId: 'maccabi-netanya',   season: '2007/08', ovr: 80 },
+    { teamId: 'hapoel-pt',         season: '2003/04', ovr: 79, desc: 'מקום 8 באמצע הטבלה; מנור חסן הוביל אותה עם 13 שערים.' },
+    { teamId: 'bnei-yehuda',       season: '2005/06', ovr: 80, desc: 'מקום 4 עם 49 נקודות — בני יהודה של אמצע העשור.' },
+    { teamId: 'maccabi-netanya',   season: '2007/08', ovr: 80, desc: 'סגנית האלופה: 58 נקודות ו-16 ניצחונות, מאחורי בית"ר בלבד.' },
   ] },
   { kind: 'fight', round: 3, nodes: [
-    { teamId: 'ironi-ks',          season: '2010/11', ovr: 81 },
-    { teamId: 'beitar-jerusalem',  season: '2001/02', ovr: 81 },
-    { teamId: 'hapoel-haifa',      season: '2017/18', ovr: 82 },
+    { teamId: 'ironi-ks',          season: '2010/11', ovr: 81, desc: 'מקום 5 בעונת הקיזוז — שנה אחת לפני האליפות ההיסטורית.' },
+    { teamId: 'beitar-jerusalem',  season: '2001/02', ovr: 81, desc: 'עונה קשה במקום 10; מנור חסן כבש 11 מהשערים.' },
+    { teamId: 'hapoel-haifa',      season: '2017/18', ovr: 82, desc: 'מקום 4 עם 62 נקודות — מהעונות הטובות של הפועל חיפה בעשור.' },
   ] },
   { kind: 'shop' },
   { kind: 'fight', round: 4, nodes: [
-    { teamId: 'maccabi-pt',        season: '2003/04', ovr: 83 },
-    { teamId: 'beitar-jerusalem',  season: '2017/18', ovr: 83 },
+    { teamId: 'maccabi-pt',        season: '2003/04', ovr: 83, desc: 'מקום 3 עם 56 נקודות; עומר גולן כבש 13.' },
+    { teamId: 'beitar-jerusalem',  season: '2017/18', ovr: 83, desc: 'מקום 3 עם 20 ניצחונות ו-68 נקודות.' },
   ] },
   { kind: 'fight', round: 5, nodes: [
-    { teamId: 'beitar-jerusalem',  season: '2007/08', ovr: 84 },
-    { teamId: 'maccabi-tlv',       season: '2002/03', ovr: 84 },
+    { teamId: 'beitar-jerusalem',  season: '2007/08', ovr: 84, desc: 'אלופה: 20 ניצחונות ו-67 נקודות.' },
+    { teamId: 'maccabi-tlv',       season: '2002/03', ovr: 84, desc: 'אלופה עם 22 ניצחונות ורק 3 תיקו; אבי נמני כבש 14.' },
   ] },
   { kind: 'fight', round: 6, nodes: [
-    { teamId: 'hapoel-beersheba',  season: '2014/15', ovr: 85 },
-    { teamId: 'hapoel-tlv',        season: '2009/10', ovr: 86, elite: true },
+    { teamId: 'hapoel-beersheba',  season: '2014/15', ovr: 85, desc: 'מקום 3 עם 62 נקודות — העונה שלפני שושלת האליפויות.' },
+    { teamId: 'hapoel-tlv',        season: '2009/10', ovr: 86, elite: true, desc: 'אלופה עם 25 ניצחונות והפסד אחד בלבד; איתי שכטר כבש 22.' },
   ] },
   { kind: 'shop' },
   { kind: 'fight', round: 7, boss: true, nodes: [
-    { teamId: 'maccabi-tlv',       season: '2015/16', ovr: 86 },
+    { teamId: 'maccabi-tlv',       season: '2015/16', ovr: 86, desc: '81 נקודות וסגנית — ערן זהבי כבש 35 שערים, שיא הליגה.' },
   ] },
   { kind: 'fight', round: 8, boss: true, nodes: [
-    { teamId: 'maccabi-haifa',     season: '2001/02', ovr: 88 },
+    { teamId: 'maccabi-haifa',     season: '2001/02', ovr: 88, desc: 'אלופה 22-9-2 — הסגל שנחשב לאחד החזקים בתולדות הליגה.' },
   ] },
 ];
 
@@ -394,6 +423,26 @@ function gmLayout() {
 function gmFightRows() { return GM_RUN.filter(r => r.kind === 'fight'); }
 
 /* ── screen ───────────────────────────────────────────────────────────────── */
+// A run in progress is one that has been started, whether or not a fight has
+// been fought — so the explainer shows once, not after every defeat.
+function gtRunStarted(run) { return !!(run.started || run.log.length || run.picks); }
+
+function gmIntroHTML() {
+  return `
+    <div class="gt-intro">
+      <div class="gt-intro-title">🗺 מסע הגאונטלט</div>
+      <p>שמונה קרבות מדרום לצפון, מול סגלים אמיתיים מההיסטוריה של ליגת העל — מקבוצה שנאבקה על הישרדות ועד מכבי חיפה של 2001/02.</p>
+      <ul class="gt-intro-list">
+        <li><b>הרכב אחד לכל הדרך.</b> דורפים פעם אחת, והוא מלווה אותך עד הסוף.</li>
+        <li><b>בכל קרב אתה בוחר את היריבה</b> מבין האפשרויות שנפתחו — ואי אפשר להתחרט.</li>
+        <li><b>ניצחת? מגרילים לך שחקן מהקבוצה שהבסת</b> ואפשר לצרף אותו להרכב.</li>
+        <li><b>בין השכבות יש חנות</b> לשיפורים.</li>
+        <li><b>הפסד אחד מסיים את הריצה.</b></li>
+      </ul>
+      <button class="btn-primary btn-full" id="gt-begin">יאללה, מתחילים ←</button>
+    </div>`;
+}
+
 function showGauntlet() {
   showScreen('gauntlet');
   const back = document.getElementById('gauntlet-back');
@@ -401,24 +450,35 @@ function showGauntlet() {
 
   const run = typeof gtRun === 'function' ? gtRun() : { at: 0, log: [], over: false };
   const map = document.getElementById('gauntlet-map');
+  const note = document.getElementById('gauntlet-note');
+  const reset = document.getElementById('gauntlet-reset');
+
+  // first visit (or a fresh run): explain the mode before showing the map
+  if (!gtRunStarted(run)) {
+    map.innerHTML = gmIntroHTML();
+    if (note) note.textContent = '';
+    if (reset) reset.style.display = 'none';
+    const go = document.getElementById('gt-begin');
+    if (go) go.onclick = () => { run.started = true; gtSave(); showGauntlet(); };
+    return;
+  }
+  if (reset) {
+    reset.style.display = '';
+    reset.onclick = () => { if (typeof gtReset === 'function') gtReset(); showGauntlet(); };
+  }
+
   renderGauntletMap(map, run.at, !!run.over);
 
-  // only the row you are standing on can be entered
-  map.querySelectorAll('.gm-station.next[data-row]').forEach(g => {
-    g.addEventListener('click', () => {
-      if (typeof gtChoose === 'function') gtChoose(+g.dataset.row, +g.dataset.node);
-    });
-  });
+  const choose = el => {
+    if (typeof gtChoose === 'function') gtChoose(+el.dataset.row, +el.dataset.node);
+  };
+  map.querySelectorAll('.gm-station.next[data-row]').forEach(g => g.addEventListener('click', () => choose(g)));
+  map.querySelectorAll('.gm-road[data-row]').forEach(b => b.addEventListener('click', () => choose(b)));
 
-  const note = document.getElementById('gauntlet-note');
   if (note) {
     const cleared = (run.log || []).filter(l => l.outcome === 'W').length;
     note.textContent = run.over
-      ? `הריצה נגמרה אחרי ${cleared} ניצחונות. התחל ריצה חדשה מהכפתור למטה.`
-      : cleared
-        ? `עברת ${cleared} מתוך 8. בחר את היריבה הבאה על המפה.`
-        : 'בחר יריבה מהשורה התחתונה, דרוף הרכב — והוא ילווה אותך עד הסוף. חיים אחד.';
+      ? `הריצה נגמרה אחרי ${cleared} ניצחונות.`
+      : cleared ? `עברת ${cleared} מתוך 8.` : '';
   }
-  const reset = document.getElementById('gauntlet-reset');
-  if (reset) reset.onclick = () => { if (typeof gtReset === 'function') gtReset(); showGauntlet(); };
 }

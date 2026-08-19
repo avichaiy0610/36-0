@@ -1190,5 +1190,22 @@ const TEXT_CATALOG = [
  { "key": "chal-req-min-low-ovr",    "screen": "אתגרים — משימות", "label": "משימת שחקנים בדירוג נמוך ({n},{x})", "selector": "virtual", "def": "לפחות {n} שחקנים עם דירוג {x} ומטה" },
  { "key": "chal-req-all-diff",       "screen": "אתגרים — משימות", "label": "משימת מועדונים שונים",            "selector": "virtual", "def": "כל השחקנים ממועדונים שונים" },
  { "key": "chal-req-era-before",     "screen": "אתגרים — משימות", "label": "משימת עונות ישנות ({n},{season})", "selector": "virtual", "def": "לפחות {n} שחקנים מעונות שלפני {season}" },
- { "key": "chal-req-era-after",      "screen": "אתגרים — משימות", "label": "משימת עונות חדשות ({n},{season})", "selector": "virtual", "def": "לפחות {n} שחקנים מעונת {season} ומעלה" }
+ { "key": "chal-req-era-after",      "screen": "אתגרים — משימות", "label": "משימת עונות חדשות ({n},{season})", "selector": "virtual", "def": "לפחות {n} שחקנים מעונת {season} ומעלה" },
+ {"key": "gt-desc-hapoel-aco-2009-10", "screen": "גאונטלט — תיאורי יריבות", "label": "הפועל עכו 2009/10", "selector": "virtual", "def": "עונת הבכורה בליגת העל — מקום 12 ומאבק הישרדות עד המחזור האחרון."},
+ {"key": "gt-desc-bnei-sakhnin-2007-08", "screen": "גאונטלט — תיאורי יריבות", "label": "בני סכנין 2007/08", "selector": "virtual", "def": "מקום רביעי מפתיע עם 15 ניצחונות — מהעונות הגדולות של סכנין."},
+ {"key": "gt-desc-hapoel-hadera-2021-22", "screen": "גאונטלט — תיאורי יריבות", "label": "הפועל חדרה 2021/22", "selector": "virtual", "def": "מקום 8 בעונה שבה מכבי חיפה לקחה אליפות — חדרה מבססת מקום בליגה."},
+ {"key": "gt-desc-hapoel-pt-2003-04", "screen": "גאונטלט — תיאורי יריבות", "label": "הפועל פתח תקווה 2003/04", "selector": "virtual", "def": "מקום 8 באמצע הטבלה; מנור חסן הוביל אותה עם 13 שערים."},
+ {"key": "gt-desc-bnei-yehuda-2005-06", "screen": "גאונטלט — תיאורי יריבות", "label": "בני יהודה 2005/06", "selector": "virtual", "def": "מקום 4 עם 49 נקודות — בני יהודה של אמצע העשור."},
+ {"key": "gt-desc-maccabi-netanya-2007-08", "screen": "גאונטלט — תיאורי יריבות", "label": "מכבי נתניה 2007/08", "selector": "virtual", "def": "סגנית האלופה: 58 נקודות ו-16 ניצחונות, מאחורי בית\"ר בלבד."},
+ {"key": "gt-desc-ironi-ks-2010-11", "screen": "גאונטלט — תיאורי יריבות", "label": "עירוני קריית שמונה 2010/11", "selector": "virtual", "def": "מקום 5 בעונת הקיזוז — שנה אחת לפני האליפות ההיסטורית."},
+ {"key": "gt-desc-beitar-jerusalem-2001-02", "screen": "גאונטלט — תיאורי יריבות", "label": "בית\"ר ירושלים 2001/02", "selector": "virtual", "def": "עונה קשה במקום 10; מנור חסן כבש 11 מהשערים."},
+ {"key": "gt-desc-hapoel-haifa-2017-18", "screen": "גאונטלט — תיאורי יריבות", "label": "הפועל חיפה 2017/18", "selector": "virtual", "def": "מקום 4 עם 62 נקודות — מהעונות הטובות של הפועל חיפה בעשור."},
+ {"key": "gt-desc-maccabi-pt-2003-04", "screen": "גאונטלט — תיאורי יריבות", "label": "מכבי פתח תקווה 2003/04", "selector": "virtual", "def": "מקום 3 עם 56 נקודות; עומר גולן כבש 13."},
+ {"key": "gt-desc-beitar-jerusalem-2017-18", "screen": "גאונטלט — תיאורי יריבות", "label": "בית\"ר ירושלים 2017/18", "selector": "virtual", "def": "מקום 3 עם 20 ניצחונות ו-68 נקודות."},
+ {"key": "gt-desc-beitar-jerusalem-2007-08", "screen": "גאונטלט — תיאורי יריבות", "label": "בית\"ר ירושלים 2007/08", "selector": "virtual", "def": "אלופה: 20 ניצחונות ו-67 נקודות."},
+ {"key": "gt-desc-maccabi-tlv-2002-03", "screen": "גאונטלט — תיאורי יריבות", "label": "מכבי תל אביב 2002/03", "selector": "virtual", "def": "אלופה עם 22 ניצחונות ורק 3 תיקו; אבי נמני כבש 14."},
+ {"key": "gt-desc-hapoel-beersheba-2014-15", "screen": "גאונטלט — תיאורי יריבות", "label": "הפועל באר שבע 2014/15", "selector": "virtual", "def": "מקום 3 עם 62 נקודות — העונה שלפני שושלת האליפויות."},
+ {"key": "gt-desc-hapoel-tlv-2009-10", "screen": "גאונטלט — תיאורי יריבות", "label": "הפועל תל אביב 2009/10", "selector": "virtual", "def": "אלופה עם 25 ניצחונות והפסד אחד בלבד; איתי שכטר כבש 22."},
+ {"key": "gt-desc-maccabi-tlv-2015-16", "screen": "גאונטלט — תיאורי יריבות", "label": "מכבי תל אביב 2015/16", "selector": "virtual", "def": "81 נקודות וסגנית — ערן זהבי כבש 35 שערים, שיא הליגה."},
+ {"key": "gt-desc-maccabi-haifa-2001-02", "screen": "גאונטלט — תיאורי יריבות", "label": "מכבי חיפה 2001/02", "selector": "virtual", "def": "אלופה 22-9-2 — הסגל שנחשב לאחד החזקים בתולדות הליגה."}
 ];
