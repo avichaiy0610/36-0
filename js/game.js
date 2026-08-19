@@ -2196,7 +2196,6 @@ function animateResults(ovr) {
     saveSeasonState(season);
     // stamp the engine so the submitted payload can mark which scale this
     // score is on (V2 outscores V1 at the same squad rating)
-    window._lastResult = { ...(window._lastResult ?? {}), engine: season.engine };
     window._resultSubmitted = false;   // a new season may be saved again
     // count every finished season (for the games_N achievements) — once per
     // season: restored seasons skip this block
