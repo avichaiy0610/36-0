@@ -20,6 +20,15 @@ const CHAL_EPOCH = '2026-07-10';   // daily #1; weekly #1 = its week; monthly #1
 const CHAL_GEN2_FROM = { daily: '2026-07-20', weekly: '2026-07-26', monthly: '2026-08' };
 function chalGen2(period, key) { return String(key) >= (CHAL_GEN2_FROM[period] ?? '9999'); }
 
+// Which challenge keys run on the V2 simulation engine. Same key-gate mechanics
+// and deploy rule as CHAL_GEN2_FROM: a key already in progress must keep
+// producing the exact season it produced yesterday, so only future keys flip.
+// Set these to dates AFTER the deploy date.
+const SIM_ENGINE2_FROM = { daily: '2026-08-25', weekly: '2026-08-30', monthly: '2026-09' };
+function chalSimEngine(period, key) {
+  return String(key) >= (SIM_ENGINE2_FROM[period] ?? '9999') ? 2 : 1;
+}
+
 // Era opponents in challenges — the sim league can be a past season's clubs.
 // Same key-gate mechanics and deploy rule as CHAL_GEN2_FROM.
 const CHAL_OPP_FROM = { daily: '2026-07-20', weekly: '2026-07-26', monthly: '2026-08' };
