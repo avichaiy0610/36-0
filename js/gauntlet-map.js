@@ -350,14 +350,14 @@ const GM_RUN = [
   ] },
   { kind: 'fight', round: 6, nodes: [
     { teamId: 'hapoel-beersheba',  season: '2014/15', ovr: 85, desc: 'מקום 3 עם 62 נקודות — העונה שלפני שושלת האליפויות.' },
-    { teamId: 'hapoel-tlv',        season: '2009/10', ovr: 86, elite: true, desc: 'אלופה עם 25 ניצחונות והפסד אחד בלבד; איתי שכטר כבש 22.' },
+    { teamId: 'hapoel-tlv',        season: '2009/10', ovr: 86, elite: true, desc: 'עונת הדאבל: אליפות שהוכרעה בדקה ה-92 במחזור האחרון, וסיום ראשון בבית בליגה האירופית.' },
   ] },
   { kind: 'shop' },
   { kind: 'fight', round: 7, boss: true, nodes: [
-    { teamId: 'maccabi-tlv',       season: '2015/16', ovr: 86, desc: '81 נקודות וסגנית — ערן זהבי כבש 35 שערים, שיא הליגה.' },
+    { teamId: 'maccabi-tlv',       season: '2015/16', ovr: 86, desc: '81 נקודות וסגנית — ערן זהבי כבש 35 שערים, שיא הליגה בעידן המודרני.' },
   ] },
   { kind: 'fight', round: 8, boss: true, nodes: [
-    { teamId: 'maccabi-haifa',     season: '2001/02', ovr: 88, desc: 'אלופה 22-9-2 — הסגל שנחשב לאחד החזקים בתולדות הליגה.' },
+    { teamId: 'maccabi-haifa',     season: '2001/02', ovr: 88, desc: 'אלופה 22-9-2 — והתואר הזה שלח אותה להיות הישראלית הראשונה בשלב הבתים של ליגת האלופות.' },
   ] },
 ];
 
