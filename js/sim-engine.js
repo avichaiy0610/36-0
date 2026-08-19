@@ -32,6 +32,10 @@ const SIM2_LINES = {
   gk:  { pos: ['GK'],                                 count: 1 },
 };
 
+// A real bottom-of-the-table club takes roughly 0.8 points per game. The raw xG
+// estimate puts it near 0.4, so the tail gets rescaled onto this floor.
+const SIM2_TABLE_FLOOR_PPG = 0.80;
+
 // A real club's four line ratings: the best N at each line, averaged.
 // Falls back to the club's overall rating when a squad has nobody in a line.
 function simLineRatingsForSquad(squadPlayers, fallbackOvr) {
@@ -144,5 +148,15 @@ function simTableEstimateV2(clubs, games) {
     }
     return sum / n;                       // expected points per match
   });
-  return per.map(p => Math.max(3, Math.round(p * games)));
+
+  // Lift the tail onto a believable floor by rescaling [worst, best] onto
+  // [SIM2_TABLE_FLOOR_PPG, best]. The champion's total and the entire ordering
+  // are untouched — only the gap below it is compressed. Skipped when the field
+  // is flat or already above the floor.
+  const lo = Math.min(...per), hi = Math.max(...per);
+  const scaled = (hi - lo < 1e-9 || lo >= SIM2_TABLE_FLOOR_PPG)
+    ? per
+    : per.map(p => SIM2_TABLE_FLOOR_PPG + (p - lo) * (hi - SIM2_TABLE_FLOOR_PPG) / (hi - lo));
+
+  return scaled.map(p => Math.max(3, Math.round(p * games)));
 }
