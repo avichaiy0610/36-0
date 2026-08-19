@@ -128,6 +128,13 @@ const TEXT_CATALOG = [
   "def": "שחק עכשיו ⚽"
  },
  {
+  "key": "btn-coffee-welcome",
+  "screen": "מסך פתיחה",
+  "label": "כפתור קנה לי קפה",
+  "selector": "#btn-coffee-welcome",
+  "def": "☕ אוהב את המשחק? קנה לי קפה"
+ },
+ {
   "key": "setup-subtitle",
   "screen": "מסך הגדרות",
   "label": "כיתוב מתחת ללוגו",
