@@ -25,9 +25,13 @@ const SIM2 = {
 };
 
 // Which positions make up each line, and how many of them a real squad fields.
+// The grouping must stay identical to ATK_POS / MID_POS / DEF_POS in game.js —
+// those draw the four bars on the results card, and the card would otherwise be
+// showing an attack number the simulation never used. CAM counts as attack, the
+// way the UI has always shown it.
 const SIM2_LINES = {
-  atk: { pos: ['ST', 'CF', 'RW', 'LW'],               count: 3 },
-  mid: { pos: ['CAM', 'CM', 'CDM', 'RM', 'LM'],       count: 3 },
+  atk: { pos: ['ST', 'CF', 'RW', 'LW', 'CAM'],        count: 3 },
+  mid: { pos: ['CM', 'CDM', 'RM', 'LM'],              count: 3 },
   def: { pos: ['CB', 'RB', 'LB'],                     count: 4 },
   gk:  { pos: ['GK'],                                 count: 1 },
 };
