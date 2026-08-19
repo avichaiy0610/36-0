@@ -49,8 +49,14 @@ console.log('OVR | wins | pts | goals |  36-0 per 300 | spec');
 //     both broke the server's absolute achievement thresholds and left 28% of
 //     seasons at OVR 87 unbeaten. Richer scorelines and a real chance of
 //     conceding cost roughly 4x on the 36-0 rate, and that was the trade taken.
+//   * The 2026-08-19 variance pass. Rival clubs now have a season's form
+//     (SIM2_TABLE_FORM_SD) and the player has one of his own
+//     (SIM2_SEASON_FORM_SD). Before it, the closed-form table gave every rival
+//     the same total every season, so the title race was settled before kickoff
+//     and an OVR 88 squad could not finish below third. Fattening the tails
+//     raised the 36-0 rate as a side effect, which is the direction wanted.
 // Treat any DRIFT here as a real regression, not a number to edit.
-const SPEC = { 84: 0.00, 85: 0.00, 86: 0.01, 87: 0.03, 88: 0.37, 89: 1.99, 90: 6.23 };
+const SPEC = { 84: 0.00, 85: 0.00, 86: 0.01, 87: 0.13, 88: 0.58, 89: 2.41, 90: 7.87 };
 let fail = false;
 for (const o of [84, 85, 86, 87, 88, 89, 90]) {
   const r = measure(bal(o), N);
