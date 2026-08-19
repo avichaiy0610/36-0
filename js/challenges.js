@@ -292,18 +292,26 @@ function challengeSettings(period, key) {
 // When missions need specific supply (a club, an era slice), the deck is
 // deterministically rearranged so enough matching squads appear in the first
 // draws — identical for everyone, and the mission is always completable.
-function challengeDeckFor(period, key, eraMin, eraMax, reqs) {
+// The squads a challenge deals you are drawn fresh for every attempt — retrying
+// gives a different eleven, which is the whole point of retrying. The missions
+// and the conditions stay keyed to the challenge, so everyone is still answering
+// the same brief, and the season itself stays a pure function of the lineup
+// (see chalSeed) so a run still cannot be re-rolled for a luckier result.
+//
+// Pass a seeded rng to reproduce a specific deck; the default is a real draw.
+function challengeDeckFor(period, key, eraMin, eraMax, reqs, rng = Math.random) {
   const pool = SQUADS.filter(sq => {
     const y = parseSeasonYear(sq.season);
     return y >= eraMin && y <= eraMax;
   });
   const deck = pool.length ? [...pool] : [...SQUADS];
-  const rng = chalRng(`chal|${period}|${key}|deck`);
   for (let i = deck.length - 1; i > 0; i--) {
     const j = Math.floor(rng() * (i + 1));
     [deck[i], deck[j]] = [deck[j], deck[i]];
   }
-  return chalSeedDeckForReqs(deck, reqs, rng, chalClubFix(period, key));
+  // The distinct-club seeding is unconditional: with the deck redrawn each
+  // attempt there is no earlier deck left to stay faithful to.
+  return chalSeedDeckForReqs(deck, reqs, rng, true);
 }
 
 function chalSeedDeckForReqs(deck, reqs, rng, clubFix) {
