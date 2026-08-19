@@ -20,6 +20,14 @@ const CHAL_EPOCH = '2026-07-10';   // daily #1; weekly #1 = its week; monthly #1
 const CHAL_GEN2_FROM = { daily: '2026-07-20', weekly: '2026-07-26', monthly: '2026-08' };
 function chalGen2(period, key) { return String(key) >= (CHAL_GEN2_FROM[period] ?? '9999'); }
 
+// Two club-mission fixes that would change a challenge already in progress, so
+// they gate on the key the same way CHAL_GEN2_FROM does: the deck now supplies
+// eleven different clubs when the mission asks for them, and "all different
+// clubs" is no longer paired with "n players from club X". Set these to dates
+// AFTER the deploy date.
+const CHAL_CLUBFIX_FROM = { daily: '2026-08-25', weekly: '2026-08-30', monthly: '2026-09' };
+function chalClubFix(period, key) { return String(key) >= (CHAL_CLUBFIX_FROM[period] ?? '9999'); }
+
 // Which challenge keys run on the V2 simulation engine. Same key-gate mechanics
 // and deploy rule as CHAL_GEN2_FROM: a key already in progress must keep
 // producing the exact season it produced yesterday, so only future keys flip.
@@ -295,10 +303,16 @@ function challengeDeckFor(period, key, eraMin, eraMax, reqs) {
     const j = Math.floor(rng() * (i + 1));
     [deck[i], deck[j]] = [deck[j], deck[i]];
   }
-  return chalSeedDeckForReqs(deck, reqs, rng);
+  return chalSeedDeckForReqs(deck, reqs, rng, chalClubFix(period, key));
 }
 
-function chalSeedDeckForReqs(deck, reqs, rng) {
+function chalSeedDeckForReqs(deck, reqs, rng, clubFix) {
+  // "all eleven from different clubs" was the one mission the deck did nothing
+  // to supply. The deck is a shuffle of SQUADS, which holds a squad per club per
+  // season, so the eleven drawn squads averaged only 8 distinct clubs — the
+  // mission was impossible in 96% of the challenges that asked for it. When it is
+  // required, the window is filled one club at a time.
+  const needDistinct = !!clubFix && (reqs ?? []).some(r => r.type === 'all_diff_clubs');
   const preds = [];
   (reqs ?? []).forEach(r => {
     if (r.type === 'club_count')
@@ -310,24 +324,33 @@ function chalSeedDeckForReqs(deck, reqs, rng) {
     else if (r.type === 'nat_count')
       preds.push({ need: (r.n ?? 1) + 2, fn: sq => sq.players.some(pl => chalPlayerHasNat(pl.name, r.nat, r.dual)) });
   });
-  if (!preds.length) return deck;
+  if (!preds.length && !needDistinct) return deck;
 
   // Rebuild the first WINDOW entries: guaranteed supply first (in deck order),
   // topped up with the earliest remaining squads, then reshuffled so the
   // guaranteed squads aren't clumped at the very start.
   const WINDOW = 16;
   const taken = new Set();
+  const clubs = new Set();
   const head = [];
+  // WINDOW is well under the 31 clubs in the data, so a fully distinct window is
+  // always reachable; the loose pass below is a safety net, not a normal path.
+  const free = sq => !taken.has(sq.id) && !(needDistinct && clubs.has(sq.teamId));
+  const take = sq => { head.push(sq); taken.add(sq.id); clubs.add(sq.teamId); };
   preds.forEach(p => {
     let have = 0;
     for (const sq of deck) {
       if (have >= p.need) break;
-      if (!taken.has(sq.id) && p.fn(sq)) { head.push(sq); taken.add(sq.id); have++; }
+      if (free(sq) && p.fn(sq)) { take(sq); have++; }
     }
   });
   for (const sq of deck) {
     if (head.length >= WINDOW) break;
-    if (!taken.has(sq.id)) { head.push(sq); taken.add(sq.id); }
+    if (free(sq)) take(sq);
+  }
+  for (const sq of deck) {
+    if (head.length >= WINDOW) break;
+    if (!taken.has(sq.id)) take(sq);
   }
   const rest = deck.filter(sq => !taken.has(sq.id));
   for (let i = head.length - 1; i > 0; i--) {
@@ -573,6 +596,7 @@ function challengeRequirementsV2(period, key, s) {
   const reqs = [];
   let supplyReqs = 0;   // club/nat/era missions rearrange the deck — cap at 2
   const ovrUsed = () => reqs.some(r => CHAL_V2_OVR_FAMILY.includes(r.type));
+  const clubFix = chalClubFix(period, key);
 
   while (reqs.length < wanted && pool.length) {
     // weighted draw without replacement
@@ -584,6 +608,11 @@ function challengeRequirementsV2(period, key, s) {
     // one rating-axis mission max — a cap + min_low_ovr is the same constraint twice
     if (CHAL_V2_OVR_FAMILY.includes(type) && ovrUsed()) continue;
     if ((type === 'club_count' || type === 'nat_count' || type.startsWith('min_era')) && supplyReqs >= 2) continue;
+    // "all eleven from different clubs" and "n players from club X" pull the same
+    // lever in opposite directions — at n >= 2 they cannot both be satisfied, and
+    // 28 of 436 generated challenges asked for both.
+    if (clubFix && type === 'club_count'     && reqs.some(r => r.type === 'all_diff_clubs')) continue;
+    if (clubFix && type === 'all_diff_clubs' && reqs.some(r => r.type === 'club_count'))     continue;
 
     const d = reqs.length === 0 ? s.difficulty : (CHAL_V2_NOTCH[s.difficulty] ?? 'normal');
 
