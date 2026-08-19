@@ -37,25 +37,20 @@ function measure(me, n) {
 
 console.log(`engine ${G.SIM_ENGINE_CURRENT} · ${N.toLocaleString()} seasons per row\n`);
 console.log('OVR | wins | pts | goals |  36-0 per 300 | spec');
-// Measured baseline from the REAL engine (50,000 seasons per row), not from a
-// prototype. The design spec's original table was produced by a standalone
-// harness that ran all 36 games against a uniform slice of the league; the real
-// engine sends a top-six side into a playoff against the five STRONGEST clubs
-// twice each, where its win rate is 0.77 rather than 0.91. That shifts the whole
-// curve right by almost exactly one rating point. The project owner reviewed the
-// gap and accepted these numbers rather than pushing the engine harder, because
-// closing it costs goal realism: reaching 5-6 per 300 at OVR 88 drops a season's
-// goals conceded to 4 in 36 games and blows the attacking-build advantage out to
-// 11x. Treat any DRIFT here as a real regression, not a number to edit.
-//
-// 2026-08-19: re-measured after CAM moved from the engine's midfield line to its
-// attack line, so SIM2_LINES matches the ATK_POS/MID_POS grouping the results
-// card has always drawn. The rows here use balanced player lines, so the shift
-// comes entirely from the AI clubs' ratings — every real squad's attack line now
-// includes its playmakers. It nudges the whole curve up by a few percent
-// (0.22 -> 0.28 at OVR 87, 14.02 -> 14.38 at OVR 90) and leaves the goal and
-// points columns essentially where they were.
-const SPEC = { 84: 0.00, 85: 0.01, 86: 0.02, 87: 0.28, 88: 1.30, 89: 5.04, 90: 14.38 };
+// Measured baseline from the REAL engine (40,000 seasons per row), not from a
+// prototype. Two things shifted it since the design spec was written:
+//   * The spec's original table came from a standalone harness that ran all 36
+//     games against a uniform slice of the league. The real engine sends a
+//     top-six side into a playoff against the five STRONGEST clubs twice each,
+//     where its win rate is 0.77 rather than 0.91 — that alone moved the curve
+//     right by about one rating point.
+//   * The 2026-08-19 goal rebalance (BASE 1.25 to 1.45, CHANCES 3 to 5, KD 0.220
+//     to 0.125). The first calibration was too stingy: a season read 74:9, which
+//     both broke the server's absolute achievement thresholds and left 28% of
+//     seasons at OVR 87 unbeaten. Richer scorelines and a real chance of
+//     conceding cost roughly 4x on the 36-0 rate, and that was the trade taken.
+// Treat any DRIFT here as a real regression, not a number to edit.
+const SPEC = { 84: 0.00, 85: 0.00, 86: 0.01, 87: 0.03, 88: 0.37, 89: 1.99, 90: 6.23 };
 let fail = false;
 for (const o of [84, 85, 86, 87, 88, 89, 90]) {
   const r = measure(bal(o), N);
