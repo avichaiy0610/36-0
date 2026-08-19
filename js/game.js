@@ -1886,11 +1886,15 @@ function generateAuthenticTable(wins, draws, losses, g) {
 
   const rowsFor = (group, gi) => {
     const poGames = spec.groups ? (spec.groups[gi] - 1) * spec.poRounds[gi] : 0;
+    // Most points this group can actually finish on, halving included. These rows
+    // print their points straight to the screen, unlike the modern table which
+    // derives them from a clamped win count, so the ceiling has to be enforced.
+    const maxPts = base(regG * 3) + poGames * 3;
     return group.map(t => {
       if (t.us) return { name: 'הקבוצה שלי', us: true, pts: base(myRegPts) + myPoPts };
       const rate  = t.pts / regG;
       const poPts = poGames ? Math.max(0, Math.round(rate * poGames + rand(-2, 2))) : 0;
-      return { name: t.name, us: false, pts: base(t.pts) + poPts };
+      return { name: t.name, us: false, pts: Math.min(maxPts, base(t.pts) + poPts) };
     }).sort((a, b) => b.pts - a.pts);
   };
 

@@ -68,6 +68,11 @@ const SIM2_TABLE_SHAPE = 0.45;
 // collected.
 const SIM2_TABLE_FORM_SD = 20;
 
+// Ceiling on a rival's points per game once form is applied. A runaway champion
+// in a real league lands around 2.4-2.6; three would mean it won every match, and
+// a hard cap at three left tables showing several clubs with perfect records.
+const SIM2_TABLE_MAX_PPG = 2.65;
+
 // The player's own season form, in rating points applied to all four lines for
 // the whole campaign — the year everything clicked, or the year nothing did.
 // Deliberately small: 36 matches average almost all noise away, so a swing large
@@ -232,7 +237,13 @@ function simTableEstimateV2(clubs, games) {
     // Giving each club a good or bad campaign is what lets a rival run away with
     // it, and it costs nothing on the player's own 36-0 chances, since it never
     // touches a match he actually plays.
-    const swing = SIM2_TABLE_FORM_SD * simFormSwing();
-    return Math.max(3, Math.round(blended * games + swing * games / 36));
+    // The swing is unbounded, so cap the RATE rather than the total. Capping the
+    // total instead pinned lucky clubs at exactly three points a game — a table
+    // full of clubs that had won every match — and letting it run produced 132
+    // points from 39 games, which the historical tables print verbatim.
+    // SIM2_TABLE_MAX_PPG is what a runaway champion actually manages.
+    const swing = SIM2_TABLE_FORM_SD * simFormSwing() / 36;
+    const rate  = Math.min(SIM2_TABLE_MAX_PPG, Math.max(0.05, blended + swing));
+    return Math.max(3, Math.round(rate * games));
   });
 }
