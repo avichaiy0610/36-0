@@ -828,6 +828,7 @@ function saveSeasonState(season) {
     const d = JSON.parse(raw);
     d.season = {
       ovr: season.ovr,
+      engine: season.engine ?? 1,   // seasons saved before the V2 cutover have none
       matches: season.matches,
       inTopSix: season.inTopSix,
       format: season.format ?? 'modern',
@@ -2014,7 +2015,7 @@ function calcPreseasonOdds(ovr, simCount = 300) {
   let ranks = [], totalPts = 0;
   for (let i = 0; i < simCount; i++) {
     const spec = specForState();
-    const g0 = generateMatches(ovr, oppTeamsForState(), spec);
+    const g0 = generateMatches(myLineRatings(), oppTeamsForState(), spec, SIM_ENGINE_CURRENT);
     const { matches, inTopSix, champOpponents, relegOpponents } = g0;
     const w = matches.filter(m => m.outcome === 'W').length;
     const d = matches.filter(m => m.outcome === 'D').length;
@@ -2159,12 +2160,13 @@ function animateResults(ovr) {
     const projected = window._preseasonProjected ?? calcPreseasonOdds(ovr).projectedFinish;
     const simulate = () => {
       const spec = specForState();
-      const g = generateMatches(ovr, oppTeamsForState(), spec);
+      const g = generateMatches(myLineRatings(), oppTeamsForState(), spec, SIM_ENGINE_CURRENT);
       let w = 0, d = 0;
       g.matches.forEach(m => { if (m.outcome === 'W') w++; else if (m.outcome === 'D') d++; });
       const l = g.matches.length - w - d;
       return {
         ovr,
+        engine: SIM_ENGINE_CURRENT,
         matches: g.matches,
         inTopSix: g.inTopSix,
         format: isModernSpec(spec) ? 'modern' : 'authentic',
