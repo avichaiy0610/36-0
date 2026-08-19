@@ -1614,7 +1614,9 @@ function generateMatches(me, oppTeams = IL_TEAMS_SIM, spec = MODERN_FORMAT, engi
 
   // Estimate opponent regular-season pts to determine which playoff bracket we land in
   const avgOppOvr = Math.round(oppTeams.reduce((s, t) => s + t.ovr, 0) / oppTeams.length);
-  const simTeamPts = oppTeams.map(t => {
+  const v2pts = engine >= 2 ? simTableEstimateV2(oppTeams, 26) : null;
+  const simTeamPts = oppTeams.map((t, i) => {
+    if (v2pts) return { ...t, pts: v2pts[i] };
     const diff  = t.ovr - avgOppOvr;
     const winP  = Math.max(0.1, Math.min(0.85, 0.47 + diff * WINP_SLOPE));
     const drawP = Math.max(0.05, 0.22 - Math.abs(diff) * 0.005);
@@ -1675,7 +1677,9 @@ function generateAuthenticMatches(me, oppTeams, spec, engine = 1) {
 
   // Opponents' regular season, scaled to this format's number of games
   const avgOppOvr = Math.round(teams.reduce((s, t) => s + t.ovr, 0) / teams.length);
-  const simTeamPts = teams.map(t => {
+  const v2pts = engine >= 2 ? simTableEstimateV2(teams, regG) : null;
+  const simTeamPts = teams.map((t, i) => {
+    if (v2pts) return { ...t, pts: v2pts[i] };
     const diff  = t.ovr - avgOppOvr;
     const winP  = Math.max(0.1, Math.min(0.85, 0.47 + diff * WINP_SLOPE));
     const drawP = Math.max(0.05, 0.22 - Math.abs(diff) * 0.005);
