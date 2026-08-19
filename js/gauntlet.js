@@ -198,7 +198,11 @@ function gtPlayLive(nodeData, opp, res, me) {
     <div class="gt-live">
       <div class="gt-live-top">
         <span class="gt-live-side">ההרכב שלך<b>${me.ovr}</b></span>
-        <span class="gt-live-score" dir="ltr"><span id="gt-sc-me">0</span> – <span id="gt-sc-them">0</span></span>
+        <!-- The page is RTL, so the flex row puts YOUR side on the right and the
+             opponent on the left. The scoreline is dir="ltr", so its first child
+             renders leftmost — the opponent's goals must come first, or your own
+             score ends up printed beside their name. -->
+        <span class="gt-live-score" dir="ltr"><span id="gt-sc-them">0</span> – <span id="gt-sc-me">0</span></span>
         <span class="gt-live-side">${club} ${nodeData.season}<b>${nodeData.ovr}</b></span>
       </div>
       <div class="gt-clock"><span id="gt-min">0</span>'</div>
