@@ -1559,7 +1559,7 @@ function setHint(text) { document.getElementById('pick-hint').textContent = text
 // the match sim, the bracket split and the final table stay consistent.
 const WINP_SLOPE = 0.031;
 
-function simulateMatch(myOvr, opp, homeOverride = null) {
+function simulateMatchV1(myOvr, opp, homeOverride = null) {
   const diff  = myOvr - opp.ovr;
   const home  = homeOverride !== null ? homeOverride : Math.random() > 0.5;
   const bonus = home ? 2 : 0;
@@ -1576,11 +1576,23 @@ function simulateMatch(myOvr, opp, homeOverride = null) {
   return { outcome, gf, ga, opponent: opp.name, home };
 }
 
-function generateMatches(ovr, oppTeams = IL_TEAMS_SIM, spec = MODERN_FORMAT) {
-  if (!isModernSpec(spec)) return generateAuthenticMatches(ovr, oppTeams, spec);
+// Engine dispatch. `me` is a number for V1 and a { ovr, atk, mid, def, gk }
+// object for V2; V1 accepts either so a V2 call site can fall back cleanly.
+// Anything recorded before the cutover keeps passing engine 1 and replays
+// byte-identically — see the compatibility table in the design spec.
+function simulateMatch(me, opp, homeOverride = null, engine = 1) {
+  if (engine >= 2 && typeof me === 'object' && me !== null) {
+    return simulateMatchV2(me, opp, homeOverride);
+  }
+  return simulateMatchV1(typeof me === 'number' ? me : me.ovr, opp, homeOverride);
+}
+
+function generateMatches(me, oppTeams = IL_TEAMS_SIM, spec = MODERN_FORMAT, engine = 1) {
+  const ovr = typeof me === 'number' ? me : me.ovr;
+  if (!isModernSpec(spec)) return generateAuthenticMatches(me, oppTeams, spec, engine);
   // ── שלב הליגה: 26 משחקים (13 יריבים × בית + חוץ) ───────────────────────────
   const regPool    = shuffleArr([...oppTeams, ...oppTeams]);
-  const regMatches = regPool.map(opp => simulateMatch(ovr, opp));
+  const regMatches = regPool.map(opp => simulateMatch(me, opp, null, engine));
   const regPts     = regMatches.reduce((s, m) => s + (m.outcome === 'W' ? 3 : m.outcome === 'D' ? 1 : 0), 0);
 
   // Estimate opponent regular-season pts to determine which playoff bracket we land in
@@ -1604,13 +1616,13 @@ function generateMatches(ovr, oppTeams = IL_TEAMS_SIM, spec = MODERN_FORMAT) {
     // פלייאוף עליון: 5 יריבים מהשישייה × בית + חוץ = 10 משחקים
     const top5 = sortedTeams.slice(0, 5);
     const pool = shuffleArr([...top5, ...top5]);
-    playoffMatches = pool.map(opp => simulateMatch(ovr, opp));
+    playoffMatches = pool.map(opp => simulateMatch(me, opp, null, engine));
   } else {
     // פלייאוף תחתון: 7 יריבים × משחק אחד  (4 בית + 3 חוץ  או  3 בית + 4 חוץ)
     const bottom7   = sortedTeams.slice(6);
     const homeCount = Math.random() < 0.5 ? 4 : 3;
     const homes     = shuffleArr([...Array(homeCount).fill(true), ...Array(7 - homeCount).fill(false)]);
-    playoffMatches  = bottom7.map((opp, i) => simulateMatch(ovr, opp, homes[i]));
+    playoffMatches  = bottom7.map((opp, i) => simulateMatch(me, opp, homes[i], engine));
   }
 
   // Bracket membership — needed for a correctly-split league table
@@ -1624,7 +1636,8 @@ function generateMatches(ovr, oppTeams = IL_TEAMS_SIM, spec = MODERN_FORMAT) {
 // One generic engine for every pre-2012 format: N-1 opponents met `rounds`
 // times, then (if the season had one) a playoff inside the group the regular
 // season put you in. 2009/10–2010/11 also halve the regular-season points.
-function generateAuthenticMatches(ovr, oppTeams, spec) {
+function generateAuthenticMatches(me, oppTeams, spec, engine = 1) {
+  const ovr     = typeof me === 'number' ? me : me.ovr;
   const teams   = oppTeams.slice(0, spec.teams - 1);
   const regG    = regularGames(spec);
 
@@ -1640,7 +1653,7 @@ function generateAuthenticMatches(ovr, oppTeams, spec) {
     const homeCount = baseHome + (extraH[i] ? 1 : 0);
     for (let r = 0; r < spec.rounds; r++) fixtures.push({ opp, home: r < homeCount });
   });
-  const regMatches = shuffleArr(fixtures).map(f => simulateMatch(ovr, f.opp, f.home));
+  const regMatches = shuffleArr(fixtures).map(f => simulateMatch(me, f.opp, f.home, engine));
   const regPts = regMatches.reduce((s, m) => s + (m.outcome === 'W' ? 3 : m.outcome === 'D' ? 1 : 0), 0);
 
   // Opponents' regular season, scaled to this format's number of games
@@ -1681,7 +1694,7 @@ function generateAuthenticMatches(ovr, oppTeams, spec) {
     const homes = shuffleArr(rivals.map((_, i) => i < half));
     rivals.forEach((opp, i) => { for (let r = 0; r < poRounds; r++) poFixtures.push({ opp, home: r === 0 ? homes[i] : !homes[i] }); });
   }
-  const poMatches = shuffleArr(poFixtures).map(f => simulateMatch(ovr, f.opp, f.home));
+  const poMatches = shuffleArr(poFixtures).map(f => simulateMatch(me, f.opp, f.home, engine));
 
   return { matches: [...regMatches, ...poMatches], inTopSix: groupIdx === 0, groupIdx, myRegRank,
            groups, myRegPts: regPts, regGames: regG, spec, format: 'authentic' };
