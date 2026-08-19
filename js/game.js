@@ -416,9 +416,22 @@ function teamOVR() {
   return weight > 0 ? Math.round(total / weight) : 0;
 }
 
+// A line's rating, on exactly the same terms as teamOVR: a player fielded out of
+// his natural position counts at 93%, because that is what he is actually worth
+// there. Without the penalty these bars ran about 1.6 points above the headline
+// OVR — a quarter of drafted players end up out of position — so the simulation
+// saw a squad meaningfully stronger than the number on screen, and a real draft
+// outperformed the rating it was indexed by.
 function calcGroupOVR(positions) {
   const ovrs = state.picks
-    .map((pick, i) => pick && positions.includes(state.slots[i].pos) ? playerOVR(pick.player) : null)
+    .map((pick, i) => {
+      if (!pick || !positions.includes(state.slots[i].pos)) return null;
+      const ovr = playerOVR(pick.player);
+      const pp  = playerPositions(pick.player);
+      const slotPos = state.slots[i].pos;
+      const inPos = (COMPAT[slotPos] ?? []).slice(0, 2).includes(pp[0]) || pp.includes(slotPos);
+      return inPos ? ovr : Math.round(ovr * 0.93);
+    })
     .filter(n => n !== null);
   return ovrs.length ? Math.round(ovrs.reduce((a,b) => a+b, 0) / ovrs.length) : null;
 }
