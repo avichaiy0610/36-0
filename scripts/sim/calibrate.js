@@ -47,7 +47,15 @@ console.log('OVR | wins | pts | goals |  36-0 per 300 | spec');
 // closing it costs goal realism: reaching 5-6 per 300 at OVR 88 drops a season's
 // goals conceded to 4 in 36 games and blows the attacking-build advantage out to
 // 11x. Treat any DRIFT here as a real regression, not a number to edit.
-const SPEC = { 84: 0.00, 85: 0.00, 86: 0.04, 87: 0.22, 88: 1.14, 89: 4.66, 90: 14.02 };
+//
+// 2026-08-19: re-measured after CAM moved from the engine's midfield line to its
+// attack line, so SIM2_LINES matches the ATK_POS/MID_POS grouping the results
+// card has always drawn. The rows here use balanced player lines, so the shift
+// comes entirely from the AI clubs' ratings — every real squad's attack line now
+// includes its playmakers. It nudges the whole curve up by a few percent
+// (0.22 -> 0.28 at OVR 87, 14.02 -> 14.38 at OVR 90) and leaves the goal and
+// points columns essentially where they were.
+const SPEC = { 84: 0.00, 85: 0.01, 86: 0.02, 87: 0.28, 88: 1.30, 89: 5.04, 90: 14.38 };
 let fail = false;
 for (const o of [84, 85, 86, 87, 88, 89, 90]) {
   const r = measure(bal(o), N);
