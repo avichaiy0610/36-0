@@ -2164,13 +2164,18 @@ function animateResults(ovr) {
     const projected = window._preseasonProjected ?? calcPreseasonOdds(ovr).projectedFinish;
     const simulate = () => {
       const spec = specForState();
-      const g = generateMatches(myLineRatings(), oppTeamsForState(), spec, SIM_ENGINE_CURRENT);
+      // A challenge already in progress must keep the engine it started on, or
+      // its scores stop being comparable — chalSimEngine gates that by key.
+      const engine = state.challenge
+        ? chalSimEngine(state.challenge.period, state.challenge.key)
+        : SIM_ENGINE_CURRENT;
+      const g = generateMatches(myLineRatings(), oppTeamsForState(), spec, engine);
       let w = 0, d = 0;
       g.matches.forEach(m => { if (m.outcome === 'W') w++; else if (m.outcome === 'D') d++; });
       const l = g.matches.length - w - d;
       return {
         ovr,
-        engine: SIM_ENGINE_CURRENT,
+        engine,
         matches: g.matches,
         inTopSix: g.inTopSix,
         format: isModernSpec(spec) ? 'modern' : 'authentic',
@@ -2189,6 +2194,9 @@ function animateResults(ovr) {
       ? withSeededRandom(chalSeed(`chal|${state.challenge.period}|${state.challenge.key}|sim|` + challengeLineupKey()), simulate)
       : simulate();
     saveSeasonState(season);
+    // stamp the engine so the submitted payload can mark which scale this
+    // score is on (V2 outscores V1 at the same squad rating)
+    window._lastResult = { ...(window._lastResult ?? {}), engine: season.engine };
     window._resultSubmitted = false;   // a new season may be saved again
     // count every finished season (for the games_N achievements) — once per
     // season: restored seasons skip this block
@@ -2260,7 +2268,10 @@ function animateResults(ovr) {
     const td = tierDisplay(tier);
     setEl('res-tier', td.name, tier.color);
     setEl('res-tier-sub', td.sub);
-    window._lastResult = { wins, draws, losses, gfTotal, gaTotal, matches, ovr, inTopSix, spec: seasonSpec };
+    // engine comes from the season itself (restored/preset seasons carry their
+    // own; league/duel presets have none → 1), so this rebuild can't lose it.
+    window._lastResult = { wins, draws, losses, gfTotal, gaTotal, matches, ovr, inTopSix, spec: seasonSpec,
+                           engine: season.engine ?? 1 };
     window._lastTier   = tier;
     const diffMapR = {
       easy:   siteText('label-diff-easy', 'קל'),
@@ -2878,6 +2889,7 @@ async function submitResult() {
     tier:      t.name,
     settings: {
       difficulty:      state.difficulty,
+      engine:          window._lastResult?.engine ?? 1,
       era_min:         state.eraMin,
       era_max:         state.eraMax,
       peak_mode:       state.peakMode,
