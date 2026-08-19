@@ -26,6 +26,7 @@ t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
 function loadWithRng() {
   const src = STUB + MULBERRY
     + fs.readFileSync(path.join(ROOT, 'js/data.js'), 'utf8') + '\n'
+    + fs.readFileSync(path.join(ROOT, 'js/sim-engine.js'), 'utf8') + '\n'
     + fs.readFileSync(path.join(ROOT, 'js/game.js'), 'utf8') + '\n'
     + fs.readFileSync(path.join(ROOT, 'js/league-sim.js'), 'utf8') + '\n'
     + ';return { generateMatches, generateLeagueTable, simTeamsForSeason,'
