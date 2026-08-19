@@ -95,6 +95,25 @@ body {
 }
 .btn-coffee:hover { transform: translateY(-2px); box-shadow: 0 6px 18px #ffdd0044; }
 .btn-coffee-results { align-self: center; margin-top: 4px; }
+/* On the welcome screen it sits a few pixels under the gold "play now" button.
+   Filled ko-fi yellow reads as a second call to action there and pulls the eye
+   off the one that matters, so this variant keeps the brand colour as an outline
+   and fills in only on hover. */
+.btn-coffee-welcome {
+  margin-top: 18px;
+  padding: 8px 20px;
+  font-size: 13px;
+  background: transparent;
+  color: #FFDD00;
+  border: 1.5px solid #FFDD0055;
+}
+.btn-coffee-welcome:hover { background: #FFDD00; color: #000; border-color: #FFDD00; }
+/* ko-fi yellow as text is unreadable on the light theme's near-white welcome
+   background — the same reason --accent drops to dark goldenrod there. Darkened
+   for the resting state; the hover still fills with the real brand yellow, which
+   is legible against black text on any background. */
+[data-theme="light"] .btn-coffee-welcome { color: #8a6d00; border-color: #c9a80077; }
+[data-theme="light"] .btn-coffee-welcome:hover { background: #FFDD00; color: #000; border-color: #FFDD00; }
 
 .site-disclaimer {
   max-width: 620px;
