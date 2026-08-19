@@ -895,6 +895,7 @@ function saveSeasonState(season) {
       // tile, and the verdict silently falls through to "בדיוק כצפוי" because both
       // comparisons against undefined are false.
       projectedFinish: season.projectedFinish ?? null,
+      projectedPoints: season.projectedPoints ?? null,
       leagueTable: season.leagueTable,
       playerStats: season.playerStats.map(({ squad, ...rest }) => rest),
     };
@@ -2162,7 +2163,8 @@ function showPreseason(ovr) {
 
   setTimeout(() => {
     const odds = calcPreseasonOdds(ovr, 300, currentSimEngine());
-    window._preseasonProjected = odds.projectedFinish;  // reused by the results story
+    window._preseasonProjected = odds.projectedFinish;
+    window._preseasonPoints    = odds.expectedPoints;  // reused by the results story
     document.getElementById('pre-finish').textContent = `מקום ${odds.projectedFinish}`;
     document.getElementById('pre-pts').textContent    = odds.expectedPoints;
 
@@ -2263,8 +2265,13 @@ function animateResults(ovr) {
   const seasonWasRestored = !!window._restoredSeason;
   window._restoredSeason = null; window._presetSeason = null;
   if (!season) {
-    const projected = window._preseasonProjected
-      ?? calcPreseasonOdds(ovr, 300, currentSimEngine()).projectedFinish;
+    // Both halves of the pre-season forecast: the finish for the tile, and the
+    // points the verdict falls back on when the finish cannot separate them.
+    const odds = (window._preseasonProjected != null && window._preseasonPoints != null)
+      ? { projectedFinish: window._preseasonProjected, expectedPoints: window._preseasonPoints }
+      : calcPreseasonOdds(ovr, 300, currentSimEngine());
+    const projected = odds.projectedFinish;
+    const projectedPts = odds.expectedPoints;
     const simulate = () => {
       const spec = specForState();
       // A challenge already in progress must keep the engine it started on, or
@@ -2287,6 +2294,7 @@ function animateResults(ovr) {
           : generateAuthenticTable(w, d, l, g),
         playerStats: simulatePlayerStats(g.matches),
         projectedFinish: projected,
+        projectedPoints: projectedPts,
       };
     };
     // Challenge run: the season is a pure function of (challenge, lineup) — the
@@ -2408,7 +2416,8 @@ function animateResults(ovr) {
     buildLeagueTable(leagueTable, seasonSpec);
     renderSeasonStory({ wins, draws, losses, gfTotal, gaTotal, ovr, myRank,
                         n: leagueTable.length, spec: seasonSpec,
-                        projectedFinish: season.projectedFinish, ps: playerStats, tier });
+                        projectedFinish: season.projectedFinish,
+                        projectedPoints: season.projectedPoints, ps: playerStats, tier });
     return tier;
   }
 
@@ -2607,6 +2616,11 @@ function fillTemplate(str, vars) {
   return String(str).replace(/\{(\w+)\}/g, (_, k) => (k in vars ? vars[k] : '{' + k + '}'));
 }
 
+// How far off the forecast a season has to land before the verdict calls it.
+// A season's points swing about five either way on their own, so anything
+// inside this is the forecast being right, not the squad over- or underdoing it.
+const VERDICT_PTS_BAND = 5;
+
 function renderSeasonStory(r) {
   const st = typeof siteText === 'function' ? siteText : (_k, d) => d;
 
@@ -2621,9 +2635,25 @@ function renderSeasonStory(r) {
   const vtile = document.getElementById('res-verdict-tile');
   const vEl   = document.getElementById('res-verdict');
   vtile.classList.remove('over', 'under', 'exact');
-  if (r.myRank < projected)      { vtile.classList.add('over');  vEl.textContent = st('verdict-over', 'מעל הציפיות 🔥'); }
-  else if (r.myRank > projected) { vtile.classList.add('under'); vEl.textContent = st('verdict-under', 'מתחת לציפיות'); }
-  else                           { vtile.classList.add('exact'); vEl.textContent = st('verdict-exact', 'בדיוק כצפוי'); }
+  // Finishing position first, points as the tie-break. Rank alone cannot say a
+  // squad beat its billing once it is projected to win the league — there is
+  // nothing above first — so a favourite could only ever disappoint. Comparing
+  // points when the position lands exactly where it was projected gives the
+  // good seasons somewhere to show up. The band keeps a normal season "as
+  // expected" rather than calling every point either way a verdict.
+  const seasonPts = r.wins * 3 + r.draws;
+  const expPts = r.projectedPoints ?? null;
+  const verdict =
+    r.myRank < projected ? 'over' :
+    r.myRank > projected ? 'under' :
+    expPts === null ? 'exact' :
+    seasonPts >= expPts + VERDICT_PTS_BAND ? 'over' :
+    seasonPts <= expPts - VERDICT_PTS_BAND ? 'under' : 'exact';
+  vtile.classList.add(verdict);
+  vEl.textContent =
+    verdict === 'over'  ? st('verdict-over',  'מעל הציפיות 🔥') :
+    verdict === 'under' ? st('verdict-under', 'מתחת לציפיות')   :
+                          st('verdict-exact', 'בדיוק כצפוי');
 
   // 2) Qualitative strength chips
   const cats = [

@@ -66,12 +66,12 @@ const SIM2_TABLE_SHAPE = 0.45;
 // so a club lands about 20 points either side of its rating once in three
 // seasons — enough that a title is genuinely lost some years rather than merely
 // collected.
-const SIM2_TABLE_FORM_SD = 20;
+const SIM2_TABLE_FORM_SD = 10;
 
 // Ceiling on a rival's points per game once form is applied. A runaway champion
 // in a real league lands around 2.4-2.6; three would mean it won every match, and
 // a hard cap at three left tables showing several clubs with perfect records.
-const SIM2_TABLE_MAX_PPG = 2.65;
+const SIM2_TABLE_MAX_PPG = 2.40;
 
 // The player's own season form, in rating points applied to all four lines for
 // the whole campaign — the year everything clicked, or the year nothing did.
