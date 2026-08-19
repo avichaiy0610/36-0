@@ -1641,6 +1641,9 @@ function simulateMatch(me, opp, homeOverride = null, engine = 1) {
 
 function generateMatches(me, oppTeams = IL_TEAMS_SIM, spec = MODERN_FORMAT, engine = 1) {
   const ovr = typeof me === 'number' ? me : me.ovr;
+  // One form swing for the whole campaign, drawn before any match. V1 never had
+  // this and is left alone; its results are frozen.
+  if (engine >= 2 && typeof me === 'object' && me !== null) me = simApplySeasonForm(me);
   if (!isModernSpec(spec)) return generateAuthenticMatches(me, oppTeams, spec, engine);
   // ── שלב הליגה: 26 משחקים (13 יריבים × בית + חוץ) ───────────────────────────
   const regPool    = shuffleArr([...oppTeams, ...oppTeams]);

@@ -62,6 +62,31 @@ const SIM2_TABLE_FLOOR_PPG = 0.80;
 // cliff. Ordering is never affected — that always comes from the xG model.
 const SIM2_TABLE_SHAPE = 0.45;
 
+// Spread of a rival club's season form, in points over 36 games. Roughly normal,
+// so a club lands about 20 points either side of its rating once in three
+// seasons — enough that a title is genuinely lost some years rather than merely
+// collected.
+const SIM2_TABLE_FORM_SD = 20;
+
+// The player's own season form, in rating points applied to all four lines for
+// the whole campaign — the year everything clicked, or the year nothing did.
+// Deliberately small: 36 matches average almost all noise away, so a swing large
+// enough to be felt would amount to randomising the squad's rating.
+const SIM2_SEASON_FORM_SD = 1.2;
+
+// Approximately standard-normal, from four uniforms. Cheap, bounded, and good
+// enough for a form swing — nothing here needs distributional precision.
+function simFormSwing() {
+  return (Math.random() + Math.random() + Math.random() + Math.random() - 2) / 1.155;
+}
+
+// Apply a season's form to the player's line ratings. Returns a copy — the caller
+// keeps its own object, which the results card still renders unmodified.
+function simApplySeasonForm(me) {
+  const f = SIM2_SEASON_FORM_SD * simFormSwing();
+  return { ovr: me.ovr, atk: me.atk + f, mid: me.mid + f, def: me.def + f, gk: me.gk + f };
+}
+
 // A real club's four line ratings: the best N at each line, averaged.
 // Falls back to the club's overall rating when a squad has nobody in a line.
 function simLineRatingsForSquad(squadPlayers, fallbackOvr) {
@@ -201,6 +226,13 @@ function simTableEstimateV2(clubs, games) {
   return per.map((p, i) => {
     const byValue = SIM2_TABLE_FLOOR_PPG + (p - lo) * span / (hi - lo);
     const blended = SIM2_TABLE_SHAPE * byValue + (1 - SIM2_TABLE_SHAPE) * ladder[i];
-    return Math.max(3, Math.round(blended * games));
+    // A season's form. Without it every rival scores exactly the same total every
+    // time — the estimate is closed-form — so the title race was decided before a
+    // ball was kicked and an OVR 88 squad simply could not finish below third.
+    // Giving each club a good or bad campaign is what lets a rival run away with
+    // it, and it costs nothing on the player's own 36-0 chances, since it never
+    // touches a match he actually plays.
+    const swing = SIM2_TABLE_FORM_SD * simFormSwing();
+    return Math.max(3, Math.round(blended * games + swing * games / 36));
   });
 }
