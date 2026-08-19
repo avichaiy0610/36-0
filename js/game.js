@@ -209,11 +209,29 @@ const POS_WEIGHT = {
 };
 
 // ─── Goal / Assist simulation weights ─────────────────────────────────────────
+// These only split a season's goals between the XI — they never affect a result.
+//
+// The spread used to be far too top-heavy: ST at 8 against 1.5 for a central
+// midfielder handed the striker 35% of everything his team scored, so a squad on
+// 92 goals produced a 28-goal top scorer, 40% of seasons cleared 30, and 9% beat
+// Eran Zahavi's all-time league record of 35. Flattening it puts a 92-goal season
+// on a ~24-goal top scorer with the record falling about once in a hundred
+// seasons, which is roughly what the real league does.
 const GOAL_W = {
-  ST:8, CF:7, RW:4.5, LW:4.5, CAM:3.5,
-  RM:2, LM:2, CM:1.5, CDM:0.5,
-  CB:0.4, RB:0.3, LB:0.3, GK:0,
+  ST:4.5, CF:4.4, RW:3.2, LW:3.2, CAM:2.9,
+  RM:2.2, LM:2.2, CM:1.8, CDM:1.0,
+  CB:0.6, RB:0.5, LB:0.5, GK:0,
 };
+
+// Goals and assists also lean on who the player actually is, not only where he
+// stands: weights get multiplied by exp(GOAL_QUALITY_K * (ovr - 80)). Without it
+// a 78-rated striker outscored a 94-rated one on the same pitch. Kept deliberately
+// gentle — at 0.015 a 94 is worth 1.24x an 80, which lifts a star striker to ~26
+// goals against ~22 for a weak one. Raising it much further makes a great striker
+// break the league record most seasons.
+const GOAL_QUALITY_K = 0.015;
+const goalWeight   = p => (GOAL_W[p.slotPos]   ?? 0) * Math.exp(GOAL_QUALITY_K * (p.ovr - 80));
+const assistWeight = p => (ASSIST_W[p.slotPos] ?? 0) * Math.exp(GOAL_QUALITY_K * (p.ovr - 80));
 const ASSIST_W = {
   ST:1, CF:1.5, RW:5, LW:5, CAM:6,
   RM:4, LM:4, CM:3.5, CDM:1.5,
@@ -1754,13 +1772,13 @@ function simulatePlayerStats(matches) {
   matches.forEach(m => {
     m.scorers = [];  // record who scored (for the per-match results line)
     for (let g = 0; g < m.gf; g++) {
-      const si = pickWeightedIdx(players.map(p => GOAL_W[p.slotPos] ?? 0));
+      const si = pickWeightedIdx(players.map(goalWeight));
       if (si >= 0) {
         players[si].goals++;
         m.scorers.push({ n: playerShortName(players[si].name), min: rand(1, 90) });
       }
       if (Math.random() > 0.15) {
-        const ai = pickWeightedIdx(players.map((p,i) => i === si ? 0 : ASSIST_W[p.slotPos] ?? 0));
+        const ai = pickWeightedIdx(players.map((p,i) => i === si ? 0 : assistWeight(p)));
         if (ai >= 0) players[ai].assists++;
       }
     }
