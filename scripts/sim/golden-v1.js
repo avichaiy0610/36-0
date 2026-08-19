@@ -37,12 +37,37 @@ const G = loadWithRng();
 const out = { seededSeasons: [], aiRatings: {}, formats: [] };
 
 // 1. Seeded seasons — exactly how a league reveal and a challenge run recompute.
-for (const seed of ['ABCD|avi', 'ABCD|dana', 'chal|daily|2026-08-01|sim|x']) {
-  for (const ovr of [78, 84, 88]) {
+// A tiny formula drift (e.g. WINP_SLOPE off by 0.0001) only flips a match's
+// outcome when that match's Math.random() draw happened to land in the thin
+// band the drift moved a win/draw boundary across — empirically ~2-3% of
+// (seed, ovr) pairs at this range. 8 league codes × 5 usernames + 4
+// challenge/duel-style seeds = 44 seeds, × 13 OVRs spanning the real drafted
+// range (70-94) = 572 independent seasons, ~20,000 matches. Verified against
+// a live WINP_SLOPE 0.031→0.0311 perturbation to reliably flip >10 seasons
+// (see task report) — comfortable margin above the "at least one" needed to
+// catch drift from a restructured simulateMatch/generateMatches dispatcher.
+const LEAGUE_CODES = ['ABCD', 'WXYZ', 'EFGH', 'QRST', 'LMNO', 'PQXY', 'KLMN', 'TUVW'];
+const USERNAMES = ['avi', 'dana', 'noa', 'omer', 'shira'];
+const SEEDS = [];
+for (const c of LEAGUE_CODES) for (const u of USERNAMES) SEEDS.push(c + '|' + u);
+SEEDS.push(
+  'chal|daily|2026-08-01|sim|x', 'chal|daily|2026-08-02|sim|x',
+  'chal|weekly|2026-W33|sim|y', 'duel|room123|p1',
+);
+const OVRS = [70, 72, 74, 76, 78, 80, 82, 84, 86, 88, 90, 92, 94];
+for (const seed of SEEDS) {
+  for (const ovr of OVRS) {
     const rec = G.withSeededRandom(G.lgSimSeed(seed + '|' + ovr), () => {
       const g = G.generateMatches(ovr);
+      let w = 0, d = 0, l = 0;
+      g.matches.forEach(m => { if (m.outcome === 'W') w++; else if (m.outcome === 'D') d++; else l++; });
+      // Consume the same extra rand() calls a real league reveal does, in the
+      // same seeded block, so the table is just as sensitive to drift as the
+      // match list — this exercises code paths generateMatches alone does not.
+      const table = G.generateLeagueTable(w, d, l, g.inTopSix, g.champOpponents, g.relegOpponents);
       return { n: g.matches.length, inTopSix: g.inTopSix,
-               matches: g.matches.map(m => `${m.outcome}${m.gf}-${m.ga}${m.home ? 'H' : 'A'}`).join(',') };
+               matches: g.matches.map(m => `${m.outcome}${m.gf}-${m.ga}${m.home ? 'H' : 'A'}`).join(','),
+               table: table.map(r => `${r.name}:${r.pts}`).join(',') };
     });
     out.seededSeasons.push({ seed, ovr, ...rec });
   }
