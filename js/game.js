@@ -536,11 +536,19 @@ function startGame() {
   document.getElementById('duel-review-chrome')?.remove();
   document.getElementById('screen-setup').classList.remove('league-locked');
   const note = document.getElementById('lg-setup-note'); if (note) note.style.display = 'none';
+  prepareSetupScreen();
+  showScreen('setup');
+}
+
+// Fill in the setup screen. Every path that opens it has to run this, not just
+// the one from the welcome card: a challenge goes straight to the draft and
+// never opens setup, so restarting out of one used to land on a screen with no
+// formation chips and an empty season list.
+function prepareSetupScreen() {
   buildFormationCards();
   initOppSeasonSelect();
-  if (!_selectedFormationKey) setFormationSelection('4-3-3');
-  else setFormationSelection(_selectedFormationKey);
-  showScreen('setup');
+  const key = [_selectedFormationKey, state.formationId, '4-3-3'].find(k => k && FORMATIONS[k]);
+  setFormationSelection(key);
 }
 
 // Start a draft recorded for a league, with the league's shared settings locked in.
@@ -2908,6 +2916,7 @@ function restartGame() {
   clearDraftState();
   const moveBtn = document.getElementById('btn-move-player');
   if (moveBtn) { moveBtn.style.display = 'none'; moveBtn.classList.remove('move-active'); moveBtn.textContent = '⇄ הזז שחקן'; }
+  prepareSetupScreen();
   showScreen('setup');
 }
 
