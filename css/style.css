@@ -2072,3 +2072,28 @@ body {
 .gm-li-club { flex: 1; font-weight: 700; }
 .gm-li-elite { font-size: 10px; font-weight: 900; color: #8b5cf6; letter-spacing: .5px; }
 .gm-li-ovr { font-weight: 900; color: var(--accent); }
+
+/* gauntlet map: fixed branching layout */
+.gm-boss { font: 800 8px Heebo, Arial, sans-serif; fill: #ff9d5c; paint-order: stroke;
+           stroke: #0d1117; stroke-width: 2.5px; stroke-linejoin: round; }
+.gm-elite-tag { font: 900 7px Heebo, Arial, sans-serif; fill: #a78bfa; letter-spacing: .4px;
+                paint-order: stroke; stroke: #0d1117; stroke-width: 2.5px; stroke-linejoin: round; }
+.gm-shop-icon { font-size: 11px; }
+.gm-station.next { cursor: pointer; }
+.gm-station.next:hover .gm-stadium { filter: brightness(1.3); }
+.gm-station.locked { pointer-events: none; }
+.gm-li.shop .gm-li-club { color: var(--muted); font-weight: 600; }
+
+/* gauntlet fight result */
+.gt-res { background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+          padding: 16px; text-align: center; margin-bottom: 12px; }
+.gt-res.win  { border-color: #22c55e66; }
+.gt-res.loss { border-color: #ef444466; }
+.gt-res-title { font-size: 22px; font-weight: 900; margin-bottom: 10px; }
+.gt-res.win .gt-res-title  { color: #22c55e; }
+.gt-res.loss .gt-res-title { color: #ef4444; }
+.gt-res-teams { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.gt-res-side { flex: 1; font-size: 12px; color: var(--muted); }
+.gt-res-side b { display: block; font-size: 16px; color: var(--text); }
+.gt-res-score { font-size: 30px; font-weight: 900; color: var(--accent); }
+.gt-res-sub { margin-top: 10px; font-size: 12px; color: var(--muted); }

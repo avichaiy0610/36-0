@@ -103,47 +103,63 @@ function gmStadiumSVG(x, y, { size = 1, state = 'locked', elite = false } = {}) 
     </g>`;
 }
 
-// Renders the whole map. `stations` = [{station, teamId, season, ovr, elite}],
-// `at` = the index you are standing on.
-function renderGauntletMap(container, stations, at = 0) {
+// Renders the map. `at` is the index of the row you are standing on; rows below
+// it are done, the row itself is choosable, everything above is locked.
+function renderGauntletMap(container, at = 0, over = false) {
   if (!container) return;
+  const layout = gmLayout();
+  const short = id => (typeof clubShortName === 'function'
+    ? clubShortName((TEAMS[id] || {}).name || id)
+    : (TEAMS[id] || {}).name || id);
 
-  // Half the league lives in Gush Dan, so grounds land on top of each other.
-  // Place them one by one and push each new one away from whatever is already
-  // there — the pin moves, the country doesn't.
-  const placed = [];
-  const spots = stations.map((st, i) => {
-    const city = gmCityFor(st.teamId) || { x: 150, y: 120 + i * 70 };
-    let { x, y } = city;
-    const MIN = 34;
-    for (let guard = 0; guard < 60; guard++) {
-      const hit = placed.find(p => Math.hypot(p.x - x, p.y - y) < MIN);
-      if (!hit) break;
-      const ang = Math.atan2(y - hit.y || 0.01, x - hit.x || 0.01);
-      x = hit.x + Math.cos(ang) * MIN;
-      y = hit.y + Math.sin(ang) * MIN;
+  // roads first, so they sit behind the grounds
+  const roads = [];
+  for (let i = 0; i < layout.length - 1; i++) {
+    for (const from of layout[i]) {
+      for (const to of layout[i + 1]) {
+        const done = i < at;
+        roads.push(`<line x1="${from.x.toFixed(1)}" y1="${from.y.toFixed(1)}"
+          x2="${to.x.toFixed(1)}" y2="${to.y.toFixed(1)}"
+          stroke="${done ? '#3f6f4a' : '#d4af3744'}" stroke-width="1.4" stroke-dasharray="4 4"/>`);
+      }
     }
-    // a ground pinned near the coast (or pushed there by the spread above) can
-    // end up in the sea — pull it back onto land before drawing
-    ({ x, y } = gmClampInside(x, y, 15));
-    placed.push({ x, y });
-    return { x, y, home: city };
-  });
+  }
 
-  const marks = stations.map((st, i) => {
-    const city = spots[i];
-    const state = i < at ? 'done' : i === at ? 'next' : 'locked';
-    // Only the number rides on the map. Names and ratings live in the list
-    // below: four Gush Dan clubs in one run made overlapping labels unreadable.
-    return `
-      <g class="gm-station" data-station="${i}">
-        ${gmCrestSVG(city.x, city.y, st.teamId, { size: i === at ? 1.3 : 1, state, elite: !!st.elite })}
-        <text class="gm-num" x="${city.x}" y="${city.y + 2}" text-anchor="middle">${i + 1}</text>
-      </g>`;
+  const nodes = GM_RUN.map((row, ri) => {
+    // a finished run leaves nothing choosable — the cleared rows still read as
+    // cleared, but no ground invites a click that gtChoose would refuse
+    const state = ri < at ? 'done' : (ri === at && !over) ? 'next' : 'locked';
+    return layout[ri].map((pt, ni) => {
+      if (row.kind === 'shop') {
+        return `
+          <g class="gm-station gm-shop-node ${state}">
+            <circle cx="${pt.x}" cy="${pt.y}" r="13" fill="#0b0f14" opacity=".92"/>
+            <circle cx="${pt.x}" cy="${pt.y}" r="11.5" fill="none" stroke="${state === 'locked' ? '#20262e' : '#8b5cf6'}" stroke-width="2"/>
+            <text class="gm-shop-icon" x="${pt.x}" y="${pt.y + 4}" text-anchor="middle">🛒</text>
+          </g>`;
+      }
+      const n = row.nodes[ni];
+      const size = row.boss ? 1.35 : 1;
+      // Name only, and staggered: three grounds on one line put their captions
+      // on top of each other. The season and rating are in the list below.
+      const dy = layout[ri].length > 2 ? (ni === 1 ? 30 : 22) : 22;
+      const label = state === 'next'
+        ? `<text class="gm-label" x="${pt.x}" y="${pt.y + dy * size}" text-anchor="middle">${short(n.teamId)}</text>`
+        : '';
+      return `
+        <g class="gm-station ${state}${n.elite ? ' elite' : ''}" data-row="${ri}" data-node="${ni}">
+          ${gmCrestSVG(pt.x, pt.y, n.teamId, { size, state, elite: !!n.elite })}
+          <g class="gm-ovr-badge">
+            <rect x="${pt.x + 4 * size}" y="${pt.y + 4 * size}" width="${17 * size}" height="${11 * size}" rx="${5 * size}"
+                  fill="#0b0f14" stroke="${n.elite ? '#8b5cf6' : '#d4af37'}" stroke-width="1"/>
+            <text class="gm-ovr" x="${pt.x + 12.5 * size}" y="${pt.y + 12.5 * size}" text-anchor="middle">${n.ovr}</text>
+          </g>
+          ${row.boss ? `<text class="gm-boss" x="${pt.x}" y="${pt.y - 20 * size}" text-anchor="middle">${ri === GM_RUN.length - 1 ? 'הבוס הסופי' : 'בוס'}</text>` : ''}
+          ${n.elite ? `<text class="gm-elite-tag" x="${pt.x}" y="${pt.y - 17}" text-anchor="middle">ELITE</text>` : ''}
+          ${label}
+        </g>`;
+    }).join('');
   }).join('');
-
-  // the road between grounds, drawn behind them
-  const road = spots.map(s => `${s.x.toFixed(1)},${s.y.toFixed(1)}`).join(' ');
 
   container.innerHTML = `
     <svg class="gm-svg" viewBox="0 0 ${GM_VIEW.w} ${GM_VIEW.h}" xmlns="http://www.w3.org/2000/svg">
@@ -153,14 +169,14 @@ function renderGauntletMap(container, stations, at = 0) {
           <stop offset="55%" stop-color="#0b1a14"/>
           <stop offset="100%" stop-color="#12160f"/>
         </linearGradient>
-        <!-- The border is drawn by dilating the FILLED silhouette, not by
-             stroking the path: a stroke would trace every sub-polygon and put
-             internal lines across the country. This traces only the outer edge. -->
         <radialGradient id="gm-glow">
           <stop offset="0%" stop-color="#ffcf6b" stop-opacity=".38"/>
           <stop offset="60%" stop-color="#ffb347" stop-opacity=".10"/>
           <stop offset="100%" stop-color="#ffb347" stop-opacity="0"/>
         </radialGradient>
+        <!-- The border is drawn by dilating the FILLED silhouette, not by
+             stroking the path: a stroke would trace every sub-polygon and put
+             internal lines across the country. This traces only the outer edge. -->
         <filter id="gm-edge" x="-10%" y="-6%" width="120%" height="112%">
           <feMorphology in="SourceAlpha" operator="dilate" radius="1.2" result="fat"/>
           <feFlood flood-color="#4ea36a"/>
@@ -170,22 +186,24 @@ function renderGauntletMap(container, stations, at = 0) {
       </defs>
       <path class="gm-land" d="${ISRAEL_PATH}" fill="url(#gm-land)" fill-rule="nonzero" filter="url(#gm-edge)"/>
       <g class="gm-lights">${gmLightsSVG()}</g>
-      <polyline class="gm-road" points="${road}" fill="none" stroke="#d4af3766" stroke-width="1.6" stroke-dasharray="4 4"/>
-      ${marks}
+      <g class="gm-roads">${roads.join('')}</g>
+      ${nodes}
     </svg>
-    <ol class="gm-list">${stations.map((st, i) => {
-      const club = (typeof TEAMS === 'object' && TEAMS[st.teamId] ? TEAMS[st.teamId].name : st.teamId);
-      const cls = i < at ? 'done' : i === at ? 'next' : '';
-      return `<li class="gm-li ${cls}${st.elite ? ' elite' : ''}">
-        <span class="gm-li-n">${i + 1}</span>
-        <span class="gm-li-club">${club} · ${st.season}</span>
-        ${st.elite ? '<span class="gm-li-elite">ELITE</span>' : ''}
-        <span class="gm-li-ovr">${st.ovr}</span>
+    <ol class="gm-list">${GM_RUN.map((row, ri) => {
+      if (row.kind === 'shop') {
+        return `<li class="gm-li shop ${ri < at ? 'done' : ''}"><span class="gm-li-n">🛒</span>
+          <span class="gm-li-club">חנות</span></li>`;
+      }
+      const cls = ri < at ? 'done' : (ri === at && !over) ? 'next' : '';
+      const names = row.nodes.map(n =>
+        `${(TEAMS[n.teamId] || {}).name || n.teamId} ${n.season} (${n.ovr})`).join('  ·  ');
+      return `<li class="gm-li ${cls}${row.nodes.some(n => n.elite) ? ' elite' : ''}">
+        <span class="gm-li-n">${row.round}</span>
+        <span class="gm-li-club">${names}</span>
+        ${row.boss ? '<span class="gm-li-elite">בוס</span>' : ''}
       </li>`;
     }).join('')}</ol>`;
 }
-
-
 
 /* ── geometry: what counts as "inside the country" ────────────────────────── */
 // The path is already numeric viewBox coordinates, so it can be parsed straight
@@ -269,56 +287,138 @@ function gmLightsSVG() {
   return (_gmSky = halos + out.join(''));
 }
 
-/* ── station picking ──────────────────────────────────────────────────────── */
-// Every club-season we hold, rated by its top-11 average — the same measure the
-// game already uses for opponents. That list IS the difficulty ladder.
-let _gmLadder = null;
-function gmLadder() {
-  if (_gmLadder) return _gmLadder;
-  const rate = sq => {
-    const top = [...sq.players].sort((a, b) => b.ovr - a.ovr).slice(0, 11);
-    return Math.round(top.reduce((s, p) => s + p.ovr, 0) / top.length);
-  };
-  return (_gmLadder = SQUADS
-    .filter(sq => gmCityFor(sq.teamId))          // only clubs we can place on the map
-    .map(sq => ({ teamId: sq.teamId, season: sq.season, ovr: rate(sq) }))
-    .sort((a, b) => a.ovr - b.ovr));
+/* ── the run: a fixed map, no draws ───────────────────────────────────────── */
+// Every club-season on the map is chosen in advance and never randomised, so
+// each player runs the identical gauntlet and depth is comparable. Ratings are
+// stored here (verified against the squad data) rather than computed at render.
+//
+//   3 rounds, choose 1 of 3  →  shop  →  3 rounds, choose 1 of 2  →  shop  →
+//   two bosses, no choice.
+const GM_RUN = [
+  { kind: 'fight', round: 1, nodes: [
+    { teamId: 'hapoel-aco',        season: '2009/10', ovr: 77 },
+    { teamId: 'bnei-sakhnin',      season: '2007/08', ovr: 77 },
+    { teamId: 'hapoel-hadera',     season: '2021/22', ovr: 78 },
+  ] },
+  { kind: 'fight', round: 2, nodes: [
+    { teamId: 'hapoel-pt',         season: '2003/04', ovr: 79 },
+    { teamId: 'bnei-yehuda',       season: '2005/06', ovr: 80 },
+    { teamId: 'maccabi-netanya',   season: '2007/08', ovr: 80 },
+  ] },
+  { kind: 'fight', round: 3, nodes: [
+    { teamId: 'ironi-ks',          season: '2010/11', ovr: 81 },
+    { teamId: 'beitar-jerusalem',  season: '2001/02', ovr: 81 },
+    { teamId: 'hapoel-haifa',      season: '2017/18', ovr: 82 },
+  ] },
+  { kind: 'shop' },
+  { kind: 'fight', round: 4, nodes: [
+    { teamId: 'maccabi-pt',        season: '2003/04', ovr: 83 },
+    { teamId: 'beitar-jerusalem',  season: '2017/18', ovr: 83 },
+  ] },
+  { kind: 'fight', round: 5, nodes: [
+    { teamId: 'beitar-jerusalem',  season: '2007/08', ovr: 84 },
+    { teamId: 'maccabi-tlv',       season: '2002/03', ovr: 84 },
+  ] },
+  { kind: 'fight', round: 6, nodes: [
+    { teamId: 'hapoel-beersheba',  season: '2014/15', ovr: 85 },
+    { teamId: 'hapoel-tlv',        season: '2009/10', ovr: 86, elite: true },
+  ] },
+  { kind: 'shop' },
+  { kind: 'fight', round: 7, boss: true, nodes: [
+    { teamId: 'maccabi-tlv',       season: '2015/16', ovr: 86 },
+  ] },
+  { kind: 'fight', round: 8, boss: true, nodes: [
+    { teamId: 'maccabi-haifa',     season: '2001/02', ovr: 88 },
+  ] },
+];
+
+/* ── layout: rows from the south up, measured off the silhouette ──────────── */
+// Row positions are derived from the country itself rather than hardcoded: at a
+// given height the land has a width, and a row only sits where its nodes fit
+// inside it. The Negev is a spike, so the bottom rows ride further north on
+// their own — no magic numbers to re-tune if the outline ever changes.
+function gmSpanAt(y) {
+  let lo = null, hi = null;
+  for (let x = 0; x <= GM_VIEW.w; x += 1) {
+    if (gmInside(x, y)) { if (lo === null) lo = x; hi = x; }
+  }
+  return lo === null ? null : { lo, hi };
+}
+function gmRowPositions(count, targetY, margin, climb = 400) {
+  for (let y = targetY; y > targetY - climb && y > 50; y -= 5) {
+    const span = gmSpanAt(y);
+    if (!span) continue;
+    const lo = span.lo + margin, hi = span.hi - margin;
+    if (hi - lo < (count - 1) * (margin * 2.9)) continue;
+    const xs = count === 1
+      ? [(lo + hi) / 2]
+      : Array.from({ length: count }, (_, i) => lo + ((hi - lo) * i) / (count - 1));
+    if (xs.every(x => gmInside(x, y) && gmInside(x, y - margin) && gmInside(x, y + margin))) {
+      return xs.map(x => ({ x, y }));
+    }
+  }
+  const span = gmSpanAt(targetY) || { lo: 60, hi: 240 };
+  const mid = (span.lo + span.hi) / 2;
+  return Array.from({ length: count }, (_, i) => ({ x: mid + (i - (count - 1) / 2) * 34, y: targetY }));
 }
 
-// Eight stations of rising difficulty. The last two are drawn from the very top
-// (the bosses); the rest are spread across bands so a run climbs steadily.
-// One mid-run station is marked ELITE — harder, richer spoils, always skippable.
-function gmPickStations(rng = Math.random) {
-  const ladder = gmLadder();                   // already sorted weakest → strongest
-  const n = ladder.length;
-  // Slice by POSITION in the ladder, not by hardcoded rating bands: fixed bands
-  // left the top ones nearly empty, the pick fell back to the whole list, and a
-  // run could end on a station weaker than the one before it.
-  const used = new Set();
-  const out = [];
-  for (let i = 0; i < 8; i++) {
-    const lo = Math.floor((i / 8) * n);
-    const hi = i === 7 ? n : Math.floor(((i + 1) / 8) * n);
-    const slice = ladder.slice(i === 7 ? Math.floor(n * 0.94) : lo, hi);   // boss = top 6%
-    let s, guard = 0;
-    do { s = slice[Math.floor(rng() * slice.length)]; guard++; }
-    while (s && used.has(s.teamId + s.season) && guard < 40);
-    if (!s) continue;
-    used.add(s.teamId + s.season);
-    out.push({ ...s, station: i, elite: false });
+// The lowest line the widest row can stand on. The Negev narrows to a spike, so
+// a row of three simply cannot sit at the bottom of the map; asking each row to
+// climb until it fits made the first three rows pile onto the same line.
+function gmWidestRow() { return Math.max(...GM_RUN.map(r => r.kind === 'shop' ? 1 : r.nodes.length)); }
+function gmBottomLine(margin = 17) {
+  const n = gmWidestRow();
+  for (let y = 700; y > 200; y -= 5) {
+    const span = gmSpanAt(y);
+    if (span && span.hi - span.lo - margin * 2 >= (n - 1) * margin * 2.9) return y;
   }
-  const eliteIdx = 3 + Math.floor(rng() * 3);          // somewhere in the middle
-  if (out[eliteIdx]) { out[eliteIdx].elite = true; out[eliteIdx].ovr += 4; }
-  return out;
+  return 560;
 }
+
+// laid out once: row 0 at the bottom, the final boss at the top
+let _gmLayout = null;
+function gmLayout() {
+  if (_gmLayout) return _gmLayout;
+  const rows = GM_RUN.length;
+  const TOP = 90, BOTTOM = gmBottomLine();
+  const gap = (BOTTOM - TOP) / (rows - 1);
+  return (_gmLayout = GM_RUN.map((row, i) => {
+    const y = BOTTOM - gap * i;
+    const n = row.kind === 'shop' ? 1 : row.nodes.length;
+    // a row may drift a little to find land, never far enough to touch its neighbour
+    return gmRowPositions(n, y, row.kind === 'shop' ? 12 : 17, gap * 0.45);
+  }));
+}
+
+// flat list of the fight rows, for the summary list under the map
+function gmFightRows() { return GM_RUN.filter(r => r.kind === 'fight'); }
 
 /* ── screen ───────────────────────────────────────────────────────────────── */
 function showGauntlet() {
   showScreen('gauntlet');
   const back = document.getElementById('gauntlet-back');
   if (back) back.onclick = () => showScreen('welcome');
-  const reroll = document.getElementById('gauntlet-reroll');
-  const draw = () => renderGauntletMap(document.getElementById('gauntlet-map'), gmPickStations(), 0);
-  if (reroll) reroll.onclick = draw;
-  draw();
+
+  const run = typeof gtRun === 'function' ? gtRun() : { at: 0, log: [], over: false };
+  const map = document.getElementById('gauntlet-map');
+  renderGauntletMap(map, run.at, !!run.over);
+
+  // only the row you are standing on can be entered
+  map.querySelectorAll('.gm-station.next[data-row]').forEach(g => {
+    g.addEventListener('click', () => {
+      if (typeof gtChoose === 'function') gtChoose(+g.dataset.row, +g.dataset.node);
+    });
+  });
+
+  const note = document.getElementById('gauntlet-note');
+  if (note) {
+    const cleared = (run.log || []).filter(l => l.outcome === 'W').length;
+    note.textContent = run.over
+      ? `הריצה נגמרה אחרי ${cleared} ניצחונות. התחל ריצה חדשה מהכפתור למטה.`
+      : cleared
+        ? `עברת ${cleared} מתוך 8. בחר את היריבה הבאה על המפה.`
+        : 'בחר יריבה מהשורה התחתונה, דרוף הרכב — והוא ילווה אותך עד הסוף. חיים אחד.';
+  }
+  const reset = document.getElementById('gauntlet-reset');
+  if (reset) reset.onclick = () => { if (typeof gtReset === 'function') gtReset(); showGauntlet(); };
 }

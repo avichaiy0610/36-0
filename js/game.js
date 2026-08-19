@@ -1521,6 +1521,8 @@ function assignPlayer(slotIdx, player) {
     state.isAnimating = false;
     // A duel draft skips the solo preseason — it submits the squad and waits.
     if (state.duelCode && typeof submitDuelSquad === 'function') setTimeout(() => submitDuelSquad(), 500);
+    // a gauntlet draft skips the pre-season too — the XI goes straight into a fight
+    else if (state.gauntlet && typeof gtFight === 'function') setTimeout(() => gtFight(), 500);
     else setTimeout(() => showPreseason(teamOVR()), 500);
   } else setTimeout(startRound, 400);
 }

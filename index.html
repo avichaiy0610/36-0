@@ -705,9 +705,20 @@
         <button class="back-btn" id="gauntlet-back">→ חזרה</button>
         <h2 class="page-title">🗺 גאונטלט</h2>
       </div>
-      <p class="page-note" id="gauntlet-note">מצב בפיתוח — זו תצוגה מקדימה של המפה. שמונה תחנות בקושי עולה, מהחלשה לחזקה, עם תחנת ELITE אחת באמצע.</p>
+      <p class="page-note" id="gauntlet-note"></p>
       <div id="gauntlet-map"></div>
-      <button class="btn-primary btn-full" id="gauntlet-reroll">🎲 הגרל מפה חדשה</button>
+      <button class="btn-secondary btn-full" id="gauntlet-reset">🔁 התחל ריצה מחדש</button>
+    </div>
+  </div>
+
+  <!-- ══ GAUNTLET FIGHT RESULT ═════════════════════════════════════════════════ -->
+  <div id="screen-gauntlet-fight" class="screen screen-page">
+    <div class="page-inner">
+      <div class="page-header">
+        <button class="back-btn" id="gt-fight-back">→ למפה</button>
+        <h2 class="page-title">⚔️ הקרב</h2>
+      </div>
+      <div id="gt-fight-body"></div>
     </div>
   </div>
 
@@ -810,6 +821,7 @@
   <script src="js/leaderboard.js"></script>
   <script src="js/profile.js"></script>
   <script src="js/gauntlet-map.js"></script>
+  <script src="js/gauntlet.js"></script>
   <script src="js/leagues.js"></script>
   <script src="js/duel.js"></script>
   <script src="js/data.js"></script>
