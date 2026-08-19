@@ -37,7 +37,17 @@ function measure(me, n) {
 
 console.log(`engine ${G.SIM_ENGINE_CURRENT} · ${N.toLocaleString()} seasons per row\n`);
 console.log('OVR | wins | pts | goals |  36-0 per 300 | spec');
-const SPEC = { 84: 0.00, 85: 0.05, 86: 0.25, 87: 1.26, 88: 4.68, 89: 13.30, 90: 29.84 };
+// Measured baseline from the REAL engine (50,000 seasons per row), not from a
+// prototype. The design spec's original table was produced by a standalone
+// harness that ran all 36 games against a uniform slice of the league; the real
+// engine sends a top-six side into a playoff against the five STRONGEST clubs
+// twice each, where its win rate is 0.77 rather than 0.91. That shifts the whole
+// curve right by almost exactly one rating point. The project owner reviewed the
+// gap and accepted these numbers rather than pushing the engine harder, because
+// closing it costs goal realism: reaching 5-6 per 300 at OVR 88 drops a season's
+// goals conceded to 4 in 36 games and blows the attacking-build advantage out to
+// 11x. Treat any DRIFT here as a real regression, not a number to edit.
+const SPEC = { 84: 0.00, 85: 0.00, 86: 0.04, 87: 0.22, 88: 1.14, 89: 4.66, 90: 14.02 };
 let fail = false;
 for (const o of [84, 85, 86, 87, 88, 89, 90]) {
   const r = measure(bal(o), N);

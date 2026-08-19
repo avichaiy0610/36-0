@@ -1,0 +1,94 @@
+diff --git a/js/duel.js b/js/duel.js
+index 6ea93e0..8c0af6b 100644
+--- a/js/duel.js
++++ b/js/duel.js
+@@ -609,7 +609,7 @@ function duelGenerateMatches(myOvr, oppTeam, h2h) {
+   const avgOppOvr = Math.round(simPool.reduce((s, t) => s + t.ovr, 0) / simPool.length);
+   const simTeamPts = simPool.map(t => {
+     const diff  = t.ovr - avgOppOvr;
+-    const winP  = Math.max(0.1, Math.min(0.85, 0.47 + diff * WINP_SLOPE));
++    const winP  = Math.max(0.1, Math.min(0.85, 0.47 + diff * TABLE_SLOPE));
+     const drawP = Math.max(0.05, 0.22 - Math.abs(diff) * 0.005);
+     const pts   = Math.max(5, Math.round((winP * 3 + drawP) * 26 + rand(-4, 4)));
+     return { ...t, pts };
+@@ -649,7 +649,7 @@ function duelBuildPersonal(squad, raw, settings) {
+ // players — so the whole table (not just the two of them) is in sync.
+ function duelCombinedTable(hRaw, gRaw, hostName, guestName) {
+   const aiRows = IL_TEAMS_SIM.slice(0, 12).map(t => {
+-    const winP = Math.max(0.1, Math.min(0.85, 0.47 + (t.ovr - 78) * WINP_SLOPE));
++    const winP = Math.max(0.1, Math.min(0.85, 0.47 + (t.ovr - 78) * TABLE_SLOPE));
+     const est  = Math.max(20, Math.round((winP * 3 + 0.2) * 34 + rand(-5, 5)));   // ~34-game points
+     const d = rand(4, 9);
+     const w = Math.max(0, Math.min(34 - d, Math.round((est - d) / 3)));
+diff --git a/js/game.js b/js/game.js
+index 0b4f325..3485411 100644
+--- a/js/game.js
++++ b/js/game.js
+@@ -1551,15 +1551,36 @@ function updateProgress() {
+ function setHint(text) { document.getElementById('pick-hint').textContent = text; }
+ 
+ // ─── Simulation ────────────────────────────────────────────────────────────────
+-// Win-probability gain per OVR point of difference. Shared by every formula so
+-// the match sim, the bracket split and the final table stay consistent.
+-const WINP_SLOPE = 0.031;
++// Two win-probability curves live here, and they are deliberately NOT the same
++// numbers any more.
++//
++// MATCH_* is the player's own per-match curve. The slope rose from 0.031 to
++// 0.050 while the base fell from 0.47 to 0.356, so the line PIVOTS instead of
++// lifting: the squad you drafted matters far more, without the game getting
++// easier overall. The pivot is calibrated on an OVR 86 squad, which still
++// averages 79 points and still takes the title ~71% of the time — exactly as
++// before. Below the pivot a weak squad is punished (an OVR 82 squad's title
++// odds drop 16% → 3%), and that is precisely what pays for the reward above it
++// (a perfect season for a top squad goes from ~1:1400 to ~1:80).
++// The cap rose 0.92 → 0.97 for the same reason: at 0.92 even a flawless team
++// could only go 36-0 once in 21 seasons (0.92^36 ≈ 4.8%), which put a ceiling
++// on the game's own namesake.
++const MATCH_BASE  = 0.356;
++const MATCH_SLOPE = 0.050;
++const MATCH_CAP   = 0.97;
++
++// TABLE_SLOPE keeps the ORIGINAL 0.031 on purpose. It never decides a real
++// match — it only estimates the AI clubs' season points for the bracket split
++// and the final table (and the duel tables). Leaving it untouched keeps the bar
++// the player is measured against exactly where it was, which is what makes the
++// change above a pivot rather than a difficulty cut.
++const TABLE_SLOPE = 0.031;
+ 
+ function simulateMatch(myOvr, opp, homeOverride = null) {
+   const diff  = myOvr - opp.ovr;
+   const home  = homeOverride !== null ? homeOverride : Math.random() > 0.5;
+   const bonus = home ? 2 : 0;
+-  const winP  = Math.max(0.08, Math.min(0.92, 0.47 + (diff + bonus) * WINP_SLOPE));
++  const winP  = Math.max(0.08, Math.min(MATCH_CAP, MATCH_BASE + (diff + bonus) * MATCH_SLOPE));
+   const drawP = Math.max(0.05, 0.22 - Math.abs(diff) * 0.005);
+   const r = Math.random();
+   const outcome = r < winP ? 'W' : r < winP + drawP ? 'D' : 'L';
+@@ -1583,7 +1604,7 @@ function generateMatches(ovr, oppTeams = IL_TEAMS_SIM, spec = MODERN_FORMAT) {
+   const avgOppOvr = Math.round(oppTeams.reduce((s, t) => s + t.ovr, 0) / oppTeams.length);
+   const simTeamPts = oppTeams.map(t => {
+     const diff  = t.ovr - avgOppOvr;
+-    const winP  = Math.max(0.1, Math.min(0.85, 0.47 + diff * WINP_SLOPE));
++    const winP  = Math.max(0.1, Math.min(0.85, 0.47 + diff * TABLE_SLOPE));
+     const drawP = Math.max(0.05, 0.22 - Math.abs(diff) * 0.005);
+     const pts   = Math.max(5, Math.round((winP * 3 + drawP) * 26 + rand(-4, 4)));
+     return { ...t, pts };
+@@ -1643,7 +1664,7 @@ function generateAuthenticMatches(ovr, oppTeams, spec) {
+   const avgOppOvr = Math.round(teams.reduce((s, t) => s + t.ovr, 0) / teams.length);
+   const simTeamPts = teams.map(t => {
+     const diff  = t.ovr - avgOppOvr;
+-    const winP  = Math.max(0.1, Math.min(0.85, 0.47 + diff * WINP_SLOPE));
++    const winP  = Math.max(0.1, Math.min(0.85, 0.47 + diff * TABLE_SLOPE));
+     const drawP = Math.max(0.05, 0.22 - Math.abs(diff) * 0.005);
+     const pts   = Math.max(3, Math.round((winP * 3 + drawP) * regG + rand(-4, 4)));
+     return { ...t, pts };
+@@ -1736,7 +1757,7 @@ function generateLeagueTable(wins, draws, losses, inTopSix, champOpponents, rele
+     // Extrapolate the opponent's simulated regular-season points to the full
+     // season so the final table stays consistent with the bracket split.
+     const regPts = opp.pts ??
+-      Math.round((Math.max(0.1, Math.min(0.85, 0.47 + (opp.ovr - 78) * WINP_SLOPE)) * 3 + 0.15) * 26);
++      Math.round((Math.max(0.1, Math.min(0.85, 0.47 + (opp.ovr - 78) * TABLE_SLOPE)) * 3 + 0.15) * 26);
+     const estPts = Math.max(3, Math.round(regPts * totalGames / 26) + rand(-3, 3));
+     const d = rand(3, 8);
+     const w = Math.max(0, Math.min(totalGames - d, Math.round((estPts - d) / 3)));
