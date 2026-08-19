@@ -834,6 +834,10 @@ function saveSeasonState(season) {
       format: season.format ?? 'modern',
       formatSpec: season.formatSpec ?? null,   // {year, mode} — replays in the right format
       groupIdx: season.groupIdx ?? null,
+      // Without this a refreshed season renders "מקום undefined" in the projected
+      // tile, and the verdict silently falls through to "בדיוק כצפוי" because both
+      // comparisons against undefined are false.
+      projectedFinish: season.projectedFinish ?? null,
       leagueTable: season.leagueTable,
       playerStats: season.playerStats.map(({ squad, ...rest }) => rest),
     };
@@ -2524,13 +2528,18 @@ function renderSeasonStory(r) {
 
   // 1) Projected vs actual
   document.getElementById('res-finish').textContent    = placeLabel(r.myRank);
-  document.getElementById('res-projected').textContent = placeLabel(r.projectedFinish);
+  // Seasons stored before projectedFinish was persisted restore without it. Fall
+  // back to the actual finish so the tile reads sensibly and the verdict says
+  // "as expected" rather than comparing against undefined — where both < and >
+  // are false, which silently produced "as expected" for every season anyway.
+  const projected = r.projectedFinish ?? r.myRank;
+  document.getElementById('res-projected').textContent = placeLabel(projected);
   const vtile = document.getElementById('res-verdict-tile');
   const vEl   = document.getElementById('res-verdict');
   vtile.classList.remove('over', 'under', 'exact');
-  if (r.myRank < r.projectedFinish)      { vtile.classList.add('over');  vEl.textContent = st('verdict-over', 'מעל הציפיות 🔥'); }
-  else if (r.myRank > r.projectedFinish) { vtile.classList.add('under'); vEl.textContent = st('verdict-under', 'מתחת לציפיות'); }
-  else                                   { vtile.classList.add('exact'); vEl.textContent = st('verdict-exact', 'בדיוק כצפוי'); }
+  if (r.myRank < projected)      { vtile.classList.add('over');  vEl.textContent = st('verdict-over', 'מעל הציפיות 🔥'); }
+  else if (r.myRank > projected) { vtile.classList.add('under'); vEl.textContent = st('verdict-under', 'מתחת לציפיות'); }
+  else                           { vtile.classList.add('exact'); vEl.textContent = st('verdict-exact', 'בדיוק כצפוי'); }
 
   // 2) Qualitative strength chips
   const cats = [

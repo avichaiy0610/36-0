@@ -10,19 +10,34 @@
 const SIM_ENGINE_CURRENT = 2;
 
 const SIM2 = {
-  BASE:      1.25,    // baseline goals per side per match
-  KA:        0.055,   // attack sensitivity, per rating point
-  KD:        0.220,   // defence+keeper sensitivity — 4x KA on purpose (see spec)
-  T:         0.0286,  // midfield sensitivity — ~half KA, because midfield acts
+  BASE:      1.45,    // baseline goals per side per match
+  KA:        0.045,   // attack sensitivity, per rating point
+  KD:        0.125,   // defence+keeper sensitivity — ~2.8x KA (see spec)
+  T:         0.0234,  // midfield sensitivity — ~half KA, because midfield acts
                       // on BOTH sides of the ball and would otherwise pay twice
-  CHANCES:   3,       // goals = chances x conversion; lower = less variance
-  MU_MAX:    3.4,     // ceiling on a side's xG — keeps 36-0 from exploding at
+  CHANCES:   5,       // goals = chances x conversion; also the hard cap on a
+                      // scoreline, so this is what allows a 4-1 or a 5-2 to exist
+  MU_MAX:    4.0,     // ceiling on a side's xG — keeps 36-0 from exploding at
                       // the top of the rating range (there is deliberately no
                       // floor on the opponent's xG; see spec)
   HOME:      1.15,
   LAMBDA:    0.75,    // shrink each line toward the overall OVR
   GK_WEIGHT: 0.30,    // keeper's share of the defensive rating
 };
+
+// Why these moved from their first calibration (BASE 1.25 / CHANCES 3 / KD 0.220):
+// that version was too stingy in both directions. CHANCES 3 capped every match at
+// three goals, so a dominant side's season read 74:9 — no 4-1 and no 5-2 existed
+// anywhere — and the steep KD meant it conceded almost nothing. Two consequences
+// showed up only once real seasons were played:
+//   * The server's absolute achievement thresholds broke. "קיר הברזל" (concede 15
+//     or fewer) went from 0.07% of seasons under V1 to 98%, devaluing it for
+//     everyone who already held it, while "100 goals" became unreachable at any
+//     rating because 36 matches x 3 goals could not get there often enough.
+//   * The game got too easy: 28% of seasons at OVR 87 ended unbeaten.
+// Raising BASE and CHANCES restores real scorelines; cutting KD is what puts goals
+// back in the player's own net, which is what makes a season a contest again.
+// At OVR 87 a season now reads about 92:22 with 8% unbeaten, against 74:9 and 28%.
 
 // Which positions make up each line, and how many of them a real squad fields.
 // The grouping must stay identical to ATK_POS / MID_POS / DEF_POS in game.js —
