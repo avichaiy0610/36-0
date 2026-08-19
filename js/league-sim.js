@@ -45,6 +45,10 @@ function lgReconstructState(players, formationLabel, settings) {
   state.showRatings = !settings || settings.ratings_visible !== false;
   state.eraMin = YEAR_MIN; state.eraMax = YEAR_MAX;
   state.leagueCode = null;
+  // A reveal reuses the single-player results screen, so any challenge left in
+  // state would label this season as that challenge and hang its retry buttons
+  // off it. Duel reveals go through here too.
+  state.challenge = null; state.challengeDeck = null; state.challengeReqs = null;
 }
 
 // A friend's full season, computed deterministically (real rules — 36/33 games).

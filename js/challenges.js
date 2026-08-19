@@ -992,7 +992,7 @@ async function loadChallengeBoard(period, key, user) {
 function setupChallengeResultsUI() {
   document.getElementById('daily-result-extras')?.remove();
   if (!state.challenge) return;
-  const { period } = state.challenge;
+  const { period, key } = state.challenge;   // `key` is read by challengeLabel below
   const actions = document.querySelector('#screen-results .results-actions');
   if (!actions) return;
 

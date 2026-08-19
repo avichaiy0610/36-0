@@ -547,8 +547,22 @@ function startGame() {
 function prepareSetupScreen() {
   buildFormationCards();
   initOppSeasonSelect();
+  syncEraSliderToState();
   const key = [_selectedFormationKey, state.formationId, '4-3-3'].find(k => k && FORMATIONS[k]);
   setFormationSelection(key);
+}
+
+// The era range lives only in `state` — beginDraft never re-reads it from the
+// DOM — and a challenge overwrites it. The slider is wired up once at load, so
+// after a challenge the screen went on showing 1999-2025 while the draft was
+// really still restricted to the challenge's years.
+function syncEraSliderToState() {
+  const minR = document.getElementById('era-min-r');
+  const maxR = document.getElementById('era-max-r');
+  if (minR) minR.value = state.eraMin;
+  if (maxR) maxR.value = state.eraMax;
+  updateEraPresetHighlight();
+  updateEraUI();
 }
 
 // Start a draft recorded for a league, with the league's shared settings locked in.
@@ -1469,6 +1483,15 @@ function handleSlotClick(slotIdx) {
 }
 
 function assignPlayer(slotIdx, player) {
+  // The round is over the moment a player is taken, but the previous squad's
+  // list stays on screen for the 400ms before the next roulette starts. Without
+  // this the player could take a SECOND player from the same squad, which queues
+  // a second startRound: two roulettes then overlap, the first one renders its
+  // list while state.currentSquad already holds the second squad, and the next
+  // pick gets stamped with the wrong club and season — on the pitch, on the share
+  // card, and in the submitted payload. isAnimating already gates picks, slot
+  // clicks and both rerolls; animateRoulette re-raises and clears it from here.
+  state.isAnimating = true;
   state.picks[slotIdx] = { player, squad: state.currentSquad };
   state.usedPlayerKeys.add(player.name);
   fillToken(slotIdx, player, state.currentSquad);
@@ -1480,6 +1503,8 @@ function assignPlayer(slotIdx, player) {
   if (moveBtn) moveBtn.style.display = '';
   updateDraftOVR();
   if (state.currentRound >= state.slots.length) {
+    // Squad complete — no further roulette will run, so release the gate here.
+    state.isAnimating = false;
     // A duel draft skips the solo preseason — it submits the squad and waits.
     if (state.duelCode && typeof submitDuelSquad === 'function') setTimeout(() => submitDuelSquad(), 500);
     else setTimeout(() => showPreseason(teamOVR()), 500);
@@ -2917,6 +2942,14 @@ function restartGame() {
     isAnimating:false, awaitingSlotPick:false,
   });
   window._lastResult = null; window._lastTier = null; window._lastPlayerStats = null;
+  // Leaving a league or duel reveal. Without this, setupSaveSection() keeps
+  // seeing review mode and hides the save block and the sign-in prompt for every
+  // season the player runs afterwards, and the reveal's back button stays parked
+  // on the results screen linking to the old league.
+  window._leagueReviewMode = null;
+  window._duelReviewMode = null;
+  document.getElementById('league-review-back')?.remove();
+  document.getElementById('duel-review-chrome')?.remove();
   clearDraftState();
   const moveBtn = document.getElementById('btn-move-player');
   if (moveBtn) { moveBtn.style.display = 'none'; moveBtn.classList.remove('move-active'); moveBtn.textContent = '⇄ הזז שחקן'; }
