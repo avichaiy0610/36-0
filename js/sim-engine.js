@@ -36,6 +36,13 @@ const SIM2_LINES = {
 // estimate puts it near 0.4, so the tail gets rescaled onto this floor.
 const SIM2_TABLE_FLOOR_PPG = 0.80;
 
+// How much of the table's SPACING comes from the raw estimate rather than from
+// an evenly spaced ladder. 1.0 leaves a ~26-point cliff at the playoff split on
+// a bunched-then-dropping league; 0 gives a perfectly even table, which no real
+// league is. 0.45 keeps a genuinely stronger club visibly ahead without the
+// cliff. Ordering is never affected — that always comes from the xG model.
+const SIM2_TABLE_SHAPE = 0.45;
+
 // A real club's four line ratings: the best N at each line, averaged.
 // Falls back to the club's overall rating when a squad has nobody in a line.
 function simLineRatingsForSquad(squadPlayers, fallbackOvr) {
@@ -149,14 +156,32 @@ function simTableEstimateV2(clubs, games) {
     return sum / n;                       // expected points per match
   });
 
-  // Lift the tail onto a believable floor by rescaling [worst, best] onto
-  // [SIM2_TABLE_FLOOR_PPG, best]. The champion's total and the entire ordering
-  // are untouched — only the gap below it is compressed. Skipped when the field
-  // is flat or already above the floor.
+  // The raw estimate needs two corrections before it can be shown as a table.
+  //
+  // First the tail: V2's steep defensive response turns a 7-point rating gap
+  // into a 20x points gap, which left the weakest club on one win a season.
+  // Rescaling [worst, best] onto [SIM2_TABLE_FLOOR_PPG, best] lifts it without
+  // moving the champion.
+  //
+  // Second the shape: a rescale preserves relative spacing, so wherever the real
+  // ratings bunch and then drop — 2025 has five clubs at 81-85 and then 79 — the
+  // table inherits a cliff two or three times anything a real league produces.
+  // Blending against an evenly spaced ladder over the same span softens that.
+  // The ORDER still comes entirely from the xG model; only the spacing is
+  // conventionalised, and these were always estimates rather than played matches.
   const lo = Math.min(...per), hi = Math.max(...per);
-  const scaled = (hi - lo < 1e-9 || lo >= SIM2_TABLE_FLOOR_PPG)
-    ? per
-    : per.map(p => SIM2_TABLE_FLOOR_PPG + (p - lo) * (hi - SIM2_TABLE_FLOOR_PPG) / (hi - lo));
-
-  return scaled.map(p => Math.max(3, Math.round(p * games)));
+  if (hi - lo < 1e-9 || lo >= SIM2_TABLE_FLOOR_PPG) {
+    return per.map(p => Math.max(3, Math.round(p * games)));
+  }
+  const span = hi - SIM2_TABLE_FLOOR_PPG;
+  const order = per.map((p, i) => i).sort((a, b) => per[b] - per[a]);
+  const ladder = [];
+  order.forEach((clubIdx, rank) => {
+    ladder[clubIdx] = hi - span * rank / (per.length - 1);
+  });
+  return per.map((p, i) => {
+    const byValue = SIM2_TABLE_FLOOR_PPG + (p - lo) * span / (hi - lo);
+    const blended = SIM2_TABLE_SHAPE * byValue + (1 - SIM2_TABLE_SHAPE) * ladder[i];
+    return Math.max(3, Math.round(blended * games));
+  });
 }
