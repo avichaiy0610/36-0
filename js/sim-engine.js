@@ -95,3 +95,54 @@ function simulateMatchV2(me, opp, homeOverride = null) {
   const outcome = gf > ga ? 'W' : gf === ga ? 'D' : 'L';
   return { outcome, gf, ga, opponent: opp.name, home };
 }
+
+// ─── Closed-form table estimate ───────────────────────────────────────────────
+// The AI clubs never play each other for real, but the final table and the
+// playoff split both need their points. Under V1 those came from a win-% curve
+// tuned to V1's scoring level; under V2 they have to come from the same xG model
+// the player's own matches use, or the table shows a 25-point gap that no match
+// ever produced. Computed exactly rather than sampled, so the table carries no
+// simulation noise of its own.
+
+// Probability of scoring exactly k goals from CHANCES chances at rate xg.
+function simGoalPmf(xg) {
+  const n = SIM2.CHANCES, p = Math.min(0.97, xg / n), out = [];
+  for (let k = 0; k <= n; k++) {
+    let c = 1;
+    for (let i = 0; i < k; i++) c = c * (n - i) / (i + 1);
+    out.push(c * Math.pow(p, k) * Math.pow(1 - p, n - k));
+  }
+  return out;
+}
+
+// Exact expected points for `me` over one match against `opp`.
+function simExpectedPoints(me, opp, home) {
+  const a = simGoalPmf(simExpectedGoals(me, opp, home));
+  const b = simGoalPmf(simExpectedGoals(opp, me, !home));
+  let win = 0, draw = 0;
+  for (let x = 0; x < a.length; x++) {
+    for (let y = 0; y < b.length; y++) {
+      if (x > y) win += a[x] * b[y];
+      else if (x === y) draw += a[x] * b[y];
+    }
+  }
+  return win * 3 + draw;
+}
+
+// Each club's expected points over a `games`-long season against the rest of the
+// field, home and away in equal measure. Same units as the player's real total,
+// because it is derived from the same xG model.
+function simTableEstimateV2(clubs, games) {
+  const per = clubs.map(t => {
+    const me = simShrinkLines(t);
+    let sum = 0, n = 0;
+    for (const o of clubs) {
+      if (o === t) continue;
+      const them = simShrinkLines(o);
+      sum += simExpectedPoints(me, them, true) + simExpectedPoints(me, them, false);
+      n += 2;
+    }
+    return sum / n;                       // expected points per match
+  });
+  return per.map(p => Math.max(3, Math.round(p * games)));
+}
