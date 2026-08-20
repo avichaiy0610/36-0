@@ -12,7 +12,7 @@ const GT_SLOTS = 5;
 const GT_RELICS = [
   /* ── the match ─────────────────────────────────────────────────────────── */
   { id: 'home-crowd', icon: '🏟', name: 'קהל ביתי', rarity: 'common',
-    desc: 'כל משחק במסע משוחק כמשחק בית — יתרון הביתיות תמיד שלך.' },
+    desc: 'כל משחק במסע משוחק כמשחק בית - יתרון הביתיות תמיד שלך.' },
   { id: 'concrete', icon: '🚌', name: 'להחנות את האוטובוס', rarity: 'common',
     desc: 'המגנים והשוער מתחזקים ב-3, החלוצים נחלשים ב-1.' },
   { id: 'counter', icon: '⚡', name: 'קונטרה', rarity: 'common',
@@ -30,7 +30,7 @@ const GT_RELICS = [
   { id: 'captain', icon: '👑', name: 'סרט הקפטן', rarity: 'rare',
     desc: 'השחקן הכי טוב בהרכב מתחזק ב-5, וכל השאר נחלשים ב-1.' },
   { id: 'evil-eye', icon: '🧿', name: 'עין הרע', rarity: 'rare',
-    desc: 'בכל משחק היריבה מפסידה את השחקן הכי טוב שלה — הוא לא משחק בכלל.' },
+    desc: 'בכל משחק היריבה מפסידה את השחקן הכי טוב שלה - הוא לא משחק בכלל.' },
   { id: 'boss-crowd', icon: '🔔', name: 'מאני טיים', rarity: 'rare',
     desc: 'יש סיכוי גבוה ב8% שתבקיע שער במחצית או בהארכה' },
   { id: 'second-chance', icon: '♻️', name: 'הזדמנות שנייה', rarity: 'epic',
@@ -257,7 +257,7 @@ function gtGrantRelic(relic, target, done) {
 
   target.innerHTML = `
     <div class="gt-relic-got">
-      <div class="gt-relic-got-t">🔮 ${relic.name} — אבל אין מקום</div>
+      <div class="gt-relic-got-t">🔮 ${relic.name} - אבל אין מקום</div>
       ${gtRelicCardHTML(relic, 'won')}
       <p class="gt-relic-swap-q">כל 5 המקומות תפוסים. על מי לוותר?</p>
       <div class="gt-relic-swap">
@@ -387,7 +387,7 @@ function gtWireRelicBar(root) {
       if (!r || !info) return;
       const open = info.dataset.open === r.id;
       info.dataset.open = open ? '' : r.id;
-      info.innerHTML = open ? '' : `<b>${r.icon} ${r.name}</b> — ${gtNums(r.desc)}`;
+      info.innerHTML = open ? '' : `<b>${r.icon} ${r.name}</b> - ${gtNums(r.desc)}`;
     };
   });
 }

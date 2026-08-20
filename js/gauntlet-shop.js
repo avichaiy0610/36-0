@@ -8,11 +8,11 @@ const GT_SHOP = [
   { id: 'training',     icon: '🏋️', name: 'מחנה אימונים', price: 40,
     desc: 'שחקן אחד לבחירתך מתחזק ב-2. אפשר לאמן את אותו שחקן עד תוספת של 4.' },
   { id: 'prime',        icon: '⚡',  name: 'מצב שיא', price: 55,
-    desc: 'שחקן אחד לבחירתך מוחלף בגרסה של עונת השיא שלו — הדירוג הכי גבוה שהיה לו אי פעם.' },
+    desc: 'שחקן אחד לבחירתך מוחלף בגרסה של עונת השיא שלו - הדירוג הכי גבוה שהיה לו אי פעם.' },
   { id: 'agent-wheel',  icon: '🎡',  name: 'גלגל סוכנים', price: 50,
     desc: 'הסוכן מאתר את העמדה החלשה בהרכב ומגריל לה שלוש חלופות טובות יותר. אחת נכנסת.' },
   { id: 'relic-wheel',  icon: '🔮',  name: 'גלגל קמעות', price: 65,
-    desc: 'סיבוב אחד על גלגל שכל הקלפים בו קמעות — קמע מובטח.' },
+    desc: 'סיבוב אחד על גלגל שכל הקלפים בו קמעות - קמע מובטח.' },
   { id: 'insurance',    icon: '🛡',  name: 'פוליסת ביטוח', price: 125, once: true,
     desc: 'פעם אחת: הפסד לא מסיים את המסע. המשחק פשוט משוחק מחדש מההתחלה.' },
   { id: 'second-stop',  icon: '🎰',  name: 'עצירה שנייה', price: 35, once: true,
@@ -82,7 +82,7 @@ function gtWireShop(root) {
       if (!item || (item.once && gtOwned(item))) return;
       const price = gtPrice(item);
       if ((run.coins || 0) < price) {
-        work.innerHTML = `<p class="gt-shop-poor">אין מספיק מטבעות ל${item.name} — חסרים ${price - (run.coins || 0)}.</p>`;
+        work.innerHTML = `<p class="gt-shop-poor">אין מספיק מטבעות ל${item.name} - חסרים ${price - (run.coins || 0)}.</p>`;
         return;
       }
       gtBuy(item, price, work);
@@ -141,7 +141,7 @@ function gtBuy(item, price, work) {
   run.effects = run.effects || {};
   run.effects[_gtEffKey(item.id)] = true;
   gtSave();
-  work.innerHTML = `<p class="gt-sign-done">✅ ${item.icon} ${item.name} — נרכש.</p>`;
+  work.innerHTML = `<p class="gt-sign-done">✅ ${item.icon} ${item.name} - נרכש.</p>`;
   refresh();
 }
 
@@ -161,7 +161,7 @@ function gtPickPlayerFor(item, price, work) {
     return;
   }
   work.innerHTML = `
-    <p class="gt-sign-q">${item.icon} ${item.name} — על מי?</p>
+    <p class="gt-sign-q">${item.icon} ${item.name} - על מי?</p>
     ${eligible.map(o => {
       const cur = gtOvrAt(o.p);
       const after = item.id === 'training' ? cur + 2 : (o.p.player.peak_ovr ?? o.p.player.ovr);
@@ -185,7 +185,7 @@ function gtPickPlayerFor(item, price, work) {
       }
       gtSave();
       gtInvalidateDeltas();
-      work.innerHTML = `<p class="gt-sign-done">✅ ${playerShortName(pick.player.name)} — ${item.name}. דירוג ההרכב: <b>${teamOVR(gtOvrAt)}</b></p>`;
+      work.innerHTML = `<p class="gt-sign-done">✅ ${playerShortName(pick.player.name)} - ${item.name}. דירוג ההרכב: <b>${teamOVR(gtOvrAt)}</b></p>`;
       gtShopRepaint();
     };
   });

@@ -43,7 +43,7 @@ function gtOfferSpoils(node, container) {
   box.innerHTML = relicDraw
     ? `<div class="gt-spoils-kicker">שלל הניצחון</div>
        <div class="gt-spoils-title">🔮 קמע נפל מהשלל</div>
-       <p class="gt-spoils-sub">${node.elite ? 'מסלול ELITE — הגלגל כאן נדיב בהרבה.' : 'הפעם לא שחקן: הגלגל עוצר על קמע.'}</p>
+       <p class="gt-spoils-sub">${node.elite ? 'מסלול ELITE - הגלגל כאן נדיב בהרבה.' : 'הפעם לא שחקן: הגלגל עוצר על קמע.'}</p>
        <div id="gt-relic-reel"></div><div id="gt-relic-out"></div>`
     : `<div class="gt-spoils-kicker">שלל הניצחון</div>
        <div class="gt-spoils-title">🎰 הגרלה מהסגל שהבסת</div>
@@ -94,7 +94,7 @@ function gtOfferSpoils(node, container) {
       const target = box.querySelector('#gt-sign');
       if (winners.length === 1) { gtOfferSigning(winners[0], target, box); return; }
       target.innerHTML = `
-        <p class="gt-sign-q">🎰 שתי עצירות — מי מהשניים?</p>
+        <p class="gt-sign-q">🎰 שתי עצירות - מי מהשניים?</p>
         ${winners.map((w, i) => `<button class="gt-sign-opt" data-w="${i}">
           <span>${w.name} · ${w.position}</span><span class="gt-delta up">${w.ovr}</span></button>`).join('')}`;
       target.querySelectorAll('.gt-sign-opt').forEach(b => {
@@ -112,7 +112,7 @@ function gtOfferSigning(player, target, box) {
   const hideSpin = () => { const s = box.querySelector('#gt-spin'); if (s) s.style.display = 'none'; };
 
   if (!options.length) {
-    target.innerHTML = `<p class="page-note">${playerShortName(player.name)} לא מתאים לאף עמדה בהרכב שלך — ההרכב נשאר כמו שהוא.</p>`;
+    target.innerHTML = `<p class="page-note">${playerShortName(player.name)} לא מתאים לאף עמדה בהרכב שלך - ההרכב נשאר כמו שהוא.</p>`;
     hideSpin();
     return;
   }

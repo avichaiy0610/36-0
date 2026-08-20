@@ -313,7 +313,7 @@ function gtEndLeg() {
     <div class="gt-half">
       <div class="gt-half-t">🔚 סוף המשחק הראשון · ${lead} במאזן</div>
       <p class="gt-half-p">מאזן: <b dir="ltr">${f.aggGa} – ${f.aggGf}</b>.
-         משחק הגומלין ${f.home ? 'בחוץ' : 'בבית'} מכריע — תיקו במאזן הולך להארכה ולפנדלים.</p>
+         משחק הגומלין ${f.home ? 'בחוץ' : 'בבית'} מכריע - תיקו במאזן הולך להארכה ולפנדלים.</p>
       <button class="btn-primary btn-full" id="gt-leg2">למשחק הגומלין ←</button>
     </div>`;
   document.getElementById('gt-leg2').onclick = () => {
@@ -347,7 +347,7 @@ function gtHalftime() {
     </div>`;
   document.getElementById('gt-rescue').onclick = () => {
     f.boost = 5; f.forfeit = true; f.rescued = true;
-    el.innerHTML = '<p class="gt-half-note">🔥 יוצאים להתקפה מלאה — ויתרת על השלל של הקרב הזה.</p>';
+    el.innerHTML = '<p class="gt-half-note">🔥 יוצאים להתקפה מלאה - ויתרת על השלל של הקרב הזה.</p>';
     gtSegment('h2');
   };
   document.getElementById('gt-nores').onclick = () => { el.innerHTML = ''; gtSegment('h2'); };
@@ -523,15 +523,15 @@ function gtVictoryHTML() {
       <div class="gt-vic-title">🏆 עברת את כל שמונת הקרבות</div>
       <div class="gt-vic-stats">
         <div><b>${beaten.length}</b><span>ניצחונות</span></div>
-        <div><b>${toughest ? toughest.ovr : '—'}</b><span>היריבה החזקה</span></div>
+        <div><b>${toughest ? toughest.ovr : '-'}</b><span>היריבה החזקה</span></div>
         <div><b>${run.coins || 0}</b><span>מטבעות שנשארו</span></div>
         <div><b>${held.length}</b><span>קמעות</span></div>
       </div>
       ${held.length ? `<div class="gt-vic-relics">${held.map(r => `<span title="${r.name}">${r.icon}</span>`).join('')}</div>` : ''}
       ${next > (run.banner || 0)
-        ? `<p class="gt-vic-next">הריצה הבאה תהיה ב<b>${gtBannerName(next)}</b> — כל יריבה על המפה מתחזקת ב-${GT_BANNERS[next]}.</p>
+        ? `<p class="gt-vic-next">הריצה הבאה תהיה ב<b>${gtBannerName(next)}</b> - כל יריבה על המפה מתחזקת ב-${GT_BANNERS[next]}.</p>
            <button class="btn-primary btn-full" id="gt-banner-up">🏴 להניף באנר ולרוץ שוב</button>`
-        : `<p class="gt-vic-next">סיימת את ${gtBannerName(run.banner)} — הרמה הגבוהה ביותר. אין מעל זה.</p>
+        : `<p class="gt-vic-next">סיימת את ${gtBannerName(run.banner)} - הרמה הגבוהה ביותר. אין מעל זה.</p>
            <button class="btn-primary btn-full" id="gt-banner-up">🔁 ריצה נוספת ב${gtBannerName(run.banner)}</button>`}
     </div>`;
 }
@@ -558,8 +558,8 @@ function gtShowResult(res) {
 
   const notes = [];
   if (res.stoppage) notes.push('🕰 שער שוויון בדקה 90+4');
-  if (res.rescued === 'second-chance') notes.push('♻️ הזדמנות שנייה — ההפסד הפך לפנדלים');
-  if (res.forfeit && won) notes.push('🔥 חיזוק המחצית נלקח — אין שלל');
+  if (res.rescued === 'second-chance') notes.push('♻️ הזדמנות שנייה - ההפסד הפך לפנדלים');
+  if (res.forfeit && won) notes.push('🔥 חיזוק המחצית נלקח - אין שלל');
   if (res.purse) {
     notes.push(`🪙 ‎+${res.purse.win} על הניצחון` +
       (res.purse.interest ? ` · ‎+${res.purse.interest} ריבית` : ''));

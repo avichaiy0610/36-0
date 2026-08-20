@@ -74,7 +74,7 @@ function gtModPickerHTML() {
     <div class="gt-opening">
       <div class="gt-opening-kicker">לפני שיוצאים לדרך</div>
       <div class="gt-opening-title">📜 בחר קמע מסע</div>
-      <p class="gt-opening-sub">קמע אחד מששה, והוא בתוקף מהקרב הראשון ועד האחרון. לכל קמע יש צד שמרוויח וצד שמשלם — אין כאן מתנות. אפשר גם לוותר ולשחק בלי שום קמע.</p>
+      <p class="gt-opening-sub">קמע אחד מששה, והוא בתוקף מהקרב הראשון ועד האחרון. לכל קמע יש צד שמרוויח וצד שמשלם - אין כאן מתנות. אפשר גם לוותר ולשחק בלי שום קמע.</p>
       <div class="gt-mod-grid">
         ${GT_MODS.map(m => `
           <button class="gt-mod" data-mod="${m.id}">
@@ -84,7 +84,7 @@ function gtModPickerHTML() {
             <span class="gt-mod-con">✖ ${gtNums(m.con)}</span>
           </button>`).join('')}
       </div>
-      <button class="btn-secondary btn-full" id="gt-mod-none">🚫 בלי קמע — יוצאים נקי</button>
+      <button class="btn-secondary btn-full" id="gt-mod-none">🚫 בלי קמע - יוצאים נקי</button>
     </div>`;
 }
 
@@ -120,7 +120,7 @@ function gtWireModBadge(root) {
     const open = info.dataset.open === 'mod';
     info.dataset.open = open ? '' : 'mod';
     info.innerHTML = open ? ''
-      : `<b>${m.icon} ${m.name}</b> — <span class="gt-mod-pro">✔ ${gtNums(m.pro)}</span> ·
+      : `<b>${m.icon} ${m.name}</b> - <span class="gt-mod-pro">✔ ${gtNums(m.pro)}</span> ·
          <span class="gt-mod-con">✖ ${gtNums(m.con)}</span>`;
   };
 }
