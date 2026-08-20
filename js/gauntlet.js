@@ -208,7 +208,12 @@ function gtFight() {
     boss: !!GM_RUN[row].boss,
     gf: 0, ga: 0, boost: 0, forfeit: false, rescued: false, stoppage: false,
     events: [], minutes: new Set(), decidedBy: 'זמן רגיל',
+    // A boss is not decided by ninety minutes of luck: two legs, aggregate score.
+    leg: 1, legs: GM_RUN[row].boss ? 2 : 1, aggGf: 0, aggGa: 0,
   };
+  // the first leg of a two-legged tie is away, so the decider is at home —
+  // unless something already promised you home ground for everything
+  if (_gtF.legs === 2 && !gtForceHome()) _gtF.home = false;
   state.gauntlet = null;
   gtRenderFight();
   gtSegment('h1');
@@ -267,8 +272,10 @@ function gtSegment(phase) {
         gtAddGoals(1, 'me', 88, 90);
         gtPaintScore();
       }
-      if (f.gf !== f.ga) return gtFinish(f.gf > f.ga ? 'W' : 'L');
-      f.decidedBy = 'הארכה';
+      if (f.leg < f.legs) return gtEndLeg();
+      const me = f.aggGf + f.gf, them = f.aggGa + f.ga;
+      if (me !== them) return gtFinish(me > them ? 'W' : 'L');
+      f.decidedBy = f.legs > 1 ? 'הארכה במשחק הגומלין' : 'הארכה';
       gtSegment('et');
     });
     return;
@@ -278,12 +285,39 @@ function gtSegment(phase) {
     f.gf += r.gf; f.ga += r.ga;
     gtAddGoals(r.gf, 'me', 90, 120); gtAddGoals(r.ga, 'them', 90, 120);
     gtPlayTo(120, () => {
-      if (f.gf !== f.ga) return gtFinish(f.gf > f.ga ? 'W' : 'L');
+      const me = f.aggGf + f.gf, them = f.aggGa + f.ga;
+      if (me !== them) return gtFinish(me > them ? 'W' : 'L');
       f.decidedBy = 'פנדלים';
       f.pens = true;
       gtFinish(Math.random() < gtPensChance() ? 'W' : 'L');
     });
   }
+}
+
+/* ── between the legs ─────────────────────────────────────────────────────── */
+// The first leg ends, the aggregate opens, and the second leg starts from 0-0 at
+// the other ground. The rescue resets with it: it is once per match, not once
+// per tie, and forfeiting the spoils in the first leg still costs them.
+function gtEndLeg() {
+  const f = _gtF;
+  f.aggGf += f.gf; f.aggGa += f.ga;
+  const el = document.getElementById('gt-after');
+  const lead = f.aggGf > f.aggGa ? 'אתה מוביל' : f.aggGf < f.aggGa ? 'אתה מפגר' : 'תיקו';
+  el.innerHTML = `
+    <div class="gt-half">
+      <div class="gt-half-t">🔚 סוף המשחק הראשון · ${lead} במאזן</div>
+      <p class="gt-half-p">מאזן: <b dir="ltr">${f.aggGa} – ${f.aggGf}</b>.
+         משחק הגומלין ${f.home ? 'בחוץ' : 'בבית'} מכריע — תיקו במאזן הולך להארכה ולפנדלים.</p>
+      <button class="btn-primary btn-full" id="gt-leg2">למשחק הגומלין ←</button>
+    </div>`;
+  document.getElementById('gt-leg2').onclick = () => {
+    f.leg++;
+    f.gf = 0; f.ga = 0; f.events = []; f.minutes = new Set(); f.shown = 0; f.min = 0;
+    f.boost = 0; f.rescued = false;
+    if (!gtForceHome()) f.home = !f.home;
+    gtRenderFight();
+    gtSegment('h1');
+  };
 }
 
 /* ── the break ────────────────────────────────────────────────────────────── */
@@ -292,12 +326,14 @@ function gtSegment(phase) {
 function gtHalftime() {
   const f = _gtF;
   const el = document.getElementById('gt-after');
-  const canRescue = f.gf <= f.ga && !f.rescued && !gtDealFlag('noRescue');
+  // in a two-legged tie it is the aggregate that decides whether you are behind
+  const me = f.aggGf + f.gf, them = f.aggGa + f.ga;
+  const canRescue = me <= them && !f.rescued && !gtDealFlag('noRescue');
   if (!canRescue) { gtSegment('h2'); return; }
 
   el.innerHTML = `
     <div class="gt-half">
-      <div class="gt-half-t">⏸ מחצית · ${f.gf === f.ga ? 'תיקו' : 'אתה מפגר'}</div>
+      <div class="gt-half-t">⏸ מחצית · ${me === them ? 'תיקו' : 'אתה מפגר'}${f.legs > 1 ? ' במאזן' : ''}</div>
       <p class="gt-half-p">אפשר לפרוק הכול על 45 הדקות הבאות: <b>+5 לכל הקווים</b>.
          המחיר — <b>מוותרים על השלל</b> אם תנצח.</p>
       <button class="btn-primary btn-full" id="gt-rescue">🔥 הכול קדימה (ויתור על השלל)</button>
@@ -334,7 +370,9 @@ function gtRenderFight() {
         <span class="gt-live-score" dir="ltr"><span id="gt-sc-them">0</span> – <span id="gt-sc-me">0</span></span>
         <span class="gt-live-side">${club} ${f.node.season}<b>${Math.round(f.opp.ovr)}</b></span>
       </div>
-      <div class="gt-clock"><span id="gt-min">0</span>'${f.home ? ' · בבית' : ' · בחוץ'}</div>
+      <div class="gt-clock"><span id="gt-min">0</span>'${f.home ? ' · בבית' : ' · בחוץ'}${
+        f.legs > 1 ? ` · משחק ${f.leg} מתוך 2` : ''}${
+        f.leg > 1 ? ` · מאזן <span dir="ltr">${f.aggGa}–${f.aggGf}</span>` : ''}</div>
       <div class="gt-bar"><span id="gt-bar-fill"></span></div>
       <div class="gt-feed" id="gt-feed"></div>
       <button class="btn-secondary btn-full" id="gt-skip">⏩ דלג לסוף הקטע</button>
@@ -388,8 +426,9 @@ function gtPlayTo(target, done) {
 function gtFinish(outcome) {
   const f = _gtF;
   const run = gtRun();
-  const res = { outcome, gf: f.gf, ga: f.ga, home: f.home, decidedBy: f.decidedBy,
-                pens: !!f.pens, stoppage: f.stoppage, forfeit: f.forfeit };
+  const res = { outcome, gf: f.aggGf + f.gf, ga: f.aggGa + f.ga, home: f.home,
+                decidedBy: f.decidedBy, pens: !!f.pens, stoppage: f.stoppage,
+                forfeit: f.forfeit, twoLegs: f.legs > 1 };
 
   // הזדמנות שנייה turns one defeat into a shootout; the insurance policy is the
   // blunter instrument behind it, and simply refuses to let the run end.
@@ -523,7 +562,7 @@ function gtShowResult(res) {
   el.innerHTML = `
     <div class="gt-res ${won ? 'win' : res.insured ? 'saved' : 'loss'}">
       <div class="gt-res-title">${won ? '✅ ניצחת' : res.insured ? '🛡 הפוליסה נכנסה לפעולה' : '❌ הפסדת'}</div>
-      <div class="gt-res-sub">הוכרע ב${res.decidedBy} · ${res.home ? 'בבית' : 'בחוץ'}</div>
+      <div class="gt-res-sub">הוכרע ב${res.decidedBy} · ${res.twoLegs ? 'מאזן שני משחקים' : res.home ? 'בבית' : 'בחוץ'}</div>
     </div>
     ${notes.length ? `<div class="gt-res-notes">${notes.map(n => `<span>${n}</span>`).join('')}</div>` : ''}
     ${done
