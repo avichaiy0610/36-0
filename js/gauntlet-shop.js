@@ -274,6 +274,8 @@ function gtAgentWheel(price, work) {
         state.usedPlayerKeys.delete(out.player.name);
         state.usedPlayerKeys.add(won.name);
       }
+      const run = gtRun();
+      run.signings = (run.signings || 0) + 1;   // a shop signing is still a signing
       gtStoreSquad();
       gtInvalidateDeltas();
       work.querySelector('#gt-aout').innerHTML =

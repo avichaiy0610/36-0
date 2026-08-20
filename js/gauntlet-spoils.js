@@ -17,7 +17,8 @@ function gtSpoilCandidates(node) {
 
 function gtRelicsLeft() { return GT_RELICS.some(r => !gtHas(r.id)); }
 function gtSpoilIsRelic(node) {
-  return gtRelicsLeft() && Math.random() < (node.elite ? 0.6 : 0.3);
+  const chance = (node.elite ? 0.6 : 0.3) + gtDealNum('relicDrop');
+  return gtRelicsLeft() && Math.random() < chance;
 }
 
 function gtOfferSpoils(node, container) {
@@ -128,6 +129,7 @@ function gtOfferSigning(player, target, box) {
       }
       // upgrades were bought for a man, not for a shirt: they leave with him
       const run = gtRun();
+      run.signings = (run.signings || 0) + 1;
       if (run.boosts) delete run.boosts[out.player.name];
       if (run.peaks) run.peaks = run.peaks.filter(n => n !== out.player.name);
       gtStoreSquad();

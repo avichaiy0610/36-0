@@ -152,7 +152,7 @@ function renderGauntletMap(container, at = 0, over = false) {
           <g class="gm-ovr-badge">
             <rect x="${pt.x + 4 * size}" y="${pt.y + 4 * size}" width="${17 * size}" height="${11 * size}" rx="${5 * size}"
                   fill="#0b0f14" stroke="${n.elite ? '#8b5cf6' : '#d4af37'}" stroke-width="1"/>
-            <text class="gm-ovr" x="${pt.x + 12.5 * size}" y="${pt.y + 12.5 * size}" text-anchor="middle">${n.ovr}</text>
+            <text class="gm-ovr" x="${pt.x + 12.5 * size}" y="${pt.y + 12.5 * size}" text-anchor="middle">${typeof gtShownOvr === 'function' ? gtShownOvr(n) : n.ovr}</text>
           </g>
           ${row.boss ? `<text class="gm-boss" x="${pt.x}" y="${pt.y - 20 * size}" text-anchor="middle">${ri === GM_RUN.length - 1 ? 'הבוס הסופי' : 'בוס'}</text>` : ''}
           ${n.elite ? `<text class="gm-elite-tag" x="${pt.x}" y="${pt.y - 17}" text-anchor="middle">ELITE</text>` : ''}
@@ -164,7 +164,9 @@ function renderGauntletMap(container, at = 0, over = false) {
   // On a shop stop the panel comes first: the map is context, the shop is the
   // reason you are standing here, and it must not sit below a full-height map.
   const picker = gmRoadPicker(at, over);
-  const shopFirst = GM_RUN[at] && GM_RUN[at].kind === 'shop';
+  // a shop stop or a finished run gets the panel above the map: the map is
+  // context, the panel is the reason you are standing here
+  const shopFirst = !GM_RUN[at] || GM_RUN[at].kind === 'shop';
 
   container.innerHTML = `
     ${typeof gtRelicBarHTML === 'function' ? gtRelicBarHTML() : ''}
@@ -205,10 +207,21 @@ function renderGauntletMap(container, at = 0, over = false) {
 function gmRoadPicker(at, over) {
   const row = GM_RUN[at];
   if (over) {
-    return `<p class="gm-picker-head">הריצה נגמרה</p>`;
+    const run = typeof gtRun === 'function' ? gtRun() : { log: [] };
+    const cleared = (run.log || []).filter(l => l.outcome === 'W').length;
+    const best = typeof gtBest === 'function' ? gtBest() : { depth: 0 };
+    const last = (run.log || [])[run.log.length - 1];
+    const club = last ? ((TEAMS[last.teamId] || {}).name || '') + ' ' + last.season : '';
+    return `
+      <div class="gm-picker gt-over">
+        <div class="gm-picker-head">💀 הריצה נגמרה</div>
+        <p class="gm-picker-sub">${cleared} ניצחונות${club ? ` · נעצרת מול ${club}` : ''} · השיא שלך: ${best.depth}</p>
+        <button class="btn-primary btn-full" id="gt-new-run">🔁 ריצה חדשה</button>
+      </div>`;
   }
   if (!row) {
-    return `<p class="gm-picker-head">🏆 עברת את כל המסלול</p>`;
+    return typeof gtVictoryHTML === 'function'
+      ? gtVictoryHTML() : `<p class="gm-picker-head">🏆 עברת את כל המסלול</p>`;
   }
   if (row.kind === 'shop') return typeof gtShopHTML === 'function' ? gtShopHTML() : '';
 
@@ -240,7 +253,7 @@ function gmRoadPicker(at, over) {
             ${scout}
           </span>
           ${n.elite ? '<span class="gm-road-elite">ELITE</span>' : ''}
-          <span class="gm-road-ovr">${n.ovr}</span>
+          <span class="gm-road-ovr">${typeof gtShownOvr === 'function' ? gtShownOvr(n) : n.ovr}</span>
         </button>`;
       }).join('')}
     </div>`;
@@ -440,22 +453,32 @@ function gmFightRows() { return GM_RUN.filter(r => r.kind === 'fight'); }
 function gtRunStarted(run) { return !!(run.started || run.log.length || run.picks); }
 
 function gmIntroHTML() {
+  const best = typeof gtBest === 'function' ? gtBest() : { depth: 0 };
+  const office = typeof gtManagerPickerHTML === 'function' ? gtManagerPickerHTML() : '';
+  // the signature-relic line is a promise, so it only appears once there is
+  // actually a front office to hire from
+  const sigLine = office
+    ? ' קמע חתימה אחד (של המנג׳ר שבחרת) נעול איתך עד סוף המסע ולא תופס מקום.' : '';
   return `
     <div class="gt-intro">
       <div class="gt-intro-title">🗺 מסע הגאונטלט</div>
+      ${best.depth ? `<p class="gt-intro-best">🏅 השיא שלך: <b>${best.depth}</b> ניצחונות${best.cleared ? ' · המסע הושלם' : ''}${best.banner ? ' · ' + gtBannerName(best.banner) : ''}</p>` : ''}
       <p>שמונה קרבות מדרום לצפון, מול סגלים אמיתיים מההיסטוריה של ליגת העל — מקבוצה שנאבקה על הישרדות ועד השושלות הגדולות ביותר בכדורגל הישראלי.</p>
       <ul class="gt-intro-list">
         <li>🎲 <b>מגרילים קבוצה ובוחרים שחקן</b> — פעם אחת בתחילת המסע, וההרכב הזה מלווה אותך עד הסוף.</li>
         <li>⚔️ <b>בכל קרב אתה בוחר את היריבה</b> מבין האפשרויות שנפתחו — ואי אפשר להתחרט.</li>
         <li>🎰 <b>ניצחת? מגרילים לך שלל</b> — שחקן מהסגל שהבסת, או <b>קמע</b>.</li>
-        <li>🛒 <b>כל 3 קרבות נפתחת חנות</b> לשיפורים.</li>
+        <li>🛒 <b>כל 3 קרבות נפתחת חנות</b> — מטבעות מניצחונות, ועליהם ריבית.</li>
+        <li>⏸ <b>מפגר במחצית?</b> אפשר לפרוק הכול על 45 הדקות הבאות — במחיר ויתור על השלל.</li>
         <li>💀 <b>הפסד אחד מסיים את הריצה.</b></li>
+        <li>🏴 <b>סיימת את כל השמונה?</b> מניפים באנר ורצים שוב — כל היריבות מתחזקות.</li>
       </ul>
       <div class="gt-intro-relic">
         <div class="gt-intro-relic-t">🔮 מה זה קמע?</div>
         <p>חפץ שמשנה כלל אחד במשחק — למשל קהל בית שמחזק אותך בקרבות מסוימים, ניצחון מובטח בבעיטות ה-11, הצצה לדירוג היריבה הבאה, או החתמת שחקן בלי הגרלה. בחירה נכונה שווה יותר משחקן טוב אחד.</p>
-        <p><b>יש לך 5 מקומות לקמעות.</b> כשהם מלאים וזוכים בעוד אחד — צריך להחליט: להחליף אותו באחד מהקיימים, או לוותר עליו. קמע חתימה אחד (של ההנהלה שבחרת) נעול איתך עד סוף המסע ולא תופס מקום.</p>
+        <p><b>יש לך 5 מקומות לקמעות.</b> כשהם מלאים וזוכים בעוד אחד — צריך להחליט: להחליף אותו באחד מהקיימים, או לוותר עליו.${sigLine}</p>
       </div>
+      ${office}
       <button class="btn-primary btn-full" id="gt-begin">יאללה, מתחילים ←</button>
     </div>`;
 }
@@ -475,8 +498,18 @@ function showGauntlet() {
     map.innerHTML = gmIntroHTML();
     if (note) note.textContent = '';
     if (reset) reset.style.display = 'none';
+    if (typeof gtWireManagerPicker === 'function') {
+      gtWireManagerPicker(map, () => { run.started = true; gtSave(); showGauntlet(); });
+    }
     const go = document.getElementById('gt-begin');
-    if (go) go.onclick = () => { run.started = true; gtSave(); showGauntlet(); };
+    if (go) go.onclick = () => {
+      // with a front office in play, hiring is the first decision of the run
+      if (typeof gtManagersEnabled === 'function' && gtManagersEnabled() && !run.managerId) {
+        const office = map.querySelector('.gt-office');
+        if (office) { office.classList.add('needed'); office.scrollIntoView({ behavior: 'smooth' }); return; }
+      }
+      run.started = true; gtSave(); showGauntlet();
+    };
     return;
   }
   if (reset) {
@@ -495,6 +528,9 @@ function showGauntlet() {
   renderGauntletMap(map, run.at, !!run.over);
   if (typeof gtWireRelicBar === 'function') gtWireRelicBar(map);
   if (typeof gtWireShop === 'function' && map.querySelector('.gt-shop')) gtWireShop(map);
+  if (typeof gtWireVictory === 'function' && map.querySelector('.gt-victory')) gtWireVictory(map);
+  const newRun = map.querySelector('#gt-new-run');
+  if (newRun) newRun.onclick = () => { gtReset(); showGauntlet(); };
 
   const choose = el => {
     if (typeof gtChoose === 'function') gtChoose(+el.dataset.row, +el.dataset.node);

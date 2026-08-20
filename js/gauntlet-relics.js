@@ -67,13 +67,18 @@ const GT_RARITY_W = { common: 5, uncommon: 3, rare: 1.4, epic: 0.5 };
 const GT_RARITY_HE = { common: 'נפוץ', uncommon: 'לא שכיח', rare: 'נדיר', epic: 'נדיר מאוד' };
 
 function gtRelic(id) { return GT_RELICS.find(r => r.id === id) || null; }
-function gtHas(id) { return (gtRun().relics || []).includes(id); }
+// A signature relic is held without occupying a slot, so every check has to go
+// through here rather than reading run.relics directly.
+function gtHas(id) {
+  if ((gtRun().relics || []).includes(id)) return true;
+  return typeof gtSignatureId === 'function' && gtSignatureId() === id;
+}
 function gtRelicsHeld() { return (gtRun().relics || []).map(gtRelic).filter(Boolean); }
 
 // Draws one you do not already hold. Nothing is ever offered twice in a run —
 // a duplicate would read as a dud, and stacking is not a mechanic here.
 function gtDrawRelic() {
-  const pool = GT_RELICS.filter(r => !gtHas(r.id));
+  const pool = GT_RELICS.filter(r => !gtHas(r.id) && !r.signatureOnly);
   if (!pool.length) return null;
   const w = pool.map(r => GT_RARITY_W[r.rarity] ?? 1);
   const i = pickWeightedIdx(w);
@@ -174,7 +179,9 @@ function gtLineMods(me, opp, ctx) {
 function gtForceHome() { return gtHas('home-crowd') || !!(gtRun().effects || {}).homeDeed; }
 function gtPensChance() { return gtHas('cool-head') ? 0.70 : 0.50; }
 function gtStoppageChance() { return gtHas('stoppage') ? 0.20 : 0; }
-function gtCoinMultiplier() { return gtHas('grass-money') ? 1.25 : 1; }
+function gtCoinMultiplier() {
+  return (gtHas('grass-money') ? 1.25 : 1) * (gtDealNum('coinMult') || 1);
+}
 function gtShopDiscount() { return gtHas('agent-friend') ? 0.8 : 1; }
 function gtScouting() { return gtHas('scout') || !!(gtRun().effects || {}).scoutReport; }
 
@@ -240,7 +247,7 @@ function gtGrantRelic(relic, target, done) {
 
 // The relic reel: same theatre as the player wheel, different cards.
 function gtSpinRelicReel(box, target, onLanded) {
-  const pool = GT_RELICS.filter(r => !gtHas(r.id));
+  const pool = GT_RELICS.filter(r => !gtHas(r.id) && !r.signatureOnly);
   if (!pool.length) {
     target.innerHTML = `<p class="page-note">יש לך כבר את כל הקמעות במשחק.</p>`;
     return;
@@ -286,10 +293,16 @@ function gtRelicBarHTML() {
       ? `<button class="gt-slot full ${r.rarity}" data-relic="${r.id}" title="${r.name}">${r.icon}</button>`
       : `<span class="gt-slot empty"></span>`);
   }
+  // the signature relic sits outside the five, locked, and is drawn that way
+  const sig = typeof gtSignatureRelic === 'function' ? gtSignatureRelic() : null;
+  const sigSlot = sig
+    ? `<button class="gt-slot full sig ${sig.rarity}" data-relic="${sig.id}" title="קמע חתימה">${sig.icon}</button>`
+    : '';
+  const banner = (run.banner || 0) ? `<span class="gt-banner-tag">🏴 ${gtBannerName(run.banner)}</span>` : '';
   return `
     <div class="gt-bar-top">
-      <div class="gt-coins">🪙 <b>${run.coins || 0}</b></div>
-      <div class="gt-slots">${slots.join('')}</div>
+      <div class="gt-coins">🪙 <b>${run.coins || 0}</b>${banner}</div>
+      <div class="gt-slots">${slots.join('')}${sigSlot}</div>
     </div>
     <div class="gt-relic-info" id="gt-relic-info"></div>`;
 }
