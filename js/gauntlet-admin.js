@@ -47,6 +47,34 @@ function gtAdminFillSquad(targetOvr) {
   gtInvalidateDeltas();
 }
 
+/* ── every crest, in both places it is drawn ──────────────────────────────── */
+// A crest is drawn twice in this mode: as a marker on the map (on a light disc)
+// and as a badge on a road card. A file can look fine in one and wrong in the
+// other, so the gallery shows both, side by side, for every club in the data —
+// and says out loud when a file is missing rather than quietly hiding it.
+function gtAdminCrestsHTML() {
+  const ids = Object.keys(TEAMS).sort();
+  const cells = ids.map(id => {
+    const name = (TEAMS[id] || {}).name || id;
+    return `
+      <div class="ga-crest" data-id="${id}">
+        <svg viewBox="0 0 40 40" class="ga-crest-map">
+          ${gmCrestSVG(20, 20, id, { size: 1.4, state: 'next' })}
+        </svg>
+        <img class="gm-road-crest" src="crests/${id}.png" alt=""
+             onerror="this.closest('.ga-crest').classList.add('missing')">
+        <span class="ga-crest-name">${name}</span>
+        <span class="ga-crest-id" dir="ltr">${id}</span>
+      </div>`;
+  }).join('');
+  return `
+    <div class="gt-admin ga-gallery">
+      <div class="gt-admin-t">🖼 כל הסמלים <span>${ids.length} מועדונים · שמאל: כרטיס · ימין: סמן במפה</span></div>
+      <div class="ga-crest-grid">${cells}</div>
+      <button class="btn-secondary btn-full" id="ga-crests-back">← חזרה למפה</button>
+    </div>`;
+}
+
 /* ── the panel ────────────────────────────────────────────────────────────── */
 function gtAdminHTML() {
   if (!gtIsAdmin()) return '';
@@ -122,6 +150,7 @@ function gtAdminHTML() {
         <button class="gt-admin-btn" id="ga-secondstop">עצירה שנייה</button>
         <button class="gt-admin-btn" id="ga-elite">הגרל ELITE מחדש</button>
         <button class="gt-admin-btn" id="ga-clearbest">אפס שיא</button>
+        <button class="gt-admin-btn" id="ga-crests">🖼 כל הסמלים</button>
       </div>
 
       <p class="gt-admin-state" id="ga-state"></p>
@@ -195,6 +224,19 @@ function gtWireAdmin(root) {
     after('אסימון עצירה שנייה פעיל');
   });
   on('ga-elite', () => { delete gtRun().elite; redraw(); });
+  on('ga-crests', () => {
+    const map = document.getElementById('gauntlet-map');
+    if (!map) return;
+    map.innerHTML = gtAdminCrestsHTML();
+    const missing = () => map.querySelectorAll('.ga-crest.missing').length;
+    map.querySelector('#ga-crests-back').onclick = () => showGauntlet();
+    // the error handlers fire as the images resolve, so count a beat later
+    setTimeout(() => {
+      const t = map.querySelector('.gt-admin-t span');
+      if (t) t.textContent += missing() ? ` · חסרים ${missing()} קבצים` : ' · כל הקבצים נטענו';
+    }, 900);
+  });
+
   on('ga-clearbest', () => {
     try { localStorage.removeItem(GT_BEST_KEY); } catch (e) {}
     say('שיא אופס');

@@ -260,3 +260,17 @@
 /* dark crests disappear on a dark card, so every card badge gets a light disc —
    the map already draws its markers this way */
 .gm-road-crest { background: #f2f4f7; border-radius: 50%; padding: 3px; }
+
+/* the crest gallery (admin) */
+.ga-crest-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+                 gap: 8px; margin: 10px 0; }
+.ga-crest { display: grid; grid-template-columns: 40px 40px; grid-auto-rows: auto;
+            align-items: center; justify-content: center; gap: 2px 8px;
+            background: var(--surface2); border: 1px solid var(--border);
+            border-radius: 8px; padding: 8px 6px; text-align: center; }
+.ga-crest .gm-road-crest { width: 34px; height: 34px; }
+.ga-crest-map { width: 40px; height: 40px; }
+.ga-crest-name { grid-column: 1 / 3; font-size: 11px; font-weight: 700; color: var(--text); }
+.ga-crest-id { grid-column: 1 / 3; font-size: 9px; color: var(--dim); }
+.ga-crest.missing { border-color: #ef4444; background: #ef444414; }
+.ga-crest.missing .ga-crest-id::after { content: ' · חסר'; color: #ef4444; font-weight: 800; }
