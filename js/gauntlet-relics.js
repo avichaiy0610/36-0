@@ -1,0 +1,308 @@
+// Gauntlet relics.
+//
+// A relic bends one rule for as long as you hold it. You hold five; a sixth
+// forces a choice. Everything here is data plus three places the run reads it:
+// per-player rating (gtOvrAt), per-line rating (gtLineMods), and the odd flag
+// the fight asks about (home ground, penalties, extra time).
+//
+// The catalogue is ours, not goat-lab's — see docs/RELICS.md.
+
+const GT_SLOTS = 5;
+
+const GT_RELICS = [
+  /* ── the match ─────────────────────────────────────────────────────────── */
+  { id: 'home-crowd', icon: '🏟', name: 'קהל הבית', rarity: 'common',
+    desc: 'כל קרב נחשב לך משחק בית.' },
+  { id: 'concrete', icon: '🧱', name: 'בטון', rarity: 'common',
+    desc: '‎+3 להגנה, ‎−1 להתקפה.' },
+  { id: 'counter', icon: '⚡', name: 'קונטרה', rarity: 'common',
+    desc: 'היריבה חזקה ממך ב-3 ומעלה? ‎+2 לכל הקווים.' },
+  { id: 'gloves', icon: '🧤', name: 'כפפות זהב', rarity: 'common',
+    desc: '‎+4 לשוער.' },
+  { id: 'stoppage', icon: '🕰', name: 'דקה 90+3', rarity: 'uncommon',
+    desc: 'פיגור של שער בסוף 90 הדקות — 20% שייפול שער שוויון.' },
+  { id: 'cool-head', icon: '🥅', name: 'קור רוח', rarity: 'uncommon',
+    desc: 'בבעיטות ה-11 אתה מנצח ב-70% במקום 50%.' },
+  { id: 'fresh-legs', icon: '⏳', name: 'רגליים טריות', rarity: 'uncommon',
+    desc: '‎+3 לכל הקווים בהארכה בלבד.' },
+  { id: 'hot-foot', icon: '🔥', name: 'רגל חמה', rarity: 'uncommon',
+    desc: 'הכובש של הקרב הקודם מקבל ‎+3.' },
+  { id: 'captain', icon: '👑', name: 'סרט הקפטן', rarity: 'rare',
+    desc: 'השחקן הטוב בהרכב ‎+5, כל השאר ‎−1.' },
+  { id: 'evil-eye', icon: '🧿', name: 'עין הרע', rarity: 'rare',
+    desc: 'היריבה משחקת בלי השחקן הכי טוב שלה.' },
+  { id: 'boss-crowd', icon: '🎺', name: 'חומת הקהל', rarity: 'rare',
+    desc: '‎+4 לכל הקווים בקרבות הבוסים.' },
+  { id: 'second-chance', icon: '♻️', name: 'הזדמנות שנייה', rarity: 'epic',
+    desc: 'פעם אחת: הפסד הופך לתיקו ועוברים לבעיטות ה-11.' },
+
+  /* ── הסגל ──────────────────────────────────────────────────────────────── */
+  { id: 'israel-trail', icon: '🥾', name: 'שביל ישראל', rarity: 'uncommon',
+    desc: 'כל 11 השחקנים מעונות שונות? ‎+2 לכל הקווים.' },
+  { id: 'millennium', icon: '🏛', name: 'דור המילניום', rarity: 'uncommon',
+    desc: 'כל שחקן מעונות 1999/00–2005/06 מקבל ‎+2.' },
+  { id: 'duo', icon: '🧬', name: 'צמד מוכר', rarity: 'uncommon',
+    desc: 'שני שחקנים מאותה קבוצה ואותה עונה? ‎+3 לשניהם.' },
+  { id: 'pride', icon: '🇮🇱', name: 'גאוות יחידה', rarity: 'uncommon',
+    desc: 'שחקנים ישראלים ‎+2.' },
+  { id: 'legionnaire', icon: '✈️', name: 'הלגיונר', rarity: 'uncommon',
+    desc: 'שחקני חוץ ‎+3, ישראלים ‎−1.' },
+  { id: 'babel', icon: '🌍', name: 'מגדל בבל', rarity: 'rare',
+    desc: '‎6 לאומים שונים ומעלה בהרכב? ‎+2 לכל הקווים.' },
+
+  /* ── מסלול וכלכלה ──────────────────────────────────────────────────────── */
+  { id: 'scout', icon: '🔍', name: 'סקאוט', rarity: 'common',
+    desc: 'רואים את דירוגי הקווים של כל יריבה לפני שבוחרים דרך.' },
+  { id: 'grass-money', icon: '💰', name: 'כסף מהמדשאה', rarity: 'common',
+    desc: '‎+25% מטבעות מכל ניצחון.' },
+  { id: 'agent-friend', icon: '🤝', name: 'חבר של הסוכן', rarity: 'uncommon',
+    desc: '‎20% הנחה בחנות.' },
+  { id: 'greased-wheel', icon: '🎰', name: 'גלגל משומן', rarity: 'rare',
+    desc: 'בהגרלת השלל מוגרלים שניים ואתה בוחר.' },
+  { id: 'watchlist', icon: '📋', name: 'רשימת מעקב', rarity: 'uncommon',
+    desc: 'ההגרלה נשלפת רק מ-6 השחקנים הטובים של המובסת.' },
+];
+
+const GT_RARITY_W = { common: 5, uncommon: 3, rare: 1.4, epic: 0.5 };
+const GT_RARITY_HE = { common: 'נפוץ', uncommon: 'לא שכיח', rare: 'נדיר', epic: 'נדיר מאוד' };
+
+function gtRelic(id) { return GT_RELICS.find(r => r.id === id) || null; }
+function gtHas(id) { return (gtRun().relics || []).includes(id); }
+function gtRelicsHeld() { return (gtRun().relics || []).map(gtRelic).filter(Boolean); }
+
+// Draws one you do not already hold. Nothing is ever offered twice in a run —
+// a duplicate would read as a dud, and stacking is not a mechanic here.
+function gtDrawRelic() {
+  const pool = GT_RELICS.filter(r => !gtHas(r.id));
+  if (!pool.length) return null;
+  const w = pool.map(r => GT_RARITY_W[r.rarity] ?? 1);
+  const i = pickWeightedIdx(w);
+  return pool[i >= 0 ? i : 0];
+}
+
+/* ── what a relic does to the XI ───────────────────────────────────────────── */
+// One pass over the eleven, returning a name → delta map. Everything that can
+// change a single player's rating lands here: shop upgrades, peak seasons, and
+// the relics whose condition is about a player rather than a line.
+function gtPlayerDeltas() {
+  const run = gtRun();
+  const picks = (state.picks || []).filter(Boolean);
+  const d = new Map();
+  const add = (name, n) => d.set(name, (d.get(name) || 0) + n);
+
+  picks.forEach(p => {
+    const boost = (run.boosts || {})[p.player.name];
+    if (boost) add(p.player.name, boost);
+  });
+
+  if (gtHas('captain') && picks.length) {
+    const best = picks.reduce((a, b) => (b.player.ovr > a.player.ovr ? b : a));
+    picks.forEach(p => add(p.player.name, p === best ? 5 : -1));
+  }
+  if (gtHas('hot-foot') && run.hotFoot) add(run.hotFoot, 3);
+  if (gtHas('millennium')) {
+    picks.forEach(p => { if (parseInt(p.squad.season, 10) <= 2005) add(p.player.name, 2); });
+  }
+  if (gtHas('duo')) {
+    const bySquad = new Map();
+    picks.forEach(p => bySquad.set(p.squad.id, (bySquad.get(p.squad.id) || 0) + 1));
+    picks.forEach(p => { if (bySquad.get(p.squad.id) > 1) add(p.player.name, 3); });
+  }
+  if (gtHas('pride') || gtHas('legionnaire')) {
+    picks.forEach(p => {
+      const isr = gtIsIsraeli(p.player.name);
+      if (gtHas('pride') && isr) add(p.player.name, 2);
+      if (gtHas('legionnaire')) add(p.player.name, isr ? -1 : 3);
+    });
+  }
+  return d;
+}
+
+function gtIsIsraeli(name) {
+  const nats = typeof playerNats === 'function' ? playerNats(name) : [];
+  return nats.includes('ישראל');
+}
+function gtNatCount() {
+  const set = new Set();
+  (state.picks || []).filter(Boolean).forEach(p => {
+    (typeof playerNats === 'function' ? playerNats(p.player.name) : []).forEach(n => set.add(n));
+  });
+  return set.size;
+}
+
+// The rating function the gauntlet hands to teamOVR/myLineRatings: base rating
+// (peak season if the shop paid for it) plus whatever the deltas say.
+function gtOvrAt(pick) {
+  const run = gtRun();
+  const peak = (run.peaks || []).includes(pick.player.name);
+  const base = peak ? (pick.player.peak_ovr ?? pick.player.ovr) : pick.player.ovr;
+  const d = _gtDeltas || (_gtDeltas = gtPlayerDeltas());
+  return Math.max(40, Math.min(99, base + (d.get(pick.player.name) || 0)));
+}
+let _gtDeltas = null;
+function gtInvalidateDeltas() { _gtDeltas = null; }
+
+// The player's XI as the engine wants it, with every relic already priced in.
+function gtMyRatings() {
+  gtInvalidateDeltas();
+  const me = myLineRatings(gtOvrAt);
+  gtInvalidateDeltas();
+  return me;
+}
+
+/* ── what a relic does to a fight ──────────────────────────────────────────── */
+// Line-level effects, applied once the two sides are rated. `ctx` carries what
+// the conditions ask about: the node being fought and which period it is.
+function gtLineMods(me, opp, ctx) {
+  const out = { ...me };
+  const all = n => { out.atk += n; out.mid += n; out.def += n; out.gk += n; out.ovr += n; };
+
+  if (gtHas('concrete')) { out.def += 3; out.atk -= 1; }
+  if (gtHas('gloves')) out.gk += 4;
+  if (gtHas('counter') && opp.ovr - me.ovr >= 3) all(2);
+  if (gtHas('boss-crowd') && ctx && ctx.boss) all(4);
+  if (gtHas('fresh-legs') && ctx && ctx.extraTime) all(3);
+  if (gtHas('israel-trail')) {
+    const picks = (state.picks || []).filter(Boolean);
+    const seasons = new Set(picks.map(p => p.squad.season));
+    if (picks.length === 11 && seasons.size === 11) all(2);
+  }
+  if (gtHas('babel') && gtNatCount() >= 6) all(2);
+  return out;
+}
+
+function gtForceHome() { return gtHas('home-crowd') || !!(gtRun().effects || {}).homeDeed; }
+function gtPensChance() { return gtHas('cool-head') ? 0.70 : 0.50; }
+function gtStoppageChance() { return gtHas('stoppage') ? 0.20 : 0; }
+function gtCoinMultiplier() { return gtHas('grass-money') ? 1.25 : 1; }
+function gtShopDiscount() { return gtHas('agent-friend') ? 0.8 : 1; }
+function gtScouting() { return gtHas('scout') || !!(gtRun().effects || {}).scoutReport; }
+
+/* ── holding, swapping, losing ─────────────────────────────────────────────── */
+// Five slots. A sixth relic is not a gift — it is a decision, and the card that
+// leaves is gone. Nothing is auto-discarded on the player's behalf.
+function gtRelicCardHTML(r, extra = '') {
+  return `
+    <div class="gt-relic-card ${r.rarity} ${extra}">
+      <span class="gt-relic-ico">${r.icon}</span>
+      <span class="gt-relic-name">${r.name}</span>
+      <span class="gt-relic-rar">${GT_RARITY_HE[r.rarity]}</span>
+      <span class="gt-relic-desc">${r.desc}</span>
+    </div>`;
+}
+
+function gtGrantRelic(relic, target, done) {
+  const run = gtRun();
+  run.relics = run.relics || [];
+  const finish = () => { gtSave(); gtInvalidateDeltas(); if (done) done(); };
+
+  if (run.relics.length < GT_SLOTS) {
+    run.relics.push(relic.id);
+    target.innerHTML = `
+      <div class="gt-relic-got">
+        <div class="gt-relic-got-t">🔮 קמע חדש</div>
+        ${gtRelicCardHTML(relic, 'won')}
+        <p class="gt-relic-slots">מקומות בשימוש: ${run.relics.length}/${GT_SLOTS}</p>
+      </div>`;
+    finish();
+    return;
+  }
+
+  target.innerHTML = `
+    <div class="gt-relic-got">
+      <div class="gt-relic-got-t">🔮 ${relic.name} — אבל אין מקום</div>
+      ${gtRelicCardHTML(relic, 'won')}
+      <p class="gt-relic-swap-q">כל 5 המקומות תפוסים. על מי לוותר?</p>
+      <div class="gt-relic-swap">
+        ${run.relics.map((id, i) => {
+          const held = gtRelic(id);
+          return held ? `<button class="gt-relic-drop" data-i="${i}">${gtRelicCardHTML(held)}<span class="gt-relic-x">✂️ להחליף</span></button>` : '';
+        }).join('')}
+      </div>
+      <button class="btn-secondary btn-full" id="gt-relic-skip">🙅 לוותר על ${relic.name}</button>
+    </div>`;
+
+  target.querySelectorAll('.gt-relic-drop').forEach(btn => {
+    btn.onclick = () => {
+      const i = +btn.dataset.i;
+      const out = gtRelic(run.relics[i]);
+      run.relics[i] = relic.id;
+      target.innerHTML = `<p class="gt-sign-done">✅ ${relic.name} נכנס במקום ${out ? out.name : ''}.</p>`;
+      finish();
+    };
+  });
+  const skip = target.querySelector('#gt-relic-skip');
+  if (skip) skip.onclick = () => {
+    target.innerHTML = `<p class="gt-sign-done">ויתרת על ${relic.name}. הקמעות שלך נשארו כמו שהם.</p>`;
+    finish();
+  };
+}
+
+// The relic reel: same theatre as the player wheel, different cards.
+function gtSpinRelicReel(box, target, onLanded) {
+  const pool = GT_RELICS.filter(r => !gtHas(r.id));
+  if (!pool.length) {
+    target.innerHTML = `<p class="page-note">יש לך כבר את כל הקמעות במשחק.</p>`;
+    return;
+  }
+  const strip = pool.concat(pool, pool);
+  box.innerHTML = `
+    <div class="gt-reel-wrap"><div class="gt-reel-mark"></div>
+      <div class="gt-reel gt-reel-relics" id="gt-rreel">
+        ${strip.map(r => `
+          <div class="gt-reel-card gt-reel-relic ${r.rarity}">
+            <span class="gt-reel-ovr">${r.icon}</span>
+            <span class="gt-reel-name">${r.name}</span>
+            <span class="gt-reel-pos">${GT_RARITY_HE[r.rarity]}</span>
+          </div>`).join('')}
+      </div>
+    </div>
+    <button class="btn-primary btn-full" id="gt-rspin">🔮 סובב</button>`;
+
+  const reel = box.querySelector('#gt-rreel');
+  const spin = box.querySelector('#gt-rspin');
+  spin.onclick = () => {
+    spin.disabled = true;
+    const won = gtDrawRelic();
+    const idx = pool.length + pool.indexOf(won);
+    const card = reel.children[idx];
+    reel.scrollTo({ left: card.offsetLeft - reel.clientWidth / 2 + card.clientWidth / 2, behavior: 'smooth' });
+    setTimeout(() => {
+      card.classList.add('won');
+      spin.style.display = 'none';
+      gtGrantRelic(won, target, onLanded);
+    }, 1200);
+  };
+}
+
+/* ── the strip on the map ──────────────────────────────────────────────────── */
+function gtRelicBarHTML() {
+  const run = gtRun();
+  const held = gtRelicsHeld();
+  const slots = [];
+  for (let i = 0; i < GT_SLOTS; i++) {
+    const r = held[i];
+    slots.push(r
+      ? `<button class="gt-slot full ${r.rarity}" data-relic="${r.id}" title="${r.name}">${r.icon}</button>`
+      : `<span class="gt-slot empty"></span>`);
+  }
+  return `
+    <div class="gt-bar-top">
+      <div class="gt-coins">🪙 <b>${run.coins || 0}</b></div>
+      <div class="gt-slots">${slots.join('')}</div>
+    </div>
+    <div class="gt-relic-info" id="gt-relic-info"></div>`;
+}
+
+function gtWireRelicBar(root) {
+  const info = root.querySelector('#gt-relic-info');
+  root.querySelectorAll('.gt-slot.full[data-relic]').forEach(b => {
+    b.onclick = () => {
+      const r = gtRelic(b.dataset.relic);
+      if (!r || !info) return;
+      const open = info.dataset.open === r.id;
+      info.dataset.open = open ? '' : r.id;
+      info.innerHTML = open ? '' : `<b>${r.icon} ${r.name}</b> — ${r.desc}`;
+    };
+  });
+}

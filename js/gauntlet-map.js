@@ -161,7 +161,14 @@ function renderGauntletMap(container, at = 0, over = false) {
     }).join('');
   }).join('');
 
+  // On a shop stop the panel comes first: the map is context, the shop is the
+  // reason you are standing here, and it must not sit below a full-height map.
+  const picker = gmRoadPicker(at, over);
+  const shopFirst = GM_RUN[at] && GM_RUN[at].kind === 'shop';
+
   container.innerHTML = `
+    ${typeof gtRelicBarHTML === 'function' ? gtRelicBarHTML() : ''}
+    ${shopFirst ? picker : ''}
     <svg class="gm-svg" viewBox="0 0 ${GM_VIEW.w} ${GM_VIEW.h}" xmlns="http://www.w3.org/2000/svg">
       <defs>
         <linearGradient id="gm-land" x1="0" y1="0" x2="0" y2="1">
@@ -189,7 +196,7 @@ function renderGauntletMap(container, at = 0, over = false) {
       <g class="gm-roads">${roads.join('')}</g>
       ${nodes}
     </svg>
-    ${gmRoadPicker(at, over)}`;
+    ${shopFirst ? '' : picker}`;
 }
 
 // "Pick your road": the row you are standing on, as tappable cards under the
@@ -203,7 +210,7 @@ function gmRoadPicker(at, over) {
   if (!row) {
     return `<p class="gm-picker-head">🏆 עברת את כל המסלול</p>`;
   }
-  if (row.kind === 'shop') return '<p class="gm-picker-head">🛒 חנות (בקרוב)</p>';
+  if (row.kind === 'shop') return typeof gtShopHTML === 'function' ? gtShopHTML() : '';
 
   const title = row.boss
     ? (at === GM_RUN.length - 1 ? '⚔️ הבוס הסופי' : '⚔️ בוס')
@@ -220,12 +227,17 @@ function gmRoadPicker(at, over) {
         const club = (TEAMS[n.teamId] || {}).name || n.teamId;
         const desc = (typeof siteText === 'function'
           ? siteText('gt-desc-' + n.teamId + '-' + n.season.replace('/', '-'), n.desc) : n.desc) || '';
+        // a scout earns his keep here: the four lines behind the headline number
+        const scout = (typeof gtScouting === 'function' && gtScouting() && typeof gtOpponent === 'function')
+          ? (o => `<span class="gm-road-scout" dir="ltr">GK ${Math.round(o.gk)} · DEF ${Math.round(o.def)} · MID ${Math.round(o.mid)} · ATK ${Math.round(o.atk)}</span>`)(gtOpponent(n))
+          : '';
         return `
         <button class="gm-road ${n.elite ? 'elite' : ''}" data-row="${at}" data-node="${ni}">
           <img class="gm-road-crest" src="crests/${n.teamId}.png" alt="" onerror="this.style.visibility='hidden'">
           <span class="gm-road-main">
             <span class="gm-road-club">${club} <span class="gm-road-season">${n.season}</span></span>
             <span class="gm-road-desc">${desc}</span>
+            ${scout}
           </span>
           ${n.elite ? '<span class="gm-road-elite">ELITE</span>' : ''}
           <span class="gm-road-ovr">${n.ovr}</span>
@@ -472,7 +484,17 @@ function showGauntlet() {
     reset.onclick = () => { if (typeof gtReset === 'function') gtReset(); showGauntlet(); };
   }
 
+  // The shop spends the squad you are carrying, so it has to be in memory
+  // before the panel is drawn — a refresh straight onto a shop row would
+  // otherwise offer upgrades for an empty eleven.
+  if (typeof gtIsShopRow === 'function' && gtIsShopRow(run.at) && typeof gtRestoreSquad === 'function') {
+    gtRestoreSquad();
+    if (typeof gtInvalidateDeltas === 'function') gtInvalidateDeltas();
+  }
+
   renderGauntletMap(map, run.at, !!run.over);
+  if (typeof gtWireRelicBar === 'function') gtWireRelicBar(map);
+  if (typeof gtWireShop === 'function' && map.querySelector('.gt-shop')) gtWireShop(map);
 
   const choose = el => {
     if (typeof gtChoose === 'function') gtChoose(+el.dataset.row, +el.dataset.node);

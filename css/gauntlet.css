@@ -51,3 +51,71 @@
 .gt-intro-relic-t { font-weight: 900; color: #a78bfa; margin-bottom: 6px; }
 .gt-intro-relic p { font-size: 13px; line-height: 1.6; color: var(--muted); margin: 0; }
 .gt-intro-relic p + p { margin-top: 8px; }
+
+/* ── relics: the strip on the map, the cards, the swap ─────────────────────── */
+.gt-bar-top { display: flex; align-items: center; justify-content: space-between; gap: 10px;
+              background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+              padding: 8px 10px; margin-bottom: 10px; }
+.gt-coins { font-size: 15px; font-weight: 900; color: var(--accent); white-space: nowrap; }
+.gt-slots { display: flex; gap: 6px; }
+.gt-slot { width: 30px; height: 30px; border-radius: 8px; border: 1px dashed var(--border);
+           background: #0d1117; display: flex; align-items: center; justify-content: center;
+           font-size: 15px; padding: 0; }
+.gt-slot.full { border-style: solid; cursor: pointer; }
+.gt-slot.full.uncommon { border-color: #38bdf8; }
+.gt-slot.full.rare { border-color: #a78bfa; }
+.gt-slot.full.epic { border-color: #f59e0b; box-shadow: 0 0 0 2px #f59e0b33; }
+.gt-relic-info { font-size: 12px; color: var(--muted); line-height: 1.5; margin: -4px 0 10px; }
+.gt-relic-info:empty { margin: 0; }
+
+.gt-relic-card { display: grid; grid-template-columns: 34px 1fr; gap: 2px 10px;
+                 background: #0d1117; border: 1px solid var(--border); border-radius: 10px;
+                 padding: 10px; text-align: start; }
+.gt-relic-card.uncommon { border-color: #38bdf855; }
+.gt-relic-card.rare { border-color: #a78bfa66; }
+.gt-relic-card.epic { border-color: #f59e0b77; }
+.gt-relic-card.won { box-shadow: 0 0 0 2px #d4af3755; }
+.gt-relic-ico { grid-row: 1 / 3; font-size: 26px; align-self: center; text-align: center; }
+.gt-relic-name { font-weight: 900; font-size: 14px; }
+.gt-relic-rar { grid-column: 2; font-size: 11px; color: var(--muted); }
+.gt-relic-desc { grid-column: 2; font-size: 12px; color: var(--muted); line-height: 1.5; }
+.gt-relic-got-t { text-align: center; font-size: 16px; font-weight: 900; margin-bottom: 8px; color: #a78bfa; }
+.gt-relic-slots { text-align: center; font-size: 12px; color: var(--muted); margin: 8px 0 0; }
+.gt-relic-swap-q { font-size: 13px; margin: 12px 0 8px; }
+.gt-relic-swap { display: grid; gap: 6px; margin-bottom: 8px; }
+.gt-relic-drop { background: none; border: 0; padding: 0; width: 100%; cursor: pointer; }
+.gt-relic-drop .gt-relic-card { border-style: dashed; }
+.gt-relic-drop:hover .gt-relic-card { border-color: #ef4444; border-style: solid; }
+.gt-relic-x { display: block; font-size: 11px; font-weight: 800; color: #ef4444; padding: 4px 2px 0; }
+.gt-reel-relic.rare { border-color: #a78bfa55; }
+.gt-reel-relic.epic { border-color: #f59e0b66; }
+
+/* ── the travelling shop ───────────────────────────────────────────────────── */
+.gt-shop { background: var(--card); border: 1px solid #8b5cf644; border-radius: 12px;
+           padding: 12px; margin-top: 12px; }
+.gt-shop-head { display: flex; align-items: center; justify-content: space-between; }
+.gt-shop-title { font-size: 17px; font-weight: 900; }
+.gt-shop-wallet { font-size: 15px; font-weight: 900; color: var(--accent); }
+.gt-shop-note { font-size: 12px; color: var(--muted); line-height: 1.5;
+                background: #d4af3710; border-radius: 8px; padding: 8px; margin: 8px 0 10px; }
+.gt-shop-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+                gap: 8px; margin-bottom: 10px; }
+.gt-item { display: flex; flex-direction: column; align-items: center; gap: 4px;
+           background: #0d1117; border: 1px solid var(--border); border-radius: 10px;
+           padding: 10px 8px; color: var(--text); cursor: pointer; text-align: center; }
+.gt-item:hover:not(:disabled) { border-color: var(--accent); }
+.gt-item.poor { opacity: .55; }
+.gt-item.owned { opacity: .5; cursor: default; }
+.gt-item-ico { font-size: 24px; }
+.gt-item-name { font-size: 13px; font-weight: 800; }
+.gt-once { display: inline-block; font-size: 9px; font-weight: 800; color: #f59e0b;
+           border: 1px solid #f59e0b66; border-radius: 4px; padding: 0 4px; margin-inline-start: 4px; }
+.gt-item-desc { font-size: 11px; color: var(--muted); line-height: 1.45; flex: 1; }
+.gt-item-price { font-size: 13px; font-weight: 900; color: var(--accent); }
+.gt-shop-poor { font-size: 13px; color: #ef4444; font-weight: 700; margin: 8px 0; text-align: center; }
+
+.gt-res.saved { border-color: #f59e0b66; }
+.gt-res-notes { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin: 8px 0; }
+.gt-res-notes span { font-size: 12px; font-weight: 700; background: #ffffff10;
+                     border-radius: 999px; padding: 4px 10px; }
+.gm-road-scout { display: block; font-size: 11px; font-weight: 700; color: #a78bfa; margin-top: 3px; }

@@ -419,13 +419,16 @@ function compatibleEmptySlots(player) {
   return emptySlotIndices().filter(i => playerFitsSlot(player, state.slots[i].pos));
 }
 
-function teamOVR() {
+// `ovrAt` lets a caller price the same XI on its own terms — the gauntlet passes
+// one that folds in shop upgrades and relics. Left out, it is plain playerOVR
+// and nothing about the league game changes.
+function teamOVR(ovrAt) {
   let total = 0, weight = 0;
   state.picks.forEach((pick, i) => {
     if (!pick) return;
     const slot = state.slots[i];
     const w = POS_WEIGHT[slot.pos] ?? 1;
-    const ovr = playerOVR(pick.player);
+    const ovr = ovrAt ? ovrAt(pick, i) : playerOVR(pick.player);
     const pp = playerPositions(pick.player);
     const inPos = (COMPAT[slot.pos] ?? []).slice(0, 2).includes(pp[0]) || pp.includes(slot.pos);
     total += (inPos ? ovr : Math.round(ovr * 0.93)) * w;
@@ -440,11 +443,11 @@ function teamOVR() {
 // OVR — a quarter of drafted players end up out of position — so the simulation
 // saw a squad meaningfully stronger than the number on screen, and a real draft
 // outperformed the rating it was indexed by.
-function calcGroupOVR(positions) {
+function calcGroupOVR(positions, ovrAt) {
   const ovrs = state.picks
     .map((pick, i) => {
       if (!pick || !positions.includes(state.slots[i].pos)) return null;
-      const ovr = playerOVR(pick.player);
+      const ovr = ovrAt ? ovrAt(pick, i) : playerOVR(pick.player);
       const pp  = playerPositions(pick.player);
       const slotPos = state.slots[i].pos;
       const inPos = (COMPAT[slotPos] ?? []).slice(0, 2).includes(pp[0]) || pp.includes(slotPos);
@@ -458,9 +461,9 @@ function calcGroupOVR(positions) {
 // that draws the four bars on the results card, so what the player sees is
 // literally what the simulation uses. An unfilled line falls back to the
 // overall rating.
-function myLineRatings() {
-  const ovr = teamOVR();
-  const line = (positions) => calcGroupOVR(positions) ?? ovr;
+function myLineRatings(ovrAt) {
+  const ovr = teamOVR(ovrAt);
+  const line = (positions) => calcGroupOVR(positions, ovrAt) ?? ovr;
   return {
     ovr,
     atk: line(SIM2_LINES.atk.pos),

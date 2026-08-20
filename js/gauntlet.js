@@ -7,14 +7,19 @@
 const GT_KEY = '36-0-gauntlet';
 
 function gtBlank() {
-  return { v: 1, at: 0, started: false, locked: null, formationId: null, picks: null, log: [], over: false };
+  return { v: 2, at: 0, started: false, locked: null, formationId: null, picks: null,
+           log: [], over: false,
+           coins: 0, relics: [], boosts: {}, peaks: [], effects: {}, hotFoot: null };
 }
 let _gtRun = null;
 function gtRun() {
   if (_gtRun) return _gtRun;
   try {
     const raw = JSON.parse(localStorage.getItem(GT_KEY));
-    if (raw && raw.v === 1) return (_gtRun = raw);
+    // a v1 save predates coins and relics; it is still a real run, so it keeps
+    // its progress and simply starts the economy at zero
+    if (raw && raw.v === 1) return (_gtRun = { ...gtBlank(), ...raw, v: 2 });
+    if (raw && raw.v === 2) return (_gtRun = raw);
   } catch (e) { /* corrupt save — start clean */ }
   return (_gtRun = gtBlank());
 }
@@ -94,25 +99,54 @@ function gtOpponent(node) {
   const sq = SQUADS.find(s => s.teamId === node.teamId && s.season === node.season);
   const name = (TEAMS[node.teamId] || {}).name || node.teamId;
   if (!sq) return { name, ovr: node.ovr, atk: node.ovr, mid: node.ovr, def: node.ovr, gk: node.ovr };
-  const lines = simLineRatingsForSquad(sq.players, node.ovr);
-  return { name, teamId: node.teamId, season: node.season, ovr: node.ovr, ...lines };
+  // עין הרע takes their best player off the teamsheet, which costs them both the
+  // line he anchored and a point off the headline rating.
+  let players = sq.players;
+  let ovr = node.ovr;
+  if (typeof gtHas === 'function' && gtHas('evil-eye')) {
+    const best = players.reduce((a, b) => (b.ovr > a.ovr ? b : a));
+    players = players.filter(p => p !== best);
+    ovr -= 1;
+  }
+  const lines = simLineRatingsForSquad(players, ovr);
+  return { name, teamId: node.teamId, season: node.season, ovr, ...lines };
 }
 
-// 90 minutes, then extra time, then a coin-flip shootout — penalties are pure
-// luck by design until players carry detailed ratings.
-function gtPlayMatch(me, opp) {
-  const home = Math.random() < 0.5;
-  const ninety = simulateMatchV2(me, opp, home);
-  if (ninety.outcome !== 'D') return { ...ninety, home, decidedBy: 'זמן רגיל' };
+// 90 minutes, then extra time, then a shootout. Penalties stay near-random by
+// design until players carry detailed ratings — a relic can tilt them, nothing
+// in the squad can. `me` arrives unmodified: relics are priced per period, so
+// extra time can be worth more than the ninety that preceded it.
+function gtPlayMatch(meBase, opp, ctx) {
+  const home = gtForceHome() ? true : Math.random() < 0.5;
+  const me = gtLineMods(meBase, opp, ctx);
+  let ninety = simulateMatchV2(me, opp, home);
+  let stoppage = false;
 
-  const et = simulateMatchV2(me, opp, home);
+  // דקה 90+3: one goal down at the whistle is not the same as beaten
+  if (ninety.outcome === 'L' && ninety.ga - ninety.gf === 1 && Math.random() < gtStoppageChance()) {
+    ninety = { outcome: 'D', gf: ninety.gf + 1, ga: ninety.ga };
+    stoppage = true;
+  }
+  if (ninety.outcome !== 'D') return { ...ninety, home, stoppage, decidedBy: 'זמן רגיל' };
+
+  const et = simulateMatchV2(gtLineMods(meBase, opp, { ...ctx, extraTime: true }), opp, home);
   if (et.outcome !== 'D') {
     return { outcome: et.outcome, gf: ninety.gf + et.gf, ga: ninety.ga + et.ga,
-             home, decidedBy: 'הארכה' };
+             home, stoppage, decidedBy: 'הארכה' };
   }
-  const won = Math.random() < 0.5;
+  const won = Math.random() < gtPensChance();
   return { outcome: won ? 'W' : 'L', gf: ninety.gf + et.gf, ga: ninety.ga + et.ga,
-           home, decidedBy: 'פנדלים', pens: true };
+           home, stoppage, decidedBy: 'פנדלים', pens: true };
+}
+
+/* ── the purse ────────────────────────────────────────────────────────────── */
+// A win over an 88 is worth more than a win over a 79, and a hammering is worth
+// more than surviving a shootout. Interest pays on what you walked in holding.
+function gtCoinsForWin(node, res) {
+  const base = 30 + Math.max(0, node.ovr - 76) * 4 + Math.max(0, res.gf - res.ga) * 5;
+  const elite = node.elite ? 20 : 0;
+  const interest = gtInterest(gtRun().coins || 0);
+  return { win: Math.round((base + elite) * gtCoinMultiplier()), interest };
 }
 
 /* ── the match as it happens ──────────────────────────────────────────────── */
@@ -146,7 +180,8 @@ function gtTimeline(res, node) {
   };
   for (let i = 0; i < res.gf; i++) {
     const s = gtPickScorer(mine);
-    events.push({ min: minute(), side: 'me', name: s ? playerShortName(s.name) : '' });
+    events.push({ min: minute(), side: 'me', name: s ? playerShortName(s.name) : '',
+                  full: s ? s.name : null });
   }
   for (let i = 0; i < res.ga; i++) {
     const s = gtPickScorer(theirs);
@@ -163,36 +198,58 @@ function gtFight() {
   if (!nodeData) { showGauntlet(); return; }
 
   gtStoreSquad();
-  const me = myLineRatings();
+  gtInvalidateDeltas();
+  const me = gtMyRatings();
   const opp = gtOpponent(nodeData);
-  const res = gtPlayMatch(me, opp);
+  const res = gtPlayMatch(me, opp, { boss: !!GM_RUN[row].boss, node: nodeData });
 
+  // הזדמנות שנייה turns one defeat into a shootout; the insurance policy is the
+  // blunter instrument behind it, and simply refuses to let the run end.
+  if (res.outcome === 'L' && gtHas('second-chance') && !run.effects.usedSecondChance) {
+    run.effects.usedSecondChance = true;
+    res.outcome = Math.random() < gtPensChance() ? 'W' : 'L';
+    res.decidedBy = 'פנדלים';
+    res.rescued = 'second-chance';
+  }
+  if (res.outcome === 'L' && run.effects.insurance) {
+    run.effects.insurance = false;
+    res.insured = true;
+  }
+
+  const timeline = gtTimeline(res, nodeData);
   run.log.push({ row, teamId: nodeData.teamId, season: nodeData.season,
                  ovr: nodeData.ovr, gf: res.gf, ga: res.ga, outcome: res.outcome });
   run.locked = null;                    // the road is done, the next one opens
+
   if (res.outcome === 'W') {
-    run.at = row + 1;
-    while (GM_RUN[run.at] && GM_RUN[run.at].kind === 'shop') run.at++;   // shops are scenery for now
+    const purse = gtCoinsForWin(nodeData, res);
+    res.purse = purse;
+    run.coins = (run.coins || 0) + purse.win + purse.interest;
+    const scorer = timeline.events.filter(e => e.side === 'me').pop();
+    run.hotFoot = scorer ? scorer.full : null;      // רגל חמה remembers him
+    run.at = row + 1;                               // a shop row is a stop, not scenery
+  } else if (res.insured) {
+    run.log.pop();                                  // the policy buys the fight back
   } else {
     run.over = true;
   }
   gtSave();
   state.gauntlet = null;
-  gtPlayLive(nodeData, opp, res, me);
+  gtPlayLive(nodeData, opp, res, me, timeline);
 }
 
 /* ── live playback ────────────────────────────────────────────────────────── */
 // The match is played out on a clock instead of being handed over as a final
 // score: goals arrive when they were scored, and you can skip to the whistle.
 let _gtTimer = null;
-function gtPlayLive(nodeData, opp, res, me) {
+function gtPlayLive(nodeData, opp, res, me, timeline) {
   showScreen('gauntlet-fight');
   const back = document.getElementById('gt-fight-back');
   if (back) back.onclick = () => { gtStopClock(); showGauntlet(); };
   const el = document.getElementById('gt-fight-body');
   if (!el) return;
 
-  const { events, last } = gtTimeline(res, nodeData);
+  const { events, last } = timeline || gtTimeline(res, nodeData);
   const club = (TEAMS[nodeData.teamId] || {}).name || nodeData.teamId;
   el.innerHTML = `
     <div class="gt-live">
@@ -256,16 +313,28 @@ function gtShowResult(nodeData, opp, res, me, target) {
   const el = target || document.getElementById('gt-fight-body');
   if (!el) return;
 
+  const notes = [];
+  if (res.stoppage) notes.push('🕰 שער שוויון בדקה 90+3');
+  if (res.rescued === 'second-chance') notes.push('♻️ הזדמנות שנייה — ההפסד הפך לפנדלים');
+  if (res.purse) {
+    notes.push(`🪙 ‎+${res.purse.win} על הניצחון` +
+      (res.purse.interest ? ` · ‎+${res.purse.interest} ריבית` : ''));
+  }
+
   el.innerHTML = `
-    <div class="gt-res ${won ? 'win' : 'loss'}">
-      <div class="gt-res-title">${won ? '✅ ניצחת' : '❌ הפסדת'}</div>
+    <div class="gt-res ${won ? 'win' : res.insured ? 'saved' : 'loss'}">
+      <div class="gt-res-title">${won ? '✅ ניצחת' : res.insured ? '🛡 הפוליסה נכנסה לפעולה' : '❌ הפסדת'}</div>
       <div class="gt-res-sub">הוכרע ב${res.decidedBy} · ${res.home ? 'בבית' : 'בחוץ'}</div>
     </div>
+    ${notes.length ? `<div class="gt-res-notes">${notes.map(n => `<span>${n}</span>`).join('')}</div>` : ''}
     ${won
       ? `<p class="page-note">עברת ${cleared} מתוך 8. הדרך צפונה נפתחה.</p>
          <button class="btn-primary btn-full" id="gt-continue">← המשך במפה</button>`
-      : `<p class="page-note">הריצה נגמרה אחרי ${cleared} ניצחונות.</p>
-         <button class="btn-primary btn-full" id="gt-restart">🔁 ריצה חדשה</button>`}
+      : res.insured
+        ? `<p class="page-note">הפסדת, אבל הביטוח שילם: הריצה ממשיכה והקרב הזה משוחק מחדש.</p>
+           <button class="btn-primary btn-full" id="gt-continue">← חזרה לקרב</button>`
+        : `<p class="page-note">הריצה נגמרה אחרי ${cleared} ניצחונות.</p>
+           <button class="btn-primary btn-full" id="gt-restart">🔁 ריצה חדשה</button>`}
     <button class="btn-secondary btn-full" id="gt-tomap">🗺 חזרה למפה</button>
   `;
   // a win first offers the spoils; the map waits until that is settled

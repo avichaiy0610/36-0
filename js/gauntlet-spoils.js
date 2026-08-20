@@ -1,34 +1,54 @@
-// Victory spoils — spin the beaten squad.
+// Victory spoils — spin the beaten squad, or spin for a relic.
 //
 // You beat them, so their roster goes on the wheel, rated as they were that
 // season. One stop, and then you either sign him (somebody has to make room in
-// an eleven) or walk away with the squad you came with.
+// an eleven) or walk away with the squad you came with. The ELITE road pays in
+// relics far more often, which is the whole reason to take it.
 
 function gtSpoilCandidates(node) {
   const sq = SQUADS.find(s => s.teamId === node.teamId && s.season === node.season);
   if (!sq) return [];
   const mine = new Set(state.picks.filter(Boolean).map(p => p.player.name));
-  return [...sq.players].sort((a, b) => b.ovr - a.ovr).slice(0, 14)
+  const depth = gtHas('watchlist') ? 6 : 14;      // רשימת מעקב narrows it to the stars
+  return [...sq.players].sort((a, b) => b.ovr - a.ovr).slice(0, depth)
     .filter(p => !mine.has(p.name))
     .map(p => ({ ...p, squad: sq }));
 }
 
+function gtRelicsLeft() { return GT_RELICS.some(r => !gtHas(r.id)); }
+function gtSpoilIsRelic(node) {
+  return gtRelicsLeft() && Math.random() < (node.elite ? 0.6 : 0.3);
+}
+
 function gtOfferSpoils(node, container) {
-  const pool = gtSpoilCandidates(node);
-  if (!pool.length) return;
+  const relicDraw = gtSpoilIsRelic(node);
+  const pool = relicDraw ? [] : gtSpoilCandidates(node);
+  if (!relicDraw && !pool.length) return;
+
   const box = document.createElement('div');
   box.className = 'gt-spoils';
-  box.innerHTML = `
-    <div class="gt-spoils-kicker">שלל הניצחון</div>
-    <div class="gt-spoils-title">🎰 הגרלה מהסגל שהבסת</div>
-    <p class="gt-spoils-sub">הסגל של ${(TEAMS[node.teamId] || {}).name || ''} ${node.season} על הגלגל, בדירוג של אותה עונה. עצירה אחת.</p>
-    <div class="gt-reel-wrap"><div class="gt-reel-mark"></div><div class="gt-reel" id="gt-reel"></div></div>
-    <button class="btn-primary btn-full" id="gt-spin">🎰 סובב</button>
-    <div id="gt-sign"></div>`;
+  const club = (TEAMS[node.teamId] || {}).name || '';
+  box.innerHTML = relicDraw
+    ? `<div class="gt-spoils-kicker">שלל הניצחון</div>
+       <div class="gt-spoils-title">🔮 קמע נפל מהשלל</div>
+       <p class="gt-spoils-sub">${node.elite ? 'מסלול ELITE — הגלגל כאן נדיב בהרבה.' : 'הפעם לא שחקן: הגלגל עוצר על קמע.'}</p>
+       <div id="gt-relic-reel"></div><div id="gt-relic-out"></div>`
+    : `<div class="gt-spoils-kicker">שלל הניצחון</div>
+       <div class="gt-spoils-title">🎰 הגרלה מהסגל שהבסת</div>
+       <p class="gt-spoils-sub">הסגל של ${club} ${node.season} על הגלגל, בדירוג של אותה עונה.</p>
+       <div class="gt-reel-wrap"><div class="gt-reel-mark"></div><div class="gt-reel" id="gt-reel"></div></div>
+       <button class="btn-primary btn-full" id="gt-spin">🎰 סובב</button>
+       <div id="gt-sign"></div>`;
+
   // sits under the result card, above the buttons — the verdict reads first
   const after = container.querySelector('.gt-res');
   if (after && after.nextSibling) container.insertBefore(box, after.nextSibling);
   else container.prepend(box);
+
+  if (relicDraw) {
+    gtSpinRelicReel(box.querySelector('#gt-relic-reel'), box.querySelector('#gt-relic-out'));
+    return;
+  }
 
   const reel = box.querySelector('#gt-reel');
   const strip = pool.concat(pool, pool);            // long enough to slide past
@@ -39,18 +59,37 @@ function gtOfferSpoils(node, container) {
       <span class="gt-reel-pos">${p.position}</span>
     </div>`).join('');
 
+  // Two stops instead of one: the greased wheel is permanent, the token is spent
+  // here and now. Either way the player picks which of the two he wants.
+  const run = gtRun();
+  const token = !!(run.effects || {}).secondStop;
+  const twice = (gtHas('greased-wheel') || token) && pool.length > 1;
+  if (token && twice) { run.effects.secondStop = false; gtSave(); }
+
   const spin = box.querySelector('#gt-spin');
   spin.onclick = () => {
     spin.disabled = true;
-    const winner = pool[Math.floor(Math.random() * pool.length)];
-    const idx = pool.length + pool.indexOf(winner);  // land inside the middle copy
-    const card = reel.children[idx];
-    const offset = card.offsetLeft - reel.clientWidth / 2 + card.clientWidth / 2;
-    reel.scrollTo({ left: offset, behavior: 'smooth' });
+    const winners = [];
+    while (winners.length < (twice ? 2 : 1)) {
+      const w = pool[Math.floor(Math.random() * pool.length)];
+      if (!winners.includes(w)) winners.push(w);
+    }
+    const land = winners.map(w => pool.length + pool.indexOf(w));
+    const card = reel.children[land[0]];
+    reel.scrollTo({ left: card.offsetLeft - reel.clientWidth / 2 + card.clientWidth / 2, behavior: 'smooth' });
     setTimeout(() => {
       [...reel.children].forEach(c => c.classList.remove('won'));
-      card.classList.add('won');
-      gtOfferSigning(winner, box.querySelector('#gt-sign'), box);
+      land.forEach(i => reel.children[i].classList.add('won'));
+      spin.style.display = 'none';
+      const target = box.querySelector('#gt-sign');
+      if (winners.length === 1) { gtOfferSigning(winners[0], target, box); return; }
+      target.innerHTML = `
+        <p class="gt-sign-q">🎰 שתי עצירות — מי מהשניים?</p>
+        ${winners.map((w, i) => `<button class="gt-sign-opt" data-w="${i}">
+          <span>${w.name} · ${w.position}</span><span class="gt-delta up">${w.ovr}</span></button>`).join('')}`;
+      target.querySelectorAll('.gt-sign-opt').forEach(b => {
+        b.onclick = () => gtOfferSigning(winners[+b.dataset.w], target, box);
+      });
     }, 1200);
   };
 }
@@ -70,9 +109,9 @@ function gtOfferSigning(player, target, box) {
   target.innerHTML = `
     <p class="gt-sign-q">לצרף את <b>${player.name}</b> (${player.position} ${player.ovr})? מישהו צריך לפנות מקום:</p>
     ${options.map(o => {
-      const d = player.ovr - playerOVR(o.pick.player);
+      const d = player.ovr - gtOvrAt(o.pick, o.i);
       return `<button class="gt-sign-opt" data-slot="${o.i}">
-        <span>✂️ להוציא את ${playerShortName(o.pick.player.name)} · ${o.slot.pos} ${playerOVR(o.pick.player)}</span>
+        <span>✂️ להוציא את ${playerShortName(o.pick.player.name)} · ${o.slot.pos} ${gtOvrAt(o.pick, o.i)}</span>
         <span class="gt-delta ${d >= 0 ? 'up' : 'down'}">${d >= 0 ? '+' : ''}${d}</span>
       </button>`;
     }).join('')}
@@ -87,8 +126,13 @@ function gtOfferSigning(player, target, box) {
         state.usedPlayerKeys.delete(out.player.name);
         state.usedPlayerKeys.add(player.name);
       }
+      // upgrades were bought for a man, not for a shirt: they leave with him
+      const run = gtRun();
+      if (run.boosts) delete run.boosts[out.player.name];
+      if (run.peaks) run.peaks = run.peaks.filter(n => n !== out.player.name);
       gtStoreSquad();
-      target.innerHTML = `<p class="gt-sign-done">✅ ${playerShortName(player.name)} נכנס במקום ${playerShortName(out.player.name)} · דירוג ההרכב: <b>${teamOVR()}</b></p>`;
+      gtInvalidateDeltas();
+      target.innerHTML = `<p class="gt-sign-done">✅ ${playerShortName(player.name)} נכנס במקום ${playerShortName(out.player.name)} · דירוג ההרכב: <b>${teamOVR(gtOvrAt)}</b></p>`;
       hideSpin();
     };
   });
