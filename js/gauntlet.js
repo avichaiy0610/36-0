@@ -12,6 +12,12 @@
 const GT_KEY = '36-0-gauntlet';
 const GT_BEST_KEY = '36-0-gauntlet-best';
 
+// The ELITE road is not just richer, it is harder: the club carries two rating
+// points it did not have in real life. The number on the map is the total —
+// nothing anywhere says "+2", because the player picks a road by its rating and
+// that rating has to be the one he will actually face.
+const GT_ELITE_BOOST = 2;
+
 // Banners: finish the run and it starts again harder. Every opponent on the map
 // is rated up by this much, which is enough to turn round 1 into a real fight.
 const GT_BANNERS = [0, 2, 4, 6, 8, 10];
@@ -140,7 +146,8 @@ function gtOpponent(node) {
   const run = gtRun();
   const sq = SQUADS.find(s => s.teamId === node.teamId && s.season === node.season);
   const name = (TEAMS[node.teamId] || {}).name || node.teamId;
-  const lift = gtBannerBoost(run) + gtDealNum('oppOvr') + gtModNum('oppOvr');
+  const lift = gtBannerBoost(run) + gtDealNum('oppOvr') + gtModNum('oppOvr')
+             + (node.elite ? GT_ELITE_BOOST : 0);
   if (!sq) {
     const flat = node.ovr + lift;
     return { name, ovr: flat, atk: flat, mid: flat, def: flat, gk: flat };
@@ -162,7 +169,10 @@ function gtOpponent(node) {
 
 // The rating a node advertises on the map — the banner is part of the map, not
 // a surprise waiting inside the fight.
-function gtShownOvr(node) { return node.ovr + gtBannerBoost() + gtDealNum('oppOvr') + gtModNum('oppOvr'); }
+function gtShownOvr(node) {
+  return node.ovr + gtBannerBoost() + gtDealNum('oppOvr') + gtModNum('oppOvr')
+       + (node.elite ? GT_ELITE_BOOST : 0);
+}
 
 /* ── the purse ────────────────────────────────────────────────────────────── */
 // A win over an 88 is worth more than a win over a 79, and a hammering is worth
