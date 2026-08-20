@@ -339,14 +339,14 @@ function gtHalftime() {
   el.innerHTML = `
     <div class="gt-half">
       <div class="gt-half-t">⏸ מחצית · ${me === them ? 'תיקו' : 'אתה מפגר'}${f.legs > 1 ? ' במאזן' : ''}</div>
-      <p class="gt-half-p">אפשר לפרוק הכול על 45 הדקות הבאות: <b>+5 לכל הקווים</b>.
-         המחיר — <b>מוותרים על השלל</b> אם תנצח.</p>
+      <p class="gt-half-p">אפשר לפרוק הכול על 45 הדקות הבאות: <b>כל הקבוצה שלך מתחזקת ב-5 דירוג</b>.
+         המחיר: אם תנצח, <b>לא תהיה הגרלת שלל</b> בקרב הזה.</p>
       <button class="btn-primary btn-full" id="gt-rescue">🔥 הכול קדימה (ויתור על השלל)</button>
       <button class="btn-secondary btn-full" id="gt-nores">ממשיכים כרגיל ←</button>
     </div>`;
   document.getElementById('gt-rescue').onclick = () => {
     f.boost = 5; f.forfeit = true; f.rescued = true;
-    el.innerHTML = '<p class="gt-half-note">🔥 הרכב מותקף קדימה — השלל ויתר על עצמו.</p>';
+    el.innerHTML = '<p class="gt-half-note">🔥 יוצאים להתקפה מלאה — ויתרת על השלל של הקרב הזה.</p>';
     gtSegment('h2');
   };
   document.getElementById('gt-nores').onclick = () => { el.innerHTML = ''; gtSegment('h2'); };
