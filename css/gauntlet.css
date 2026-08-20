@@ -50,4 +50,4 @@
                   padding: 12px; margin: 4px 0 16px; }
 .gt-intro-relic-t { font-weight: 900; color: #a78bfa; margin-bottom: 6px; }
 .gt-intro-relic p { font-size: 13px; line-height: 1.6; color: var(--muted); margin: 0; }
-.gt-soon { margin-top: 8px !important; font-size: 12px !important; opacity: .8; font-style: italic; }
+.gt-intro-relic p + p { margin-top: 8px; }
