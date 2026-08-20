@@ -56,7 +56,7 @@ function gtShopHTML() {
                   data-item="${it.id}" ${owned ? 'disabled' : ''}>
             <span class="gt-item-ico">${it.icon}</span>
             <span class="gt-item-name">${it.name}${it.once ? '<span class="gt-once">חד-פעמי</span>' : ''}</span>
-            <span class="gt-item-desc">${it.desc}</span>
+            <span class="gt-item-desc">${gtNums(it.desc)}</span>
             <span class="gt-item-price">${owned ? '✅ נרכש' : '🪙 ' + price}</span>
           </button>`;
         }).join('')}

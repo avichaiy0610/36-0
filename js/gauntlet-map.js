@@ -524,6 +524,7 @@ function showGauntlet() {
   if (typeof gtNeedsOpeningRelic === 'function' && gtNeedsOpeningRelic()) {
     map.innerHTML = gtOpeningHTML();
     if (note) note.textContent = '';
+    if (reset) reset.style.display = 'none';   // nothing has happened yet to reset
     gtWireOpening(map, () => showGauntlet());
     return;
   }

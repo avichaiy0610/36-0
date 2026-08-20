@@ -72,7 +72,7 @@ function gtManagerPickerHTML() {
             <span class="gt-gm-ico">${m.icon || '💼'}</span>
             <span class="gt-gm-name">${m.name}</span>
             <span class="gt-gm-blurb">${m.blurb || ''}</span>
-            ${sig ? `<span class="gt-gm-sig">${sig.icon} ${sig.name} — ${sig.desc}</span>` : ''}
+            ${sig ? `<span class="gt-gm-sig">${sig.icon} ${sig.name} — ${gtNums(sig.desc)}</span>` : ''}
           </button>`;
         }).join('')}
       </div>

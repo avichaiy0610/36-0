@@ -188,13 +188,24 @@ function gtScouting() { return gtHas('scout') || !!(gtRun().effects || {}).scout
 /* ── holding, swapping, losing ─────────────────────────────────────────────── */
 // Five slots. A sixth relic is not a gift — it is a decision, and the card that
 // leaves is gone. Nothing is auto-discarded on the player's behalf.
+// "+3" inside a Hebrew sentence comes out as "3+": the sign is a neutral
+// character, so the RTL paragraph puts it on the wrong side of the digits. A
+// left-to-right mark ahead of it is not enough once the run touches a full
+// stop — isolating each number with <bdi> is, and it needs no invisible
+// characters in the source strings.
+function gtNums(text) {
+  return String(text || '')
+    .replace(/[‎‏]/g, '')
+    .replace(/([+−-]\d+%?)/g, '<bdi dir="ltr">$1</bdi>');
+}
+
 function gtRelicCardHTML(r, extra = '') {
   return `
     <div class="gt-relic-card ${r.rarity} ${extra}">
       <span class="gt-relic-ico">${r.icon}</span>
       <span class="gt-relic-name">${r.name}</span>
       <span class="gt-relic-rar">${GT_RARITY_HE[r.rarity]}</span>
-      <span class="gt-relic-desc">${r.desc}</span>
+      <span class="gt-relic-desc">${gtNums(r.desc)}</span>
     </div>`;
 }
 
@@ -332,9 +343,11 @@ function gtOpeningOffer() {
   return run.openingOffer.map(gtRelic).filter(Boolean);
 }
 
+// Only before the first fight. A run that is already under way — one saved from
+// before this screen existed, say — never gets sent back to it.
 function gtNeedsOpeningRelic() {
   const run = gtRun();
-  return !run.openingPicked && !run.over && !(run.log || []).length;
+  return !run.openingPicked && !run.over && !run.at && !(run.log || []).length;
 }
 
 function gtOpeningHTML() {
@@ -399,7 +412,7 @@ function gtWireRelicBar(root) {
       if (!r || !info) return;
       const open = info.dataset.open === r.id;
       info.dataset.open = open ? '' : r.id;
-      info.innerHTML = open ? '' : `<b>${r.icon} ${r.name}</b> — ${r.desc}`;
+      info.innerHTML = open ? '' : `<b>${r.icon} ${r.name}</b> — ${gtNums(r.desc)}`;
     };
   });
 }
