@@ -193,10 +193,13 @@ function gtScouting() { return gtHas('scout') || !!(gtRun().effects || {}).scout
 // left-to-right mark ahead of it is not enough once the run touches a full
 // stop — isolating each number with <bdi> is, and it needs no invisible
 // characters in the source strings.
+// Only a real plus or a real minus sign (U+2212) counts. An ASCII hyphen in
+// Hebrew is usually a maqaf — "ה-11", "ב-70%" — and isolating that turns it
+// into "ה11-", which is how the light theme caught me.
 function gtNums(text) {
   return String(text || '')
     .replace(/[‎‏]/g, '')
-    .replace(/([+−-]\d+%?)/g, '<bdi dir="ltr">$1</bdi>');
+    .replace(/([+−]\d+%?)/g, '<bdi dir="ltr">$1</bdi>');
 }
 
 function gtRelicCardHTML(r, extra = '') {
@@ -356,7 +359,7 @@ function gtOpeningHTML() {
     <div class="gt-opening">
       <div class="gt-opening-kicker">לפני שיוצאים לדרך</div>
       <div class="gt-opening-title">🔮 בחר קמע פתיחה</div>
-      <p class="gt-opening-sub">אחד משלושה, והוא נכנס לאחד מחמשת המקומות שלך. בהמשך יפלו עוד — מהשלל ומהחנות.</p>
+      <p class="gt-opening-sub">שלוש הצעות מתוך ${GT_RELICS.length} קמעות במשחק. הנבחר נכנס לאחד מחמשת המקומות שלך, ובהמשך יפלו עוד — מהשלל ומהחנות.</p>
       <div class="gt-opening-grid">
         ${offer.map(r => `<button class="gt-open-pick" data-relic="${r.id}">${gtRelicCardHTML(r)}</button>`).join('')}
       </div>

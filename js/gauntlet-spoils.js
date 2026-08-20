@@ -122,7 +122,7 @@ function gtOfferSigning(player, target, box) {
       const d = player.ovr - gtOvrAt(o.pick, o.i);
       return `<button class="gt-sign-opt" data-slot="${o.i}">
         <span>✂️ להוציא את ${playerShortName(o.pick.player.name)} · ${o.slot.pos} ${gtOvrAt(o.pick, o.i)}</span>
-        <span class="gt-delta ${d >= 0 ? 'up' : 'down'}">${d >= 0 ? '+' : ''}${d}</span>
+        <span class="gt-delta ${d >= 0 ? 'up' : 'down'}" dir="ltr">${d >= 0 ? '+' : ''}${d}</span>
       </button>`;
     }).join('')}
     <button class="btn-secondary btn-full" id="gt-pass">🙅 ויתור, נשאר עם ההרכב שלי</button>`;
