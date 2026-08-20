@@ -139,6 +139,7 @@ function renderGauntletMap(container, at = 0, over = false) {
           </g>`;
       }
       const n = row.nodes[ni];
+      const elite = typeof gtIsElite === 'function' && gtIsElite(n);
       const size = row.boss ? 1.35 : 1;
       // Name only, and staggered: three grounds on one line put their captions
       // on top of each other. The season and rating are in the list below.
@@ -147,15 +148,15 @@ function renderGauntletMap(container, at = 0, over = false) {
         ? `<text class="gm-label" x="${pt.x}" y="${pt.y + dy * size}" text-anchor="middle">${short(n.teamId)}</text>`
         : '';
       return `
-        <g class="gm-station ${state}${n.elite ? ' elite' : ''}" data-row="${ri}" data-node="${ni}">
-          ${gmCrestSVG(pt.x, pt.y, n.teamId, { size, state, elite: !!n.elite })}
+        <g class="gm-station ${state}${elite ? ' elite' : ''}" data-row="${ri}" data-node="${ni}">
+          ${gmCrestSVG(pt.x, pt.y, n.teamId, { size, state, elite })}
           <g class="gm-ovr-badge">
             <rect x="${pt.x + 4 * size}" y="${pt.y + 4 * size}" width="${17 * size}" height="${11 * size}" rx="${5 * size}"
-                  fill="#0b0f14" stroke="${n.elite ? '#8b5cf6' : '#d4af37'}" stroke-width="1"/>
+                  fill="#0b0f14" stroke="${elite ? '#8b5cf6' : '#d4af37'}" stroke-width="1"/>
             <text class="gm-ovr" x="${pt.x + 12.5 * size}" y="${pt.y + 12.5 * size}" text-anchor="middle">${typeof gtShownOvr === 'function' ? gtShownOvr(n) : n.ovr}</text>
           </g>
           ${row.boss ? `<text class="gm-boss" x="${pt.x}" y="${pt.y - 20 * size}" text-anchor="middle">${ri === GM_RUN.length - 1 ? 'הבוס הסופי' : 'בוס'}</text>` : ''}
-          ${n.elite ? `<text class="gm-elite-tag" x="${pt.x}" y="${pt.y - 17}" text-anchor="middle">ELITE</text>` : ''}
+          ${elite ? `<text class="gm-elite-tag" x="${pt.x}" y="${pt.y - 17}" text-anchor="middle">ELITE</text>` : ''}
           ${label}
         </g>`;
     }).join('');
@@ -238,6 +239,7 @@ function gmRoadPicker(at, over) {
       <p class="gm-picker-sub">${sub}</p>
       ${row.nodes.map((n, ni) => {
         const club = (TEAMS[n.teamId] || {}).name || n.teamId;
+        const elite = typeof gtIsElite === 'function' && gtIsElite(n);
         const desc = (typeof siteText === 'function'
           ? siteText('gt-desc-' + n.teamId + '-' + n.season.replace('/', '-'), n.desc) : n.desc) || '';
         // a scout earns his keep here: the four lines behind the headline number
@@ -245,14 +247,14 @@ function gmRoadPicker(at, over) {
           ? (o => `<span class="gm-road-scout" dir="ltr">GK ${Math.round(o.gk)} · DEF ${Math.round(o.def)} · MID ${Math.round(o.mid)} · ATK ${Math.round(o.atk)}</span>`)(gtOpponent(n))
           : '';
         return `
-        <button class="gm-road ${n.elite ? 'elite' : ''}" data-row="${at}" data-node="${ni}">
+        <button class="gm-road ${elite ? 'elite' : ''}" data-row="${at}" data-node="${ni}">
           <img class="gm-road-crest" src="crests/${n.teamId}.png" alt="" onerror="this.style.visibility='hidden'">
           <span class="gm-road-main">
             <span class="gm-road-club">${club} <span class="gm-road-season">${n.season}</span></span>
             <span class="gm-road-desc">${desc}</span>
             ${scout}
           </span>
-          ${n.elite ? '<span class="gm-road-elite">ELITE</span>' : ''}
+          ${elite ? '<span class="gm-road-elite">ELITE</span>' : ''}
           <span class="gm-road-ovr">${typeof gtShownOvr === 'function' ? gtShownOvr(n) : n.ovr}</span>
         </button>`;
       }).join('')}
@@ -375,7 +377,7 @@ const GM_RUN = [
   ] },
   { kind: 'fight', round: 6, nodes: [
     { teamId: 'hapoel-beersheba',  season: '2014/15', ovr: 85, desc: 'מקום 3 עם 62 נקודות - העונה שלפני שושלת האליפויות.' },
-    { teamId: 'hapoel-tlv',        season: '2009/10', ovr: 86, elite: true, desc: 'עונת הדאבל: אליפות שהוכרעה בדקה ה-92 במחזור האחרון, וסיום ראשון בבית בליגה האירופית.' },
+    { teamId: 'hapoel-tlv',        season: '2009/10', ovr: 86, desc: 'עונת הדאבל: אליפות שהוכרעה בדקה ה-92 במחזור האחרון, וסיום ראשון בבית בליגה האירופית.' },
   ] },
   { kind: 'shop' },
   { kind: 'fight', round: 7, boss: true, nodes: [
@@ -468,6 +470,7 @@ function gmIntroHTML() {
         <li>📜 <b>פותחים בקמע מסע</b> - אחד מששה, לכל אחד יתרון ומחיר, ומלווה אותך עד הסוף. אפשר גם בלי.</li>
         <li>🎲 <b>מגרילים קבוצה ובוחרים שחקן</b> - פעם אחת בתחילת המסע, וההרכב הזה מלווה אותך עד הסוף.</li>
         <li>⚽ <b>בכל משחק אתה בוחר את היריבה</b> מבין האפשרויות שנפתחו - ואי אפשר להתחרט.</li>
+        <li>💜 <b>בכל סיבוב אחת היריבות מסומנת ELITE</b> - חזקה יותר, אבל השלל שלה מפיל קמעות הרבה יותר.</li>
         <li>🎰 <b>ניצחת? מגרילים לך שלל</b> - שחקן מהסגל שהבסת, או <b>קמע</b>.</li>
         <li>🛒 <b>כל 3 קרבות נפתחת חנות</b> - מטבעות מניצחונות, ועליהם ריבית.</li>
         <li>⏸ <b>מפגר במחצית?</b> אפשר לפרוק הכול על 45 הדקות הבאות - במחיר ויתור על השלל.</li>

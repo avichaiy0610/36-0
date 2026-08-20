@@ -18,6 +18,39 @@ const GT_BEST_KEY = '36-0-gauntlet-best';
 // that rating has to be the one he will actually face.
 const GT_ELITE_BOOST = 2;
 
+// Which club wears the ELITE badge is drawn once per run, one per round that
+// offers a choice — a single round with no alternative has nothing to make
+// elite. The draw is stored with the run, so a refresh cannot roll it again and
+// the map you plan around is the map you play.
+function gtEliteAt(rowIdx) {
+  const row = GM_RUN[rowIdx];
+  if (!row || row.kind !== 'fight' || row.nodes.length < 2) return -1;
+  const run = gtRun();
+  run.elite = run.elite || {};
+  if (run.elite[rowIdx] === undefined) {
+    run.elite[rowIdx] = Math.floor(Math.random() * row.nodes.length);
+    gtSave();
+  }
+  return run.elite[rowIdx];
+}
+
+// The rest of the code holds nodes, not row indexes, so the lookup runs the
+// other way: GM_RUN never changes, so the node → (row, index) map is built once.
+let _gtNodeAddr = null;
+function gtNodeAddr(node) {
+  if (!_gtNodeAddr) {
+    _gtNodeAddr = new Map();
+    GM_RUN.forEach((row, ri) => {
+      if (row.kind === 'fight') row.nodes.forEach((n, ni) => _gtNodeAddr.set(n, [ri, ni]));
+    });
+  }
+  return _gtNodeAddr.get(node) || null;
+}
+function gtIsElite(node) {
+  const at = gtNodeAddr(node);
+  return !!at && gtEliteAt(at[0]) === at[1];
+}
+
 // Banners: finish the run and it starts again harder. Every opponent on the map
 // is rated up by this much, which is enough to turn round 1 into a real fight.
 const GT_BANNERS = [0, 2, 4, 6, 8, 10];
@@ -147,7 +180,7 @@ function gtOpponent(node) {
   const sq = SQUADS.find(s => s.teamId === node.teamId && s.season === node.season);
   const name = (TEAMS[node.teamId] || {}).name || node.teamId;
   const lift = gtBannerBoost(run) + gtDealNum('oppOvr') + gtModNum('oppOvr')
-             + (node.elite ? GT_ELITE_BOOST : 0);
+             + (gtIsElite(node) ? GT_ELITE_BOOST : 0);
   if (!sq) {
     const flat = node.ovr + lift;
     return { name, ovr: flat, atk: flat, mid: flat, def: flat, gk: flat };
@@ -171,7 +204,7 @@ function gtOpponent(node) {
 // a surprise waiting inside the fight.
 function gtShownOvr(node) {
   return node.ovr + gtBannerBoost() + gtDealNum('oppOvr') + gtModNum('oppOvr')
-       + (node.elite ? GT_ELITE_BOOST : 0);
+       + (gtIsElite(node) ? GT_ELITE_BOOST : 0);
 }
 
 /* ── the purse ────────────────────────────────────────────────────────────── */
@@ -179,7 +212,7 @@ function gtShownOvr(node) {
 // more than surviving a shootout. Interest pays on what you walked in holding.
 function gtCoinsForWin(node, res) {
   const base = 30 + Math.max(0, gtShownOvr(node) - 76) * 4 + Math.max(0, res.gf - res.ga) * 5;
-  const elite = node.elite ? 20 : 0;
+  const elite = gtIsElite(node) ? 20 : 0;
   const interest = gtInterest(gtRun().coins || 0);
   return { win: Math.round((base + elite) * gtCoinMultiplier()), interest };
 }
@@ -498,7 +531,7 @@ async function gtSubmitRun(run, cleared) {
     const eliteBeaten = wins.some(l => {
       const row = GM_RUN[l.row];
       const n = row && row.nodes && row.nodes.find(x => x.teamId === l.teamId && x.season === l.season);
-      return !!(n && n.elite);
+      return !!(n && gtIsElite(n));
     });
     await _supabase.rpc('submit_gauntlet_run', {
       p: {

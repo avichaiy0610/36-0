@@ -25,7 +25,7 @@ function gtSpoilIsRelic(node) {
   if (!gtRelicsLeft()) return false;
   const run = gtRun();
   if ((run.dryWins || 0) >= 3) return true;
-  const chance = (node.elite ? 0.75 : 0.42) + gtDealNum('relicDrop') + gtModNum('relicDrop');
+  const chance = (gtIsElite(node) ? 0.75 : 0.42) + gtDealNum('relicDrop') + gtModNum('relicDrop');
   return Math.random() < chance;
 }
 
@@ -43,7 +43,7 @@ function gtOfferSpoils(node, container) {
   box.innerHTML = relicDraw
     ? `<div class="gt-spoils-kicker">שלל הניצחון</div>
        <div class="gt-spoils-title">🔮 קמע נפל מהשלל</div>
-       <p class="gt-spoils-sub">${node.elite ? 'מסלול ELITE - הגלגל כאן נדיב בהרבה.' : 'הפעם לא שחקן: הגלגל עוצר על קמע.'}</p>
+       <p class="gt-spoils-sub">${gtIsElite(node) ? 'מסלול ELITE - הגלגל כאן נדיב בהרבה.' : 'הפעם לא שחקן: הגלגל עוצר על קמע.'}</p>
        <div id="gt-relic-reel"></div><div id="gt-relic-out"></div>`
     : `<div class="gt-spoils-kicker">שלל הניצחון</div>
        <div class="gt-spoils-title">🎰 הגרלה מהסגל שהבסת</div>
