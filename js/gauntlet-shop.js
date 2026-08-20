@@ -238,7 +238,7 @@ function gtAgentWheel(price, work) {
     const c = pool[Math.floor(Math.random() * pool.length)];
     if (!shown.some(s => s.name === c.name)) shown.push(c);
   }
-  const strip = shown.concat(shown, shown);
+  const strip = shown.concat(shown, shown, shown, shown, shown);
   work.innerHTML = `
     <div class="gt-spoils">
       <div class="gt-spoils-title">🎡 גלגל הסוכנים</div>
@@ -262,11 +262,7 @@ function gtAgentWheel(price, work) {
   spin.onclick = () => {
     spin.disabled = true;
     const won = shown[Math.floor(Math.random() * shown.length)];
-    const idx = shown.length + shown.indexOf(won);
-    const card = reel.children[idx];
-    reel.scrollTo({ left: card.offsetLeft - reel.clientWidth / 2 + card.clientWidth / 2, behavior: 'smooth' });
-    setTimeout(() => {
-      card.classList.add('won');
+    gtAnimateReel(reel, shown.length * 4 + shown.indexOf(won), () => {
       spin.style.display = 'none';
       const out = state.picks[weak.i];
       state.picks[weak.i] = { player: won, squad: won.squad };
@@ -280,6 +276,6 @@ function gtAgentWheel(price, work) {
       gtInvalidateDeltas();
       work.querySelector('#gt-aout').innerHTML =
         `<p class="gt-sign-done">✅ ${playerShortName(won.name)} נכנס במקום ${playerShortName(out.player.name)} · דירוג ההרכב: <b>${teamOVR(gtOvrAt)}</b></p>`;
-    }, 1200);
+    });
   };
 }

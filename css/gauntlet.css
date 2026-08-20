@@ -162,3 +162,26 @@
 /* the gauntlet board has no "view squad" column, so it needs its own grid */
 .gt-lb-row { grid-template-columns: 32px 1fr auto minmax(0, 1fr); }
 .gt-lb-row .lb-stat small { font-size: .7em; color: var(--muted); }
+
+/* ── the opening relic, and a wheel that takes its time ────────────────────── */
+.gt-opening { background: var(--card); border: 1px solid #8b5cf655; border-radius: 12px;
+              padding: 16px; margin-bottom: 12px; }
+.gt-opening-kicker { text-align: center; font-size: 11px; font-weight: 800;
+                     letter-spacing: .6px; color: #a78bfa; }
+.gt-opening-title { text-align: center; font-size: 20px; font-weight: 900; margin: 4px 0 6px; }
+.gt-opening-sub { text-align: center; font-size: 12px; color: var(--muted);
+                  line-height: 1.6; margin: 0 0 14px; }
+.gt-opening-grid { display: grid; gap: 8px; }
+.gt-open-pick { background: none; border: 0; padding: 0; width: 100%; cursor: pointer; }
+.gt-open-pick .gt-relic-card { transition: border-color .15s, transform .15s; }
+.gt-open-pick:hover .gt-relic-card { border-color: var(--accent); transform: translateY(-2px); }
+
+/* while it spins the cards blur slightly — the eye should not be able to read
+   the one under the marker until it stops */
+.gt-reel.spinning .gt-reel-card { filter: blur(.4px); opacity: .9; }
+.gt-reel-card.won { animation: gt-land .45s ease-out; }
+@keyframes gt-land {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.09); }
+  100% { transform: scale(1); }
+}

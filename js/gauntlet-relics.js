@@ -245,6 +245,38 @@ function gtGrantRelic(relic, target, done) {
   };
 }
 
+/* ── the spin ─────────────────────────────────────────────────────────────── */
+// Every wheel in the gauntlet lands through here. The browser's smooth scroll
+// was over in a blink and gave the draw away instantly; this runs for close to
+// three seconds and spends the last one crawling, which is where the tension in
+// a wheel actually lives. Card ticks past → slow → almost stops → one more.
+const GT_SPIN_MS = 2900;
+
+// Stepped on a timer rather than requestAnimationFrame, like the match clock:
+// same 60fps in a real browser, and it still runs when the tab is driven by a
+// headless virtual clock, where rAF simply never fires.
+function gtAnimateReel(reel, targetIdx, done) {
+  const card = reel.children[targetIdx];
+  if (!card) { if (done) done(); return; }
+  const from = reel.scrollLeft;
+  const to = card.offsetLeft - reel.clientWidth / 2 + card.clientWidth / 2;
+  const t0 = Date.now();
+  // a quartic ease-out: most of the distance early, the last few cards slowly
+  const ease = t => 1 - Math.pow(1 - t, 4);
+  reel.classList.add('spinning');
+  const timer = setInterval(() => {
+    const t = Math.min(1, (Date.now() - t0) / GT_SPIN_MS);
+    reel.scrollLeft = from + (to - from) * ease(t);
+    if (t < 1) return;
+    clearInterval(timer);
+    reel.scrollLeft = to;
+    reel.classList.remove('spinning');
+    card.classList.add('won');
+    // a beat after it stops, before the result is spelled out
+    setTimeout(() => { if (done) done(); }, 550);
+  }, 16);
+}
+
 // The relic reel: same theatre as the player wheel, different cards.
 function gtSpinRelicReel(box, target, onLanded) {
   const pool = GT_RELICS.filter(r => !gtHas(r.id) && !r.signatureOnly);
@@ -252,7 +284,9 @@ function gtSpinRelicReel(box, target, onLanded) {
     target.innerHTML = `<p class="page-note">יש לך כבר את כל הקמעות במשחק.</p>`;
     return;
   }
-  const strip = pool.concat(pool, pool);
+  // six copies, landing in the fifth: the strip has to be long enough that a
+  // three-second spin is still travelling when it starts to slow down
+  const strip = pool.concat(pool, pool, pool, pool, pool);
   box.innerHTML = `
     <div class="gt-reel-wrap"><div class="gt-reel-mark"></div>
       <div class="gt-reel gt-reel-relics" id="gt-rreel">
@@ -271,15 +305,65 @@ function gtSpinRelicReel(box, target, onLanded) {
   spin.onclick = () => {
     spin.disabled = true;
     const won = gtDrawRelic();
-    const idx = pool.length + pool.indexOf(won);
-    const card = reel.children[idx];
-    reel.scrollTo({ left: card.offsetLeft - reel.clientWidth / 2 + card.clientWidth / 2, behavior: 'smooth' });
-    setTimeout(() => {
-      card.classList.add('won');
+    gtAnimateReel(reel, pool.length * 4 + pool.indexOf(won), () => {
       spin.style.display = 'none';
       gtGrantRelic(won, target, onLanded);
-    }, 1200);
+    });
   };
+}
+
+/* ── the relic you start with ─────────────────────────────────────────────── */
+// One choice before the first fight, three cards, no wheel: the run should open
+// on a decision the player makes, not on one the game makes for him. The offer
+// is stored so a refresh cannot reroll it into something better.
+function gtOpeningOffer() {
+  const run = gtRun();
+  if (!run.openingOffer || !run.openingOffer.length) {
+    const offer = [];
+    while (offer.length < 3) {
+      const r = gtDrawRelic();
+      if (!r) break;
+      if (!offer.includes(r.id)) offer.push(r.id);
+      else if (GT_RELICS.length <= offer.length) break;
+    }
+    run.openingOffer = offer;
+    gtSave();
+  }
+  return run.openingOffer.map(gtRelic).filter(Boolean);
+}
+
+function gtNeedsOpeningRelic() {
+  const run = gtRun();
+  return !run.openingPicked && !run.over && !(run.log || []).length;
+}
+
+function gtOpeningHTML() {
+  const offer = gtOpeningOffer();
+  return `
+    <div class="gt-opening">
+      <div class="gt-opening-kicker">לפני שיוצאים לדרך</div>
+      <div class="gt-opening-title">🔮 בחר קמע פתיחה</div>
+      <p class="gt-opening-sub">אחד משלושה, והוא נכנס לאחד מחמשת המקומות שלך. בהמשך יפלו עוד — מהשלל ומהחנות.</p>
+      <div class="gt-opening-grid">
+        ${offer.map(r => `<button class="gt-open-pick" data-relic="${r.id}">${gtRelicCardHTML(r)}</button>`).join('')}
+      </div>
+    </div>`;
+}
+
+function gtWireOpening(root, done) {
+  root.querySelectorAll('.gt-open-pick[data-relic]').forEach(btn => {
+    btn.onclick = () => {
+      const run = gtRun();
+      const r = gtRelic(btn.dataset.relic);
+      if (!r) return;
+      run.relics = run.relics || [];
+      run.relics.push(r.id);
+      run.openingPicked = r.id;
+      gtSave();
+      gtInvalidateDeltas();
+      if (done) done();
+    };
+  });
 }
 
 /* ── the strip on the map ──────────────────────────────────────────────────── */

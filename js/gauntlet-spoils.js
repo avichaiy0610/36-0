@@ -15,14 +15,25 @@ function gtSpoilCandidates(node) {
     .map(p => ({ ...p, squad: sq }));
 }
 
-function gtRelicsLeft() { return GT_RELICS.some(r => !gtHas(r.id)); }
+function gtRelicsLeft() { return GT_RELICS.some(r => !gtHas(r.id) && !r.signatureOnly); }
+
+// Relics are the reason to keep going, so they cannot be rare enough to miss in
+// a whole run. Two in five wins on the normal road, three in four on ELITE — and
+// a floor underneath: three wins with no relic and the next one is guaranteed,
+// because a run that never shows you the mechanic may as well not have it.
 function gtSpoilIsRelic(node) {
-  const chance = (node.elite ? 0.6 : 0.3) + gtDealNum('relicDrop');
-  return gtRelicsLeft() && Math.random() < chance;
+  if (!gtRelicsLeft()) return false;
+  const run = gtRun();
+  if ((run.dryWins || 0) >= 3) return true;
+  const chance = (node.elite ? 0.75 : 0.42) + gtDealNum('relicDrop');
+  return Math.random() < chance;
 }
 
 function gtOfferSpoils(node, container) {
   const relicDraw = gtSpoilIsRelic(node);
+  const run = gtRun();
+  run.dryWins = relicDraw ? 0 : (run.dryWins || 0) + 1;
+  gtSave();
   const pool = relicDraw ? [] : gtSpoilCandidates(node);
   if (!relicDraw && !pool.length) return;
 
@@ -52,7 +63,8 @@ function gtOfferSpoils(node, container) {
   }
 
   const reel = box.querySelector('#gt-reel');
-  const strip = pool.concat(pool, pool);            // long enough to slide past
+  // long enough that a three-second spin is still moving when it starts to slow
+  const strip = pool.concat(pool, pool, pool, pool, pool);
   reel.innerHTML = strip.map(p => `
     <div class="gt-reel-card">
       <span class="gt-reel-ovr">${p.ovr}</span>
@@ -62,7 +74,6 @@ function gtOfferSpoils(node, container) {
 
   // Two stops instead of one: the greased wheel is permanent, the token is spent
   // here and now. Either way the player picks which of the two he wants.
-  const run = gtRun();
   const token = !!(run.effects || {}).secondStop;
   const twice = (gtHas('greased-wheel') || token) && pool.length > 1;
   if (token && twice) { run.effects.secondStop = false; gtSave(); }
@@ -75,12 +86,10 @@ function gtOfferSpoils(node, container) {
       const w = pool[Math.floor(Math.random() * pool.length)];
       if (!winners.includes(w)) winners.push(w);
     }
-    const land = winners.map(w => pool.length + pool.indexOf(w));
-    const card = reel.children[land[0]];
-    reel.scrollTo({ left: card.offsetLeft - reel.clientWidth / 2 + card.clientWidth / 2, behavior: 'smooth' });
-    setTimeout(() => {
-      [...reel.children].forEach(c => c.classList.remove('won'));
-      land.forEach(i => reel.children[i].classList.add('won'));
+    const land = winners.map(w => pool.length * 4 + pool.indexOf(w));
+    [...reel.children].forEach(c => c.classList.remove('won'));
+    gtAnimateReel(reel, land[0], () => {
+      land.forEach(k => reel.children[k].classList.add('won'));
       spin.style.display = 'none';
       const target = box.querySelector('#gt-sign');
       if (winners.length === 1) { gtOfferSigning(winners[0], target, box); return; }
@@ -91,7 +100,7 @@ function gtOfferSpoils(node, container) {
       target.querySelectorAll('.gt-sign-opt').forEach(b => {
         b.onclick = () => gtOfferSigning(winners[+b.dataset.w], target, box);
       });
-    }, 1200);
+    });
   };
 }
 
