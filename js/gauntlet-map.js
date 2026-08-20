@@ -454,6 +454,25 @@ function gmFightRows() { return GM_RUN.filter(r => r.kind === 'fight'); }
 // been fought — so the explainer shows once, not after every defeat.
 function gtRunStarted(run) { return !!(run.started || run.log.length || run.picks); }
 
+// Once a banner has been cleared, every level up to it stays playable — the run
+// that starts now is a choice, not whatever the last one left behind.
+function gmBannerPickerHTML() {
+  const unlocked = typeof gtUnlockedBanner === 'function' ? gtUnlockedBanner() : 0;
+  if (!unlocked) return '';
+  const cur = gtRun().banner || 0;
+  const opts = [];
+  for (let i = 0; i <= unlocked; i++) {
+    opts.push(`<button class="gt-banner-pick ${i === cur ? 'on' : ''}" data-banner="${i}">${
+      i ? gtBannerName(i) + ' <small>+' + GT_BANNERS[i] + '</small>' : 'רגיל'}</button>`);
+  }
+  return `
+    <div class="gt-banner-row">
+      <div class="gt-banner-t">🏴 באיזו רמה לרוץ?</div>
+      <p class="gt-banner-sub">כל רמה שסיימת נשארת פתוחה. ככל שהבאנר גבוה יותר, כל היריבות על המפה חזקות יותר.</p>
+      <div class="gt-banner-opts">${opts.join('')}</div>
+    </div>`;
+}
+
 function gmIntroHTML() {
   const best = typeof gtBest === 'function' ? gtBest() : { depth: 0 };
   const office = typeof gtManagerPickerHTML === 'function' ? gtManagerPickerHTML() : '';
@@ -464,6 +483,7 @@ function gmIntroHTML() {
   return `
     <div class="gt-intro">
       <div class="gt-intro-title">🗺 מסע הגאונטלט</div>
+      ${gmBannerPickerHTML()}
       ${best.depth ? `<p class="gt-intro-best">🏅 השיא שלך: <b>${best.depth}</b> ניצחונות${best.cleared ? ' · המסע הושלם' : ''}${best.banner ? ' · ' + gtBannerName(best.banner) : ''}</p>` : ''}
       <p>שמונה קרבות מדרום לצפון, מול סגלים אמיתיים מההיסטוריה של ליגת העל - מקבוצה שנאבקה על הישרדות ועד השושלות הגדולות ביותר בכדורגל הישראלי.</p>
       <ul class="gt-intro-list">
@@ -503,6 +523,14 @@ function showGauntlet() {
     map.innerHTML = gmIntroHTML();
     if (note) note.textContent = '';
     if (reset) reset.style.display = 'none';
+    map.querySelectorAll('.gt-banner-pick[data-banner]').forEach(btn => {
+      btn.onclick = () => {
+        const r = gtRun();
+        r.banner = +btn.dataset.banner || 0;
+        gtSave();
+        showGauntlet();
+      };
+    });
     if (typeof gtWireManagerPicker === 'function') {
       gtWireManagerPicker(map, () => { run.started = true; gtSave(); showGauntlet(); });
     }

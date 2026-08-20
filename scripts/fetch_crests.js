@@ -14,7 +14,8 @@ const TEAMS = new Function(fs.readFileSync(path.join(__dirname, '..', 'js', 'dat
 const QUERY = {
   'maccabi-haifa': ['Maccabi Haifa'], 'maccabi-tlv': ['Maccabi Tel Aviv'],
   'hapoel-tlv': ['Hapoel Tel Aviv FC', 'Hapoel Tel-Aviv'], 'beitar-jerusalem': ['Beitar Jerusalem'],
-  'hapoel-beersheba': ['Hapoel Beer Sheva', 'Hapoel Be er Sheva'],
+  // "Hapoel Beer Sheva" returns the BASKETBALL club first; this spelling finds the football one
+  'hapoel-beersheba': ['Hapoel Be er Sheva', 'Beer Sheva'],
   'hapoel-jerusalem': ['Hapoel Jerusalem'], 'maccabi-netanya': ['Maccabi Netanya'],
   'bnei-sakhnin': ['Bnei Sakhnin'], 'hapoel-haifa': ['Hapoel Haifa'],
   'maccabi-pt': ['Maccabi Petah Tikva'], 'hapoel-pt': ['Hapoel Petah Tikva'],

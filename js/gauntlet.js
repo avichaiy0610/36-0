@@ -91,6 +91,13 @@ function gtReset(carry) {
   gtSave();
 }
 
+// The highest banner ever cleared stays unlocked: a player who reached III can
+// choose to run I again, and should not have to lose deliberately to get there.
+function gtUnlockedBanner() {
+  const run = gtRun();
+  return Math.max(gtBest().banner || 0, run.banner || 0);
+}
+
 /* ── the record book ──────────────────────────────────────────────────────── */
 function gtBest() {
   try { return JSON.parse(localStorage.getItem(GT_BEST_KEY)) || { depth: 0, banner: 0, cleared: false }; }
@@ -533,6 +540,7 @@ function gtFinish(outcome) {
     if (run.at >= GM_RUN.length) { gtRecordRun(run, true); gtSubmitRun(run, true); }
   } else if (res.insured) {
     run.log.pop();                                  // the policy buys the fight back
+    run.locked = { row: f.row, node: gtNodeAddr(f.node)[1] };   // same opponent, straight away
   } else {
     run.over = true;
     gtRecordRun(run, false);
@@ -600,7 +608,7 @@ function gtVictoryHTML() {
       </div>
       ${held.length ? `<div class="gt-vic-relics">${held.map(r => `<span title="${r.name}">${r.icon}</span>`).join('')}</div>` : ''}
       ${next > (run.banner || 0)
-        ? `<p class="gt-vic-next">הריצה הבאה תהיה ב<b>${gtBannerName(next)}</b> - כל יריבה על המפה מתחזקת ב-${GT_BANNERS[next]}.</p>
+        ? `<p class="gt-vic-next">הריצה הבאה תהיה ב<b>${gtBannerName(next)}</b> - כל יריבה על המפה מתחזקת ב-${GT_BANNERS[next]}. במסך הפתיחה אפשר גם לבחור לרוץ שוב באחת הרמות שכבר סיימת.</p>
            <button class="btn-primary btn-full" id="gt-banner-up">🏴 להניף באנר ולרוץ שוב</button>`
         : `<p class="gt-vic-next">סיימת את ${gtBannerName(run.banner)} - הרמה הגבוהה ביותר. אין מעל זה.</p>
            <button class="btn-primary btn-full" id="gt-banner-up">🔁 ריצה נוספת ב${gtBannerName(run.banner)}</button>`}
@@ -649,8 +657,8 @@ function gtShowResult(res) {
         ? `<p class="page-note">עברת ${cleared} מתוך 8. הדרך צפונה נפתחה.</p>
            <button class="btn-primary btn-full" id="gt-continue">← המשך במפה</button>`
         : res.insured
-          ? `<p class="page-note">הפסדת, אבל הביטוח שילם: הריצה ממשיכה והקרב הזה משוחק מחדש.</p>
-             <button class="btn-primary btn-full" id="gt-continue">← חזרה לקרב</button>`
+          ? `<p class="page-note">הפסדת, אבל הביטוח שילם: אותו קרב, מההתחלה.</p>
+             <button class="btn-primary btn-full" id="gt-replay">↻ לשחק את הקרב מחדש</button>`
           : `<p class="page-note">הריצה נגמרה אחרי ${cleared} ניצחונות.</p>
              <button class="btn-primary btn-full" id="gt-restart">🔁 ריצה חדשה</button>`}
     <button class="btn-secondary btn-full" id="gt-tomap">🗺 חזרה למפה</button>
@@ -660,6 +668,14 @@ function gtShowResult(res) {
 
   const cont = document.getElementById('gt-continue');
   if (cont) cont.onclick = () => { _gtF = null; showGauntlet(); };
+  // the insured fight restarts here rather than sending the player back to a
+  // road he already chose and cannot change
+  const replay = document.getElementById('gt-replay');
+  if (replay) replay.onclick = () => {
+    const at = gtRun().locked || { row: f.row, node: 0 };
+    _gtF = null;
+    gtChoose(at.row, at.node);
+  };
   const again = document.getElementById('gt-restart');
   if (again) again.onclick = () => { _gtF = null; gtReset(); showGauntlet(); };
   const toMap = document.getElementById('gt-tomap');
