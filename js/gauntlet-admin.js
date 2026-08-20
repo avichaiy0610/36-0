@@ -54,22 +54,32 @@ function gtAdminFillSquad(targetOvr) {
 // and says out loud when a file is missing rather than quietly hiding it.
 function gtAdminCrestsHTML() {
   const ids = Object.keys(TEAMS).sort();
+  // The marker's glow reaches 1.9x its radius, so the viewBox has to be wide
+  // enough to hold it — a tight box clips the glow into a square, which is what
+  // the odd backing behind some badges was.
+  const marker = (id, elite) => `
+    <svg viewBox="0 0 60 60" class="ga-crest-map">
+      ${gmCrestSVG(30, 30, id, { size: 1.2, state: 'next', elite })}
+    </svg>`;
   const cells = ids.map(id => {
     const name = (TEAMS[id] || {}).name || id;
     return `
       <div class="ga-crest" data-id="${id}">
-        <svg viewBox="0 0 40 40" class="ga-crest-map">
-          ${gmCrestSVG(20, 20, id, { size: 1.4, state: 'next' })}
-        </svg>
         <img class="gm-road-crest" src="crests/${id}.png" alt=""
              onerror="this.closest('.ga-crest').classList.add('missing')">
+        ${marker(id, false)}
+        ${marker(id, true)}
+        <span class="ga-crest-cap">כרטיס</span>
+        <span class="ga-crest-cap">רגיל</span>
+        <span class="ga-crest-cap">ELITE</span>
         <span class="ga-crest-name">${name}</span>
         <span class="ga-crest-id" dir="ltr">${id}</span>
       </div>`;
   }).join('');
   return `
     <div class="gt-admin ga-gallery">
-      <div class="gt-admin-t">🖼 כל הסמלים <span>${ids.length} מועדונים · שמאל: כרטיס · ימין: סמן במפה</span></div>
+      <div class="gt-admin-t">🖼 כל הסמלים
+        <span>${ids.length} מועדונים · כל אחד בשלוש התצוגות שבהן הוא מופיע במשחק</span></div>
       <div class="ga-crest-grid">${cells}</div>
       <button class="btn-secondary btn-full" id="ga-crests-back">← חזרה למפה</button>
     </div>`;
