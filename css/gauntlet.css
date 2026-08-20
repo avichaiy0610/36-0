@@ -295,3 +295,13 @@
 .gt-peek-club { font-size: 9.5px; color: var(--dim); white-space: nowrap; }
 .gt-peek-ovr { font-weight: 900; text-align: center; color: var(--text); }
 .gt-peek-ovr.up { color: #22c55e; }
+
+/* the act, and what became of each club that season */
+.gm-picker-act { text-align: center; font-size: 11px; font-weight: 800; letter-spacing: 1px;
+                 color: #a78bfa; text-transform: none; margin-bottom: 2px; }
+.gm-road-tag { display: inline-block; font-size: 10px; font-weight: 800; border-radius: 4px;
+               padding: 1px 6px; margin-inline-start: 6px; vertical-align: middle; }
+.gm-road-tag.down { color: #ef4444; background: #ef444418; }
+.gm-road-tag.champ { color: var(--accent); background: #d4af3718; }
+.gm-road-tag.second { color: #9aa4b2; background: #9aa4b218; }
+.gm-road-fin { display: block; font-size: 11px; font-weight: 700; color: var(--dim); margin-top: 1px; }
