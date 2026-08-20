@@ -16,7 +16,8 @@ function gmText(prefix, node, fallback) {
   const key = prefix + node.teamId + '-' + node.season.replace('/', '-');
   return (typeof siteText === 'function' ? siteText(key, fallback) : fallback) || '';
 }
-const GM_ACT_KEYS = { 'התחתית': 'floor', 'אמצע הטבלה': 'mid', 'המתמודדות': 'contenders', 'השושלות': 'dynasties' };
+const GM_ACT_KEYS = { 'התחתית': 'floor', 'הגדולות שנפלו': 'fallen', 'אמצע הטבלה': 'mid',
+                      'המתמודדות': 'contenders', 'השושלות': 'dynasties' };
 function gmActText(act) {
   const k = GM_ACT_KEYS[act];
   return (k && typeof siteText === 'function' ? siteText('gt-act-' + k, act) : act) || act;
@@ -379,34 +380,34 @@ const GM_RUN = [
     { teamId: 'hapoel-holon',      season: '2000/01', ovr: 77, tag: 'down', fin: 'מקום 12/12 · הפרש ‎−60',
       desc: '30 הפסדים ו-85 ספיגות: הפרש השערים הגרוע ביותר בכל הדאטה שלנו.' },
   ] },
-  { kind: 'fight', round: 2, act: 'התחתית', nodes: [
-    { teamId: 'hapoel-rg',         season: '2010/11', ovr: 77, tag: 'down', fin: 'מקום 16/16 · 3 ניצחונות',
-      desc: 'שלושה ניצחונות ב-35 משחקים, ומקום אחרון בעונת הקיזוז.' },
-    { teamId: 'maccabi-ahi-naz',   season: '2009/10', ovr: 77, tag: 'down', fin: 'מקום 16/16 · 81 ספיגות',
-      desc: '81 שערים ספגה בעונה אחת, וסיימה אחרונה בליגה של 16 קבוצות.' },
-    { teamId: 'maccabi-netanya',   season: '2015/16', ovr: 78, tag: 'down', fin: 'מקום 14/14 · ניצחון אחד',
-      desc: 'ניצחון אחד בכל העונה ו-14 שערים - הפחות שנרשמו אי פעם בדאטה שלנו.' },
+  { kind: 'fight', round: 2, act: 'הגדולות שנפלו', nodes: [
+    { teamId: 'hapoel-beersheba',  season: '2004/05', ovr: 79, tag: 'down', fin: 'מקום 12/12 · 33:57',
+      desc: 'מקום אחרון וירידה - אחת עשרה שנים לפני שבאר שבע הפכה למכונת אליפויות.' },
+    { teamId: 'bnei-yehuda',       season: '2013/14', ovr: 79, tag: 'down', fin: 'מקום 14/14 · 32 שערים',
+      desc: '16 הפסדים ו-32 שערים בלבד: בני יהודה, מוסד תל אביבי, יורדת ליגה.' },
+    { teamId: 'hapoel-tlv',        season: '2016/17', ovr: 80, tag: 'down', fin: 'מקום 14/14 · 14 תיקו',
+      desc: 'אלופת 2010 יורדת ליגה: 14 תיקו, מקום אחרון, והפרש שערים של ‎−5 בלבד.' },
   ] },
   { kind: 'fight', round: 3, act: 'אמצע הטבלה', nodes: [
-    { teamId: 'hapoel-jerusalem',  season: '2022/23', ovr: 79, fin: 'מקום 4/14 · 45 נק׳',
-      desc: 'מקום רביעי עם הפרש שערים שלילי - עונה של תוצאות צמודות, גיא בדש כבש 11.' },
-    { teamId: 'maccabi-netanya',   season: '2011/12', ovr: 79, fin: 'מקום 4/16 · 59 נק׳',
-      desc: 'אחמד סבע (86) כבש 20 שערים ולקח את נתניה למקום רביעי.' },
-    { teamId: 'bnei-yehuda',       season: '2012/13', ovr: 80, fin: 'מקום 4/14 · 55 נק׳',
-      desc: 'מקום רביעי עם 16 ניצחונות, ופדרו גלבאן (88) בהרכב.' },
+    { teamId: 'hapoel-haifa',      season: '2023/24', ovr: 80, fin: 'מקום 4/14 · 59 נק׳',
+      desc: 'מקום רביעי עם 18 ניצחונות, וגיא מלמד (83) שכבש 17 שערים.' },
+    { teamId: 'ironi-ks',          season: '2014/15', ovr: 80, tag: 'second', fin: 'סגנית · 64 נק׳',
+      desc: 'סגנית האלופה עם 64 נקודות - קריית שמונה של רועי קהת (84).' },
+    { teamId: 'ms-ashdod',         season: '2020/21', ovr: 81, fin: 'מקום 3/14 · 54 נק׳',
+      desc: 'מקום שלישי מפתיע: 15 ניצחונות ו-54 נקודות לאשדוד.' },
   ] },
   { kind: 'shop' },
   { kind: 'fight', round: 4, act: 'אמצע הטבלה', nodes: [
-    { teamId: 'maccabi-tlv',       season: '2006/07', ovr: 81, fin: 'מקום 3/12 · 28 ספיגות',
-      desc: 'רק 28 ספיגות בכל העונה, ואבי נמני (87) עדיין מוביל את ההתקפה.' },
     { teamId: 'beitar-jerusalem',  season: '2015/16', ovr: 82, fin: 'מקום 3/14 · 18 ניצחונות',
       desc: 'עונת בית"ר של איתי שכטר ואלי דסה - 18 ניצחונות ומקום שלישי.' },
-  ] },
-  { kind: 'fight', round: 5, act: 'המתמודדות', nodes: [
     { teamId: 'hapoel-beersheba',  season: '2013/14', ovr: 83, tag: 'second', fin: 'סגנית · 68 נק׳',
       desc: 'סגנית עם 20 ניצחונות - באר שבע של מאור בוזגלו (89), שנתיים לפני האליפות.' },
+  ] },
+  { kind: 'fight', round: 5, act: 'המתמודדות', nodes: [
     { teamId: 'maccabi-haifa',     season: '2010/11', ovr: 84, tag: 'champ', fin: 'אלופה · 3 הפסדים',
       desc: '24 ניצחונות מול 3 הפסדים, ואליפות בעונת הקיזוז.' },
+    { teamId: 'maccabi-tlv',       season: '2002/03', ovr: 84, tag: 'champ', fin: 'אלופה · 22 ניצחונות',
+      desc: 'אליפות עם 22 ניצחונות ו-3 תיקו בלבד; אבי נמני (91) כבש 14.' },
   ] },
   { kind: 'fight', round: 6, act: 'המתמודדות', nodes: [
     { teamId: 'hapoel-beersheba',  season: '2025/26', ovr: 85, tag: 'champ', fin: 'אלופה · 79 נק׳',
