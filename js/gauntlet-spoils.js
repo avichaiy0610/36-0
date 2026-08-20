@@ -125,17 +125,26 @@ function gtOfferSpoils(node, container) {
   };
 
   const spin = box.querySelector('#gt-spin');
-  spin.onclick = () => {
-    spin.disabled = true;
-    const winners = [];
-    while (winners.length < (twice ? 2 : 1)) {
-      const w = gtPickSpoil(pool);
-      if (!winners.includes(w)) winners.push(w);
-    }
-    const land = winners.map(w => pool.length * 4 + pool.indexOf(w));
-    [...reel.children].forEach(c => c.classList.remove('won'));
-    gtAnimateReel(reel, land[0], () => {
-      land.forEach(k => reel.children[k].classList.add('won'));
+  let winners = [];
+  gtWireSpin(spin, reel, pool.length, 5,
+    () => {
+      winners = [];
+      while (winners.length < (twice ? 2 : 1)) {
+        const w = gtPickSpoil(pool);
+        if (!winners.includes(w)) winners.push(w);
+      }
+      [...reel.children].forEach(c => c.classList.remove('won'));
+      return pool.indexOf(winners[0]);
+    },
+    () => {
+      // the second stop is marked on the card that shares its face
+      winners.slice(1).forEach(w => {
+        const i = pool.indexOf(w);
+        for (let k = 0; k < 5; k++) {
+          const el = reel.children[pool.length * k + i];
+          if (el) el.classList.add('won');
+        }
+      });
       spin.style.display = 'none';
       const target = box.querySelector('#gt-sign');
       if (winners.length === 1) return settle(winners[0], target);
@@ -150,7 +159,6 @@ function gtOfferSpoils(node, container) {
         b.onclick = () => settle(winners[+b.dataset.w], target);
       });
     });
-  };
 }
 
 // Signing keeps the XI at eleven, so a place has to be cleared. Only the slots

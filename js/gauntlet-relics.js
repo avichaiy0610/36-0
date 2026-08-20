@@ -297,35 +297,85 @@ function gtGrantRelic(relic, target, done) {
 }
 
 /* ── the spin ─────────────────────────────────────────────────────────────── */
-// Every wheel in the gauntlet lands through here. The browser's smooth scroll
-// was over in a blink and gave the draw away instantly; this runs for close to
-// three seconds and spends the last one crawling, which is where the tension in
-// a wheel actually lives. Card ticks past → slow → almost stops → one more.
-const GT_SPIN_MS = 2900;
+// Every wheel in the gauntlet turns here, and the player stops it himself:
+// press once and it runs, press again and it settles. The card is drawn at the
+// moment STOP is pressed, not before — nothing is decided while it spins, and
+// nothing about the timing of the press decides it either.
+const GT_SPIN_STEP = 15;      // px per tick — about 900px a second
+const GT_STOP_MS = 1600;      // how long it takes to settle once STOP is hit
+const GT_MIN_TRAVEL = 520;    // it must always run forwards into the card
 
-// Stepped on a timer rather than requestAnimationFrame, like the match clock:
-// same 60fps in a real browser, and it still runs when the tab is driven by a
-// headless virtual clock, where rAF simply never fires.
-function gtAnimateReel(reel, targetIdx, done) {
-  const card = reel.children[targetIdx];
-  if (!card) { if (done) done(); return; }
-  const from = reel.scrollLeft;
-  const to = card.offsetLeft - reel.clientWidth / 2 + card.clientWidth / 2;
-  const t0 = Date.now();
-  // a quartic ease-out: most of the distance early, the last few cards slowly
-  const ease = t => 1 - Math.pow(1 - t, 4);
+function gtSpinReel(reel, poolLen, copies) {
+  // This page is RTL, and an RTL scroller runs its scrollLeft from 0 down to
+  // -(scrollWidth - clientWidth): pushing it positive just clamps at zero, which
+  // is a wheel that never turns. So the direction is read off the element and
+  // every step, wrap and target is expressed in it.
+  const dir = getComputedStyle(reel).direction === 'rtl' ? -1 : 1;
+  const one = reel.scrollWidth / copies;          // one full copy of the pool
+  const ahead = (a, b) => (dir > 0 ? a >= b : a <= b);
   reel.classList.add('spinning');
-  const timer = setInterval(() => {
-    const t = Math.min(1, (Date.now() - t0) / GT_SPIN_MS);
-    reel.scrollLeft = from + (to - from) * ease(t);
-    if (t < 1) return;
-    clearInterval(timer);
-    reel.scrollLeft = to;
-    reel.classList.remove('spinning');
-    card.classList.add('won');
-    // a beat after it stops, before the result is spelled out
-    setTimeout(() => { if (done) done(); }, 550);
+  let timer = setInterval(() => {
+    reel.scrollLeft += GT_SPIN_STEP * dir;
+    // seamless loop: the strip is the same pool repeated, so stepping back one
+    // copy is invisible
+    if (Math.abs(reel.scrollLeft) > one * (copies - 2)) reel.scrollLeft -= one * dir;
   }, 16);
+
+  return {
+    stop(logicalIdx, done) {
+      if (timer) { clearInterval(timer); timer = null; }
+      const from = reel.scrollLeft;
+      const posOf = el => el.offsetLeft - reel.clientWidth / 2 + el.clientWidth / 2;
+      // land on whichever copy of that card is far enough ahead to look like a
+      // wheel slowing down rather than a jump
+      let card = null, to = 0;
+      for (let k = 0; k < copies; k++) {
+        const el = reel.children[poolLen * k + logicalIdx];
+        if (!el) continue;
+        const p = posOf(el);
+        if (ahead(p, from + GT_MIN_TRAVEL * dir)) { card = el; to = p; break; }
+      }
+      if (!card) {                                  // nothing ahead: take the last one
+        for (let k = copies - 1; k >= 0; k--) {
+          const el = reel.children[poolLen * k + logicalIdx];
+          if (el) { card = el; to = posOf(el); break; }
+        }
+      }
+      if (!card) { reel.classList.remove('spinning'); if (done) done(); return; }
+
+      const t0 = Date.now();
+      const ease = t => 1 - Math.pow(1 - t, 4);     // long run, slow settle
+      const tick = setInterval(() => {
+        const t = Math.min(1, (Date.now() - t0) / GT_STOP_MS);
+        reel.scrollLeft = from + (to - from) * ease(t);
+        if (t < 1) return;
+        clearInterval(tick);
+        reel.scrollLeft = to;
+        reel.classList.remove('spinning');
+        card.classList.add('won');
+        setTimeout(() => { if (done) done(); }, 450);   // a beat before the verdict
+      }, 16);
+    },
+  };
+}
+
+// Wires a spin button to a reel: first press starts it, second press stops it.
+// `pick` is called at the stop and returns the logical index that wins.
+function gtWireSpin(btn, reel, poolLen, copies, pick, done) {
+  let spinner = null;
+  const label = btn.textContent;
+  btn.onclick = () => {
+    if (!spinner) {
+      spinner = gtSpinReel(reel, poolLen, copies);
+      btn.textContent = '🛑 עצור';
+      btn.classList.add('gt-stop-btn');
+      return;
+    }
+    btn.disabled = true;
+    btn.textContent = label;
+    btn.classList.remove('gt-stop-btn');
+    spinner.stop(pick(), done);
+  };
 }
 
 // The relic reel: same theatre as the player wheel, different cards.
@@ -353,14 +403,10 @@ function gtSpinRelicReel(box, target, onLanded) {
 
   const reel = box.querySelector('#gt-rreel');
   const spin = box.querySelector('#gt-rspin');
-  spin.onclick = () => {
-    spin.disabled = true;
-    const won = gtDrawRelic();
-    gtAnimateReel(reel, pool.length * 4 + pool.indexOf(won), () => {
-      spin.style.display = 'none';
-      gtGrantRelic(won, target, onLanded);
-    });
-  };
+  let won = null;
+  gtWireSpin(spin, reel, pool.length, 5,
+    () => { won = gtDrawRelic(); return pool.indexOf(won); },
+    () => { spin.style.display = 'none'; gtGrantRelic(won, target, onLanded); });
 }
 
 // The number the player steers by: his XI as it will actually be fielded, with
@@ -388,6 +434,26 @@ function gtSquadLines() {
 }
 function gtSquadRating() { const l = gtSquadLines(); return l ? l.ovr : null; }
 
+// The eleven itself, folded away behind the rating: who is on the pitch, where,
+// and what he is worth right now — the shop upgrades and the relics included, so
+// a player who was trained or peaked reads at his current number, not his card.
+function gtSquadPeekHTML() {
+  const picks = state.picks || [];
+  if (!picks.some(Boolean)) return '';
+  const rows = picks.map((p, i) => {
+    if (!p) return '';
+    const boosted = gtOvrAt(p, i) !== p.player.ovr;
+    return `
+      <div class="gt-peek-row">
+        <span class="gt-peek-pos">${state.slots[i].pos}</span>
+        <span class="gt-peek-name">${playerShortName(p.player.name)}</span>
+        <span class="gt-peek-club">${clubShortName((TEAMS[p.squad.teamId] || {}).name || '')} ${p.squad.season}</span>
+        <span class="gt-peek-ovr ${boosted ? 'up' : ''}">${gtOvrAt(p, i)}</span>
+      </div>`;
+  }).join('');
+  return `<div class="gt-peek" id="gt-squad-peek" hidden>${rows}</div>`;
+}
+
 /* ── the strip on the map ──────────────────────────────────────────────────── */
 function gtRelicBarHTML() {
   const run = gtRun();
@@ -410,17 +476,27 @@ function gtRelicBarHTML() {
     <div class="gt-bar-top">
       <div class="gt-coins">🪙 <b>${run.coins || 0}</b>${banner}${
         typeof gtModBadgeHTML === 'function' ? gtModBadgeHTML() : ''}</div>
-      ${lines ? `<div class="gt-squad-ovr">⚽ ההרכב שלך <b>${lines.ovr}</b></div>` : ''}
+      ${lines ? `<button class="gt-squad-ovr" id="gt-squad-toggle" title="לראות את ההרכב">⚽ ההרכב שלך <b>${lines.ovr}</b> <span class="gt-peek-caret">▾</span></button>` : ''}
       <div class="gt-slots">${slots.join('')}${sigSlot}</div>
     </div>
     ${lines ? `<div class="gt-bar-lines" dir="ltr">
       <span>ATK <b>${lines.atk}</b></span><span>MID <b>${lines.mid}</b></span>
       <span>DEF <b>${lines.def}</b></span><span>GK <b>${lines.gk}</b></span></div>` : ''}
+    ${gtSquadPeekHTML()}
     <div class="gt-relic-info" id="gt-relic-info"></div>`;
 }
 
 function gtWireRelicBar(root) {
   if (typeof gtWireModBadge === 'function') gtWireModBadge(root);
+  const toggle = root.querySelector('#gt-squad-toggle');
+  const peek = root.querySelector('#gt-squad-peek');
+  if (toggle && peek) {
+    toggle.onclick = () => {
+      peek.hidden = !peek.hidden;
+      const caret = toggle.querySelector('.gt-peek-caret');
+      if (caret) caret.textContent = peek.hidden ? '▾' : '▴';
+    };
+  }
   const info = root.querySelector('#gt-relic-info');
   root.querySelectorAll('.gt-slot.full[data-relic]').forEach(b => {
     b.onclick = () => {

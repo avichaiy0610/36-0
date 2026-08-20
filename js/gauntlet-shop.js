@@ -259,10 +259,10 @@ function gtAgentWheel(price, work) {
 
   const reel = work.querySelector('#gt-areel');
   const spin = work.querySelector('#gt-aspin');
-  spin.onclick = () => {
-    spin.disabled = true;
-    const won = shown[Math.floor(Math.random() * shown.length)];
-    gtAnimateReel(reel, shown.length * 4 + shown.indexOf(won), () => {
+  let won = null;
+  gtWireSpin(spin, reel, shown.length, 5,
+    () => { won = shown[Math.floor(Math.random() * shown.length)]; return shown.indexOf(won); },
+    () => {
       spin.style.display = 'none';
       const out = state.picks[weak.i];
       state.picks[weak.i] = { player: won, squad: won.squad };
@@ -277,5 +277,4 @@ function gtAgentWheel(price, work) {
       work.querySelector('#gt-aout').innerHTML =
         `<p class="gt-sign-done">✅ ${playerShortName(won.name)} נכנס במקום ${playerShortName(out.player.name)} · דירוג ההרכב: <b>${teamOVR(gtOvrAt)}</b></p>`;
     });
-  };
 }
