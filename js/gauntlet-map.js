@@ -465,7 +465,7 @@ function gmIntroHTML() {
       ${best.depth ? `<p class="gt-intro-best">🏅 השיא שלך: <b>${best.depth}</b> ניצחונות${best.cleared ? ' · המסע הושלם' : ''}${best.banner ? ' · ' + gtBannerName(best.banner) : ''}</p>` : ''}
       <p>שמונה קרבות מדרום לצפון, מול סגלים אמיתיים מההיסטוריה של ליגת העל — מקבוצה שנאבקה על הישרדות ועד השושלות הגדולות ביותר בכדורגל הישראלי.</p>
       <ul class="gt-intro-list">
-        <li>🔮 <b>פותחים בקמע</b> — בוחרים אחד משלושה לפני הקרב הראשון.</li>
+        <li>📜 <b>פותחים בחוק מסע</b> — אחד מששה, לכל אחד יתרון ומחיר, ומלווה אותך עד הסוף. אפשר גם בלי.</li>
         <li>🎲 <b>מגרילים קבוצה ובוחרים שחקן</b> — פעם אחת בתחילת המסע, וההרכב הזה מלווה אותך עד הסוף.</li>
         <li>⚔️ <b>בכל קרב אתה בוחר את היריבה</b> מבין האפשרויות שנפתחו — ואי אפשר להתחרט.</li>
         <li>🎰 <b>ניצחת? מגרילים לך שלל</b> — שחקן מהסגל שהבסת, או <b>קמע</b>.</li>
@@ -519,13 +519,13 @@ function showGauntlet() {
     reset.onclick = () => { if (typeof gtReset === 'function') gtReset(); showGauntlet(); };
   }
 
-  // The run opens on a choice: one relic out of three, before the first road is
+  // The run opens on a bargain: one run rule, or none, before the first road is
   // even on screen.
-  if (typeof gtNeedsOpeningRelic === 'function' && gtNeedsOpeningRelic()) {
-    map.innerHTML = gtOpeningHTML();
+  if (typeof gtNeedsMod === 'function' && gtNeedsMod()) {
+    map.innerHTML = gtModPickerHTML();
     if (note) note.textContent = '';
     if (reset) reset.style.display = 'none';   // nothing has happened yet to reset
-    gtWireOpening(map, () => showGauntlet());
+    gtWireModPicker(map, () => showGauntlet());
     return;
   }
 

@@ -105,6 +105,16 @@ function gtPlayerDeltas() {
     picks.forEach(p => add(p.player.name, p === best ? 5 : -1));
   }
   if (gtHas('hot-foot') && run.hotFoot) add(run.hotFoot, 3);
+
+  // דור אחד: one cutoff, a bonus on one side of it and a penalty on the other
+  const fx = typeof gtModFx === 'function' ? gtModFx() : {};
+  if (fx.eraYear) {
+    picks.forEach(p => {
+      const year = parseInt(p.squad.season, 10);
+      add(p.player.name, year <= fx.eraYear ? (fx.eraUp || 0) : (fx.eraDown || 0));
+    });
+  }
+
   if (gtHas('millennium')) {
     picks.forEach(p => { if (parseInt(p.squad.season, 10) <= 2005) add(p.player.name, 2); });
   }
@@ -162,6 +172,12 @@ function gtLineMods(me, opp, ctx) {
   const out = { ...me };
   const all = n => { out.atk += n; out.mid += n; out.def += n; out.gk += n; out.ovr += n; };
 
+  // the run rule first: it is the frame the relics then bend
+  const fx = typeof gtModFx === 'function' ? gtModFx() : {};
+  ['atk', 'mid', 'def', 'gk'].forEach(k => { if (fx[k]) out[k] += fx[k]; });
+  if (fx.allLines) all(fx.allLines);
+  if (fx.normalTime) all(fx.normalTime);        // 90' and extra time, never the shootout
+
   if (gtHas('concrete')) { out.def += 3; out.atk -= 1; }
   if (gtHas('gloves')) out.gk += 4;
   if (gtHas('counter') && opp.ovr - me.ovr >= 3) all(2);
@@ -177,10 +193,13 @@ function gtLineMods(me, opp, ctx) {
 }
 
 function gtForceHome() { return gtHas('home-crowd') || !!(gtRun().effects || {}).homeDeed; }
-function gtPensChance() { return gtHas('cool-head') ? 0.70 : 0.50; }
+function gtPensChance() {
+  const fromMod = typeof gtModNum === 'function' ? gtModNum('pens') : 0;
+  return Math.max(fromMod, gtHas('cool-head') ? 0.70 : 0.50);
+}
 function gtStoppageChance() { return gtHas('stoppage') ? 0.20 : 0; }
 function gtCoinMultiplier() {
-  return (gtHas('grass-money') ? 1.25 : 1) * (gtDealNum('coinMult') || 1);
+  return (gtHas('grass-money') ? 1.25 : 1) * (gtDealNum('coinMult') || 1) * (gtModNum('coinMult') || 1);
 }
 function gtShopDiscount() { return gtHas('agent-friend') ? 0.8 : 1; }
 function gtScouting() { return gtHas('scout') || !!(gtRun().effects || {}).scoutReport; }
@@ -326,62 +345,6 @@ function gtSpinRelicReel(box, target, onLanded) {
   };
 }
 
-/* ── the relic you start with ─────────────────────────────────────────────── */
-// One choice before the first fight, three cards, no wheel: the run should open
-// on a decision the player makes, not on one the game makes for him. The offer
-// is stored so a refresh cannot reroll it into something better.
-function gtOpeningOffer() {
-  const run = gtRun();
-  if (!run.openingOffer || !run.openingOffer.length) {
-    const offer = [];
-    while (offer.length < 3) {
-      const r = gtDrawRelic();
-      if (!r) break;
-      if (!offer.includes(r.id)) offer.push(r.id);
-      else if (GT_RELICS.length <= offer.length) break;
-    }
-    run.openingOffer = offer;
-    gtSave();
-  }
-  return run.openingOffer.map(gtRelic).filter(Boolean);
-}
-
-// Only before the first fight. A run that is already under way — one saved from
-// before this screen existed, say — never gets sent back to it.
-function gtNeedsOpeningRelic() {
-  const run = gtRun();
-  return !run.openingPicked && !run.over && !run.at && !(run.log || []).length;
-}
-
-function gtOpeningHTML() {
-  const offer = gtOpeningOffer();
-  return `
-    <div class="gt-opening">
-      <div class="gt-opening-kicker">לפני שיוצאים לדרך</div>
-      <div class="gt-opening-title">🔮 בחר קמע פתיחה</div>
-      <p class="gt-opening-sub">שלוש הצעות מתוך ${GT_RELICS.length} קמעות במשחק. הנבחר נכנס לאחד מחמשת המקומות שלך, ובהמשך יפלו עוד — מהשלל ומהחנות.</p>
-      <div class="gt-opening-grid">
-        ${offer.map(r => `<button class="gt-open-pick" data-relic="${r.id}">${gtRelicCardHTML(r)}</button>`).join('')}
-      </div>
-    </div>`;
-}
-
-function gtWireOpening(root, done) {
-  root.querySelectorAll('.gt-open-pick[data-relic]').forEach(btn => {
-    btn.onclick = () => {
-      const run = gtRun();
-      const r = gtRelic(btn.dataset.relic);
-      if (!r) return;
-      run.relics = run.relics || [];
-      run.relics.push(r.id);
-      run.openingPicked = r.id;
-      gtSave();
-      gtInvalidateDeltas();
-      if (done) done();
-    };
-  });
-}
-
 /* ── the strip on the map ──────────────────────────────────────────────────── */
 function gtRelicBarHTML() {
   const run = gtRun();
@@ -401,13 +364,15 @@ function gtRelicBarHTML() {
   const banner = (run.banner || 0) ? `<span class="gt-banner-tag">🏴 ${gtBannerName(run.banner)}</span>` : '';
   return `
     <div class="gt-bar-top">
-      <div class="gt-coins">🪙 <b>${run.coins || 0}</b>${banner}</div>
+      <div class="gt-coins">🪙 <b>${run.coins || 0}</b>${banner}${
+        typeof gtModBadgeHTML === 'function' ? gtModBadgeHTML() : ''}</div>
       <div class="gt-slots">${slots.join('')}${sigSlot}</div>
     </div>
     <div class="gt-relic-info" id="gt-relic-info"></div>`;
 }
 
 function gtWireRelicBar(root) {
+  if (typeof gtWireModBadge === 'function') gtWireModBadge(root);
   const info = root.querySelector('#gt-relic-info');
   root.querySelectorAll('.gt-slot.full[data-relic]').forEach(b => {
     b.onclick = () => {

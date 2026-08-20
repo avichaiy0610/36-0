@@ -25,7 +25,7 @@ function gtSpoilIsRelic(node) {
   if (!gtRelicsLeft()) return false;
   const run = gtRun();
   if ((run.dryWins || 0) >= 3) return true;
-  const chance = (node.elite ? 0.75 : 0.42) + gtDealNum('relicDrop');
+  const chance = (node.elite ? 0.75 : 0.42) + gtDealNum('relicDrop') + gtModNum('relicDrop');
   return Math.random() < chance;
 }
 

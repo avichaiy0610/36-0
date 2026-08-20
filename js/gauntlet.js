@@ -24,6 +24,7 @@ function gtBlank(carry) {
   const c = carry || {};
   return { v: 2, at: 0, started: false, locked: null, formationId: null, picks: null,
            log: [], over: false, banner: c.banner || 0, managerId: c.managerId || null,
+           modId: c.modId || null,
            coins: gtStartCoinsFor(c.managerId), relics: [], boosts: {}, peaks: [],
            effects: {}, hotFoot: null };
 }
@@ -139,7 +140,7 @@ function gtOpponent(node) {
   const run = gtRun();
   const sq = SQUADS.find(s => s.teamId === node.teamId && s.season === node.season);
   const name = (TEAMS[node.teamId] || {}).name || node.teamId;
-  const lift = gtBannerBoost(run) + gtDealNum('oppOvr');
+  const lift = gtBannerBoost(run) + gtDealNum('oppOvr') + gtModNum('oppOvr');
   if (!sq) {
     const flat = node.ovr + lift;
     return { name, ovr: flat, atk: flat, mid: flat, def: flat, gk: flat };
@@ -161,7 +162,7 @@ function gtOpponent(node) {
 
 // The rating a node advertises on the map — the banner is part of the map, not
 // a surprise waiting inside the fight.
-function gtShownOvr(node) { return node.ovr + gtBannerBoost() + gtDealNum('oppOvr'); }
+function gtShownOvr(node) { return node.ovr + gtBannerBoost() + gtDealNum('oppOvr') + gtModNum('oppOvr'); }
 
 /* ── the purse ────────────────────────────────────────────────────────────── */
 // A win over an 88 is worth more than a win over a 79, and a hammering is worth
@@ -332,7 +333,7 @@ function gtHalftime() {
   const el = document.getElementById('gt-after');
   // in a two-legged tie it is the aggregate that decides whether you are behind
   const me = f.aggGf + f.gf, them = f.aggGa + f.ga;
-  const canRescue = me <= them && !f.rescued && !gtDealFlag('noRescue');
+  const canRescue = me <= them && !f.rescued && !gtDealFlag('noRescue') && !gtModFlag('noRescue');
   if (!canRescue) { gtSegment('h2'); return; }
 
   el.innerHTML = `

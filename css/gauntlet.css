@@ -201,3 +201,19 @@
   40%  { transform: scale(1.09); }
   100% { transform: scale(1); }
 }
+
+/* ── run rules: one bargain for the whole run ──────────────────────────────── */
+.gt-mod-grid { display: grid; gap: 8px; grid-template-columns: 1fr; margin-bottom: 10px; }
+@media (min-width: 560px) { .gt-mod-grid { grid-template-columns: repeat(3, 1fr); } }
+.gt-mod { display: grid; gap: 3px; background: var(--surface2); border: 1px solid var(--border);
+          border-radius: 10px; padding: 12px 10px; color: var(--text); font: inherit;
+          text-align: center; cursor: pointer; transition: border-color .15s, transform .15s; }
+.gt-mod:hover { border-color: var(--accent); transform: translateY(-2px); }
+.gt-mod-ico { font-size: 26px; }
+.gt-mod-name { font-size: 14px; font-weight: 900; margin-bottom: 2px; }
+.gt-mod-pro { font-size: 12px; color: #22c55e; line-height: 1.45; }
+.gt-mod-con { font-size: 12px; color: #ef4444; line-height: 1.45; }
+.gt-mod-badge { background: #8b5cf618; border: 1px solid #8b5cf655; border-radius: 8px;
+                padding: 2px 7px; font-size: 14px; margin-inline-start: 8px; cursor: pointer;
+                color: var(--text); }
+.gt-mod-badge:hover { border-color: var(--accent); }

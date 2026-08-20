@@ -47,7 +47,7 @@ function gtShopHTML() {
       </div>
       <p class="gt-shop-note">🪙 ריבית: על כל 5 מטבעות שאתה מחזיק, ‎+1 בכל ניצחון (עד ‎+10). ארנק שמן עובד בשבילך.</p>
       <div class="gt-shop-grid" id="gt-shop-grid">
-        ${GT_SHOP.map(it => {
+        ${GT_SHOP.filter(it => !(it.id === 'insurance' && gtModFlag('noInsurance'))).map(it => {
           const price = gtPrice(it);
           const owned = it.once && gtOwned(it);
           const poor = (run.coins || 0) < price;
