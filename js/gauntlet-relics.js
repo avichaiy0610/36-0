@@ -297,12 +297,13 @@ function gtGrantRelic(relic, target, done) {
 }
 
 /* ── the spin ─────────────────────────────────────────────────────────────── */
-// Every wheel in the gauntlet turns here, and the player stops it himself:
-// press once and it runs, press again and it settles. The card is drawn at the
-// moment STOP is pressed, not before — nothing is decided while it spins, and
-// nothing about the timing of the press decides it either.
+// Every wheel in the gauntlet turns here. It runs for a couple of seconds and
+// settles on its own; the button is there for anyone who does not want to watch,
+// and skipping only shortens the settle — it never changes what the wheel found.
 const GT_SPIN_STEP = 15;      // px per tick — about 900px a second
-const GT_STOP_MS = 1600;      // how long it takes to settle once STOP is hit
+const GT_FREE_MS = 1500;      // how long it turns before it starts settling
+const GT_STOP_MS = 1600;      // the settle itself
+const GT_SKIP_MS = 500;       // ...unless you skip, and then it is brisk
 const GT_MIN_TRAVEL = 520;    // it must always run forwards into the card
 
 function gtSpinReel(reel, poolLen, copies) {
@@ -322,8 +323,9 @@ function gtSpinReel(reel, poolLen, copies) {
   }, 16);
 
   return {
-    stop(logicalIdx, done) {
+    stop(logicalIdx, done, ms) {
       if (timer) { clearInterval(timer); timer = null; }
+      const settle = ms || GT_STOP_MS;
       const from = reel.scrollLeft;
       const posOf = el => el.offsetLeft - reel.clientWidth / 2 + el.clientWidth / 2;
       // land on whichever copy of that card is far enough ahead to look like a
@@ -346,7 +348,7 @@ function gtSpinReel(reel, poolLen, copies) {
       const t0 = Date.now();
       const ease = t => 1 - Math.pow(1 - t, 4);     // long run, slow settle
       const tick = setInterval(() => {
-        const t = Math.min(1, (Date.now() - t0) / GT_STOP_MS);
+        const t = Math.min(1, (Date.now() - t0) / settle);
         reel.scrollLeft = from + (to - from) * ease(t);
         if (t < 1) return;
         clearInterval(tick);
@@ -359,22 +361,29 @@ function gtSpinReel(reel, poolLen, copies) {
   };
 }
 
-// Wires a spin button to a reel: first press starts it, second press stops it.
-// `pick` is called at the stop and returns the logical index that wins.
+// Wires a spin button to a reel. One press starts it; it then runs for a moment
+// and settles by itself. While it is running the button becomes SKIP, which does
+// the same landing in a hurry. `pick` is called once, when the settle begins.
 function gtWireSpin(btn, reel, poolLen, copies, pick, done) {
-  let spinner = null;
-  const label = btn.textContent;
+  let spinner = null, landing = false, autoTimer = null;
+  const land = ms => {
+    if (landing) return;
+    landing = true;
+    clearTimeout(autoTimer);
+    btn.disabled = true;
+    btn.classList.remove('gt-stop-btn');
+    btn.style.display = 'none';
+    spinner.stop(pick(), done, ms);
+  };
   btn.onclick = () => {
     if (!spinner) {
       spinner = gtSpinReel(reel, poolLen, copies);
-      btn.textContent = '🛑 עצור';
+      btn.textContent = '⏭ דלג';
       btn.classList.add('gt-stop-btn');
+      autoTimer = setTimeout(() => land(GT_STOP_MS), GT_FREE_MS);
       return;
     }
-    btn.disabled = true;
-    btn.textContent = label;
-    btn.classList.remove('gt-stop-btn');
-    spinner.stop(pick(), done);
+    land(GT_SKIP_MS);
   };
 }
 
