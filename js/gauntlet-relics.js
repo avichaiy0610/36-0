@@ -243,15 +243,26 @@ function gtGrantRelic(relic, target, done) {
   run.relics = run.relics || [];
   const finish = () => { gtSave(); gtInvalidateDeltas(); if (done) done(); };
 
+  // Room for it is not a reason to take it: a relic can be a bad fit for the
+  // squad you are carrying, so the offer is always an offer.
   if (run.relics.length < GT_SLOTS) {
-    run.relics.push(relic.id);
     target.innerHTML = `
       <div class="gt-relic-got">
         <div class="gt-relic-got-t">🔮 קמע חדש</div>
         ${gtRelicCardHTML(relic, 'won')}
-        <p class="gt-relic-slots">מקומות בשימוש: ${run.relics.length}/${GT_SLOTS}</p>
+        <p class="gt-relic-slots">יש לך ${run.relics.length} מתוך ${GT_SLOTS} מקומות בשימוש.</p>
+        <button class="btn-primary btn-full" id="gt-relic-take">✅ לקחת את ${relic.name}</button>
+        <button class="btn-secondary btn-full" id="gt-relic-leave">🙅 לוותר עליו</button>
       </div>`;
-    finish();
+    target.querySelector('#gt-relic-take').onclick = () => {
+      run.relics.push(relic.id);
+      target.innerHTML = `<p class="gt-sign-done">✅ ${relic.name} נכנס לתיק · ${run.relics.length}/${GT_SLOTS} מקומות בשימוש.</p>`;
+      finish();
+    };
+    target.querySelector('#gt-relic-leave').onclick = () => {
+      target.innerHTML = `<p class="gt-sign-done">ויתרת על ${relic.name}. הקמעות שלך נשארו כמו שהם.</p>`;
+      finish();
+    };
     return;
   }
 
@@ -352,6 +363,31 @@ function gtSpinRelicReel(box, target, onLanded) {
   };
 }
 
+// The number the player steers by: his XI as it will actually be fielded, with
+// the run rule and the relics already in it. Without this a rule that lifts the
+// attack by five changes nothing the player can see until the goals arrive.
+// Priced against itself as the opponent, so the relics that ask "is he stronger
+// than me?" stay quiet, and with no period, so extra-time effects stay out.
+function gtSquadLines() {
+  if (!state.picks || !state.picks.some(Boolean)) return null;
+  const me = gtMyRatings();
+  const mod = gtLineMods(me, me, {});
+  // A rule that trades attack for defence leaves the headline where it was —
+  // correct, but invisible. So the four lines are shown as well, and the
+  // headline itself moves with the average of what the lines gained or lost.
+  // The whole-team effects are already inside mod.ovr; subtracting that shift
+  // out of the average keeps them from counting twice.
+  const dLines = (['atk', 'mid', 'def', 'gk'].reduce((s, k) => s + (mod[k] - me[k]), 0)) / 4;
+  const dAll = mod.ovr - me.ovr;
+  return {
+    ovr: Math.round(mod.ovr + (dLines - dAll)),
+    atk: Math.round(mod.atk), mid: Math.round(mod.mid),
+    def: Math.round(mod.def), gk: Math.round(mod.gk),
+    base: Math.round(me.ovr),
+  };
+}
+function gtSquadRating() { const l = gtSquadLines(); return l ? l.ovr : null; }
+
 /* ── the strip on the map ──────────────────────────────────────────────────── */
 function gtRelicBarHTML() {
   const run = gtRun();
@@ -369,12 +405,17 @@ function gtRelicBarHTML() {
     ? `<button class="gt-slot full sig ${sig.rarity}" data-relic="${sig.id}" title="קמע חתימה">${sig.icon}</button>`
     : '';
   const banner = (run.banner || 0) ? `<span class="gt-banner-tag">🏴 ${gtBannerName(run.banner)}</span>` : '';
+  const lines = gtSquadLines();
   return `
     <div class="gt-bar-top">
       <div class="gt-coins">🪙 <b>${run.coins || 0}</b>${banner}${
         typeof gtModBadgeHTML === 'function' ? gtModBadgeHTML() : ''}</div>
+      ${lines ? `<div class="gt-squad-ovr">⚽ ההרכב שלך <b>${lines.ovr}</b></div>` : ''}
       <div class="gt-slots">${slots.join('')}${sigSlot}</div>
     </div>
+    ${lines ? `<div class="gt-bar-lines" dir="ltr">
+      <span>ATK <b>${lines.atk}</b></span><span>MID <b>${lines.mid}</b></span>
+      <span>DEF <b>${lines.def}</b></span><span>GK <b>${lines.gk}</b></span></div>` : ''}
     <div class="gt-relic-info" id="gt-relic-info"></div>`;
 }
 

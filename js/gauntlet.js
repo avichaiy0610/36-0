@@ -411,7 +411,7 @@ function gtRenderFight() {
   el.innerHTML = `
     <div class="gt-live">
       <div class="gt-live-top">
-        <span class="gt-live-side">ההרכב שלך<b>${f.me.ovr}</b></span>
+        <span class="gt-live-side">ההרכב שלך<b>${Math.round(gtLineMods(f.me, f.opp, { boss: f.boss }).ovr)}</b></span>
         <!-- The page is RTL, so the flex row puts YOUR side on the right and the
              opponent on the left. The scoreline is dir="ltr", so its first child
              renders leftmost — the opponent's goals must come first, or your own

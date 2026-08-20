@@ -1,9 +1,8 @@
-// Victory spoils — spin the beaten squad, or spin for a relic.
+// Victory spoils — one wheel, players and relics on it together.
 //
 // You beat them, so their roster goes on the wheel, rated as they were that
-// season. One stop, and then you either sign him (somebody has to make room in
-// an eleven) or walk away with the squad you came with. The ELITE road pays in
-// relics far more often, which is the whole reason to take it.
+// season, mixed in with relics you do not hold yet. The ELITE road is why you
+// took it: there the relics outnumber the players.
 
 function gtSpoilCandidates(node) {
   const sq = SQUADS.find(s => s.teamId === node.teamId && s.season === node.season);
@@ -17,73 +16,114 @@ function gtSpoilCandidates(node) {
 
 function gtRelicsLeft() { return GT_RELICS.some(r => !gtHas(r.id) && !r.signatureOnly); }
 
-// Relics are the reason to keep going, so they cannot be rare enough to miss in
-// a whole run. Two in five wins on the normal road, three in four on ELITE — and
-// a floor underneath: three wins with no relic and the next one is guaranteed,
-// because a run that never shows you the mechanic may as well not have it.
-function gtSpoilIsRelic(node) {
-  if (!gtRelicsLeft()) return false;
+// How the wheel is stacked. On the normal road most cards are players; on the
+// ELITE road the relics outnumber them, which is the whole reason to take it.
+// The deal and the rule can tilt it further.
+function gtSpoilMix(node) {
+  const elite = gtIsElite(node);
+  const tilt = gtDealNum('relicDrop') + gtModNum('relicDrop');   // 0.2 → two more
+  return {
+    players: elite ? 4 : 8,
+    relics: Math.round((elite ? 6 : 3) + tilt * 10),
+  };
+}
+
+function gtShuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+// The cards on the wheel: real players from the beaten squad, real relics from
+// what is left in the game, shuffled together so the eye cannot count them.
+function gtSpoilPool(node) {
+  const mix = gtSpoilMix(node);
+  const players = gtSpoilCandidates(node).slice(0, mix.players)
+    .map(p => ({ kind: 'player', player: p }));
+  const relics = gtShuffle(GT_RELICS.filter(r => !gtHas(r.id) && !r.signatureOnly))
+    .slice(0, mix.relics).map(r => ({ kind: 'relic', relic: r }));
+  return gtShuffle(players.concat(relics));
+}
+
+function gtSpoilCardHTML(c) {
+  return c.kind === 'relic'
+    ? `<div class="gt-reel-card gt-reel-relic ${c.relic.rarity}">
+         <span class="gt-reel-ovr">${c.relic.icon}</span>
+         <span class="gt-reel-name">${c.relic.name}</span>
+         <span class="gt-reel-pos">${GT_RARITY_HE[c.relic.rarity]}</span>
+       </div>`
+    : `<div class="gt-reel-card">
+         <span class="gt-reel-ovr">${c.player.ovr}</span>
+         <span class="gt-reel-name">${playerShortName(c.player.name)}</span>
+         <span class="gt-reel-pos">${c.player.position}</span>
+       </div>`;
+}
+
+// A run that never shows you a relic may as well not have the mechanic, so
+// three relic-less wins in a row and the next wheel is made to land on one.
+function gtPickSpoil(pool) {
   const run = gtRun();
-  if ((run.dryWins || 0) >= 3) return true;
-  const chance = (gtIsElite(node) ? 0.75 : 0.42) + gtDealNum('relicDrop') + gtModNum('relicDrop');
-  return Math.random() < chance;
+  const relics = pool.filter(c => c.kind === 'relic');
+  if ((run.dryWins || 0) >= 3 && relics.length) {
+    return relics[Math.floor(Math.random() * relics.length)];
+  }
+  return pool[Math.floor(Math.random() * pool.length)];
 }
 
 function gtOfferSpoils(node, container) {
-  const relicDraw = gtSpoilIsRelic(node);
-  const run = gtRun();
-  run.dryWins = relicDraw ? 0 : (run.dryWins || 0) + 1;
-  gtSave();
-  const pool = relicDraw ? [] : gtSpoilCandidates(node);
-  if (!relicDraw && !pool.length) return;
+  const pool = gtSpoilPool(node);
+  if (!pool.length) return;
 
   const box = document.createElement('div');
   box.className = 'gt-spoils';
   const club = (TEAMS[node.teamId] || {}).name || '';
-  box.innerHTML = relicDraw
-    ? `<div class="gt-spoils-kicker">שלל הניצחון</div>
-       <div class="gt-spoils-title">🔮 קמע נפל מהשלל</div>
-       <p class="gt-spoils-sub">${gtIsElite(node) ? 'מסלול ELITE - הגלגל כאן נדיב בהרבה.' : 'הפעם לא שחקן: הגלגל עוצר על קמע.'}</p>
-       <div id="gt-relic-reel"></div><div id="gt-relic-out"></div>`
-    : `<div class="gt-spoils-kicker">שלל הניצחון</div>
-       <div class="gt-spoils-title">🎰 הגרלה מהסגל שהבסת</div>
-       <p class="gt-spoils-sub">הסגל של ${club} ${node.season} על הגלגל, בדירוג של אותה עונה.</p>
-       <div class="gt-reel-wrap"><div class="gt-reel-mark"></div><div class="gt-reel" id="gt-reel"></div></div>
-       <button class="btn-primary btn-full" id="gt-spin">🎰 סובב</button>
-       <div id="gt-sign"></div>`;
+  const relicCount = pool.filter(c => c.kind === 'relic').length;
+  box.innerHTML = `
+    <div class="gt-spoils-kicker">שלל הניצחון</div>
+    <div class="gt-spoils-title">🎰 גלגל השלל</div>
+    <p class="gt-spoils-sub">${gtIsElite(node)
+      ? `מסלול ELITE - על הגלגל ${relicCount} קמעות מול ${pool.length - relicCount} שחקנים של ${club} ${node.season}.`
+      : `שחקנים של ${club} ${node.season} בדירוג של אותה עונה, ובתוכם ${relicCount} קמעות.`}</p>
+    <div class="gt-reel-wrap"><div class="gt-reel-mark"></div><div class="gt-reel" id="gt-reel"></div></div>
+    <button class="btn-primary btn-full" id="gt-spin">🎰 סובב</button>
+    <div id="gt-sign"></div>`;
 
   // sits under the result card, above the buttons — the verdict reads first
   const after = container.querySelector('.gt-res');
   if (after && after.nextSibling) container.insertBefore(box, after.nextSibling);
   else container.prepend(box);
 
-  if (relicDraw) {
-    gtSpinRelicReel(box.querySelector('#gt-relic-reel'), box.querySelector('#gt-relic-out'));
-    return;
-  }
-
   const reel = box.querySelector('#gt-reel');
   // long enough that a three-second spin is still moving when it starts to slow
   const strip = pool.concat(pool, pool, pool, pool, pool);
-  reel.innerHTML = strip.map(p => `
-    <div class="gt-reel-card">
-      <span class="gt-reel-ovr">${p.ovr}</span>
-      <span class="gt-reel-name">${playerShortName(p.name)}</span>
-      <span class="gt-reel-pos">${p.position}</span>
-    </div>`).join('');
+  reel.innerHTML = strip.map(gtSpoilCardHTML).join('');
 
   // Two stops instead of one: the greased wheel is permanent, the token is spent
   // here and now. Either way the player picks which of the two he wants.
+  const run = gtRun();
   const token = !!(run.effects || {}).secondStop;
   const twice = (gtHas('greased-wheel') || token) && pool.length > 1;
   if (token && twice) { run.effects.secondStop = false; gtSave(); }
+
+  const settle = (card, target) => {
+    const r = gtRun();
+    if (card.kind === 'relic') {
+      r.dryWins = 0; gtSave();
+      gtGrantRelic(card.relic, target);
+    } else {
+      r.dryWins = (r.dryWins || 0) + 1; gtSave();
+      gtOfferSigning(card.player, target, box);
+    }
+  };
 
   const spin = box.querySelector('#gt-spin');
   spin.onclick = () => {
     spin.disabled = true;
     const winners = [];
     while (winners.length < (twice ? 2 : 1)) {
-      const w = pool[Math.floor(Math.random() * pool.length)];
+      const w = gtPickSpoil(pool);
       if (!winners.includes(w)) winners.push(w);
     }
     const land = winners.map(w => pool.length * 4 + pool.indexOf(w));
@@ -92,13 +132,16 @@ function gtOfferSpoils(node, container) {
       land.forEach(k => reel.children[k].classList.add('won'));
       spin.style.display = 'none';
       const target = box.querySelector('#gt-sign');
-      if (winners.length === 1) { gtOfferSigning(winners[0], target, box); return; }
+      if (winners.length === 1) return settle(winners[0], target);
       target.innerHTML = `
-        <p class="gt-sign-q">🎰 שתי עצירות - מי מהשניים?</p>
+        <p class="gt-sign-q">🎰 שתי עצירות - מה לקחת?</p>
         ${winners.map((w, i) => `<button class="gt-sign-opt" data-w="${i}">
-          <span>${w.name} · ${w.position}</span><span class="gt-delta up">${w.ovr}</span></button>`).join('')}`;
+          <span>${w.kind === 'relic' ? w.relic.icon + ' ' + w.relic.name
+                                     : w.player.name + ' · ' + w.player.position}</span>
+          <span class="gt-delta up">${w.kind === 'relic' ? GT_RARITY_HE[w.relic.rarity] : w.player.ovr}</span>
+        </button>`).join('')}`;
       target.querySelectorAll('.gt-sign-opt').forEach(b => {
-        b.onclick = () => gtOfferSigning(winners[+b.dataset.w], target, box);
+        b.onclick = () => settle(winners[+b.dataset.w], target);
       });
     });
   };

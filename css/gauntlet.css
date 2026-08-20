@@ -219,3 +219,11 @@
                 padding: 2px 7px; font-size: 14px; margin-inline-start: 8px; cursor: pointer;
                 color: var(--text); }
 .gt-mod-badge:hover { border-color: var(--accent); }
+
+/* the rating you steer by, always on screen next to the wallet */
+.gt-squad-ovr { font-size: 12px; font-weight: 700; color: var(--dim); white-space: nowrap; }
+.gt-squad-ovr b { font-size: 16px; font-weight: 900; color: var(--text); margin-inline-start: 4px; }
+@media (max-width: 420px) { .gt-squad-ovr { font-size: 11px; } }
+.gt-bar-lines { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;
+                font-size: 11px; color: var(--dim); margin: -6px 0 10px; }
+.gt-bar-lines b { color: var(--text); font-weight: 800; margin-inline-start: 3px; }

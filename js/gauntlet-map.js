@@ -471,7 +471,7 @@ function gmIntroHTML() {
         <li>🎲 <b>מגרילים קבוצה ובוחרים שחקן</b> - פעם אחת בתחילת המסע, וההרכב הזה מלווה אותך עד הסוף.</li>
         <li>⚽ <b>בכל משחק אתה בוחר את היריבה</b> מבין האפשרויות שנפתחו - ואי אפשר להתחרט.</li>
         <li>💜 <b>בכל סיבוב אחת היריבות מסומנת ELITE</b> - חזקה יותר, אבל השלל שלה מפיל קמעות הרבה יותר.</li>
-        <li>🎰 <b>ניצחת? מגרילים לך שלל</b> - שחקן מהסגל שהבסת, או <b>קמע</b>.</li>
+        <li>🎰 <b>ניצחת? מסתובב גלגל השלל</b> - עליו גם שחקנים מהסגל שהבסת וגם <b>קמעות</b>, ואף פעם אין חובה לקחת.</li>
         <li>🛒 <b>כל 3 קרבות נפתחת חנות</b> - מטבעות מניצחונות, ועליהם ריבית.</li>
         <li>⏸ <b>מפגר במחצית?</b> אפשר לפרוק הכול על 45 הדקות הבאות - במחיר ויתור על השלל.</li>
         <li>🥇 <b>שני הבוסים האחרונים</b> משוחקים בשני משחקים - חוץ ובית, מאזן מצטבר.</li>
@@ -532,10 +532,9 @@ function showGauntlet() {
     return;
   }
 
-  // The shop spends the squad you are carrying, so it has to be in memory
-  // before the panel is drawn — a refresh straight onto a shop row would
-  // otherwise offer upgrades for an empty eleven.
-  if (typeof gtIsShopRow === 'function' && gtIsShopRow(run.at) && typeof gtRestoreSquad === 'function') {
+  // The squad has to be in memory whenever this screen draws: the shop spends it,
+  // and the bar prints its rating.
+  if (run.picks && typeof gtRestoreSquad === 'function') {
     gtRestoreSquad();
     if (typeof gtInvalidateDeltas === 'function') gtInvalidateDeltas();
   }
