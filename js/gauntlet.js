@@ -232,8 +232,9 @@ function gtSimSegment(share, ctx) {
   const me = gtLineMods(f.me, f.opp, ctx);
   if (f.boost) ['ovr', 'atk', 'mid', 'def', 'gk'].forEach(k => { me[k] += f.boost; });
   const a = simShrinkLines(me), b = simShrinkLines(f.opp);
+  const mine = typeof gtXgMultiplier === 'function' ? gtXgMultiplier(ctx) : 1;
   return {
-    gf: simDrawGoals(simExpectedGoals(a, b, f.home) * share),
+    gf: simDrawGoals(simExpectedGoals(a, b, f.home) * share * mine),
     ga: simDrawGoals(simExpectedGoals(b, a, !f.home) * share),
   };
 }
@@ -556,7 +557,7 @@ function gtShowResult(res) {
   const done = won && run.at >= GM_RUN.length;
 
   const notes = [];
-  if (res.stoppage) notes.push('🕰 שער שוויון בדקה 90+3');
+  if (res.stoppage) notes.push('🕰 שער שוויון בדקה 90+4');
   if (res.rescued === 'second-chance') notes.push('♻️ הזדמנות שנייה — ההפסד הפך לפנדלים');
   if (res.forfeit && won) notes.push('🔥 חיזוק המחצית נלקח — אין שלל');
   if (res.purse) {

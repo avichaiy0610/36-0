@@ -11,52 +11,52 @@ const GT_SLOTS = 5;
 
 const GT_RELICS = [
   /* ── the match ─────────────────────────────────────────────────────────── */
-  { id: 'home-crowd', icon: '🏟', name: 'קהל הבית', rarity: 'common',
-    desc: 'כל קרב במסע משוחק כמשחק בית — יתרון הביתיות תמיד שלך.' },
-  { id: 'concrete', icon: '🧱', name: 'בטון', rarity: 'common',
-    desc: 'המגנים והשוער מתחזקים ב-3 דירוג, החלוצים נחלשים ב-1.' },
+  { id: 'home-crowd', icon: '🏟', name: 'קהל ביתי', rarity: 'common',
+    desc: 'כל משחק במסע משוחק כמשחק בית — יתרון הביתיות תמיד שלך.' },
+  { id: 'concrete', icon: '🚌', name: 'להחנות את האוטובוס', rarity: 'common',
+    desc: 'המגנים והשוער מתחזקים ב-3, החלוצים נחלשים ב-1.' },
   { id: 'counter', icon: '⚡', name: 'קונטרה', rarity: 'common',
     desc: 'מול יריבה שחזקה ממך ב-3 דירוג ומעלה, כל הקבוצה שלך מתחזקת ב-2.' },
   { id: 'gloves', icon: '🧤', name: 'כפפות זהב', rarity: 'common',
-    desc: 'השוער שלך מתחזק ב-4 דירוג.' },
-  { id: 'stoppage', icon: '🕰', name: 'דקה 90+3', rarity: 'uncommon',
-    desc: 'אם אתה מפגר בשער אחד בסוף 90 הדקות, יש 20% שייפול לך שער שוויון ברגע האחרון.' },
+    desc: 'השוער שלך מתחזק ב-4.' },
+  { id: 'stoppage', icon: '🕰', name: 'תוספת זמן', rarity: 'uncommon',
+    desc: 'אם אתה בפיגור בשער אחד בסוף 90 הדקות, יש 20% שתבקיע שער שוויון ברגע האחרון.' },
   { id: 'cool-head', icon: '🥅', name: 'קור רוח', rarity: 'uncommon',
-    desc: 'קרב שמגיע לבעיטות 11 — אתה מנצח בו ב-70% מהמקרים במקום 50%.' },
+    desc: 'ניצחון ב70% מהמקרים בהם המשחק מגיע לפנדלים' },
   { id: 'fresh-legs', icon: '⏳', name: 'רגליים טריות', rarity: 'uncommon',
-    desc: 'אם הקרב נגרר להארכה, כל הקבוצה שלך מתחזקת ב-3 דירוג — רק להארכה.' },
+    desc: 'אם הקרב נגרר להארכה, כל הקבוצה שלך מתחזקת ב-3 דירוג באותו משחק.' },
   { id: 'hot-foot', icon: '🔥', name: 'רגל חמה', rarity: 'uncommon',
-    desc: 'מי שכבש לך בקרב הקודם מתחזק ב-3 דירוג בקרב הבא.' },
+    desc: 'מי שכבש לך במשחק הקודם מתחזק ב-1 במשחק הבא.' },
   { id: 'captain', icon: '👑', name: 'סרט הקפטן', rarity: 'rare',
-    desc: 'השחקן הכי טוב בהרכב מתחזק ב-5 דירוג, וכל השאר נחלשים ב-1.' },
+    desc: 'השחקן הכי טוב בהרכב מתחזק ב-5, וכל השאר נחלשים ב-1.' },
   { id: 'evil-eye', icon: '🧿', name: 'עין הרע', rarity: 'rare',
-    desc: 'בכל קרב היריבה מפסידה את השחקן הכי טוב שלה — הוא לא עולה בכלל.' },
-  { id: 'boss-crowd', icon: '🎺', name: 'חומת הקהל', rarity: 'rare',
-    desc: 'בשני קרבות הבוס האחרונים כל הקבוצה שלך מתחזקת ב-4 דירוג.' },
+    desc: 'בכל משחק היריבה מפסידה את השחקן הכי טוב שלה — הוא לא משחק בכלל.' },
+  { id: 'boss-crowd', icon: '🔔', name: 'מאני טיים', rarity: 'rare',
+    desc: 'יש סיכוי גבוה ב8% שתבקיע שער במחצית או בהארכה' },
   { id: 'second-chance', icon: '♻️', name: 'הזדמנות שנייה', rarity: 'epic',
-    desc: 'פעם אחת במסע: הפסד מתבטל, והקרב מוכרע בבעיטות 11 במקום.' },
+    desc: 'חד פעמי: הפסד מתבטל, והקרב מוכרע בפנדלים במקום.' },
 
   /* ── הסגל ──────────────────────────────────────────────────────────────── */
-  { id: 'israel-trail', icon: '🥾', name: 'שביל ישראל', rarity: 'uncommon',
-    desc: 'אם 11 השחקנים שלך מגיעים מ-11 עונות שונות, כל הקבוצה מתחזקת ב-2 דירוג.' },
+  { id: 'israel-trail', icon: '🌀', name: 'הנוסע בזמן', rarity: 'uncommon',
+    desc: 'אם 11 השחקנים שלך מגיעים מ-11 עונות שונות, כל הקבוצה מתחזקת ב-2.' },
   { id: 'millennium', icon: '🏛', name: 'דור המילניום', rarity: 'uncommon',
-    desc: 'כל שחקן שנבחר מעונות 1999/00 עד 2005/06 מתחזק ב-2 דירוג.' },
+    desc: 'כל שחקן שנבחר מעונות 1999/00 עד 2005/06 מתחזק ב-2.' },
   { id: 'duo', icon: '🧬', name: 'צמד מוכר', rarity: 'uncommon',
-    desc: 'שני שחקנים שנבחרו מאותה קבוצה ומאותה עונה מתחזקים ב-3 דירוג כל אחד.' },
+    desc: 'שני שחקנים שנבחרו מאותה קבוצה ומאותה עונה מתחזקים ב-3 כל אחד.' },
   { id: 'pride', icon: '🇮🇱', name: 'גאוות יחידה', rarity: 'uncommon',
-    desc: 'כל שחקן ישראלי בהרכב מתחזק ב-2 דירוג.' },
-  { id: 'legionnaire', icon: '✈️', name: 'הלגיונר', rarity: 'uncommon',
-    desc: 'כל שחקן חוץ מתחזק ב-3 דירוג, וכל ישראלי נחלש ב-1.' },
+    desc: 'כל שחקן ישראלי בהרכב מתחזק ב-1.' },
+  { id: 'legionnaire', icon: '✈️', name: 'שחקן זר', rarity: 'uncommon',
+    desc: 'כל שחקן זר מתחזק ב-3, וכל ישראלי נחלש ב-1.' },
   { id: 'babel', icon: '🌍', name: 'מגדל בבל', rarity: 'rare',
-    desc: 'אם יש בהרכב שחקנים מ-6 לאומים שונים ומעלה, כל הקבוצה מתחזקת ב-2 דירוג.' },
+    desc: 'אם יש בהרכב שחקנים מ-6 לאומים שונים ומעלה, כל הקבוצה מתחזקת ב-2.' },
 
   /* ── מסלול וכלכלה ──────────────────────────────────────────────────────── */
   { id: 'scout', icon: '🔍', name: 'סקאוט', rarity: 'common',
-    desc: 'לפני שבוחרים דרך רואים כמה חזקה כל יריבה בהתקפה, בקישור, בהגנה ובשוער.' },
+    desc: 'לפני שבוחרים יריבה לשחק מולה רואים כמה היריבות חזקות בהתקפה, בקישור, בהגנה ובשוער.' },
   { id: 'grass-money', icon: '💰', name: 'כסף מהמדשאה', rarity: 'common',
-    desc: 'כל ניצחון משלם 25% יותר מטבעות.' },
+    desc: 'כל ניצחון מקנה 25% יותר מטבעות.' },
   { id: 'agent-friend', icon: '🤝', name: 'חבר של הסוכן', rarity: 'uncommon',
-    desc: 'כל מה שקונים בחנות עולה 20% פחות.' },
+    desc: 'המוצרים בחנות זולים ב-20%.' },
   { id: 'greased-wheel', icon: '🎰', name: 'גלגל משומן', rarity: 'rare',
     desc: 'בהגרלת השלל אחרי ניצחון הגלגל עוצר על שני שחקנים, ואתה בוחר מי מהם מצטרף.' },
   { id: 'watchlist', icon: '📋', name: 'רשימת מעקב', rarity: 'uncommon',
@@ -104,7 +104,7 @@ function gtPlayerDeltas() {
     const best = picks.reduce((a, b) => (b.player.ovr > a.player.ovr ? b : a));
     picks.forEach(p => add(p.player.name, p === best ? 5 : -1));
   }
-  if (gtHas('hot-foot') && run.hotFoot) add(run.hotFoot, 3);
+  if (gtHas('hot-foot') && run.hotFoot) add(run.hotFoot, 1);
 
   // דור אחד: one cutoff, a bonus on one side of it and a penalty on the other
   const fx = typeof gtModFx === 'function' ? gtModFx() : {};
@@ -126,7 +126,7 @@ function gtPlayerDeltas() {
   if (gtHas('pride') || gtHas('legionnaire')) {
     picks.forEach(p => {
       const isr = gtIsIsraeli(p.player.name);
-      if (gtHas('pride') && isr) add(p.player.name, 2);
+      if (gtHas('pride') && isr) add(p.player.name, 1);
       if (gtHas('legionnaire')) add(p.player.name, isr ? -1 : 3);
     });
   }
@@ -177,11 +177,11 @@ function gtLineMods(me, opp, ctx) {
   ['atk', 'mid', 'def', 'gk'].forEach(k => { if (fx[k]) out[k] += fx[k]; });
   if (fx.allLines) all(fx.allLines);
   if (fx.normalTime) all(fx.normalTime);        // 90' and extra time, never the shootout
+  if (fx.extraTime && ctx && ctx.extraTime) all(fx.extraTime);
 
-  if (gtHas('concrete')) { out.def += 3; out.atk -= 1; }
+  if (gtHas('concrete')) { out.def += 3; out.gk += 3; out.atk -= 1; }
   if (gtHas('gloves')) out.gk += 4;
   if (gtHas('counter') && opp.ovr - me.ovr >= 3) all(2);
-  if (gtHas('boss-crowd') && ctx && ctx.boss) all(4);
   if (gtHas('fresh-legs') && ctx && ctx.extraTime) all(3);
   if (gtHas('israel-trail')) {
     const picks = (state.picks || []).filter(Boolean);
@@ -190,6 +190,13 @@ function gtLineMods(me, opp, ctx) {
   }
   if (gtHas('babel') && gtNatCount() >= 6) all(2);
   return out;
+}
+
+// מאני טיים does not make the team better, it makes the goals likelier: the
+// expected-goals number itself is nudged, and only when the clock is late.
+function gtXgMultiplier(ctx) {
+  const late = ctx && (ctx.half === 2 || ctx.extraTime);
+  return gtHas('boss-crowd') && late ? 1.08 : 1;
 }
 
 function gtForceHome() { return gtHas('home-crowd') || !!(gtRun().effects || {}).homeDeed; }

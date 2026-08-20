@@ -9,6 +9,7 @@
 //   atk / mid / def / gk   line deltas, all the time
 //   allLines               added to every line
 //   normalTime             extra delta during 90' and extra time only
+//   extraTime              extra delta during extra time only
 //   oppOvr                 every opponent on the map rated up by this
 //   startCoins             coins in the wallet on day one
 //   coinMult               multiplier on victory money
@@ -19,30 +20,30 @@
 //   eraYear / eraUp / eraDown   season cutoff, and the deltas either side of it
 
 const GT_MODS = [
-  { id: 'total', icon: '⚔️', name: 'כדורגל טוטאלי',
-    pro: 'החלוצים והקשרים שלך משחקים כאילו הם טובים ב-5 דירוג יותר',
-    con: 'המגנים והשוער משחקים כאילו הם חלשים ב-5 דירוג',
+  { id: 'total', icon: '⚔️', name: 'טוטאל פוטבול',
+    pro: 'פלוס 5 בדירוג לחלוצים לקשרים',
+    con: 'מינוס 5 בדירוג לשחקני ההגנה ולשוער',
     effects: { atk: 5, mid: 5, def: -5, gk: -5 } },
 
   { id: 'catenaccio', icon: '🧱', name: 'קטנאצ׳ו',
-    pro: 'המגנים והשוער משחקים כאילו הם טובים ב-5 דירוג יותר',
-    con: 'החלוצים והקשרים משחקים כאילו הם חלשים ב-5 דירוג',
+    pro: 'פלוס 5 בדירוג לשחקני ההגנה ולשוער',
+    con: 'מינוס 5 בדירוג לחלוצים לקשרים',
     effects: { atk: -5, mid: -5, def: 5, gk: 5 } },
 
-  { id: 'rich', icon: '💰', name: 'בעלים עשיר',
-    pro: 'נכנסים לקרב הראשון עם 150 מטבעות בקופה',
-    con: 'כל הקבוצות במפה מתחזקות ב-2 דירוג',
+  { id: 'rich', icon: '💰', name: 'אוליגרך',
+    pro: 'מתחילים את המשחק עם 150 מטבעות בקופה',
+    con: 'הדירוג של כל הקבוצות במפה עולה ב2',
     effects: { startCoins: 150, oppOvr: 2 } },
 
   { id: 'noreturn', icon: '💀', name: 'אין דרך חזרה',
-    pro: 'פי 1.6 מטבעות על כל ניצחון, ועוד 20% סיכוי שייפול קמע במקום שחקן',
-    con: 'בלי רשת ביטחון: אי אפשר להתחזק במחצית כשמפגרים, ואי אפשר לקנות בחנות פוליסה שמבטלת הפסד',
+    pro: 'פי 1.6 מטבעות על כל ניצחון, ו20% סיכוי שיוגרל קמע במקום שחקן',
+    con: 'בלי רשת ביטחון: אי אפשר להתחזק במחצית, ואי אפשר לקנות בחנות פוליסה שמבטלת הפסד',
     effects: { coinMult: 1.6, relicDrop: 0.2, noRescue: true, noInsurance: true } },
 
-  { id: 'shootout', icon: '🎯', name: 'מכונת פנדלים',
-    pro: 'קרב שמגיע לבעיטות 11 — אתה מנצח בו ב-85% מהמקרים במקום 50%',
-    con: 'אבל ב-90 הדקות ובהארכה כל הקבוצה שלך חלשה ב-3 דירוג',
-    effects: { pens: 0.85, normalTime: -3 } },
+  { id: 'shootout', icon: '🎯', name: 'פנדליסט',
+    pro: 'ניצחון ב85% מהמקרים בהם המשחק מגיע לפנדלים',
+    con: 'בהארכה הקבוצה שלך נחלשת ב2',
+    effects: { pens: 0.85, extraTime: -2 } },
 
   { id: 'oldschool', icon: '🏛', name: 'דור אחד',
     pro: 'כל שחקן שנבחר מעונת 2005/06 ואחורה מתחזק ב-4 דירוג',
@@ -72,8 +73,8 @@ function gtModPickerHTML() {
   return `
     <div class="gt-opening">
       <div class="gt-opening-kicker">לפני שיוצאים לדרך</div>
-      <div class="gt-opening-title">📜 בחר חוק מסע</div>
-      <p class="gt-opening-sub">חוק אחד מששה, והוא בתוקף מהקרב הראשון ועד האחרון. לכל חוק יש צד שמרוויח וצד שמשלם — אין כאן מתנות. אפשר גם לוותר ולשחק בלי שום חוק.</p>
+      <div class="gt-opening-title">📜 בחר קמע מסע</div>
+      <p class="gt-opening-sub">קמע אחד מששה, והוא בתוקף מהקרב הראשון ועד האחרון. לכל קמע יש צד שמרוויח וצד שמשלם — אין כאן מתנות. אפשר גם לוותר ולשחק בלי שום קמע.</p>
       <div class="gt-mod-grid">
         ${GT_MODS.map(m => `
           <button class="gt-mod" data-mod="${m.id}">
@@ -83,7 +84,7 @@ function gtModPickerHTML() {
             <span class="gt-mod-con">✖ ${gtNums(m.con)}</span>
           </button>`).join('')}
       </div>
-      <button class="btn-secondary btn-full" id="gt-mod-none">🚫 בלי חוק — יוצאים נקי</button>
+      <button class="btn-secondary btn-full" id="gt-mod-none">🚫 בלי קמע — יוצאים נקי</button>
     </div>`;
 }
 
