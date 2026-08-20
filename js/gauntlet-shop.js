@@ -6,21 +6,21 @@
 
 const GT_SHOP = [
   { id: 'training',     icon: '🏋️', name: 'מחנה אימונים', price: 40,
-    desc: '‎+2 לשחקן אחד בהרכב. עד ‎+4 לשחקן.' },
+    desc: 'שחקן אחד לבחירתך מתחזק ב-2 דירוג. אפשר לאמן את אותו שחקן עד תוספת של 4.' },
   { id: 'prime',        icon: '⚡',  name: 'מצב שיא', price: 55,
-    desc: 'שחקן אחד עובר לעונת השיא של הקריירה שלו.' },
+    desc: 'שחקן אחד לבחירתך מוחלף בגרסה של עונת השיא שלו — הדירוג הכי גבוה שהיה לו אי פעם.' },
   { id: 'agent-wheel',  icon: '🎡',  name: 'גלגל סוכנים', price: 50,
-    desc: 'הסוכן סורק את העמדה החלשה שלך ומביא חלופה.' },
+    desc: 'הסוכן מאתר את העמדה החלשה בהרכב ומגריל לה שלוש חלופות טובות יותר. אחת נכנסת.' },
   { id: 'relic-wheel',  icon: '🔮',  name: 'גלגל קמעות', price: 65,
-    desc: 'גלגל שכל הקלפים בו קמעות.' },
+    desc: 'סיבוב אחד על גלגל שכל הקלפים בו קמעות — קמע מובטח.' },
   { id: 'insurance',    icon: '🛡',  name: 'פוליסת ביטוח', price: 125, once: true,
-    desc: 'הפסד שהיה מסיים את הריצה מתבטל — והקרב משוחק מחדש.' },
+    desc: 'פעם אחת: הפסד לא מסיים את המסע. הקרב פשוט משוחק מחדש מההתחלה.' },
   { id: 'second-stop',  icon: '🎰',  name: 'עצירה שנייה', price: 35, once: true,
-    desc: 'בהגרלת השלל הבאה עוצרים פעמיים ובוחרים.' },
+    desc: 'בהגרלת השלל הבאה הגלגל עוצר על שני שחקנים, ואתה בוחר מי מהם מצטרף.' },
   { id: 'home-deed',    icon: '🏟',  name: 'שטר קהל בית', price: 45, once: true,
-    desc: 'כל שאר הקרבות במסע משוחקים בבית.' },
+    desc: 'כל הקרבות שנשארו במסע ישוחקו בבית, עם יתרון הביתיות.' },
   { id: 'scout-report', icon: '📋',  name: 'דוח סקאוטים', price: 35, once: true,
-    desc: 'דירוגי הקווים של כל יריבה נחשפים עד סוף המסע.' },
+    desc: 'עד סוף המסע תראה כמה חזקה כל יריבה בהתקפה, בקישור, בהגנה ובשוער — לפני שבוחרים דרך.' },
 ];
 
 // Interest, the way goat-lab does it: a wallet you sat on pays you for sitting
@@ -45,7 +45,7 @@ function gtShopHTML() {
         <span class="gt-shop-title">🛒 החנות הנודדת</span>
         <span class="gt-shop-wallet">🪙 <b id="gt-wallet">${run.coins || 0}</b></span>
       </div>
-      <p class="gt-shop-note">🪙 ריבית: על כל 5 מטבעות שאתה מחזיק, ‎+1 בכל ניצחון (עד ‎+10). ארנק שמן עובד בשבילך.</p>
+      <p class="gt-shop-note">🪙 <b>ריבית:</b> בכל ניצחון אתה מקבל מטבע נוסף על כל 5 מטבעות ששמורים אצלך, עד 10 נוספים. כלומר גם לא לבזבז זה משתלם.</p>
       <div class="gt-shop-grid" id="gt-shop-grid">
         ${GT_SHOP.filter(it => !(it.id === 'insurance' && gtModFlag('noInsurance'))).map(it => {
           const price = gtPrice(it);

@@ -204,8 +204,10 @@
 
 /* ── run rules: one bargain for the whole run ──────────────────────────────── */
 .gt-mod-grid { display: grid; gap: 8px; grid-template-columns: 1fr; margin-bottom: 10px; }
-@media (min-width: 560px) { .gt-mod-grid { grid-template-columns: repeat(3, 1fr); } }
-.gt-mod { display: grid; gap: 3px; background: var(--surface2); border: 1px solid var(--border);
+/* the explanations run long on purpose, so let the column count follow the
+   width rather than forcing three narrow strips of wrapped text */
+@media (min-width: 560px) { .gt-mod-grid { grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); } }
+.gt-mod { display: grid; gap: 4px; align-content: start; background: var(--surface2); border: 1px solid var(--border);
           border-radius: 10px; padding: 12px 10px; color: var(--text); font: inherit;
           text-align: center; cursor: pointer; transition: border-color .15s, transform .15s; }
 .gt-mod:hover { border-color: var(--accent); transform: translateY(-2px); }
