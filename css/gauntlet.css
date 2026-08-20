@@ -227,3 +227,19 @@
 .gt-bar-lines { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;
                 font-size: 11px; color: var(--dim); margin: -6px 0 10px; }
 .gt-bar-lines b { color: var(--text); font-weight: 800; margin-inline-start: 3px; }
+
+/* ── admin sandbox (one account) ───────────────────────────────────────────── */
+.gt-admin { background: #ef444410; border: 1px dashed #ef444466; border-radius: 10px;
+            padding: 12px; margin-top: 14px; }
+.gt-admin-t { font-weight: 900; color: #ef4444; margin-bottom: 8px; font-size: 14px; }
+.gt-admin-t span { font-weight: 600; font-size: 11px; color: var(--dim); margin-inline-start: 8px; }
+.gt-admin-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 7px; }
+.gt-admin-row label { font-size: 12px; color: var(--dim); min-width: 92px; }
+.gt-admin-row select, .gt-admin-row input {
+  background: var(--surface2); color: var(--text); border: 1px solid var(--border);
+  border-radius: 6px; padding: 4px 6px; font-family: inherit; font-size: 12px; max-width: 190px; }
+.gt-admin-btn { background: var(--surface2); color: var(--text); border: 1px solid var(--border);
+                border-radius: 6px; padding: 4px 10px; font-family: inherit; font-size: 12px;
+                cursor: pointer; }
+.gt-admin-btn:hover { border-color: #ef4444; color: #ef4444; }
+.gt-admin-state { font-size: 11px; color: var(--dim); margin: 6px 0 0; direction: rtl; }

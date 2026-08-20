@@ -66,6 +66,12 @@ function gtSpoilCardHTML(c) {
 function gtPickSpoil(pool) {
   const run = gtRun();
   const relics = pool.filter(c => c.kind === 'relic');
+  if (run.forceSpoil) {                       // sandbox: pin the card type
+    const want = pool.filter(c => c.kind === run.forceSpoil);
+    delete run.forceSpoil;
+    gtSave();
+    if (want.length) return want[Math.floor(Math.random() * want.length)];
+  }
   if ((run.dryWins || 0) >= 3 && relics.length) {
     return relics[Math.floor(Math.random() * relics.length)];
   }

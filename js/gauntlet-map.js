@@ -546,6 +546,17 @@ function showGauntlet() {
   const newRun = map.querySelector('#gt-new-run');
   if (newRun) newRun.onclick = () => { gtReset(); showGauntlet(); };
 
+  // the sandbox, for one account
+  if (typeof gtAdminHTML === 'function') {
+    const panel = gtAdminHTML();
+    if (panel) {
+      const host = document.createElement('div');
+      host.innerHTML = panel;
+      map.appendChild(host);
+      gtWireAdmin(host);
+    }
+  }
+
   const choose = el => {
     if (typeof gtChoose === 'function') gtChoose(+el.dataset.row, +el.dataset.node);
   };

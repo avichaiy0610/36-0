@@ -97,6 +97,7 @@ function gtBest() {
   catch (e) { return { depth: 0, banner: 0, cleared: false }; }
 }
 function gtRecordRun(run, cleared) {
+  if (run.sandbox) return gtBest();
   const best = gtBest();
   const depth = (run.log || []).filter(l => l.outcome === 'W').length;
   const better = depth > best.depth || (depth === best.depth && (run.banner || 0) > (best.banner || 0));
@@ -301,6 +302,18 @@ function gtAddGoals(n, side, from, to) {
 
 // The phases of a fight, in order. Each one simulates its own goals, plays them
 // out on the clock, and hands over to the next.
+// The sandbox can pin a result. It is applied at the whistle rather than by
+// skipping the match, so everything downstream — the timeline, the purse, the
+// spoils, the two-legged tie — runs exactly as it would in a real fight.
+function gtForcedOutcome() {
+  const forced = gtRun().force;
+  if (!forced) return null;
+  const r = gtRun();
+  delete r.force;                       // one fight, then back to normal
+  gtSave();
+  return forced;
+}
+
 function gtSegment(phase) {
   const f = _gtF;
   if (phase === 'h1') {
@@ -322,8 +335,22 @@ function gtSegment(phase) {
         gtPaintScore();
       }
       if (f.leg < f.legs) return gtEndLeg();
+      const forced = gtForcedOutcome();
+      if (forced === 'W' || forced === 'L') {
+        // make the scoreline agree with the verdict before it is shown
+        const gap = (f.aggGf + f.gf) - (f.aggGa + f.ga);
+        if (forced === 'W' && gap <= 0) { f.gf += 1 - gap; gtAddGoals(1 - gap, 'me', 60, 90); }
+        if (forced === 'L' && gap >= 0) { f.ga += 1 + gap; gtAddGoals(1 + gap, 'them', 60, 90); }
+        gtPaintScore();
+        return gtFinish(forced);
+      }
       const me = f.aggGf + f.gf, them = f.aggGa + f.ga;
-      if (me !== them) return gtFinish(me > them ? 'W' : 'L');
+      if (me !== them && forced !== 'D') return gtFinish(me > them ? 'W' : 'L');
+      if (forced === 'D' && me !== them) {         // level it up and play on
+        if (me > them) { f.ga += me - them; gtAddGoals(me - them, 'them', 60, 90); }
+        else { f.gf += them - me; gtAddGoals(them - me, 'me', 60, 90); }
+        gtPaintScore();
+      }
       f.decidedBy = f.legs > 1 ? 'הארכה במשחק הגומלין' : 'הארכה';
       gtSegment('et');
     });
@@ -521,6 +548,7 @@ function gtFinish(outcome) {
 // record book already holds the run.
 async function gtSubmitRun(run, cleared) {
   if (run.submitted) return;
+  if (run.sandbox) { run.submitted = true; gtSave(); return; }   // a rigged run is not a record
   run.submitted = true;
   gtSave();
   if (typeof _supabase === 'undefined' || !_supabase) return;
