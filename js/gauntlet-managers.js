@@ -29,10 +29,14 @@
 
 const GT_MANAGERS = [];
 
-function gtManager() {
-  const id = gtRun().managerId;
+// Everything here comes in two forms: one that takes the manager id, and one
+// that reads it off the run. gtBlank() builds a run and therefore MUST use the
+// by-id form — asking gtRun() for a run that is still being constructed sends it
+// straight back into gtBlank(), which is a hang, not an error.
+function gtManagerById(id) {
   return id ? (GT_MANAGERS.find(m => m.id === id) || null) : null;
 }
+function gtManager() { return gtManagerById(gtRun().managerId); }
 function gtManagersEnabled() { return GT_MANAGERS.length > 0; }
 
 // The signature relic is held, but never in a slot — that is the whole point of
@@ -46,10 +50,12 @@ function gtSignatureRelic() {
   return id && typeof gtRelic === 'function' ? gtRelic(id) : null;
 }
 
-function gtDeal() { return (gtManager() || {}).deal || {}; }
+function gtDealOf(manager) { return (manager || {}).deal || {}; }
+function gtDeal() { return gtDealOf(gtManager()); }
 function gtDealNum(key) { return Number(gtDeal()[key] || 0); }
 function gtDealFlag(key) { return !!gtDeal()[key]; }
-function gtStartCoins() { return gtDealNum('startCoins'); }
+// by id, because the only caller is the one building a run from nothing
+function gtStartCoinsFor(id) { return Number(gtDealOf(gtManagerById(id)).startCoins || 0); }
 
 /* ── hiring, when there is anyone to hire ─────────────────────────────────── */
 function gtManagerPickerHTML() {
@@ -78,7 +84,7 @@ function gtWireManagerPicker(root, done) {
     btn.onclick = () => {
       const run = gtRun();
       run.managerId = btn.dataset.gm;
-      run.coins = (run.coins || 0) + gtStartCoins();
+      run.coins = (run.coins || 0) + gtStartCoinsFor(run.managerId);
       gtSave();
       if (done) done();
     };

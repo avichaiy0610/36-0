@@ -18,22 +18,26 @@ const GT_BANNERS = [0, 2, 4, 6, 8, 10];
 function gtBannerBoost(run) { return GT_BANNERS[(run || gtRun()).banner || 0] || 0; }
 function gtBannerName(n) { return ['', 'באנר I', 'באנר II', 'באנר III', 'באנר IV', 'באנר V'][n] || ('באנר ' + n); }
 
+// A blank run must be buildable without a run already existing, so nothing here
+// may go through gtRun() — hence gtStartCoinsFor(id) rather than gtStartCoins().
 function gtBlank(carry) {
   const c = carry || {};
   return { v: 2, at: 0, started: false, locked: null, formationId: null, picks: null,
            log: [], over: false, banner: c.banner || 0, managerId: c.managerId || null,
-           coins: gtStartCoins(), relics: [], boosts: {}, peaks: [], effects: {}, hotFoot: null };
+           coins: gtStartCoinsFor(c.managerId), relics: [], boosts: {}, peaks: [],
+           effects: {}, hotFoot: null };
 }
 let _gtRun = null;
 function gtRun() {
   if (_gtRun) return _gtRun;
-  try {
-    const raw = JSON.parse(localStorage.getItem(GT_KEY));
-    // a v1 save predates coins and relics; it is still a real run, so it keeps
-    // its progress and simply starts the economy at zero
-    if (raw && raw.v === 1) return (_gtRun = { ...gtBlank(), ...raw, v: 2, coins: 0 });
-    if (raw && raw.v === 2) return (_gtRun = raw);
-  } catch (e) { /* corrupt save — start clean */ }
+  // Only the parse is guarded. Wrapping the run construction too would swallow a
+  // real error and then retry it, which turns one bug into a frozen tab.
+  let raw = null;
+  try { raw = JSON.parse(localStorage.getItem(GT_KEY)); } catch (e) { raw = null; }
+  if (raw && raw.v === 2) return (_gtRun = raw);
+  // a v1 save predates coins and relics; it is still a real run, so it keeps its
+  // progress and simply starts the economy at zero
+  if (raw && raw.v === 1) return (_gtRun = { ...gtBlank(), ...raw, v: 2, coins: 0 });
   return (_gtRun = gtBlank());
 }
 function gtSave() {

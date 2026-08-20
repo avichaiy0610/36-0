@@ -47,6 +47,26 @@ the admin email, `from()` → a chainable that resolves `{data: [], error: null}
 `rpc`/`channel` no-ops) plus `getCurrentUser()`. The whole panel then renders and
 buttons can be clicked.
 
-Learned the hard way twice: parsing the inline script proves nothing. Both the
-dead "play" button and the dead preset button were runtime ReferenceErrors that
-a syntax check passed happily. Always click the thing.
+## 4. Always test the EMPTY state, and the OLD state
+
+A driver that seeds localStorage tests the state you imagined, never the state a
+real visitor arrives in. The gauntlet froze on first click for exactly that
+reason: every scenario wrote a current-version save, so nobody ever ran the "no
+save at all" branch, where building a blank run re-entered the loader that was
+still building it. Old saves are the same trap from the other side — a migration
+branch only runs for someone who played the previous version.
+
+So for anything with a `localStorage` save, run three states, not one:
+
+| state | how |
+|---|---|
+| fresh | `localStorage.removeItem(KEY)` before the click |
+| previous version | write a save with the old `v` and the old fields |
+| current | the seeded scenario you were going to write anyway |
+
+And run the browser under `timeout 45 ...`: an infinite loop shows up as exit
+code 124, which a screenshot alone will never tell you.
+
+Learned the hard way three times: parsing the inline script proves nothing. The
+dead "play" button, the dead preset button and the frozen gauntlet were all
+runtime failures that a syntax check passed happily. Always click the thing.
