@@ -11,11 +11,15 @@
 // the data — rates 91 (92 in peak mode). A normal good draft lands at 85-88.
 // The pots are set against that number, not against it being close:
 //
-//   pot 1  96-99   pot 2  93-95   pot 3  89-90   pot 4  84-87  (you belong here)
+//   pot 1  96-99   pot 2  93-99   pot 3  89-90   pot 4  84-91
 //
-// Real Madrid and Barcelona are 99 — eight clear of anything Israeli football
-// has ever assembled. That gap is the design, not an accident of tuning: see
+// Eleven clubs sit at 99 — eight clear of anything Israeli football has ever
+// assembled. That gap is the design, not an accident of tuning: see
 // docs/EUROPE.md for what it costs a squad at each rating.
+//
+// The pots are the DRAW (two clubs from each), not a difficulty ladder: the
+// ratings were set club by club, so pot 2 holds three 99s and pot 4 holds a 91.
+// Nothing in the code assumes pot number tracks strength.
 
 /* ── the clubs ────────────────────────────────────────────────────────────────
    The four qualifying opponents are not invented. docs/EUROPE_OPPONENTS.md counts
@@ -39,18 +43,18 @@ const EU_POTS = [
     { name: 'ריאל מדריד', flag: '🇪🇸', ovr: 99 },
     { name: 'ברצלונה', flag: '🇪🇸', ovr: 99 },
     { name: "מנצ'סטר סיטי", flag: '🏴', ovr: 99 },
-    { name: 'באיירן מינכן', flag: '🇩🇪', ovr: 98 },
-    { name: 'ליברפול', flag: '🏴', ovr: 98 },
-    { name: "פריז סן ז'רמן", flag: '🇫🇷', ovr: 97 },
-    { name: 'אינטר', flag: '🇮🇹', ovr: 97 },
-    { name: 'בורוסיה דורטמונד', flag: '🇩🇪', ovr: 96 },
+    { name: 'באיירן מינכן', flag: '🇩🇪', ovr: 99 },
+    { name: 'ליברפול', flag: '🏴', ovr: 99 },
+    { name: "פריז סן ז'רמן", flag: '🇫🇷', ovr: 99 },
+    { name: 'אינטר', flag: '🇮🇹', ovr: 99 },
+    { name: 'בורוסיה דורטמונד', flag: '🇩🇪', ovr: 99 },
     { name: 'לייפציג', flag: '🇩🇪', ovr: 96 },
   ],
-  [ // pot 2 — 93-95
-    { name: 'ארסנל', flag: '🏴', ovr: 95 },
-    { name: 'אתלטיקו מדריד', flag: '🇪🇸', ovr: 95 },
+  [ // pot 2 — 93-99. Arsenal, Atlético and Juventus are rated with pot 1.
+    { name: 'ארסנל', flag: '🏴', ovr: 99 },
+    { name: 'אתלטיקו מדריד', flag: '🇪🇸', ovr: 99 },
     { name: 'באייר לוורקוזן', flag: '🇩🇪', ovr: 94 },
-    { name: 'יובנטוס', flag: '🇮🇹', ovr: 94 },
+    { name: 'יובנטוס', flag: '🇮🇹', ovr: 99 },
     { name: 'מילאן', flag: '🇮🇹', ovr: 94 },
     { name: 'אטלנטה', flag: '🇮🇹', ovr: 93 },
     { name: 'בנפיקה', flag: '🇵🇹', ovr: 93 },
@@ -69,10 +73,11 @@ const EU_POTS = [
     { name: 'יאנג בויז', flag: '🇨🇭', ovr: 89 },
     { name: 'אולימפיאקוס', flag: '🇬🇷', ovr: 89 },
   ],
-  [ // pot 4 — 84-87. Your own pot, and the only place the table is winnable.
-    { name: 'אסטון וילה', flag: '🏴', ovr: 87 },
-    { name: 'מונאקו', flag: '🇫🇷', ovr: 87 },
-    { name: 'שטוטגרט', flag: '🇩🇪', ovr: 86 },
+  [ // pot 4 — 84-91. Your own pot, and the only place the table is winnable —
+    // though Aston Villa at 91 outrates everything in pot 3.
+    { name: 'אסטון וילה', flag: '🏴', ovr: 91 },
+    { name: 'מונאקו', flag: '🇫🇷', ovr: 90 },
+    { name: 'שטוטגרט', flag: '🇩🇪', ovr: 88 },
     { name: "ז'ירונה", flag: '🇪🇸', ovr: 86 },
     { name: 'ספרטה פראג', flag: '🇨🇿', ovr: 85 },
     { name: 'ברסט', flag: '🇫🇷', ovr: 85 },
