@@ -902,6 +902,10 @@ function saveSeasonState(season) {
       leagueTable: season.leagueTable,
       playerStats: season.playerStats.map(({ squad, ...rest }) => rest),
     };
+    // A new season means last season's European campaign is void — it belonged
+    // to a squad and a finishing position that no longer exist.
+    delete d.europe;
+    if (typeof _euCampaign !== 'undefined') _euCampaign = null;
     localStorage.setItem(DRAFT_SAVE_KEY, JSON.stringify(d));
   } catch (e) {}
 }
@@ -2199,11 +2203,24 @@ function showPreseason(ovr) {
 // After a season the XI has nowhere to go. This sends it to Europe — the same
 // four qualifying ties the gauntlet ends with, played on a run that is never
 // saved, so a season cannot disturb gauntlet progress.
-function wireEuropeButton() {
+// Only the champion goes to Europe. That is both the real rule and the point:
+// winning the league has to buy something the tier name alone doesn't. Everyone
+// else still sees the button, so they know what finishing first is worth.
+// Called with the finishing rank, which is only known once the season is built —
+// until then there is nothing to show.
+function wireEuropeButton(rank) {
   const btn = document.getElementById('btn-europe');
   if (!btn) return;
-  btn.style.display = typeof gtSeasonEuStart === 'function' ? '' : 'none';
-  btn.onclick = () => { if (typeof gtSeasonEuStart === 'function') gtSeasonEuStart(); };
+  if (typeof euStart !== 'function' || typeof rank !== 'number') {
+    btn.style.display = 'none';
+    return;
+  }
+  const champ = rank === 1;
+  btn.style.display = '';
+  btn.classList.toggle('locked', !champ);
+  btn.disabled = !champ;
+  btn.textContent = champ ? '🇪🇺 המשך למוקדמות אירופה' : '🇪🇺 אירופה - רק לאלופה';
+  btn.onclick = champ ? () => euStart() : null;
 }
 
 function showResults() {
@@ -2217,7 +2234,7 @@ function showResults() {
   }
   buildResultsPitch();
   showScreen('results');
-  wireEuropeButton();
+  wireEuropeButton(null);   // hidden until animateResults knows where we finished
   setTimeout(() => animateResults(ovr), 400);
 }
 
@@ -2350,6 +2367,7 @@ function animateResults(ovr) {
     gfTotal += m.gf; gaTotal += m.ga;
   });
   const myRank = leagueTable.findIndex(t => t.us) + 1;
+  wireEuropeButton(myRank);
 
   function makeMatchRow(m) {
     const rc = m.outcome==='W' ? 'win' : m.outcome==='D' ? 'draw' : 'loss';

@@ -2124,3 +2124,58 @@ body {
 .gm-road-desc { display: block; font-size: 12px; color: var(--muted); line-height: 1.45; margin-top: 2px; }
 .gm-road-elite { font-size: 10px; font-weight: 900; color: #a78bfa; letter-spacing: .5px; }
 .gm-road-ovr { font-size: 22px; font-weight: 900; color: var(--accent); }
+
+/* ═══ EUROPE — the season's continuation ═══════════════════════════════════════
+   Deliberately built out of the results screen's own parts (.match-row, .lt-row)
+   so a European night reads like a league night. Only the tie wrapper, the
+   aggregate line and the verdicts are new. */
+.eu-head { text-align: center; margin: 4px 0 18px; }
+.eu-kicker { font-size: 11px; color: var(--dim); letter-spacing: .5px; }
+.eu-title { font-size: 20px; font-weight: 900; margin: 2px 0 6px; }
+.eu-sub { font-size: 12px; color: var(--dim); line-height: 1.6; margin: 0; }
+
+.eu-tie {
+  border: 1px solid var(--border); border-right: 3px solid var(--border);
+  border-radius: 10px; background: var(--surface);
+  padding: 10px; margin-bottom: 14px;
+}
+.eu-tie.won  { border-right-color: #2a5c2a; }
+.eu-tie.lost { border-right-color: #5c1a1a; }
+.eu-tie-head { display: flex; align-items: center; gap: 9px; margin-bottom: 4px; }
+.eu-tie-crest { width: 30px; height: 30px; object-fit: contain; flex-shrink: 0; }
+.eu-tie-name { flex: 1; font-size: 13px; font-weight: 700; line-height: 1.35; }
+.eu-tie-sub { display: block; font-size: 10px; font-weight: 400; color: var(--dim); }
+.eu-tie-ovr {
+  font-size: 15px; font-weight: 900; color: var(--accent);
+  min-width: 30px; text-align: center; flex-shrink: 0;
+}
+.eu-tie-scout { font-size: 10px; color: var(--dim); margin: 0 0 8px 0; }
+
+.eu-agg {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border);
+  font-size: 11px;
+}
+.eu-agg-lbl { color: var(--dim); }
+.eu-agg-val { font-size: 14px; font-weight: 900; }
+.eu-agg-extra { color: var(--dim); }
+.eu-agg-res { margin-inline-start: auto; font-weight: 700; }
+
+.eu-phase { margin: 20px 0 10px; }
+.eu-phase-t { font-size: 15px; font-weight: 900; }
+.eu-phase-sub { font-size: 11px; color: var(--dim); margin: 3px 0 0; line-height: 1.5; }
+.mr-pot { font-size: 10px; color: var(--dim); }
+.eu-table { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+
+.eu-verdict {
+  border-radius: 10px; padding: 12px; margin: 16px 0; text-align: center;
+  border: 1px solid var(--border); background: var(--surface2);
+}
+.eu-verdict.in  { border-color: #2a5c2a; background: linear-gradient(180deg, #0d1f33, var(--surface2)); }
+.eu-verdict.out { border-color: #5c1a1a; }
+.eu-verdict-t { font-size: 15px; font-weight: 900; margin-bottom: 4px; }
+.eu-verdict p { font-size: 12px; color: var(--dim); margin: 0; line-height: 1.6; }
+
+.btn-europe.locked { opacity: .5; cursor: not-allowed; }
+.eu-tie-desc { font-size: 11px; color: var(--dim); line-height: 1.5; margin: 2px 0 6px; }
+.eu-tie-desc:empty { display: none; }
