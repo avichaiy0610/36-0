@@ -81,6 +81,9 @@ function gtRun() {
   return (_gtRun = gtBlank());
 }
 function gtSave() {
+  // A season's European run borrows this machinery but is not a gauntlet run:
+  // it must not overwrite the map progress sitting in storage.
+  if (_gtRun && _gtRun.transient) return;
   try { localStorage.setItem(GT_KEY, JSON.stringify(gtRun())); } catch (e) {}
 }
 // A reset keeps what belongs to the player rather than to the run: the banner
@@ -647,7 +650,9 @@ function gtShowResult(res) {
   const cleared = run.log.filter(l => l.outcome === 'W').length;
   const el = document.getElementById('gt-fight-body');
   if (!el) return;
-  const done = won && run.at >= GM_RUN.length;
+  const done = won && f.eu === null && run.at >= GM_RUN.length;
+  // the last European tie is the play-off: winning it is the group stage
+  const euDone = won && f.eu !== null && (run.euAt || 0) >= GM_EU.length;
 
   const notes = [];
   if (res.stoppage) notes.push('🕰 שער שוויון בדקה 90+4');
@@ -664,7 +669,13 @@ function gtShowResult(res) {
       <div class="gt-res-sub">הוכרע ב${res.decidedBy} · ${res.twoLegs ? 'מאזן שני משחקים' : res.home ? 'בבית' : 'בחוץ'}</div>
     </div>
     ${notes.length ? `<div class="gt-res-notes">${notes.map(n => `<span>${n}</span>`).join('')}</div>` : ''}
-    ${done
+    ${euDone
+      ? `<div class="gt-ucl-in">
+           <div class="gt-ucl-t">🏆 עלית לשלב הליגה של ליגת האלופות!</div>
+           <p>${GM_EU[GM_EU.length - 1].name} נשארת מאחור. אין יותר מוקדמות.</p>
+         </div>
+         <button class="btn-primary btn-full" id="gt-continue">← המשך</button>`
+      : done
       ? `<p class="page-note">🏆 עברת את כל שמונת הקרבות.</p>
          <button class="btn-primary btn-full" id="gt-continue">← למסך הסיום</button>`
       : won

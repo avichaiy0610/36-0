@@ -558,6 +558,21 @@ function showGauntlet() {
   const note = document.getElementById('gauntlet-note');
   const reset = document.getElementById('gauntlet-reset');
 
+  // a season's European run has no map, no shop and no intro — only the ties
+  if (typeof gtSeasonEuActive === 'function' && gtSeasonEuActive()) {
+    if (note) note.textContent = 'מוקדמות אירופה · ההרכב של העונה שלך';
+    if (reset) reset.style.display = 'none';
+    if (run.picks) gtRestoreSquad();
+    gtInvalidateDeltas();
+    map.innerHTML = (typeof gtRelicBarHTML === 'function' ? gtRelicBarHTML() : '') +
+                    gtSeasonEuPanelHTML();
+    if (typeof gtWireRelicBar === 'function') gtWireRelicBar(map);
+    gtWireEu(map);
+    const back = map.querySelector('#gt-eu-back');
+    if (back) back.onclick = () => gtSeasonEuExit();
+    return;
+  }
+
   // first visit (or a fresh run): explain the mode before showing the map
   if (!gtRunStarted(run)) {
     map.innerHTML = gmIntroHTML();

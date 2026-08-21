@@ -123,3 +123,50 @@ function gtEuChoose(i) {
   state.gauntlet = { eu: i };
   gtFight();
 }
+
+
+/* ── the season's European run ────────────────────────────────────────────── */
+// A normal 36-0 season ends with an XI and nothing to do with it. This lets that
+// squad play the same four ties: same clubs, same two legs, same single life —
+// but on a run that is never saved and never touches gauntlet progress. No
+// relics, no coins, no shop; just the eleven you drafted against Europe.
+function gtSeasonEuStart() {
+  if (!state.picks || !state.picks.some(Boolean)) return false;
+  _gtRun = {
+    v: 2, transient: true, seasonEu: true,
+    at: GM_RUN.length, euAt: 0, over: false, log: [],
+    banner: 0, managerId: null, modId: 'none', coins: 0,
+    relics: [], boosts: {}, peaks: [], effects: {}, hotFoot: null,
+    formationId: state.formationId,
+    picks: state.picks.map(p => p ? { squadId: p.squad.id, name: p.player.name } : null),
+  };
+  showGauntlet();
+  return true;
+}
+
+function gtSeasonEuActive() { return !!(_gtRun && _gtRun.seasonEu); }
+
+// Leaving drops the transient run on the floor and lets the real one load again
+// from storage, exactly as it was.
+function gtSeasonEuExit() {
+  _gtRun = null;
+  gtInvalidateDeltas();
+  showScreen('results');
+}
+
+// The panel the season sees: the ties, and a way back.
+function gtSeasonEuPanelHTML() {
+  const run = gtRun();
+  const wins = (run.log || []).filter(l => l.outcome === 'W').length;
+  const done = gtEuDone();
+  return `
+    ${gtEuPanelHTML()}
+    <div class="gt-eu-season">
+      ${run.over
+        ? `<p class="page-note">הודחת אחרי ${wins} סיבובים. הקיץ נגמר.</p>`
+        : done
+          ? `<p class="page-note">🏆 ארבעה סיבובים, ארבעה מאזנים - שלב הליגה.</p>`
+          : `<p class="page-note">ההרכב מהעונה שלך משחק כמו שהוא: בלי קמעות, בלי חנות, בלי מטבעות.</p>`}
+      <button class="btn-secondary btn-full" id="gt-eu-back">← חזרה לתוצאות העונה</button>
+    </div>`;
+}

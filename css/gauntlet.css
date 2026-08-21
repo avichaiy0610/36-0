@@ -320,3 +320,11 @@
 .eu-round { display: inline-block; font-size: 10px; font-weight: 800; color: #38bdf8;
             background: #38bdf818; border-radius: 4px; padding: 1px 6px; margin-inline-start: 6px;
             vertical-align: middle; }
+
+/* reaching the group stage */
+.gt-ucl-in { background: linear-gradient(180deg, #1b2a5e, #0d1430); border: 1px solid #4c6ef5;
+             border-radius: 12px; padding: 16px; margin-bottom: 12px; text-align: center; }
+.gt-ucl-t { font-size: 19px; font-weight: 900; color: #fff; margin-bottom: 6px; }
+.gt-ucl-in p { font-size: 13px; color: #c7d2fe; margin: 0; line-height: 1.6; }
+.btn-europe { background: linear-gradient(180deg, #4c6ef5, #364fc7) !important; color: #fff !important; }
+.gt-eu-season { margin-top: 10px; }

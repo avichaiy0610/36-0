@@ -2196,6 +2196,16 @@ function showPreseason(ovr) {
   }, 50);
 }
 
+// After a season the XI has nowhere to go. This sends it to Europe — the same
+// four qualifying ties the gauntlet ends with, played on a run that is never
+// saved, so a season cannot disturb gauntlet progress.
+function wireEuropeButton() {
+  const btn = document.getElementById('btn-europe');
+  if (!btn) return;
+  btn.style.display = typeof gtSeasonEuStart === 'function' ? '' : 'none';
+  btn.onclick = () => { if (typeof gtSeasonEuStart === 'function') gtSeasonEuStart(); };
+}
+
 function showResults() {
   const ovr = teamOVR();
   // League draft: no personal reveal. Simulate silently, record the season to
@@ -2207,6 +2217,7 @@ function showResults() {
   }
   buildResultsPitch();
   showScreen('results');
+  wireEuropeButton();
   setTimeout(() => animateResults(ovr), 400);
 }
 
