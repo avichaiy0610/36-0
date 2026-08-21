@@ -30,10 +30,12 @@
    line ratings inside a run. Change a rating in one place, change it in both. */
 
 const EU_QUAL = [
-  { id: 'eu-kalju',    name: 'נומה קאליו',           country: 'אסטוניה', flag: '🇪🇪', round: 'מוקדמות 1',  ovr: 77 },
-  { id: 'eu-sheriff',  name: 'שריף טירספול',         country: 'מולדובה', flag: '🇲🇩', round: 'מוקדמות 2',  ovr: 84 },
-  { id: 'eu-zvezda',   name: 'הכוכב האדום בלגרד',    country: 'סרביה',   flag: '🇷🇸', round: 'מוקדמות 3',  ovr: 87 },
-  { id: 'eu-salzburg', name: 'רד בול זלצבורג',       country: 'אוסטריה', flag: '🇦🇹', round: 'פלייאוף',    ovr: 89 },
+  // `round` is the chip on the tie header, where space is short. `roundLong` is
+  // the form a sentence needs: "נעצרת בסיבוב המוקדמות השלישי", not "נעצרת במוקדמות 3".
+  { id: 'eu-kalju',    name: 'נומה קאליו',           country: 'אסטוניה', flag: '🇪🇪', round: 'מוקדמות 1',  roundLong: 'סיבוב המוקדמות הראשון',  ovr: 77 },
+  { id: 'eu-sheriff',  name: 'שריף טירספול',         country: 'מולדובה', flag: '🇲🇩', round: 'מוקדמות 2',  roundLong: 'סיבוב המוקדמות השני',    ovr: 84 },
+  { id: 'eu-zvezda',   name: 'הכוכב האדום בלגרד',    country: 'סרביה',   flag: '🇷🇸', round: 'מוקדמות 3',  roundLong: 'סיבוב המוקדמות השלישי',  ovr: 87 },
+  { id: 'eu-salzburg', name: 'רד בול זלצבורג',       country: 'אוסטריה', flag: '🇦🇹', round: 'פלייאוף',    roundLong: 'שלב הפלייאוף',            ovr: 89 },
 ];
 
 // 35 clubs in four pots. The 36th seat in the table is yours, and it is in pot 4
@@ -113,7 +115,7 @@ function euPlayTie(me, club) {
   const opp = euTeam(club);
   const legs = [simulateMatchV2(me, opp, false), simulateMatchV2(me, opp, true)];
   const tie = { id: club.id, name: club.name, flag: club.flag, country: club.country,
-                round: club.round, ovr: club.ovr, lines: { atk: opp.atk, mid: opp.mid, def: opp.def, gk: opp.gk },
+                round: club.round, roundLong: club.roundLong, ovr: club.ovr, lines: { atk: opp.atk, mid: opp.mid, def: opp.def, gk: opp.gk },
                 legs, et: null, pens: null };
   let gf = legs[0].gf + legs[1].gf, ga = legs[0].ga + legs[1].ga;
   if (gf === ga) {
@@ -316,7 +318,7 @@ function euRender(animate) {
     const t = c.qual[c.eliminatedAt];
     tail = `
       <div class="eu-verdict out">
-        <div class="eu-verdict-t">${euText('eu-out-title', 'נעצרת ב')}${t.round}</div>
+        <div class="eu-verdict-t">${euText('eu-out-title', 'נעצרת ב')}${euText('eu-round-' + t.id, t.roundLong || t.round)}</div>
         <p>${t.name} ${euText('eu-out-body', 'עברה במצבר')} <bdi dir="ltr">${t.agg.ga}-${t.agg.gf}</bdi>.
            ${euText('eu-out-tail-a', 'עברת')} ${won} ${euText('eu-out-tail-b', 'מתוך 4 סיבובים - הקיץ נגמר.')}</p>
       </div>`;
