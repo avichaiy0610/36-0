@@ -219,8 +219,9 @@ function gtShownOvr(node) {
 // A win over an 88 is worth more than a win over a 79, and a hammering is worth
 // more than surviving a shootout. Interest pays on what you walked in holding.
 function gtCoinsForWin(node, res) {
-  const base = 30 + Math.max(0, gtShownOvr(node) - 76) * 4 + Math.max(0, res.gf - res.ga) * 5;
-  const elite = gtIsElite(node) ? 20 : 0;
+  const shown = node.eu ? gtEuShownOvr(node) : gtShownOvr(node);
+  const base = 30 + Math.max(0, shown - 76) * 4 + Math.max(0, res.gf - res.ga) * 5;
+  const elite = !node.eu && gtIsElite(node) ? 20 : 0;
   const interest = gtInterest(gtRun().coins || 0);
   return { win: Math.round((base + elite) * gtCoinMultiplier()), interest };
 }
@@ -238,6 +239,8 @@ function gtMyScorers() {
   return state.picks.map((p, i) => p && { name: p.player.name, pos: state.slots[i].pos }).filter(Boolean);
 }
 function gtTheirScorers(node) {
+  // a European club has no squad in the data, so the goal carries the club name
+  if (node.eu || (!node.teamId && node.name)) return [{ name: node.name, pos: 'ST' }];
   const sq = SQUADS.find(s => s.teamId === node.teamId && s.season === node.season);
   if (!sq) return [{ name: (TEAMS[node.teamId] || {}).name || 'היריבה', pos: 'ST' }];
   return [...sq.players].sort((a, b) => b.ovr - a.ovr).slice(0, 16)
@@ -250,22 +253,26 @@ let _gtF = null;
 
 function gtFight() {
   const run = gtRun();
-  const { row, node } = state.gauntlet || {};
-  const nodeData = gtNodeAt(row, node);
+  const { row, node, eu } = state.gauntlet || {};
+  // Europe is its own ladder: no row on the map, no squad behind the opponent,
+  // and every tie is two-legged.
+  const isEu = eu !== undefined && eu !== null;
+  const nodeData = isEu ? gtEuNode(eu) : gtNodeAt(row, node);
   if (!nodeData) { showGauntlet(); return; }
 
   gtStoreSquad();
   gtInvalidateDeltas();
   _gtF = {
-    row, node: nodeData,
+    row, eu: isEu ? eu : null, node: nodeData,
     me: gtMyRatings(),
-    opp: gtOpponent(nodeData),
+    opp: isEu ? gtEuOpponent(nodeData) : gtOpponent(nodeData),
     home: gtForceHome() ? true : Math.random() < 0.5,
-    boss: !!GM_RUN[row].boss,
+    boss: isEu ? eu === GM_EU.length - 1 : !!GM_RUN[row].boss,
     gf: 0, ga: 0, boost: 0, forfeit: false, rescued: false, stoppage: false,
     events: [], minutes: new Set(), decidedBy: 'זמן רגיל',
     // A boss is not decided by ninety minutes of luck: two legs, aggregate score.
-    leg: 1, legs: GM_RUN[row].boss ? 2 : 1, aggGf: 0, aggGa: 0,
+    // Neither is a European tie — that is how the real qualifying rounds work.
+    leg: 1, legs: (isEu || GM_RUN[row].boss) ? 2 : 1, aggGf: 0, aggGa: 0,
   };
   // the first leg of a two-legged tie is away, so the decider is at home —
   // unless something already promised you home ground for everything
@@ -441,7 +448,7 @@ function gtRenderFight() {
   if (back) back.onclick = () => { gtStopClock(); _gtF = null; showGauntlet(); };
   const el = document.getElementById('gt-fight-body');
   if (!el) return;
-  const club = (TEAMS[f.node.teamId] || {}).name || f.node.teamId;
+  const club = f.eu !== null ? f.node.name : ((TEAMS[f.node.teamId] || {}).name || f.node.teamId);
   el.innerHTML = `
     <div class="gt-live">
       <div class="gt-live-top">
@@ -451,7 +458,7 @@ function gtRenderFight() {
              renders leftmost — the opponent's goals must come first, or your own
              score ends up printed beside their name. -->
         <span class="gt-live-score" dir="ltr"><span id="gt-sc-them">0</span> – <span id="gt-sc-me">0</span></span>
-        <span class="gt-live-side">${club} ${f.node.season}<b>${Math.round(f.opp.ovr)}</b></span>
+        <span class="gt-live-side">${club} ${f.eu !== null ? f.node.flag + ' ' + f.node.country : f.node.season}<b>${Math.round(f.opp.ovr)}</b></span>
       </div>
       <div class="gt-clock"><span id="gt-min">0</span>'${f.home ? ' · בבית' : ' · בחוץ'}${
         f.legs > 1 ? ` · משחק ${f.leg} מתוך 2` : ''}${
@@ -526,8 +533,10 @@ function gtFinish(outcome) {
     res.insured = true;
   }
 
-  run.log.push({ row: f.row, teamId: f.node.teamId, season: f.node.season,
-                 ovr: gtShownOvr(f.node), gf: res.gf, ga: res.ga, outcome: res.outcome });
+  run.log.push({ row: f.row, eu: f.eu, teamId: f.node.teamId || f.node.id,
+                 season: f.node.season || f.node.country,
+                 ovr: f.eu !== null ? gtEuShownOvr(f.node) : gtShownOvr(f.node),
+                 gf: res.gf, ga: res.ga, outcome: res.outcome });
   run.locked = null;                    // the road is done, the next one opens
 
   if (res.outcome === 'W') {
@@ -536,11 +545,16 @@ function gtFinish(outcome) {
     run.coins = (run.coins || 0) + purse.win + purse.interest;
     const scorer = f.events.filter(e => e.side === 'me').pop();
     run.hotFoot = scorer ? scorer.full : null;      // רגל חמה remembers him
-    run.at = f.row + 1;                             // a shop row is a stop, not scenery
-    if (run.at >= GM_RUN.length) { gtRecordRun(run, true); gtSubmitRun(run, true); }
+    if (f.eu !== null) {
+      run.euAt = f.eu + 1;                          // through to the next round
+    } else {
+      run.at = f.row + 1;                           // a shop row is a stop, not scenery
+      if (run.at >= GM_RUN.length) { gtRecordRun(run, true); gtSubmitRun(run, true); }
+    }
   } else if (res.insured) {
     run.log.pop();                                  // the policy buys the fight back
-    run.locked = { row: f.row, node: gtNodeAddr(f.node)[1] };   // same opponent, straight away
+    // same opponent, straight away
+    if (f.eu === null) run.locked = { row: f.row, node: gtNodeAddr(f.node)[1] };
   } else {
     run.over = true;
     gtRecordRun(run, false);
@@ -672,9 +686,10 @@ function gtShowResult(res) {
   // road he already chose and cannot change
   const replay = document.getElementById('gt-replay');
   if (replay) replay.onclick = () => {
+    const eu = f.eu;
     const at = gtRun().locked || { row: f.row, node: 0 };
     _gtF = null;
-    gtChoose(at.row, at.node);
+    if (eu !== null) gtEuChoose(eu); else gtChoose(at.row, at.node);
   };
   const again = document.getElementById('gt-restart');
   if (again) again.onclick = () => { _gtF = null; gtReset(); showGauntlet(); };

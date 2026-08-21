@@ -20,6 +20,8 @@ function gtRelicsLeft() { return GT_RELICS.some(r => !gtHas(r.id) && !r.signatur
 // ELITE road the relics outnumber them, which is the whole reason to take it.
 // The deal and the rule can tilt it further.
 function gtSpoilMix(node) {
+  // a European club leaves no players behind, so its wheel is relics end to end
+  if (node.eu) return { players: 0, relics: 8 };
   const elite = gtIsElite(node);
   const tilt = gtDealNum('relicDrop') + gtModNum('relicDrop');   // 0.2 → two more
   return {
@@ -84,12 +86,14 @@ function gtOfferSpoils(node, container) {
 
   const box = document.createElement('div');
   box.className = 'gt-spoils';
-  const club = (TEAMS[node.teamId] || {}).name || '';
+  const club = node.eu ? node.name : ((TEAMS[node.teamId] || {}).name || '');
   const relicCount = pool.filter(c => c.kind === 'relic').length;
   box.innerHTML = `
     <div class="gt-spoils-kicker">שלל הניצחון</div>
     <div class="gt-spoils-title">🎰 גלגל השלל</div>
-    <p class="gt-spoils-sub">${gtIsElite(node)
+    <p class="gt-spoils-sub">${node.eu
+      ? `${club} לא משאירה שחקנים מאחור - הגלגל הזה כולו קמעות.`
+      : gtIsElite(node)
       ? `מסלול ELITE - על הגלגל ${relicCount} קמעות מול ${pool.length - relicCount} שחקנים של ${club} ${node.season}.`
       : `שחקנים של ${club} ${node.season} בדירוג של אותה עונה, ובתוכם ${relicCount} קמעות.`}</p>
     <div class="gt-reel-wrap"><div class="gt-reel-mark"></div><div class="gt-reel" id="gt-reel"></div></div>

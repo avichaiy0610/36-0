@@ -305,3 +305,18 @@
 .gm-road-tag.champ { color: var(--accent); background: #d4af3718; }
 .gm-road-tag.second { color: #9aa4b2; background: #9aa4b218; }
 .gm-road-fin { display: block; font-size: 11px; font-weight: 700; color: var(--dim); margin-top: 1px; }
+
+/* ── the European leg ──────────────────────────────────────────────────────── */
+.gt-eu { background: var(--surface); border: 1px solid #38bdf855; border-radius: 12px;
+         padding: 14px; margin-bottom: 12px; }
+.gt-eu-head { text-align: center; margin-bottom: 10px; }
+.gt-eu-kicker { font-size: 11px; font-weight: 800; letter-spacing: .6px; color: #38bdf8; }
+.gt-eu-title { font-size: 20px; font-weight: 900; margin: 2px 0 4px; }
+.gt-eu-sub { font-size: 12px; color: var(--dim); line-height: 1.6; margin: 0; }
+.eu-road { margin-bottom: 8px; }
+.eu-road.done { opacity: .5; }
+.eu-road.locked { opacity: .38; }
+.eu-road.next { border-color: #38bdf8; }
+.eu-round { display: inline-block; font-size: 10px; font-weight: 800; color: #38bdf8;
+            background: #38bdf818; border-radius: 4px; padding: 1px 6px; margin-inline-start: 6px;
+            vertical-align: middle; }

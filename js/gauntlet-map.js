@@ -239,8 +239,10 @@ function gmRoadPicker(at, over) {
       </div>`;
   }
   if (!row) {
-    return typeof gtVictoryHTML === 'function'
-      ? gtVictoryHTML() : `<p class="gm-picker-head">🏆 עברת את כל המסלול</p>`;
+    // Israel is behind you: Europe first, the banner underneath it
+    const eu = typeof gtEuPanelHTML === 'function' ? gtEuPanelHTML() : '';
+    const vic = typeof gtVictoryHTML === 'function' ? gtVictoryHTML() : '';
+    return (eu + vic) || `<p class="gm-picker-head">🏆 עברת את כל המסלול</p>`;
   }
   if (row.kind === 'shop') return typeof gtShopHTML === 'function' ? gtShopHTML() : '';
 
@@ -609,6 +611,7 @@ function showGauntlet() {
   if (typeof gtWireRelicBar === 'function') gtWireRelicBar(map);
   if (typeof gtWireShop === 'function' && map.querySelector('.gt-shop')) gtWireShop(map);
   if (typeof gtWireVictory === 'function' && map.querySelector('.gt-victory')) gtWireVictory(map);
+  if (typeof gtWireEu === 'function' && map.querySelector('.gt-eu')) gtWireEu(map);
   const newRun = map.querySelector('#gt-new-run');
   if (newRun) newRun.onclick = () => { gtReset(); showGauntlet(); };
 
