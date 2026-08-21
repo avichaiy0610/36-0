@@ -11,13 +11,11 @@
 // the data — rates 91 (92 in peak mode). A normal good draft lands at 85-88.
 // The pots are set against that number, not against it being close:
 //
-//   pot 1  93-96   pot 2  90-92   pot 3  87-89   pot 4  83-87  (you belong here)
+//   pot 1  96-99   pot 2  93-95   pot 3  89-90   pot 4  84-87  (you belong here)
 //
-// Measured against the V2 engine over 20k campaigns: an OVR 88 squad takes about
-// 8 points from its eight matches, an OVR 91 squad about 11-12. Eighth place in
-// the table below is around 15. So the play-off band (9th-24th) is a real target
-// for a strong draft, and the top eight is an outlier, not a goal. That is
-// deliberate: an Israeli XI has no business beating Real Madrid.
+// Real Madrid and Barcelona are 99 — eight clear of anything Israeli football
+// has ever assembled. That gap is the design, not an accident of tuning: see
+// docs/EUROPE.md for what it costs a squad at each rating.
 
 /* ── the clubs ────────────────────────────────────────────────────────────────
    The four qualifying opponents are not invented. docs/EUROPE_OPPONENTS.md counts
@@ -37,49 +35,49 @@ const EU_QUAL = [
 // 35 clubs in four pots. The 36th seat in the table is yours, and it is in pot 4
 // — which is where an Israeli champion actually lands.
 const EU_POTS = [
-  [ // pot 1 — the ones you are not supposed to beat
-    { name: 'ריאל מדריד', flag: '🇪🇸', ovr: 96 },
-    { name: 'מנצ\'סטר סיטי', flag: '🏴', ovr: 95 },
-    { name: 'באיירן מינכן', flag: '🇩🇪', ovr: 95 },
-    { name: 'ליברפול', flag: '🏴', ovr: 94 },
-    { name: 'אינטר', flag: '🇮🇹', ovr: 94 },
-    { name: 'פריז סן ז\'רמן', flag: '🇫🇷', ovr: 94 },
-    { name: 'ברצלונה', flag: '🇪🇸', ovr: 94 },
-    { name: 'בורוסיה דורטמונד', flag: '🇩🇪', ovr: 93 },
-    { name: 'לייפציג', flag: '🇩🇪', ovr: 93 },
+  [ // pot 1 — 96-99. The clubs you are not supposed to take a point off.
+    { name: 'ריאל מדריד', flag: '🇪🇸', ovr: 99 },
+    { name: 'ברצלונה', flag: '🇪🇸', ovr: 99 },
+    { name: "מנצ'סטר סיטי", flag: '🏴', ovr: 99 },
+    { name: 'באיירן מינכן', flag: '🇩🇪', ovr: 98 },
+    { name: 'ליברפול', flag: '🏴', ovr: 98 },
+    { name: "פריז סן ז'רמן", flag: '🇫🇷', ovr: 97 },
+    { name: 'אינטר', flag: '🇮🇹', ovr: 97 },
+    { name: 'בורוסיה דורטמונד', flag: '🇩🇪', ovr: 96 },
+    { name: 'לייפציג', flag: '🇩🇪', ovr: 96 },
   ],
-  [ // pot 2
-    { name: 'ארסנל', flag: '🏴', ovr: 92 },
-    { name: 'באייר לוורקוזן', flag: '🇩🇪', ovr: 92 },
-    { name: 'אתלטיקו מדריד', flag: '🇪🇸', ovr: 92 },
-    { name: 'אטלנטה', flag: '🇮🇹', ovr: 91 },
-    { name: 'יובנטוס', flag: '🇮🇹', ovr: 91 },
-    { name: 'מילאן', flag: '🇮🇹', ovr: 91 },
-    { name: 'בנפיקה', flag: '🇵🇹', ovr: 90 },
-    { name: 'אתלטיק בילבאו', flag: '🇪🇸', ovr: 90 },
-    { name: 'פורטו', flag: '🇵🇹', ovr: 90 },
+  [ // pot 2 — 93-95
+    { name: 'ארסנל', flag: '🏴', ovr: 95 },
+    { name: 'אתלטיקו מדריד', flag: '🇪🇸', ovr: 95 },
+    { name: 'באייר לוורקוזן', flag: '🇩🇪', ovr: 94 },
+    { name: 'יובנטוס', flag: '🇮🇹', ovr: 94 },
+    { name: 'מילאן', flag: '🇮🇹', ovr: 94 },
+    { name: 'אטלנטה', flag: '🇮🇹', ovr: 93 },
+    { name: 'בנפיקה', flag: '🇵🇹', ovr: 93 },
+    { name: 'פורטו', flag: '🇵🇹', ovr: 93 },
+    { name: 'אתלטיק בילבאו', flag: '🇪🇸', ovr: 93 },
   ],
-  [ // pot 3 — Olympiacos and Young Boys are here for a reason: both knocked on
-    // Israeli doors in the real qualifying rounds
-    { name: 'ספורטינג ליסבון', flag: '🇵🇹', ovr: 89 },
-    { name: 'פיינורד', flag: '🇳🇱', ovr: 89 },
-    { name: 'PSV איינדהובן', flag: '🇳🇱', ovr: 89 },
-    { name: 'ליל', flag: '🇫🇷', ovr: 88 },
-    { name: 'סלטיק', flag: '🏴', ovr: 88 },
-    { name: 'שחטאר דונייצק', flag: '🇺🇦', ovr: 88 },
-    { name: 'דינמו זאגרב', flag: '🇭🇷', ovr: 87 },
-    { name: 'יאנג בויז', flag: '🇨🇭', ovr: 87 },
-    { name: 'אולימפיאקוס', flag: '🇬🇷', ovr: 87 },
+  [ // pot 3 — 89-90. Olympiacos and Young Boys are here for a reason: both
+    // knocked on Israeli doors in the real qualifying rounds.
+    { name: 'ספורטינג ליסבון', flag: '🇵🇹', ovr: 90 },
+    { name: 'פיינורד', flag: '🇳🇱', ovr: 90 },
+    { name: 'PSV איינדהובן', flag: '🇳🇱', ovr: 90 },
+    { name: 'ליל', flag: '🇫🇷', ovr: 90 },
+    { name: 'סלטיק', flag: '🏴', ovr: 89 },
+    { name: 'שחטאר דונייצק', flag: '🇺🇦', ovr: 89 },
+    { name: 'דינמו זאגרב', flag: '🇭🇷', ovr: 89 },
+    { name: 'יאנג בויז', flag: '🇨🇭', ovr: 89 },
+    { name: 'אולימפיאקוס', flag: '🇬🇷', ovr: 89 },
   ],
-  [ // pot 4 — your own pot, which is the only place the table is winnable
+  [ // pot 4 — 84-87. Your own pot, and the only place the table is winnable.
     { name: 'אסטון וילה', flag: '🏴', ovr: 87 },
     { name: 'מונאקו', flag: '🇫🇷', ovr: 87 },
     { name: 'שטוטגרט', flag: '🇩🇪', ovr: 86 },
-    { name: 'ז\'ירונה', flag: '🇪🇸', ovr: 85 },
+    { name: "ז'ירונה", flag: '🇪🇸', ovr: 86 },
     { name: 'ספרטה פראג', flag: '🇨🇿', ovr: 85 },
     { name: 'ברסט', flag: '🇫🇷', ovr: 85 },
     { name: 'שטורם גראץ', flag: '🇦🇹', ovr: 84 },
-    { name: 'סלובאן ברטיסלבה', flag: '🇸🇰', ovr: 83 },
+    { name: 'סלובאן ברטיסלבה', flag: '🇸🇰', ovr: 84 },
   ],
 ];
 
