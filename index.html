@@ -139,6 +139,15 @@
     </div>
   </div>
 
+  <!-- ══ WHAT'S NEW ═════════════════════════ -->
+  <div id="whatsnew-modal" class="modal-overlay" style="display:none">
+    <div class="modal-box wn-box">
+      <button class="modal-close" id="wn-close">✕</button>
+      <div class="modal-title">🆕 מה חדש</div>
+      <div id="wn-body"></div>
+    </div>
+  </div>
+
   <!-- ══ WELCOME ══════════════════════════════════════════════════════════════ -->
   <div id="screen-welcome" class="screen">
     <div class="welcome-inner">
@@ -161,7 +170,9 @@
         <span class="dw-sub" id="dw-conditions">אותם תנאים לכולם — פעם ביום</span>
         <span class="dw-more" id="dw-avail" style="display:none"></span>
       </button>
-      <a class="btn-coffee btn-coffee-welcome" id="btn-coffee-welcome" href="https://ko-fi.com/360ligathaal" target="_blank" rel="noopener">☕ אוהב את המשחק? קנה לי קפה</a>
+      
+      <button class="wn-link" id="btn-whatsnew"><span id="wn-label">מה חדש!</span><span class="wn-dot" id="wn-dot"></span></button>
+      <div class="wn-version" id="wn-version" dir="ltr">v1.4</div>
     </div>
     <footer class="site-disclaimer">
       <p>
@@ -849,6 +860,7 @@
   <script src="js/sim-engine.js"></script>
   <script src="js/game.js"></script>
   <script src="js/europe.js"></script>
+  <script src="js/whatsnew.js"></script>
   <script src="js/league-sim.js"></script>
   <script src="js/player_nats.js"></script>
   <script src="js/challenges.js"></script>
