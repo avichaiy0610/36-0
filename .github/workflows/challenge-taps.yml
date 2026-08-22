@@ -1,0 +1,36 @@
+name: challenge-taps
+
+# Reads the ✅/🗑️ taps from Telegram and nothing else.
+#
+# The engine itself runs once a day, and for a while that was also the only time
+# a tap was read — so pressing approve gave no answer until the next morning, and
+# a tap made shortly after a run could be dropped entirely, because Telegram
+# discards an unread update after 24 hours and the daily schedule drifts past
+# that. This job closes both holes. It never proposes anything: composing a
+# challenge stays on the daily run.
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+# Shares the group with challenge-engine so the two never poll getUpdates at the
+# same time — they share one offset in engine_state, and a race would skip taps.
+concurrency:
+  group: challenge-engine
+  cancel-in-progress: false
+
+jobs:
+  taps:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node scripts/challenge_engine.js
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          TELEGRAM_CHAL_BOT_TOKEN: ${{ secrets.TELEGRAM_CHAL_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TAPS_ONLY: '1'

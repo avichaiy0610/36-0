@@ -352,11 +352,25 @@ function unscheduledNote(inRange, all) {
 📌 עדיין בלי שעת פתיחה — ${notes.join(' · ')}.` : '';
 }
 
-/* ── Telegram approvals from the previous run ─────────────────────────────── */
+/* ── Telegram approvals ───────────────────────────────────────────────────── */
+// A tap does nothing on its own: Telegram queues it, and it is only acted on the
+// next time this function runs. That used to be once a day with the rest of the
+// engine, which meant pressing ✅ produced no visible answer for up to 24 hours —
+// and worse, Telegram DISCARDS an unread update after 24 hours, so a tap made
+// just after a run could expire unseen before the next one (the schedule drifts:
+// two consecutive runs were 24h03m apart). challenge-taps.yml now calls this
+// every ten minutes with TAPS_ONLY=1, which fixes both.
+//
+// It logs what it saw, because a silent no-op is exactly what made this hard to
+// diagnose from the outside.
 async function processTaps() {
   const offset = await stateGet('chal_tg_offset');
   const u = await tg('getUpdates', { offset: offset ? +offset + 1 : undefined, timeout: 0 });
-  if (!u || !u.ok) return;
+  if (!u || !u.ok) {
+    console.log(`taps: getUpdates failed — ${u ? (u.description || JSON.stringify(u)) : 'no response'}`);
+    return;
+  }
+  console.log(`taps: ${u.result.length} update(s) since ${offset || 'the beginning'}`);
   for (const up of u.result) {
     await stateSet('chal_tg_offset', up.update_id);
     const cq = up.callback_query;
@@ -379,6 +393,7 @@ async function processTaps() {
       }
       await stateSet(`chal_pending|${period}|${key}`, '');
     }
+    console.log(`taps: ${cq.data} → ${msg}`);
     await tg('answerCallbackQuery', { callback_query_id: cq.id, text: msg });
     await tg('sendMessage', { chat_id: TELEGRAM_CHAT_ID, text: msg });
   }
@@ -388,6 +403,15 @@ async function processTaps() {
 (async () => {
   const dry = DRY_RUN === '1';
   const force = process.env.FORCE === '1';   // re-propose even if one is pending
+
+  // The ten-minute run: read the taps and stop. It must not compose or propose —
+  // the engine only ever writes a period that has not started, and it does that
+  // once a day.
+  if (process.env.TAPS_ONLY === '1') {
+    await processTaps();
+    return;
+  }
+
   if (!dry) await processTaps().catch(e => console.error('taps failed:', e.message));
 
   const all = await fixtures();
