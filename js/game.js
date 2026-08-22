@@ -419,13 +419,16 @@ function compatibleEmptySlots(player) {
   return emptySlotIndices().filter(i => playerFitsSlot(player, state.slots[i].pos));
 }
 
-function teamOVR() {
+// `ovrAt` lets a caller price the same XI on its own terms — the gauntlet passes
+// one that folds in shop upgrades and relics. Left out, it is plain playerOVR
+// and nothing about the league game changes.
+function teamOVR(ovrAt) {
   let total = 0, weight = 0;
   state.picks.forEach((pick, i) => {
     if (!pick) return;
     const slot = state.slots[i];
     const w = POS_WEIGHT[slot.pos] ?? 1;
-    const ovr = playerOVR(pick.player);
+    const ovr = ovrAt ? ovrAt(pick, i) : playerOVR(pick.player);
     const pp = playerPositions(pick.player);
     const inPos = (COMPAT[slot.pos] ?? []).slice(0, 2).includes(pp[0]) || pp.includes(slot.pos);
     total += (inPos ? ovr : Math.round(ovr * 0.93)) * w;
@@ -440,11 +443,11 @@ function teamOVR() {
 // OVR — a quarter of drafted players end up out of position — so the simulation
 // saw a squad meaningfully stronger than the number on screen, and a real draft
 // outperformed the rating it was indexed by.
-function calcGroupOVR(positions) {
+function calcGroupOVR(positions, ovrAt) {
   const ovrs = state.picks
     .map((pick, i) => {
       if (!pick || !positions.includes(state.slots[i].pos)) return null;
-      const ovr = playerOVR(pick.player);
+      const ovr = ovrAt ? ovrAt(pick, i) : playerOVR(pick.player);
       const pp  = playerPositions(pick.player);
       const slotPos = state.slots[i].pos;
       const inPos = (COMPAT[slotPos] ?? []).slice(0, 2).includes(pp[0]) || pp.includes(slotPos);
@@ -458,9 +461,9 @@ function calcGroupOVR(positions) {
 // that draws the four bars on the results card, so what the player sees is
 // literally what the simulation uses. An unfilled line falls back to the
 // overall rating.
-function myLineRatings() {
-  const ovr = teamOVR();
-  const line = (positions) => calcGroupOVR(positions) ?? ovr;
+function myLineRatings(ovrAt) {
+  const ovr = teamOVR(ovrAt);
+  const line = (positions) => calcGroupOVR(positions, ovrAt) ?? ovr;
   return {
     ovr,
     atk: line(SIM2_LINES.atk.pos),
@@ -899,6 +902,10 @@ function saveSeasonState(season) {
       leagueTable: season.leagueTable,
       playerStats: season.playerStats.map(({ squad, ...rest }) => rest),
     };
+    // A new season means last season's European campaign is void — it belonged
+    // to a squad and a finishing position that no longer exist.
+    delete d.europe;
+    if (typeof _euCampaign !== 'undefined') _euCampaign = null;
     localStorage.setItem(DRAFT_SAVE_KEY, JSON.stringify(d));
   } catch (e) {}
 }
@@ -1521,6 +1528,8 @@ function assignPlayer(slotIdx, player) {
     state.isAnimating = false;
     // A duel draft skips the solo preseason — it submits the squad and waits.
     if (state.duelCode && typeof submitDuelSquad === 'function') setTimeout(() => submitDuelSquad(), 500);
+    // a gauntlet draft skips the pre-season too — the XI goes straight into a fight
+    else if (state.gauntlet && typeof gtFight === 'function') setTimeout(() => gtFight(), 500);
     else setTimeout(() => showPreseason(teamOVR()), 500);
   } else setTimeout(startRound, 400);
 }
@@ -2191,6 +2200,29 @@ function showPreseason(ovr) {
   }, 50);
 }
 
+// After a season the XI has nowhere to go. This sends it to Europe — the same
+// four qualifying ties the gauntlet ends with, played on a run that is never
+// saved, so a season cannot disturb gauntlet progress.
+// Only the champion goes to Europe. That is both the real rule and the point:
+// winning the league has to buy something the tier name alone doesn't. Everyone
+// else still sees the button, so they know what finishing first is worth.
+// Called with the finishing rank, which is only known once the season is built —
+// until then there is nothing to show.
+function wireEuropeButton(rank) {
+  const btn = document.getElementById('btn-europe');
+  if (!btn) return;
+  if (typeof euStart !== 'function' || typeof rank !== 'number') {
+    btn.style.display = 'none';
+    return;
+  }
+  const champ = rank === 1;
+  btn.style.display = '';
+  btn.classList.toggle('locked', !champ);
+  btn.disabled = !champ;
+  btn.textContent = champ ? '🇪🇺 המשך למוקדמות אירופה' : '🇪🇺 אירופה - רק לאלופה';
+  btn.onclick = champ ? () => euStart() : null;
+}
+
 function showResults() {
   const ovr = teamOVR();
   // League draft: no personal reveal. Simulate silently, record the season to
@@ -2202,6 +2234,7 @@ function showResults() {
   }
   buildResultsPitch();
   showScreen('results');
+  wireEuropeButton(null);   // hidden until animateResults knows where we finished
   setTimeout(() => animateResults(ovr), 400);
 }
 
@@ -2334,6 +2367,7 @@ function animateResults(ovr) {
     gfTotal += m.gf; gaTotal += m.ga;
   });
   const myRank = leagueTable.findIndex(t => t.us) + 1;
+  wireEuropeButton(myRank);
 
   function makeMatchRow(m) {
     const rc = m.outcome==='W' ? 'win' : m.outcome==='D' ? 'draw' : 'loss';

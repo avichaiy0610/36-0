@@ -1,0 +1,330 @@
+/* Gauntlet: live match, and the victory spoils wheel. */
+
+.gt-live { background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+           padding: 14px; margin-bottom: 12px; }
+.gt-live-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.gt-live-side { flex: 1; font-size: 12px; color: var(--dim); text-align: center; }
+.gt-live-side b { display: block; font-size: 15px; color: var(--text); }
+.gt-live-score { font-size: 34px; font-weight: 900; color: var(--accent); }
+.gt-clock { text-align: center; font-size: 13px; font-weight: 800; color: var(--dim); margin-top: 6px; }
+.gt-bar { height: 5px; background: #ffffff14; border-radius: 3px; overflow: hidden; margin: 8px 0 10px; }
+.gt-bar span { display: block; height: 100%; width: 0; background: var(--accent); transition: width .12s linear; }
+.gt-feed { min-height: 44px; max-height: 200px; overflow-y: auto; }
+.gt-ev { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 6px;
+         font-size: 13px; margin-bottom: 4px; }
+.gt-ev.me { background: #22c55e18; }
+.gt-ev.them { background: #ef444418; }
+.gt-ev-min { font-weight: 800; color: var(--dim); min-width: 30px; }
+.gt-ev-txt { flex: 1; font-weight: 700; }
+.gt-ev-score { font-weight: 900; color: var(--accent); }
+
+.gt-spoils { background: var(--surface); border: 1px solid #8b5cf655; border-radius: 12px;
+             padding: 14px; margin-bottom: 12px; }
+.gt-spoils-kicker { text-align: center; font-size: 11px; font-weight: 800; letter-spacing: .6px; color: #a78bfa; }
+.gt-spoils-title { text-align: center; font-size: 19px; font-weight: 900; margin: 2px 0 4px; }
+.gt-spoils-sub { text-align: center; font-size: 12px; color: var(--dim); margin: 0 0 10px; }
+.gt-reel-wrap { position: relative; }
+.gt-reel-mark { position: absolute; inset-inline-start: 50%; top: -2px; bottom: -2px; width: 2px;
+                background: var(--accent); opacity: .8; z-index: 2; }
+.gt-reel { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding: 8px 0 10px;
+           border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.gt-reel::-webkit-scrollbar { display: none; }
+.gt-reel-card { flex: 0 0 84px; background: var(--surface2); border: 1px solid var(--border);
+                border-radius: 10px; padding: 8px 4px; text-align: center; transition: border-color .2s; }
+.gt-reel-card.won { border-color: var(--accent); box-shadow: 0 0 0 2px #d4af3755; }
+.gt-reel-ovr { display: block; font-size: 19px; font-weight: 900; color: var(--accent); }
+.gt-reel-name { display: block; font-size: 11px; font-weight: 700; }
+.gt-reel-pos { display: block; font-size: 10px; color: var(--dim); }
+
+.gt-sign-q { font-size: 14px; margin: 12px 0 8px; }
+.gt-sign-opt { display: flex; justify-content: space-between; align-items: center; width: 100%;
+               background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
+               padding: 9px 10px; margin-bottom: 6px; color: var(--text); font-size: 13px; cursor: pointer; }
+.gt-sign-opt:hover { border-color: var(--accent); }
+.gt-delta { font-weight: 900; }
+.gt-delta.up { color: #22c55e; }
+.gt-delta.down { color: #ef4444; }
+.gt-sign-done { text-align: center; font-size: 14px; font-weight: 700; margin: 10px 0 0; }
+
+.gt-intro-relic { background: #8b5cf610; border: 1px solid #8b5cf644; border-radius: 10px;
+                  padding: 12px; margin: 4px 0 16px; }
+.gt-intro-relic-t { font-weight: 900; color: #a78bfa; margin-bottom: 6px; }
+.gt-intro-relic p { font-size: 13px; line-height: 1.6; color: var(--dim); margin: 0; }
+.gt-intro-relic p + p { margin-top: 8px; }
+
+/* ── relics: the strip on the map, the cards, the swap ─────────────────────── */
+.gt-bar-top { display: flex; align-items: center; justify-content: space-between; gap: 10px;
+              background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+              padding: 8px 10px; margin-bottom: 10px; }
+.gt-coins { font-size: 15px; font-weight: 900; color: var(--accent); white-space: nowrap; }
+.gt-slots { display: flex; gap: 6px; }
+.gt-slot { width: 30px; height: 30px; border-radius: 8px; border: 1px dashed var(--border);
+           background: var(--surface2); display: flex; align-items: center; justify-content: center;
+           font-size: 15px; padding: 0; color: var(--text); }
+.gt-slot.full { border-style: solid; cursor: pointer; }
+.gt-slot.full.uncommon { border-color: #38bdf8; }
+.gt-slot.full.rare { border-color: #a78bfa; }
+.gt-slot.full.epic { border-color: #f59e0b; box-shadow: 0 0 0 2px #f59e0b33; }
+.gt-relic-info { font-size: 12px; color: var(--dim); line-height: 1.5; margin: -4px 0 10px; }
+.gt-relic-info:empty { margin: 0; }
+
+.gt-relic-card { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 2px 10px;
+                 background: var(--surface2); border: 1px solid var(--border); border-radius: 10px;
+                 padding: 10px; text-align: start; align-content: center;
+                 color: var(--text); }
+.gt-relic-card.uncommon { border-color: #38bdf855; }
+.gt-relic-card.rare { border-color: #a78bfa66; }
+.gt-relic-card.epic { border-color: #f59e0b77; }
+.gt-relic-card.won { box-shadow: 0 0 0 2px #d4af3755; }
+.gt-relic-ico { grid-row: 1 / 3; font-size: 26px; align-self: center; text-align: center; }
+.gt-relic-name { font-weight: 900; font-size: 14px; }
+.gt-relic-rar { grid-column: 2; font-size: 11px; font-weight: 700; color: #6b7787; }
+.gt-relic-card.uncommon .gt-relic-rar { color: #38bdf8; }
+.gt-relic-card.rare .gt-relic-rar { color: #a78bfa; }
+.gt-relic-card.epic .gt-relic-rar { color: #f59e0b; }
+.gt-relic-desc { grid-column: 2; font-size: 12.5px; color: var(--text); opacity: .88;
+                 line-height: 1.55; }
+.gt-relic-got-t { text-align: center; font-size: 16px; font-weight: 900; margin-bottom: 8px; color: #a78bfa; }
+.gt-relic-slots { text-align: center; font-size: 12px; color: var(--dim); margin: 8px 0 0; }
+.gt-relic-swap-q { font-size: 13px; margin: 12px 0 8px; }
+.gt-relic-swap { display: grid; gap: 6px; margin-bottom: 8px; }
+.gt-relic-drop { background: none; border: 0; padding: 0; width: 100%; cursor: pointer;
+                 color: var(--text); font: inherit; }
+.gt-relic-drop .gt-relic-card { border-style: dashed; }
+.gt-relic-drop:hover .gt-relic-card { border-color: #ef4444; border-style: solid; }
+.gt-relic-x { display: block; font-size: 11px; font-weight: 800; color: #ef4444; padding: 4px 2px 0; }
+.gt-reel-relic.rare { border-color: #a78bfa55; }
+.gt-reel-relic.epic { border-color: #f59e0b66; }
+
+/* ── the travelling shop ───────────────────────────────────────────────────── */
+.gt-shop { background: var(--surface); border: 1px solid #8b5cf644; border-radius: 12px;
+           padding: 12px; margin-top: 12px; }
+.gt-shop-head { display: flex; align-items: center; justify-content: space-between; }
+.gt-shop-title { font-size: 17px; font-weight: 900; }
+.gt-shop-wallet { font-size: 15px; font-weight: 900; color: var(--accent); }
+.gt-shop-note { font-size: 12px; color: var(--dim); line-height: 1.5;
+                background: #d4af3710; border-radius: 8px; padding: 8px; margin: 8px 0 10px; }
+.gt-shop-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+                gap: 8px; margin-bottom: 10px; }
+.gt-item { display: flex; flex-direction: column; align-items: center; gap: 4px;
+           background: var(--surface2); border: 1px solid var(--border); border-radius: 10px;
+           padding: 10px 8px; color: var(--text); cursor: pointer; text-align: center; }
+.gt-item:hover:not(:disabled) { border-color: var(--accent); }
+.gt-item.poor { opacity: .55; }
+.gt-item.owned { opacity: .5; cursor: default; }
+.gt-item-ico { font-size: 24px; }
+.gt-item-name { font-size: 13px; font-weight: 800; }
+.gt-once { display: inline-block; font-size: 9px; font-weight: 800; color: #f59e0b;
+           border: 1px solid #f59e0b66; border-radius: 4px; padding: 0 4px; margin-inline-start: 4px; }
+.gt-item-desc { font-size: 11px; color: var(--dim); line-height: 1.45; flex: 1; }
+.gt-item-price { font-size: 13px; font-weight: 900; color: var(--accent); }
+.gt-shop-poor { font-size: 13px; color: #ef4444; font-weight: 700; margin: 8px 0; text-align: center; }
+
+.gt-res.saved { border-color: #f59e0b66; }
+.gt-res-notes { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin: 8px 0; }
+.gt-res-notes span { font-size: 12px; font-weight: 700; background: #ffffff10;
+                     border-radius: 999px; padding: 4px 10px; }
+.gm-road-scout { display: block; font-size: 11px; font-weight: 700; color: #a78bfa; margin-top: 3px; }
+
+/* ── halftime, the banner run, and the front office ────────────────────────── */
+.gt-half { background: var(--surface); border: 1px solid #f59e0b66; border-radius: 12px;
+           padding: 14px; margin-bottom: 12px; }
+.gt-half-t { font-size: 16px; font-weight: 900; text-align: center; margin-bottom: 6px; }
+.gt-half-p { font-size: 13px; color: var(--dim); line-height: 1.6; margin: 0 0 10px; }
+.gt-half-note { font-size: 13px; font-weight: 700; text-align: center; margin: 10px 0; color: #f59e0b; }
+
+.gt-banner-tag { font-size: 11px; font-weight: 800; color: #a78bfa;
+                 border: 1px solid #8b5cf655; border-radius: 999px; padding: 2px 8px;
+                 margin-inline-start: 8px; }
+
+.gt-victory { background: var(--surface); border: 1px solid var(--accent); border-radius: 12px;
+              padding: 16px; margin-bottom: 12px; text-align: center; }
+.gt-vic-kicker { font-size: 11px; font-weight: 800; letter-spacing: .6px; color: var(--dim); }
+.gt-vic-title { font-size: 20px; font-weight: 900; margin: 4px 0 12px; color: var(--accent); }
+.gt-vic-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 10px; }
+.gt-vic-stats div { background: var(--surface2); border-radius: 8px; padding: 8px 4px; }
+.gt-vic-stats b { display: block; font-size: 19px; font-weight: 900; }
+.gt-vic-stats span { font-size: 10px; color: var(--dim); }
+.gt-vic-relics { font-size: 22px; letter-spacing: 6px; margin-bottom: 10px; }
+.gt-vic-next { font-size: 13px; color: var(--dim); line-height: 1.6; margin: 0 0 10px; }
+.gt-over { text-align: center; }
+
+.gt-office { background: #8b5cf610; border: 1px solid #8b5cf644; border-radius: 10px;
+             padding: 12px; margin-bottom: 12px; }
+.gt-office.needed { border-color: #f59e0b; box-shadow: 0 0 0 2px #f59e0b33; }
+.gt-office-t { font-weight: 900; color: #a78bfa; margin-bottom: 4px; }
+.gt-office-p { font-size: 12px; color: var(--dim); margin: 0 0 10px; line-height: 1.5; }
+.gt-office-grid { display: grid; gap: 8px; }
+.gt-gm { display: grid; gap: 3px; background: var(--surface2); border: 1px solid var(--border);
+         border-radius: 10px; padding: 10px; color: var(--text); text-align: start; cursor: pointer; }
+.gt-gm:hover { border-color: #a78bfa; }
+.gt-gm-ico { font-size: 22px; }
+.gt-gm-name { font-size: 14px; font-weight: 900; }
+.gt-gm-blurb { font-size: 12px; color: var(--dim); line-height: 1.5; }
+.gt-gm-sig { font-size: 11px; color: #a78bfa; line-height: 1.5; }
+.gt-slot.full.sig { border-color: #f59e0b; background: #f59e0b18; }
+.gt-intro-best { font-size: 13px; font-weight: 700; text-align: center; color: var(--accent); margin: 0 0 10px; }
+
+/* the gauntlet board has no "view squad" column, so it needs its own grid */
+.gt-lb-row { grid-template-columns: 32px 1fr auto minmax(0, 1fr); }
+.gt-lb-row .lb-stat small { font-size: .7em; color: var(--dim); }
+
+/* ── the opening relic, and a wheel that takes its time ────────────────────── */
+.gt-opening { background: var(--surface); border: 1px solid #8b5cf655; border-radius: 12px;
+              padding: 16px; margin-bottom: 12px; max-width: 720px; margin-inline: auto; }
+.gt-opening-kicker { text-align: center; font-size: 11px; font-weight: 800;
+                     letter-spacing: .6px; color: #a78bfa; }
+.gt-opening-title { text-align: center; font-size: 20px; font-weight: 900; margin: 4px 0 6px; }
+.gt-opening-sub { text-align: center; font-size: 12px; color: var(--dim);
+                  line-height: 1.6; margin: 0 0 14px; }
+/* one card per row on a phone, three across once there is room for them */
+.gt-opening-grid { display: grid; gap: 8px; grid-template-columns: 1fr; }
+@media (min-width: 560px) {
+  .gt-opening-grid { grid-template-columns: repeat(3, 1fr); align-items: stretch; }
+  .gt-opening-grid .gt-relic-card { height: 100%; grid-template-columns: 1fr;
+                                    justify-items: center; text-align: center; gap: 4px; }
+  .gt-opening-grid .gt-relic-ico { grid-row: auto; font-size: 30px; }
+  .gt-opening-grid .gt-relic-rar,
+  .gt-opening-grid .gt-relic-desc { grid-column: auto; }
+}
+.gt-open-pick { background: none; border: 0; padding: 0; width: 100%; cursor: pointer;
+                color: var(--text); font: inherit; }
+.gt-open-pick .gt-relic-card { transition: border-color .15s, transform .15s; }
+.gt-open-pick:hover .gt-relic-card { border-color: var(--accent); transform: translateY(-2px); }
+
+/* while it spins the cards blur slightly — the eye should not be able to read
+   the one under the marker until it stops */
+.gt-reel.spinning .gt-reel-card { filter: blur(.4px); opacity: .9; }
+.gt-reel-card.won { animation: gt-land .45s ease-out; }
+@keyframes gt-land {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.09); }
+  100% { transform: scale(1); }
+}
+
+/* ── run rules: one bargain for the whole run ──────────────────────────────── */
+.gt-mod-grid { display: grid; gap: 8px; grid-template-columns: 1fr; margin-bottom: 10px; }
+/* the explanations run long on purpose, so let the column count follow the
+   width rather than forcing three narrow strips of wrapped text */
+@media (min-width: 560px) { .gt-mod-grid { grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); } }
+.gt-mod { display: grid; gap: 4px; align-content: start; background: var(--surface2); border: 1px solid var(--border);
+          border-radius: 10px; padding: 12px 10px; color: var(--text); font: inherit;
+          text-align: center; cursor: pointer; transition: border-color .15s, transform .15s; }
+.gt-mod:hover { border-color: var(--accent); transform: translateY(-2px); }
+.gt-mod-ico { font-size: 26px; }
+.gt-mod-name { font-size: 14px; font-weight: 900; margin-bottom: 2px; }
+.gt-mod-pro { font-size: 12px; color: #22c55e; line-height: 1.45; }
+.gt-mod-con { font-size: 12px; color: #ef4444; line-height: 1.45; }
+.gt-mod-badge { background: #8b5cf618; border: 1px solid #8b5cf655; border-radius: 8px;
+                padding: 2px 7px; font-size: 14px; margin-inline-start: 8px; cursor: pointer;
+                color: var(--text); }
+.gt-mod-badge:hover { border-color: var(--accent); }
+
+/* the rating you steer by, always on screen next to the wallet */
+.gt-squad-ovr { font-size: 12px; font-weight: 700; color: var(--dim); white-space: nowrap; }
+.gt-squad-ovr b { font-size: 16px; font-weight: 900; color: var(--text); margin-inline-start: 4px; }
+@media (max-width: 420px) { .gt-squad-ovr { font-size: 11px; } }
+.gt-bar-lines { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;
+                font-size: 11px; color: var(--dim); margin: -6px 0 10px; }
+.gt-bar-lines b { color: var(--text); font-weight: 800; margin-inline-start: 3px; }
+
+/* ── admin sandbox (one account) ───────────────────────────────────────────── */
+.gt-admin { background: #ef444410; border: 1px dashed #ef444466; border-radius: 10px;
+            padding: 12px; margin-top: 14px; }
+.gt-admin-t { font-weight: 900; color: #ef4444; margin-bottom: 8px; font-size: 14px; }
+.gt-admin-t span { font-weight: 600; font-size: 11px; color: var(--dim); margin-inline-start: 8px; }
+.gt-admin-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 7px; }
+.gt-admin-row label { font-size: 12px; color: var(--dim); min-width: 92px; }
+.gt-admin-row select, .gt-admin-row input {
+  background: var(--surface2); color: var(--text); border: 1px solid var(--border);
+  border-radius: 6px; padding: 4px 6px; font-family: inherit; font-size: 12px; max-width: 190px; }
+.gt-admin-btn { background: var(--surface2); color: var(--text); border: 1px solid var(--border);
+                border-radius: 6px; padding: 4px 10px; font-family: inherit; font-size: 12px;
+                cursor: pointer; }
+.gt-admin-btn:hover { border-color: #ef4444; color: #ef4444; }
+.gt-admin-state { font-size: 11px; color: var(--dim); margin: 6px 0 0; direction: rtl; }
+
+/* choosing which banner to run */
+.gt-banner-row { background: #8b5cf610; border: 1px solid #8b5cf644; border-radius: 10px;
+                 padding: 12px; margin-bottom: 12px; }
+.gt-banner-t { font-weight: 900; color: #a78bfa; margin-bottom: 4px; }
+.gt-banner-sub { font-size: 12px; color: var(--dim); line-height: 1.5; margin: 0 0 8px; }
+.gt-banner-opts { display: flex; gap: 6px; flex-wrap: wrap; }
+.gt-banner-pick { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
+                  padding: 6px 12px; color: var(--text); font: inherit; font-size: 13px;
+                  font-weight: 700; cursor: pointer; }
+.gt-banner-pick small { color: var(--dim); font-weight: 600; margin-inline-start: 4px; }
+.gt-banner-pick:hover { border-color: #a78bfa; }
+.gt-banner-pick.on { border-color: #a78bfa; background: #8b5cf628; }
+
+/* dark crests disappear on a dark card, so every card badge gets a light disc —
+   the map already draws its markers this way */
+.gm-road-crest { background: #f2f4f7; border-radius: 50%; padding: 3px; }
+
+/* the crest gallery (admin) */
+.ga-crest-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(152px, 1fr));
+                 gap: 8px; margin: 10px 0; }
+.ga-crest { display: grid; grid-template-columns: 36px 46px 46px; grid-auto-rows: auto;
+            align-items: center; justify-content: center; gap: 2px 6px;
+            background: var(--surface2); border: 1px solid var(--border);
+            border-radius: 8px; padding: 8px 6px; text-align: center; }
+.ga-crest .gm-road-crest { width: 34px; height: 34px; }
+.ga-crest-map { width: 46px; height: 46px; overflow: visible; }
+.ga-crest-cap { font-size: 9px; color: var(--dim); }
+.ga-crest-name { grid-column: 1 / 4; font-size: 11px; font-weight: 700; color: var(--text); }
+.ga-crest-id { grid-column: 1 / 4; font-size: 9px; color: var(--dim); }
+.ga-crest.missing { border-color: #ef4444; background: #ef444414; }
+.ga-crest.missing .ga-crest-id::after { content: ' · חסר'; color: #ef4444; font-weight: 800; }
+
+/* the spin button while the wheel is running */
+.gt-stop-btn { background: #ef4444 !important; border-color: #ef4444 !important; color: #fff !important; }
+
+/* the XI, folded away behind the rating chip */
+.gt-squad-ovr { background: none; border: 0; font: inherit; cursor: pointer; padding: 0; }
+.gt-squad-ovr:hover { color: var(--text); }
+.gt-peek-caret { font-size: 9px; color: var(--dim); }
+.gt-peek { display: grid; grid-template-columns: 1fr; gap: 2px; margin: -4px 0 10px;
+           background: var(--surface2); border: 1px solid var(--border);
+           border-radius: 8px; padding: 6px; }
+@media (min-width: 560px) { .gt-peek { grid-template-columns: 1fr 1fr; gap: 2px 10px; } }
+.gt-peek-row { display: grid; grid-template-columns: 34px 1fr auto 26px;
+               align-items: center; gap: 6px; font-size: 11.5px; padding: 1px 2px; }
+.gt-peek-pos { font-size: 9.5px; font-weight: 800; color: var(--accent); text-align: center;
+               border: 1px solid var(--border); border-radius: 4px; padding: 1px 0; }
+.gt-peek-name { font-weight: 700; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gt-peek-club { font-size: 9.5px; color: var(--dim); white-space: nowrap; }
+.gt-peek-ovr { font-weight: 900; text-align: center; color: var(--text); }
+.gt-peek-ovr.up { color: #22c55e; }
+
+/* the act, and what became of each club that season */
+.gm-picker-act { text-align: center; font-size: 11px; font-weight: 800; letter-spacing: 1px;
+                 color: #a78bfa; text-transform: none; margin-bottom: 2px; }
+.gm-road-tag { display: inline-block; font-size: 10px; font-weight: 800; border-radius: 4px;
+               padding: 1px 6px; margin-inline-start: 6px; vertical-align: middle; }
+.gm-road-tag.down { color: #ef4444; background: #ef444418; }
+.gm-road-tag.champ { color: var(--accent); background: #d4af3718; }
+.gm-road-tag.second { color: #9aa4b2; background: #9aa4b218; }
+.gm-road-fin { display: block; font-size: 11px; font-weight: 700; color: var(--dim); margin-top: 1px; }
+
+/* ── the European leg ──────────────────────────────────────────────────────── */
+.gt-eu { background: var(--surface); border: 1px solid #38bdf855; border-radius: 12px;
+         padding: 14px; margin-bottom: 12px; }
+.gt-eu-head { text-align: center; margin-bottom: 10px; }
+.gt-eu-kicker { font-size: 11px; font-weight: 800; letter-spacing: .6px; color: #38bdf8; }
+.gt-eu-title { font-size: 20px; font-weight: 900; margin: 2px 0 4px; }
+.gt-eu-sub { font-size: 12px; color: var(--dim); line-height: 1.6; margin: 0; }
+.eu-road { margin-bottom: 8px; }
+.eu-road.done { opacity: .5; }
+.eu-road.locked { opacity: .38; }
+.eu-road.next { border-color: #38bdf8; }
+.eu-round { display: inline-block; font-size: 10px; font-weight: 800; color: #38bdf8;
+            background: #38bdf818; border-radius: 4px; padding: 1px 6px; margin-inline-start: 6px;
+            vertical-align: middle; }
+
+/* reaching the group stage */
+.gt-ucl-in { background: linear-gradient(180deg, #1b2a5e, #0d1430); border: 1px solid #4c6ef5;
+             border-radius: 12px; padding: 16px; margin-bottom: 12px; text-align: center; }
+.gt-ucl-t { font-size: 19px; font-weight: 900; color: #fff; margin-bottom: 6px; }
+.gt-ucl-in p { font-size: 13px; color: #c7d2fe; margin: 0; line-height: 1.6; }
+.btn-europe { background: linear-gradient(180deg, #4c6ef5, #364fc7) !important; color: #fff !important; }
+.gt-eu-season { margin-top: 10px; }

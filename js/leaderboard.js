@@ -83,9 +83,64 @@ async function showLeaderboard() {
   loadLeaderboard();
 }
 
+// The gauntlet board is a different game: no seasons, no formats, no periods —
+// how deep you got, and at which banner. Its filters are hidden rather than
+// disabled, because none of them mean anything here.
+function lbToggleSeasonFilters(show) {
+  ['.lb-season-row', '.lb-modes', '.lb-filters:not(.lb-modes)'].forEach(sel => {
+    document.querySelectorAll(sel).forEach(el => { el.style.display = show ? '' : 'none'; });
+  });
+}
+
+async function loadGauntletBoard(table) {
+  const { data: rows, error } = await _supabase
+    .from('gauntlet_runs')
+    .select('depth, cleared, banner, team_ovr, created_at, profiles(username, avatar_url)')
+    .order('banner', { ascending: false })
+    .order('depth', { ascending: false })
+    .order('created_at', { ascending: true })
+    .limit(200);
+
+  if (error || !rows?.length) {
+    table.innerHTML = '<div class="page-loading">אין ריצות עדיין — היה הראשון</div>';
+    return;
+  }
+  // one row per player: his best run, which is the first he appears in
+  const seen = new Set();
+  const best = rows.filter(r => {
+    const who = r.profiles?.username ?? '—';
+    if (seen.has(who)) return false;
+    seen.add(who);
+    return true;
+  });
+
+  table.innerHTML = '';
+  best.forEach((row, i) => {
+    const rank = i + 1;
+    const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank;
+    const date = new Date(row.created_at).toLocaleDateString('he-IL', { day: 'numeric', month: 'numeric', year: '2-digit' });
+    const sub = [row.cleared ? '🏆 המסע הושלם' : null,
+                 row.banner ? '🏴 ' + gtBannerName(row.banner) : null,
+                 row.team_ovr ? 'OVR ' + row.team_ovr : null, date]
+      .filter(Boolean).map(x => `<bdi>${esc(x)}</bdi>`).join(' · ');
+
+    const el = document.createElement('div');
+    el.className = 'lb-row gt-lb-row';
+    el.innerHTML = `
+      <span class="lb-rank ${rank <= 3 ? 'lb-rank-top' : ''}">${medal}</span>
+      <span class="lb-name">${esc(row.profiles?.username ?? 'אנונימי')}</span>
+      <span class="lb-stat">${row.depth}<small>/8</small></span>
+      <span class="lb-sub" dir="rtl">${sub}</span>`;
+    table.appendChild(el);
+  });
+}
+
 async function loadLeaderboard() {
   const table = document.getElementById('leaderboard-table');
   table.innerHTML = '<div class="page-loading">טוען...</div>';
+
+  lbToggleSeasonFilters(lbTab !== 'gauntlet');
+  if (lbTab === 'gauntlet') return loadGauntletBoard(table);
 
   const orderCol = lbTab === 'ovr' ? 'ovr' : 'points';
   let query = _supabase

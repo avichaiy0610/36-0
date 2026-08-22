@@ -18,6 +18,8 @@
 !manifest.json
 !robots.txt
 !sitemap.xml
+!crests
+!crests/**
 !team
 !team/**
 !player
