@@ -156,7 +156,21 @@ function euTeam(club) { return { name: club.name, ovr: club.ovr, ...euLines(club
 // to extra time in the second leg — a third of a match's worth of chances — and
 // then, if it is still level, to a coin flip. No away goals: UEFA abolished them
 // in 2021 and this ladder is the modern one.
-function euPlayTie(me, club) {
+// `want` is the sandbox forcing a result. It replays the tie until the
+// simulation produces the asked-for outcome, so the legs, the aggregate and the
+// scorers all stay internally consistent — and if the simulation simply will not
+// cooperate (forcing a 90-rated squad to lose to a 79 is a sub-1% event, and a
+// retry budget loses that coin flip often enough to matter) it MIRRORS the last
+// tie instead of quietly returning the opposite of what was asked. A sandbox
+// that silently ignores you is worse than no sandbox.
+function euPlayTie(me, club, want) {
+  if (want) {
+    for (let n = 0; n < 200; n++) {
+      const t = euPlayTie(me, club);
+      if ((want === 'W') === t.won) return t;
+    }
+    return euMirrorTie(euPlayTie(me, club));
+  }
   const opp = euTeam(club);
   const legs = [simulateMatchV2(me, opp, false), simulateMatchV2(me, opp, true)];
   const tie = { id: club.id, name: club.name, flag: club.flag, country: club.country,
@@ -177,6 +191,23 @@ function euPlayTie(me, club) {
   tie.agg = { gf, ga };
   tie.won = tie.pens ? tie.pens.gf > tie.pens.ga : gf > ga;
   return tie;
+}
+
+// Swap both sides of every leg. The scoreline stays a real one the engine could
+// have produced, it just belongs to the other team now.
+function euMirrorTie(t) {
+  t.legs.forEach(l => {
+    const g = l.gf; l.gf = l.ga; l.ga = g;
+    l.outcome = l.gf > l.ga ? 'W' : l.gf === l.ga ? 'D' : 'L';
+    l.scorers = [];                       // they were the other side's goals
+  });
+  if (t.et) { const g = t.et.gf; t.et.gf = t.et.ga; t.et.ga = g; }
+  if (t.pens) { const g = t.pens.gf; t.pens.gf = t.pens.ga; t.pens.ga = g; }
+  const gf = t.legs[0].gf + t.legs[1].gf + (t.et ? t.et.gf : 0);
+  const ga = t.legs[0].ga + t.legs[1].ga + (t.et ? t.et.ga : 0);
+  t.agg = { gf, ga };
+  t.won = t.pens ? t.pens.gf > t.pens.ga : gf > ga;
+  return t;
 }
 
 /* ── the league phase ─────────────────────────────────────────────────────── */
@@ -240,15 +271,18 @@ function euBand(rank) { return EU_BANDS.find(b => rank <= b.max); }
 
 /* ── the campaign ─────────────────────────────────────────────────────────── */
 function euBuildCampaign() {
-  const me = myLineRatings();
+  let me = myLineRatings();
+  if (typeof euForcedLines === 'function') me = euForcedLines(me);
   const c = { v: 1, ovr: me.ovr, lines: { atk: me.atk, mid: me.mid, def: me.def, gk: me.gk },
               qual: [], eliminatedAt: null, league: null };
   const beaten = [];
   for (let i = 0; i < EU_ROUNDS.length; i++) {
     const r = EU_ROUNDS[i];
-    const club = { ...r.clubs[Math.floor(Math.random() * r.clubs.length)],
+    const forced = typeof euForcedClub === 'function' ? euForcedClub(i) : null;
+    const club = { ...(forced || r.clubs[Math.floor(Math.random() * r.clubs.length)]),
                    round: r.round, roundLong: r.roundLong };
-    const tie = euPlayTie(me, club);
+    const want = typeof euForcedOutcome === 'function' ? euForcedOutcome(i) : null;
+    const tie = euPlayTie(me, club, want);
     c.qual.push(tie);
     if (!tie.won) { c.eliminatedAt = i; break; }
     beaten.push(tie.name);
@@ -275,6 +309,8 @@ function euBuildCampaign() {
 async function euSubmit(c) {
   if (c.submitted) return;
   c.submitted = true;
+  // a sandbox 👑 שמינית הגמר is not an achievement
+  if (typeof euSandboxActive === 'function' && euSandboxActive()) return;
   if (typeof getCurrentUser !== 'function' || !getCurrentUser()) return;
   const L = c.league;
   const giant = !!(L && L.matches.some(m => m.outcome === 'W' && m.ovr >= 96));
@@ -450,7 +486,9 @@ function euRender(animate) {
   }
 
   body.innerHTML = head + ties + tail +
-    `<button class="btn-secondary btn-full" id="eu-done">← ${euText('eu-back', 'חזרה לתוצאות העונה')}</button>`;
+    `<button class="btn-secondary btn-full" id="eu-done">← ${euText('eu-back', 'חזרה לתוצאות העונה')}</button>` +
+    (typeof euAdminHTML === 'function' ? euAdminHTML() : '');
+  if (typeof euWireAdmin === 'function') euWireAdmin(body);
   const done = body.querySelector('#eu-done');
   if (done) done.onclick = () => showScreen('results');
 
