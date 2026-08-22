@@ -29,13 +29,46 @@
    GM_EU with the same ratings; the gauntlet keeps its own copy because it stores
    line ratings inside a run. Change a rating in one place, change it in both. */
 
-const EU_QUAL = [
-  // `round` is the chip on the tie header, where space is short. `roundLong` is
-  // the form a sentence needs: "נעצרת בסיבוב המוקדמות השלישי", not "נעצרת במוקדמות 3".
-  { id: 'eu-kalju',    name: 'נומה קאליו',           country: 'אסטוניה', flag: '🇪🇪', round: 'מוקדמות 1',  roundLong: 'סיבוב המוקדמות הראשון',  ovr: 77 },
-  { id: 'eu-sheriff',  name: 'שריף טירספול',         country: 'מולדובה', flag: '🇲🇩', round: 'מוקדמות 2',  roundLong: 'סיבוב המוקדמות השני',    ovr: 84 },
-  { id: 'eu-zvezda',   name: 'הכוכב האדום בלגרד',    country: 'סרביה',   flag: '🇷🇸', round: 'מוקדמות 3',  roundLong: 'סיבוב המוקדמות השלישי',  ovr: 87 },
-  { id: 'eu-salzburg', name: 'רד בול זלצבורג',       country: 'אוסטריה', flag: '🇦🇹', round: 'פלייאוף',    roundLong: 'שלב הפלייאוף',            ovr: 89 },
+// Three candidates per round, one drawn per campaign, so the same season is not
+// the same summer twice. Each round holds one club easier and one harder than
+// the anchor, which is what makes the draw worth caring about: a 79 in the first
+// round can end a run that a 75 would have waved through.
+//
+// `round` is the chip on the tie header, where space is short. `roundLong` is
+// the form a sentence needs: "נעצרת בסיבוב המוקדמות השלישי", not "נעצרת במוקדמות 3".
+const EU_ROUNDS = [
+  { round: 'מוקדמות 1', roundLong: 'סיבוב המוקדמות הראשון', clubs: [
+    { id: 'eu-kalju',  name: 'נומה קאליו',   country: 'אסטוניה', flag: '🇪🇪', ovr: 77,
+      desc: 'אלופת אסטוניה. הסיבוב שישראלית מגיעה אליו רק כשהמקדם נמוך - ובכל ארבע הפעמים היריבה הייתה אחרת.' },
+    { id: 'eu-flora',  name: 'פלורה טאלין',  country: 'אסטוניה', flag: '🇪🇪', ovr: 75,
+      desc: 'הפועל באר שבע עברה אותה ב-2018/19. הסיבוב הראשון שלה, וגם שלך.' },
+    { id: 'eu-kairat', name: 'קייראט אלמאטי', country: 'קזחסטן', flag: '🇰🇿', ovr: 79,
+      desc: 'אלופת קזחסטן שהדיחה את מכבי חיפה ב-2021/22. הסיבוב הראשון לא תמיד קל.' },
+  ]},
+  { round: 'מוקדמות 2', roundLong: 'סיבוב המוקדמות השני', clubs: [
+    { id: 'eu-sheriff', name: 'שריף טירספול', country: 'מולדובה', flag: '🇲🇩', ovr: 84,
+      desc: 'היריבה החוזרת ביותר של הסיבוב השני: פעמיים מול ישראליות, ושתי הפעמים הן עברו.' },
+    { id: 'eu-zilina',  name: 'ז\'ילינה',      country: 'סלובקיה', flag: '🇸🇰', ovr: 81,
+      desc: 'נפגשה פעמיים בסיבוב הזה - מכבי ת"א ב-2003/04 ועירוני קריית שמונה ב-2012/13.' },
+    { id: 'eu-copenhagen', name: 'קופנהגן',   country: 'דנמרק',  flag: '🇩🇰', ovr: 87,
+      desc: 'בית"ר ירושלים נתקלה בה ב-2007/08. גדולה מדי לסיבוב השני, וזה בדיוק העניין.' },
+  ]},
+  { round: 'מוקדמות 3', roundLong: 'סיבוב המוקדמות השלישי', clubs: [
+    { id: 'eu-zvezda',  name: 'הכוכב האדום בלגרד', country: 'סרביה',   flag: '🇷🇸', ovr: 87,
+      desc: 'מכבי חיפה הדיחה אותה ב-2022/23 ועלתה לשלב הבתים. מרקאנה הסרבית לא מוחלת פעמיים.' },
+    { id: 'eu-maribor', name: 'מריבור',            country: 'סלובניה', flag: '🇸🇮', ovr: 85,
+      desc: 'שלושה מפגשים מול ישראליות - יותר מכל מועדון חוץ מזלצבורג.' },
+    { id: 'eu-basel',   name: 'באזל',              country: 'שווייץ',  flag: '🇨🇭', ovr: 89,
+      desc: 'מכבי ת"א עברה אותה ב-2015/16 בשערי חוץ. הסיבוב השלישי במיטבו הקשה.' },
+  ]},
+  { round: 'פלייאוף', roundLong: 'שלב הפלייאוף', clubs: [
+    { id: 'eu-salzburg', name: 'רד בול זלצבורג', country: 'אוסטריה', flag: '🇦🇹', ovr: 89,
+      desc: 'הקיר של הפלייאוף: שלושה מפגשים מול ישראליות, יותר מכל מועדון אחר. מי שעובר אותה - בשלב הליגה.' },
+    { id: 'eu-bate',     name: 'באט"ה בוריסוב',  country: 'בלארוס',  flag: '🇧🇾', ovr: 86,
+      desc: 'עצרה את עירוני קריית שמונה ב-2012/13, במסע האירופי היחיד של המועדון.' },
+    { id: 'eu-celtic',   name: 'סלטיק',          country: 'סקוטלנד', flag: '🏴', ovr: 91,
+      desc: 'הפועל באר שבע נפלה מולה ב-2016/17. סלטיק פארק הוא לא מקום להתחיל בו קיץ.' },
+  ]},
 ];
 
 // 35 clubs in four pots. The 36th seat in the table is yours, and it is in pot 4
@@ -88,6 +121,18 @@ const EU_POTS = [
   ],
 ];
 
+// One stand-by per pot. The league phase is 36 clubs and stays 36: a side you
+// eliminated in qualifying is out of the competition, and somebody takes the
+// seat. Today only Celtic can trigger this — she is the one club that sits in
+// both a qualifying round and a pot — but the mechanism is general, because the
+// day another overlap is added nobody will remember to re-check the count.
+const EU_RESERVES = [
+  [{ name: "צ'לסי", flag: '🏴', ovr: 97 },       { name: 'ניוקאסל', flag: '🏴', ovr: 96 }],
+  [{ name: 'נאפולי', flag: '🇮🇹', ovr: 93 },      { name: 'מרסיי', flag: '🇫🇷', ovr: 93 }],
+  [{ name: 'גלאטסראיי', flag: '🇹🇷', ovr: 89 },   { name: 'אייאקס', flag: '🇳🇱', ovr: 89 }],
+  [{ name: "קלאב ברוז'", flag: '🇧🇪', ovr: 85 },  { name: "ריינג'רס", flag: '🏴', ovr: 85 }],
+];
+
 const EU_KEY = 'europe';                 // the slot inside the saved draft
 let _euCampaign = null;
 
@@ -138,9 +183,28 @@ function euPlayTie(me, club) {
 // Eight matches against eight different clubs: two out of every pot, one at home
 // and one away in each — the real format since 2024. Your own pot gives you two
 // of the eight clubs in it, because the ninth seat is you.
-function euDrawLeaguePhase(me, myOvr) {
+function euDrawLeaguePhase(me, myOvr, beaten = []) {
+  const out = new Set(beaten);
+  const used = new Set();          // a reserve fills exactly one seat
+  const pots = EU_POTS.map((pot, i) => {
+    const kept = pot.filter(c => !out.has(c.name));
+    // refill, so the field is always 35 opponents and the table always 36 rows
+    const bench = EU_RESERVES[i] || [];
+    for (const club of bench) {
+      if (kept.length >= pot.length) break;
+      if (!used.has(club.name)) { kept.push(club); used.add(club.name); }
+    }
+    // A pot can in principle lose all four qualifying opponents, more than its
+    // own bench covers, so a pot that is still short borrows from the others.
+    // Without this the table quietly returns 35 rows and calls itself 36.
+    for (const club of EU_RESERVES.flat()) {
+      if (kept.length >= pot.length) break;
+      if (!used.has(club.name)) { kept.push(club); used.add(club.name); }
+    }
+    return kept;
+  });
   const opponents = [];
-  EU_POTS.forEach((pot, pi) => {
+  pots.forEach((pot, pi) => {
     const two = shuffleArr([...pot]).slice(0, 2);
     two.forEach((club, k) => opponents.push({ ...club, pot: pi + 1, home: k === 0 }));
   });
@@ -154,7 +218,7 @@ function euDrawLeaguePhase(me, myOvr) {
   // closed-form estimator that already fills the Israeli league table, over the
   // same eight matches — order from the xG model, spacing conventionalised, and
   // a form swing per club so the table is not identical every campaign.
-  const field = EU_POTS.flat().map(c => ({ ...c, ...euLines(c.ovr) }));
+  const field = pots.flat().map(c => ({ ...c, ...euLines(c.ovr) }));
   const est = simTableEstimateV2([...field, { ...me, name: 'me' }], 8);
   const myPts = matches.reduce((s, m) => s + (m.outcome === 'W' ? 3 : m.outcome === 'D' ? 1 : 0), 0);
 
@@ -179,12 +243,21 @@ function euBuildCampaign() {
   const me = myLineRatings();
   const c = { v: 1, ovr: me.ovr, lines: { atk: me.atk, mid: me.mid, def: me.def, gk: me.gk },
               qual: [], eliminatedAt: null, league: null };
-  for (let i = 0; i < EU_QUAL.length; i++) {
-    const tie = euPlayTie(me, EU_QUAL[i]);
+  const beaten = [];
+  for (let i = 0; i < EU_ROUNDS.length; i++) {
+    const r = EU_ROUNDS[i];
+    const club = { ...r.clubs[Math.floor(Math.random() * r.clubs.length)],
+                   round: r.round, roundLong: r.roundLong };
+    const tie = euPlayTie(me, club);
     c.qual.push(tie);
     if (!tie.won) { c.eliminatedAt = i; break; }
+    beaten.push(tie.name);
   }
-  if (c.eliminatedAt === null) c.league = euDrawLeaguePhase(me, me.ovr);
+  // A club you knocked out in July cannot be waiting for you in September. That
+  // is why Salzburg and Crvena Zvezda were kept out of the pots by hand; doing it
+  // from the tie you actually played covers every draw, including Celtic, who
+  // sits in pot 3 as well as the play-off.
+  if (c.eliminatedAt === null) c.league = euDrawLeaguePhase(me, me.ovr, beaten);
 
   // Scorers, so a European row reads like a league row. Same helper the season
   // uses, so the names come from the XI that actually played.
