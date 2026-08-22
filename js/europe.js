@@ -268,6 +268,35 @@ function euBuildCampaign() {
   return c;
 }
 
+/* ── achievements ─────────────────────────────────────────────────────────── */
+// Sent once, when the campaign is built. There is no run table behind this: a
+// European summer is not a leaderboard, it is something that either happened to
+// your season or did not, so only the badges are recorded.
+async function euSubmit(c) {
+  if (c.submitted) return;
+  c.submitted = true;
+  if (typeof getCurrentUser !== 'function' || !getCurrentUser()) return;
+  const L = c.league;
+  const giant = !!(L && L.matches.some(m => m.outcome === 'W' && m.ovr >= 96));
+  // a tie survived without conceding over BOTH legs, extra time included
+  const clean = c.qual.some(t => t.won &&
+    t.legs.reduce((n, l) => n + l.ga, 0) + (t.et ? t.et.ga : 0) === 0);
+  try {
+    const r = await _supabase.rpc('submit_europe_run', {
+      p: {
+        won_ties: c.qual.filter(t => t.won).length,
+        rank: L ? L.rank : 0,
+        points: L ? L.pts : 0,
+        beat_giant: giant,
+        clean_tie: clean,
+      },
+    });
+    // pop the toast for whatever the run just earned, same as everywhere else
+    const got = (r && r.data && r.data.achievements) || [];
+    if (got.length && typeof showAchievementToasts === 'function') showAchievementToasts(got);
+  } catch (e) {}
+}
+
 /* ── persistence ──────────────────────────────────────────────────────────── */
 // The campaign lives beside the season inside the saved draft, so a refresh
 // shows the campaign you played rather than rolling a new one.
@@ -310,7 +339,7 @@ function euStart() {
   if (!state.picks || !state.picks.some(Boolean)) return;
   _euCampaign = _euCampaign || euLoad();
   const fresh = !_euCampaign;
-  if (fresh) { _euCampaign = euBuildCampaign(); euSave(_euCampaign); }
+  if (fresh) { _euCampaign = euBuildCampaign(); euSave(_euCampaign); euSubmit(_euCampaign); }
   showScreen('europe');
   const back = document.getElementById('eu-back');
   if (back) back.onclick = () => showScreen('results');

@@ -8,7 +8,8 @@ function lgEsc(s) {
   ));
 }
 
-let _lgCreate = { max: 6, difficulty: 'normal', peak: false, ratings: true };
+const LG_MAX_MEMBERS = 6;
+let _lgCreate = { max: LG_MAX_MEMBERS, difficulty: 'normal', peak: false, ratings: true };
 let _pendingLeagueCode = null;
 
 async function showLeagues() {
@@ -40,7 +41,7 @@ async function renderLeaguesHome() {
       </div>
       <div class="lg-config">
         <div class="lg-config-row"><span>מספר מקומות</span>
-          <input id="lg-max" class="lg-input lg-max-input" type="number" min="2" max="30" value="${_lgCreate.max}"></div>
+          <input id="lg-max" class="lg-input lg-max-input" type="number" min="2" max="6" value="${_lgCreate.max}"></div>
         <div class="lg-config-row"><span>קושי</span>
           <div class="lg-mini" id="lg-diff">
             <button data-v="easy">קל</button><button data-v="normal">רגיל</button><button data-v="hard">קשה</button>
@@ -74,7 +75,10 @@ async function renderLeaguesHome() {
   wireMini('lg-diff', _lgCreate.difficulty, v => _lgCreate.difficulty = v);
   wireMini('lg-peak', _lgCreate.peak ? 'on' : 'off', v => _lgCreate.peak = v === 'on');
   wireMini('lg-ratings', _lgCreate.ratings ? 'on' : 'off', v => _lgCreate.ratings = v === 'on');
-  document.getElementById('lg-max').oninput = e => _lgCreate.max = Math.max(2, Math.min(30, +e.target.value || 6));
+  // Six is the ceiling: the league table has fourteen clubs, and past six
+  // friends the season stops being Ligat ha'Al with your mates in it and
+  // becomes a table of strangers.
+  document.getElementById('lg-max').oninput = e => _lgCreate.max = Math.max(2, Math.min(LG_MAX_MEMBERS, +e.target.value || 6));
 
   document.getElementById('lg-create-btn').onclick = createLeagueFlow;
   document.getElementById('lg-join-btn').onclick   = joinLeagueFlow;
@@ -96,7 +100,7 @@ async function createLeagueFlow() {
     difficulty: _lgCreate.difficulty, peak_mode: _lgCreate.peak,
     ratings_visible: _lgCreate.ratings, draft_mode: 'squad-first',
   };
-  const { data, error } = await _supabase.rpc('create_league', { p_name: name, p_max: _lgCreate.max, p_settings: settings });
+  const { data, error } = await _supabase.rpc('create_league', { p_name: name, p_max: Math.max(2, Math.min(LG_MAX_MEMBERS, _lgCreate.max)), p_settings: settings });
   if (error) { lgMsg('יצירת הליגה נכשלה: ' + error.message, false); return; }
   openLeague(data);
 }

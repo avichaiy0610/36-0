@@ -72,8 +72,11 @@ function lgInjectFriends(table, friends) {
   friends.forEach(f => {
     const primary = f.inTopSix ? champSlots : relegSlots;
     const alt     = f.inTopSix ? relegSlots : champSlots;
-    let idx = primary.shift(); if (idx === undefined) idx = alt.shift();
-    if (idx === undefined) return;               // more friends than slots (huge league)
+    // Take the WEAKEST free slot in the bracket, not the strongest: a friend
+    // joining should push out the club nobody would miss, and the table is
+    // already sorted by points, so the last index is the bottom of that bracket.
+    let idx = primary.pop(); if (idx === undefined) idx = alt.pop();
+    if (idx === undefined) return;               // more friends than slots (capped at 6, so unreachable)
     table[idx] = { name: f.name, pts: f.pts, w: f.w, d: f.d, l: f.l, gf: f.gf, ga: f.ga, us: false, isFriend: true };
   });
   const bySort = (a, b) => b.pts - a.pts || (b.w - a.w) || ((b.gf - b.ga) - (a.gf - a.ga));
