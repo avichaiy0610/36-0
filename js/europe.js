@@ -409,7 +409,7 @@ function euRender(animate) {
     <div class="eu-head">
       <div class="eu-kicker">${euText('eu-kicker', 'אלופת ישראל · הקיץ שאחרי')}</div>
       <div class="eu-title">🇪🇺 ${euText('eu-title', 'מוקדמות ליגת האלופות')}</div>
-      <p class="eu-sub">${euText('eu-sub', 'ארבעה תיקים, כל אחד בית וחוץ. ההרכב שלך משחק כמו שהוא -')}
+      <p class="eu-sub">${euText('eu-sub', 'ארבעה סיבובים, כל אחד בית וחוץ. ההרכב שלך משחק כמו שהוא -')}
         <bdi dir="ltr">${c.ovr}</bdi> ${euText('eu-sub-tail', 'מול אירופה.')}</p>
     </div>`;
 
