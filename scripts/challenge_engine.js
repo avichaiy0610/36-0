@@ -404,6 +404,37 @@ async function processTaps() {
   const dry = DRY_RUN === '1';
   const force = process.env.FORCE === '1';   // re-propose even if one is pending
 
+  // Why a tap can vanish, answered with facts instead of guesses. Read-only:
+  // getUpdates WITHOUT an offset returns the queue without confirming anything,
+  // so running this never destroys a pending tap.
+  //
+  // The four things it settles:
+  //  · getMe        — which bot this token is. If it prints the same username as
+  //                   the news bot, the two engines share a queue and whichever
+  //                   polls first deletes the other's taps.
+  //  · getWebhookInfo — a webhook makes getUpdates fail outright with a 409.
+  //  · stored offset vs. the real queue — an offset above every waiting update
+  //                   skips them forever.
+  //  · the queue itself — update ids, types, and callback data.
+  if (process.env.TAPS_DIAG === '1') {
+    const me = await tg('getMe', {});
+    console.log(`diag: bot = ${me.ok ? '@' + me.result.username + ' (id ' + me.result.id + ')' : JSON.stringify(me)}`);
+    const wh = await tg('getWebhookInfo', {});
+    console.log(`diag: webhook = ${wh.ok ? (wh.result.url || '(none)') + ' pending=' + wh.result.pending_update_count : JSON.stringify(wh)}`);
+    const stored = await stateGet('chal_tg_offset');
+    console.log(`diag: stored chal_tg_offset = ${stored}`);
+    const q = await tg('getUpdates', { timeout: 0 });          // no offset: peek, do not confirm
+    if (!q.ok) { console.log(`diag: getUpdates failed — ${q.description}`); return; }
+    console.log(`diag: ${q.result.length} update(s) waiting in the queue`);
+    for (const up of q.result) {
+      const kind = Object.keys(up).filter(k => k !== 'update_id').join(',');
+      const data = up.callback_query ? ` data=${up.callback_query.data}` : '';
+      const skipped = stored && up.update_id <= +stored ? '  ← BELOW THE STORED OFFSET, never read' : '';
+      console.log(`diag:   id=${up.update_id} ${kind}${data}${skipped}`);
+    }
+    return;
+  }
+
   // The ten-minute run: read the taps and stop. It must not compose or propose —
   // the engine only ever writes a period that has not started, and it does that
   // once a day.

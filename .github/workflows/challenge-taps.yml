@@ -12,6 +12,11 @@ on:
   schedule:
     - cron: '*/10 * * * *'
   workflow_dispatch:
+    inputs:
+      diag:
+        description: 'דיאגנוסטיקה — מי הבוט, יש webhook, ומה באמת ממתין בתור (לא צורך לחיצות)'
+        type: boolean
+        default: false
 
 # Shares the group with challenge-engine so the two never poll getUpdates at the
 # same time — they share one offset in engine_state, and a race would skip taps.
@@ -33,4 +38,5 @@ jobs:
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
           TELEGRAM_CHAL_BOT_TOKEN: ${{ secrets.TELEGRAM_CHAL_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          TAPS_ONLY: '1'
+          TAPS_ONLY: ${{ inputs.diag && '0' || '1' }}
+          TAPS_DIAG: ${{ inputs.diag && '1' || '' }}
