@@ -99,7 +99,7 @@ function renderProfile(body, s) {
 
     <div class="pf-card">
       <div class="pf-card-title">🎯 ההרגלים שלך</div>
-      ${line('⚽', 'השחקן שדרפטת הכי הרבה', s.top_player ? `${s.top_player} (${s.top_player_n})` : null)}
+      ${line('⚽', 'השחקן שבחרת הכי הרבה', s.top_player ? `${s.top_player} (${s.top_player_n})` : null)}
       ${line('🛡', 'המועדון שאתה חוזר אליו', s.top_club ? `${teamName(s.top_club)} (${s.top_club_n})` : null)}
       ${line('📋', 'המערך המועדף', s.top_formation ? `${s.top_formation} (${s.top_formation_n})` : null)}
       ${line('🏅', 'הדרגה שהכי חזרה', s.top_tier)}
