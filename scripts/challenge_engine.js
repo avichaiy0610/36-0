@@ -430,12 +430,7 @@ async function processTaps() {
     const me = await tg('getMe', {});
     const r = await tg('sendMessage', {
       chat_id: TELEGRAM_CHAT_ID,
-      text: '🧪 בדיקת כפתורים · ' + new Date().toISOString().slice(11, 16) +
-            '
-
-זו הודעה מהבוט של האתגרים (@' + (me.ok ? me.result.username : '?') + ').' +
-            '
-תלחץ על הכפתור למטה - ותגיד לי שלחצת.',
+      text: '🧪 בדיקת כפתורים · ' + new Date().toISOString().slice(11, 16) + '\n\nזו הודעה מהבוט של האתגרים (@' + (me.ok ? me.result.username : '?') + ').' + '\nתלחץ על הכפתור למטה - ותגיד לי שלחצת.',
       reply_markup: { inline_keyboard: [[{ text: '✅ לחץ כאן לבדיקה', callback_data: 'ping:test:now' }]] },
     });
     console.log('ping: sent=' + r.ok + (r.ok ? ' message_id=' + r.result.message_id : ' ' + r.description));
