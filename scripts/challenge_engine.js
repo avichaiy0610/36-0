@@ -376,6 +376,12 @@ async function processTaps() {
     const cq = up.callback_query;
     if (!cq || !cq.data) continue;
     const [action, period, key] = cq.data.split(':');
+    if (action === 'ping') {                     // the connectivity test button
+      console.log(`taps: PING RECEIVED from ${cq.from && cq.from.username} — the bot does see your taps`);
+      await tg('answerCallbackQuery', { callback_query_id: cq.id, text: '✅ הגיע! הבוט רואה את הלחיצות שלך' });
+      await tg('sendMessage', { chat_id: TELEGRAM_CHAT_ID, text: '✅ הבדיקה עברה - הלחיצה הגיעה לבוט של האתגרים.' });
+      continue;
+    }
     if (action !== 'ca' && action !== 'cr') continue;
     const raw = await stateGet(`chal_pending|${period}|${key}`);
     let msg = 'הצעה לא נמצאה (אולי כבר טופלה)';
@@ -416,6 +422,26 @@ async function processTaps() {
   //  · stored offset vs. the real queue — an offset above every waiting update
   //                   skips them forever.
   //  · the queue itself — update ids, types, and callback data.
+  // A fresh message from THIS bot with one button on it. Tapping the real
+  // proposals produces nothing and the queue stays empty, which leaves only two
+  // explanations: the tap never leaves the phone, or it is going to the other
+  // bot in the same chat. A button we just sent settles which.
+  if (process.env.TAPS_PING === '1') {
+    const me = await tg('getMe', {});
+    const r = await tg('sendMessage', {
+      chat_id: TELEGRAM_CHAT_ID,
+      text: '🧪 בדיקת כפתורים · ' + new Date().toISOString().slice(11, 16) +
+            '
+
+זו הודעה מהבוט של האתגרים (@' + (me.ok ? me.result.username : '?') + ').' +
+            '
+תלחץ על הכפתור למטה - ותגיד לי שלחצת.',
+      reply_markup: { inline_keyboard: [[{ text: '✅ לחץ כאן לבדיקה', callback_data: 'ping:test:now' }]] },
+    });
+    console.log('ping: sent=' + r.ok + (r.ok ? ' message_id=' + r.result.message_id : ' ' + r.description));
+    return;
+  }
+
   if (process.env.TAPS_DIAG === '1') {
     const me = await tg('getMe', {});
     console.log(`diag: bot = ${me.ok ? '@' + me.result.username + ' (id ' + me.result.id + ')' : JSON.stringify(me)}`);
