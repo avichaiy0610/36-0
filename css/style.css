@@ -2224,5 +2224,6 @@ body {
 .eu-mini-crest { width: 16px; height: 16px; object-fit: contain; vertical-align: -3px; margin-inline-end: 3px; }
 .eu-mini-crest.missing { display: none; }
 .eu-mini-flag  { display: none; margin-inline-end: 3px; }
+.eu-mini-flag.shown { display: inline; }
 .eu-mini-crest.missing + .eu-mini-flag { display: inline; }
 .lt-name .eu-mini-crest { width: 18px; height: 18px; }

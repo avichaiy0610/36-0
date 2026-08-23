@@ -77,10 +77,10 @@ const EU_POTS = [
   [ // pot 1 — 96-99. The clubs you are not supposed to take a point off.
     { id: 'eu-real', name: 'ריאל מדריד', flag: '🇪🇸', ovr: 99 },
     { id: 'eu-barca', name: 'ברצלונה', flag: '🇪🇸', ovr: 99 },
-    { name: "מנצ'סטר סיטי", flag: '🏴', ovr: 99 },
+    { id: 'eu-mancity', name: "מנצ'סטר סיטי", flag: '🏴', ovr: 99 },
     { id: 'eu-bayern', name: 'באיירן מינכן', flag: '🇩🇪', ovr: 99 },
     { id: 'eu-liverpool', name: 'ליברפול', flag: '🏴', ovr: 99 },
-    { name: "פריז סן ז'רמן", flag: '🇫🇷', ovr: 99 },
+    { id: 'eu-psg', name: "פריז סן ז'רמן", flag: '🇫🇷', ovr: 99 },
     { id: 'eu-inter', name: 'אינטר', flag: '🇮🇹', ovr: 99 },
     { id: 'eu-dortmund', name: 'בורוסיה דורטמונד', flag: '🇩🇪', ovr: 99 },
     { id: 'eu-leipzig', name: 'לייפציג', flag: '🇩🇪', ovr: 96 },
@@ -113,7 +113,7 @@ const EU_POTS = [
     { id: 'eu-villa', name: 'אסטון וילה', flag: '🏴', ovr: 91 },
     { id: 'eu-monaco', name: 'מונאקו', flag: '🇫🇷', ovr: 90 },
     { id: 'eu-stuttgart', name: 'שטוטגרט', flag: '🇩🇪', ovr: 88 },
-    { name: "ז'ירונה", flag: '🇪🇸', ovr: 86 },
+    { id: 'eu-girona', name: "ג'ירונה", flag: '🇪🇸', ovr: 86 },
     { id: 'eu-sparta', name: 'ספרטה פראג', flag: '🇨🇿', ovr: 85 },
     { id: 'eu-brest', name: 'ברסט', flag: '🇫🇷', ovr: 85 },
     { id: 'eu-sturm', name: 'שטורם גראץ', flag: '🇦🇹', ovr: 84 },
@@ -127,10 +127,10 @@ const EU_POTS = [
 // both a qualifying round and a pot — but the mechanism is general, because the
 // day another overlap is added nobody will remember to re-check the count.
 const EU_RESERVES = [
-  [{ name: "צ'לסי", flag: '🏴', ovr: 97 },       { id: 'eu-newcastle', name: 'ניוקאסל', flag: '🏴', ovr: 96 }],
+  [{ id: 'eu-chelsea', name: "צ'לסי", flag: '🏴', ovr: 97 },       { id: 'eu-newcastle', name: 'ניוקאסל', flag: '🏴', ovr: 96 }],
   [{ id: 'eu-napoli', name: 'נאפולי', flag: '🇮🇹', ovr: 93 },      { id: 'eu-marseille', name: 'מרסיי', flag: '🇫🇷', ovr: 93 }],
   [{ id: 'eu-galatasaray', name: 'גלאטסראיי', flag: '🇹🇷', ovr: 89 },   { id: 'eu-ajax', name: 'אייאקס', flag: '🇳🇱', ovr: 89 }],
-  [{ name: "קלאב ברוז'", flag: '🇧🇪', ovr: 85 },  { name: "ריינג'רס", flag: '🏴', ovr: 85 }],
+  [{ id: 'eu-brugge', name: "קלאב ברוז'", flag: '🇧🇪', ovr: 85 },  { id: 'eu-rangers', name: "ריינג'רס", flag: '🏴', ovr: 85 }],
 ];
 
 const EU_KEY = 'europe';                 // the slot inside the saved draft
@@ -375,7 +375,10 @@ function euText(key, def) {
 // onerror away and never leaves an empty box.
 function euCrest(cid, flag) {
   const f = `<span class="eu-mini-flag">${flag || ''}</span>`;
-  if (!cid) return f;
+  // `.eu-mini-flag` is hidden until a badge next to it fails, so a club with no
+  // badge at all needs the visible variant or it shows nothing — which is
+  // exactly how Manchester City and Girona ended up with an empty gap.
+  if (!cid) return `<span class="eu-mini-flag shown">${flag || ''}</span>`;
   // The flag is always in the markup, hidden by CSS while the badge is intact.
   // A broken badge only has to add a class to itself — no quoting a fallback
   // element inside an onerror inside an attribute inside a template literal,
