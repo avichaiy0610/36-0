@@ -374,7 +374,17 @@ async function processTaps() {
   for (const up of u.result) {
     await stateSet('chal_tg_offset', up.update_id);
     const cq = up.callback_query;
-    if (!cq || !cq.data) continue;
+    // Nothing is allowed to vanish without a line. A tap that produces no answer
+    // and no log entry is indistinguishable from a tap that never happened, which
+    // is exactly the hole this spent a day in.
+    if (!cq) {
+      console.log(`taps: update ${up.update_id} is not a tap (${Object.keys(up).filter(k => k !== 'update_id').join(',')}) — skipped`);
+      continue;
+    }
+    if (!cq.data) {
+      console.log(`taps: tap ${up.update_id} carried no data — skipped`);
+      continue;
+    }
     const [action, period, key] = cq.data.split(':');
     if (action === 'ping') {                     // the connectivity test button
       console.log(`taps: PING RECEIVED from ${cq.from && cq.from.username} — the bot does see your taps`);
@@ -382,8 +392,17 @@ async function processTaps() {
       await tg('sendMessage', { chat_id: TELEGRAM_CHAT_ID, text: '✅ הבדיקה עברה - הלחיצה הגיעה לבוט של האתגרים.' });
       continue;
     }
-    if (action !== 'ca' && action !== 'cr') continue;
+    if (action !== 'ca' && action !== 'cr') {
+      console.log(`taps: UNRECOGNISED data "${cq.data}" from message ${cq.message && cq.message.message_id} — skipped`);
+      await tg('answerCallbackQuery', { callback_query_id: cq.id, text: 'הכפתור הזה לא מוכר לי' });
+      continue;
+    }
     const raw = await stateGet(`chal_pending|${period}|${key}`);
+    if (!raw) {
+      const all = await sb('GET', 'engine_state?key=like.chal_pending*&select=key,value');
+      const live = (all || []).filter(r => r.value).map(r => r.key).join(', ') || 'אין אף הצעה פתוחה';
+      console.log(`taps: nothing pending for ${period}|${key}. currently open: ${live}`);
+    }
     let msg = 'הצעה לא נמצאה (אולי כבר טופלה)';
     if (raw) {
       if (action === 'ca') {
