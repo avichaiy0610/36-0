@@ -75,49 +75,49 @@ const EU_ROUNDS = [
 // — which is where an Israeli champion actually lands.
 const EU_POTS = [
   [ // pot 1 — 96-99. The clubs you are not supposed to take a point off.
-    { name: 'ריאל מדריד', flag: '🇪🇸', ovr: 99 },
-    { name: 'ברצלונה', flag: '🇪🇸', ovr: 99 },
+    { id: 'eu-real', name: 'ריאל מדריד', flag: '🇪🇸', ovr: 99 },
+    { id: 'eu-barca', name: 'ברצלונה', flag: '🇪🇸', ovr: 99 },
     { name: "מנצ'סטר סיטי", flag: '🏴', ovr: 99 },
-    { name: 'באיירן מינכן', flag: '🇩🇪', ovr: 99 },
-    { name: 'ליברפול', flag: '🏴', ovr: 99 },
+    { id: 'eu-bayern', name: 'באיירן מינכן', flag: '🇩🇪', ovr: 99 },
+    { id: 'eu-liverpool', name: 'ליברפול', flag: '🏴', ovr: 99 },
     { name: "פריז סן ז'רמן", flag: '🇫🇷', ovr: 99 },
-    { name: 'אינטר', flag: '🇮🇹', ovr: 99 },
-    { name: 'בורוסיה דורטמונד', flag: '🇩🇪', ovr: 99 },
-    { name: 'לייפציג', flag: '🇩🇪', ovr: 96 },
+    { id: 'eu-inter', name: 'אינטר', flag: '🇮🇹', ovr: 99 },
+    { id: 'eu-dortmund', name: 'בורוסיה דורטמונד', flag: '🇩🇪', ovr: 99 },
+    { id: 'eu-leipzig', name: 'לייפציג', flag: '🇩🇪', ovr: 96 },
   ],
   [ // pot 2 — 93-99. Arsenal, Atlético and Juventus are rated with pot 1.
-    { name: 'ארסנל', flag: '🏴', ovr: 99 },
-    { name: 'אתלטיקו מדריד', flag: '🇪🇸', ovr: 99 },
-    { name: 'באייר לוורקוזן', flag: '🇩🇪', ovr: 94 },
-    { name: 'יובנטוס', flag: '🇮🇹', ovr: 99 },
-    { name: 'מילאן', flag: '🇮🇹', ovr: 94 },
-    { name: 'אטלנטה', flag: '🇮🇹', ovr: 93 },
-    { name: 'בנפיקה', flag: '🇵🇹', ovr: 93 },
-    { name: 'פורטו', flag: '🇵🇹', ovr: 93 },
-    { name: 'אתלטיק בילבאו', flag: '🇪🇸', ovr: 93 },
+    { id: 'eu-arsenal', name: 'ארסנל', flag: '🏴', ovr: 99 },
+    { id: 'eu-atletico', name: 'אתלטיקו מדריד', flag: '🇪🇸', ovr: 99 },
+    { id: 'eu-leverkusen', name: 'באייר לוורקוזן', flag: '🇩🇪', ovr: 94 },
+    { id: 'eu-juventus', name: 'יובנטוס', flag: '🇮🇹', ovr: 99 },
+    { id: 'eu-milan', name: 'מילאן', flag: '🇮🇹', ovr: 94 },
+    { id: 'eu-atalanta', name: 'אטלנטה', flag: '🇮🇹', ovr: 93 },
+    { id: 'eu-benfica', name: 'בנפיקה', flag: '🇵🇹', ovr: 93 },
+    { id: 'eu-porto', name: 'פורטו', flag: '🇵🇹', ovr: 93 },
+    { id: 'eu-bilbao', name: 'אתלטיק בילבאו', flag: '🇪🇸', ovr: 93 },
   ],
   [ // pot 3 — 89-90. Olympiacos and Young Boys are here for a reason: both
     // knocked on Israeli doors in the real qualifying rounds.
-    { name: 'ספורטינג ליסבון', flag: '🇵🇹', ovr: 90 },
-    { name: 'פיינורד', flag: '🇳🇱', ovr: 90 },
-    { name: 'PSV איינדהובן', flag: '🇳🇱', ovr: 90 },
-    { name: 'ליל', flag: '🇫🇷', ovr: 90 },
-    { name: 'סלטיק', flag: '🏴', ovr: 89 },
-    { name: 'שחטאר דונייצק', flag: '🇺🇦', ovr: 89 },
-    { name: 'דינמו זאגרב', flag: '🇭🇷', ovr: 89 },
-    { name: 'יאנג בויז', flag: '🇨🇭', ovr: 89 },
-    { name: 'אולימפיאקוס', flag: '🇬🇷', ovr: 89 },
+    { id: 'eu-sporting', name: 'ספורטינג ליסבון', flag: '🇵🇹', ovr: 90 },
+    { id: 'eu-feyenoord', name: 'פיינורד', flag: '🇳🇱', ovr: 90 },
+    { id: 'eu-psv', name: 'PSV איינדהובן', flag: '🇳🇱', ovr: 90 },
+    { id: 'eu-lille', name: 'ליל', flag: '🇫🇷', ovr: 90 },
+    { id: 'eu-celtic', name: 'סלטיק', flag: '🏴', ovr: 89 },
+    { id: 'eu-shakhtar', name: 'שחטאר דונייצק', flag: '🇺🇦', ovr: 89 },
+    { id: 'eu-zagreb', name: 'דינמו זאגרב', flag: '🇭🇷', ovr: 89 },
+    { id: 'eu-youngboys', name: 'יאנג בויז', flag: '🇨🇭', ovr: 89 },
+    { id: 'eu-olympiacos', name: 'אולימפיאקוס', flag: '🇬🇷', ovr: 89 },
   ],
   [ // pot 4 — 84-91. Your own pot, and the only place the table is winnable —
     // though Aston Villa at 91 outrates everything in pot 3.
-    { name: 'אסטון וילה', flag: '🏴', ovr: 91 },
-    { name: 'מונאקו', flag: '🇫🇷', ovr: 90 },
-    { name: 'שטוטגרט', flag: '🇩🇪', ovr: 88 },
+    { id: 'eu-villa', name: 'אסטון וילה', flag: '🏴', ovr: 91 },
+    { id: 'eu-monaco', name: 'מונאקו', flag: '🇫🇷', ovr: 90 },
+    { id: 'eu-stuttgart', name: 'שטוטגרט', flag: '🇩🇪', ovr: 88 },
     { name: "ז'ירונה", flag: '🇪🇸', ovr: 86 },
-    { name: 'ספרטה פראג', flag: '🇨🇿', ovr: 85 },
-    { name: 'ברסט', flag: '🇫🇷', ovr: 85 },
-    { name: 'שטורם גראץ', flag: '🇦🇹', ovr: 84 },
-    { name: 'סלובאן ברטיסלבה', flag: '🇸🇰', ovr: 84 },
+    { id: 'eu-sparta', name: 'ספרטה פראג', flag: '🇨🇿', ovr: 85 },
+    { id: 'eu-brest', name: 'ברסט', flag: '🇫🇷', ovr: 85 },
+    { id: 'eu-sturm', name: 'שטורם גראץ', flag: '🇦🇹', ovr: 84 },
+    { id: 'eu-slovan', name: 'סלובאן ברטיסלבה', flag: '🇸🇰', ovr: 84 },
   ],
 ];
 
@@ -127,9 +127,9 @@ const EU_POTS = [
 // both a qualifying round and a pot — but the mechanism is general, because the
 // day another overlap is added nobody will remember to re-check the count.
 const EU_RESERVES = [
-  [{ name: "צ'לסי", flag: '🏴', ovr: 97 },       { name: 'ניוקאסל', flag: '🏴', ovr: 96 }],
-  [{ name: 'נאפולי', flag: '🇮🇹', ovr: 93 },      { name: 'מרסיי', flag: '🇫🇷', ovr: 93 }],
-  [{ name: 'גלאטסראיי', flag: '🇹🇷', ovr: 89 },   { name: 'אייאקס', flag: '🇳🇱', ovr: 89 }],
+  [{ name: "צ'לסי", flag: '🏴', ovr: 97 },       { id: 'eu-newcastle', name: 'ניוקאסל', flag: '🏴', ovr: 96 }],
+  [{ id: 'eu-napoli', name: 'נאפולי', flag: '🇮🇹', ovr: 93 },      { id: 'eu-marseille', name: 'מרסיי', flag: '🇫🇷', ovr: 93 }],
+  [{ id: 'eu-galatasaray', name: 'גלאטסראיי', flag: '🇹🇷', ovr: 89 },   { id: 'eu-ajax', name: 'אייאקס', flag: '🇳🇱', ovr: 89 }],
   [{ name: "קלאב ברוז'", flag: '🇧🇪', ovr: 85 },  { name: "ריינג'רס", flag: '🏴', ovr: 85 }],
 ];
 
@@ -241,7 +241,7 @@ function euDrawLeaguePhase(me, myOvr, beaten = []) {
   });
   const matches = shuffleArr(opponents).map(o => {
     const m = simulateMatchV2(me, euTeam(o), o.home);
-    m.pot = o.pot; m.flag = o.flag; m.ovr = o.ovr;
+    m.pot = o.pot; m.flag = o.flag; m.ovr = o.ovr; m.cid = o.id;
     return m;
   });
 
@@ -253,7 +253,7 @@ function euDrawLeaguePhase(me, myOvr, beaten = []) {
   const est = simTableEstimateV2([...field, { ...me, name: 'me' }], 8);
   const myPts = matches.reduce((s, m) => s + (m.outcome === 'W' ? 3 : m.outcome === 'D' ? 1 : 0), 0);
 
-  const table = field.map((c, i) => ({ name: c.name, flag: c.flag, pts: est[i], us: false }));
+  const table = field.map((c, i) => ({ name: c.name, flag: c.flag, cid: c.id, pts: est[i], us: false }));
   table.push({ name: 'הקבוצה שלי', flag: '🇮🇱', pts: myPts, us: true, ovr: myOvr });
   // Ties always favour the player — the same rule the league table uses.
   table.sort((a, b) => b.pts - a.pts || (a.us ? -1 : b.us ? 1 : 0));
@@ -370,6 +370,19 @@ function euText(key, def) {
   return (typeof siteText === 'function' ? siteText(key, def) : def) || def;
 }
 
+// A badge, falling back to the flag emoji if we do not have that club's crest.
+// Written as a sibling rather than a background-image so the fallback is one
+// onerror away and never leaves an empty box.
+function euCrest(cid, flag) {
+  const f = `<span class="eu-mini-flag">${flag || ''}</span>`;
+  if (!cid) return f;
+  // The flag is always in the markup, hidden by CSS while the badge is intact.
+  // A broken badge only has to add a class to itself — no quoting a fallback
+  // element inside an onerror inside an attribute inside a template literal,
+  // which is exactly how the first attempt shipped a literal backslash.
+  return `<img class="eu-mini-crest" src="crests/eu/${cid}.png" alt="" loading="lazy" onerror="this.classList.add('missing')">` + f;
+}
+
 /* ── the screen ───────────────────────────────────────────────────────────── */
 function euStart() {
   if (!state.picks || !state.picks.some(Boolean)) return;
@@ -429,7 +442,7 @@ function euTableHTML(table) {
     const sep = (i === 8 || i === 24) ? '<div class="lt-bracket-sep"></div>' : '';
     const name = t.us
       ? `<span class="lt-name">הקבוצה שלי <span class="lt-us-badge">#${i + 1}</span></span>`
-      : `<span class="lt-name">${t.flag} ${t.name}</span>`;
+      : `<span class="lt-name">${euCrest(t.cid, t.flag)} ${t.name}</span>`;
     return `${sep}<div class="lt-row${t.us ? ' lt-us' : ''}">
       <span class="lt-pos">${i + 1}</span>${name}
       <span class="lt-pts" dir="ltr">${t.pts}</span></div>`;
@@ -469,9 +482,9 @@ function euRender(animate) {
       </div>
       <div class="eu-phase">
         <div class="eu-phase-t">${euText('eu-phase-t', 'שלב הליגה')}</div>
-        <p class="eu-phase-sub">${euText('eu-phase-sub', 'שמונה משחקים מול שמונה יריבות שונות - שתיים מכל סל, אחת בבית ואחת בחוץ.')}</p>
+        <p class="eu-phase-sub">${euText('eu-phase-sub', 'שמונה משחקים מול שמונה יריבות שונות - שתיים מכל דרג, אחת בבית ואחת בחוץ.')}</p>
       </div>
-      ${L.matches.map(m => euMatchRowHTML(m, `${m.flag} ${m.opponent} <span class="mr-pot">סל ${m.pot} · ${m.ovr}</span>`)).join('')}
+      ${L.matches.map(m => euMatchRowHTML(m, `${euCrest(m.cid, m.flag)} ${m.opponent} <span class="mr-pot">דרג ${m.pot} · ${m.ovr}</span>`)).join('')}
       <div class="eu-phase">
         <div class="eu-phase-t">${euText('eu-table-t', 'טבלת שלב הליגה')}</div>
         <p class="eu-phase-sub">${euText('eu-table-sub', '36 קבוצות, 8 מחזורים. הקו הראשון הוא השמינית, השני הוא הפלייאוף.')}</p>

@@ -548,6 +548,7 @@ function startGame() {
 // never opens setup, so restarting out of one used to land on a screen with no
 // formation chips and an empty season list.
 function prepareSetupScreen() {
+  if (typeof saAttach === 'function') setTimeout(saAttach, 0);
   buildFormationCards();
   initOppSeasonSelect();
   syncEraSliderToState();
@@ -1084,9 +1085,19 @@ function fitShortNames(root = document) {
       span.style.fontSize = size + 'px';
     }
     if (span.scrollWidth <= max) return;
-    // still too wide at a readable size — go two-line
+    // A single word has nowhere to break, so break-word splits it mid-name:
+    // "שטראובר" came out as "שטרא / ובר". Shrink it further instead — smaller is
+    // always better than a name cut in half.
+    if (!/\s/.test(span.textContent.trim())) {
+      while (size > 5 && span.scrollWidth > max) {
+        size -= 0.5;
+        span.style.fontSize = size + 'px';
+      }
+      return;
+    }
+    // more than one word — a line break can fall in a space
     span.style.whiteSpace = 'normal';
-    span.style.wordBreak = 'break-word';
+    span.style.wordBreak = 'keep-all';
     span.style.lineHeight = '1.05';
     span.style.textAlign = 'center';
     span.style.maxWidth = max + 'px';
@@ -2215,18 +2226,26 @@ function wireEuropeButton(rank) {
     btn.style.display = 'none';
     return;
   }
-  // The admin account gets in from any finishing position. Without this the
-  // Europe sandbox is unreachable: the panel lives inside the Europe screen, and
-  // the only way in was to actually win the league.
-  const admin = typeof euIsAdmin === 'function' && euIsAdmin();
-  const champ = rank === 1 || admin;
+  const champ = rank === 1;
   btn.style.display = '';
   btn.classList.toggle('locked', !champ);
   btn.disabled = !champ;
-  btn.textContent = rank === 1 ? '🇪🇺 המשך למוקדמות אירופה'
-                  : admin      ? '🧪 אירופה (סנדבוקס - כניסה מכל מקום)'
-                               : '🇪🇺 אירופה - רק לאלופה';
+  btn.textContent = champ ? '🇪🇺 המשך למוקדמות אירופה' : '🇪🇺 אירופה - רק לאלופה';
   btn.onclick = champ ? () => euStart() : null;
+
+  // The admin's way in from any finishing position is a small link under the
+  // row, not a third button in it: as a button it wrapped its own label down
+  // seven lines and ate a third of the actions row.
+  const old = document.getElementById('eu-admin-link');
+  if (old) old.remove();
+  if (!champ && typeof euIsAdmin === 'function' && euIsAdmin()) {
+    const a = document.createElement('button');
+    a.id = 'eu-admin-link';
+    a.className = 'eu-admin-link';
+    a.textContent = '🧪 סנדבוקס: פתח את אירופה בכל זאת';
+    a.onclick = () => euStart();
+    btn.parentNode.appendChild(a);
+  }
 }
 
 function showResults() {

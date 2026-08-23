@@ -33,6 +33,48 @@ const QUERY = {
   'eu-salzburg':   ['Austria',     'Red Bull Salzburg'],
   'eu-bate':       ['Belarus',     'BATE Borisov'],
   'eu-celtic':     ['Scotland',    'Celtic'],
+  'eu-real':         ['Spain', 'Real Madrid'],
+  'eu-barca':        ['Spain', 'Barcelona'],
+  'eu-mancity':      ['England', 'Manchester City'],
+  'eu-bayern':       ['Germany', 'Bayern Munich'],
+  'eu-liverpool':    ['England', 'Liverpool'],
+  'eu-psg':          ['France', 'Paris Saint Germain'],
+  'eu-inter':        ['Italy', 'Inter Milan'],
+  'eu-dortmund':     ['Germany', 'Borussia Dortmund'],
+  'eu-leipzig':      ['Germany', 'RB Leipzig'],
+  'eu-arsenal':      ['England', 'Arsenal'],
+  'eu-atletico':     ['Spain', 'Atletico Madrid'],
+  'eu-leverkusen':   ['Germany', 'Bayer Leverkusen'],
+  'eu-juventus':     ['Italy', 'Juventus'],
+  'eu-milan':        ['Italy', 'AC Milan'],
+  'eu-atalanta':     ['Italy', 'Atalanta'],
+  'eu-benfica':      ['Portugal', 'Benfica'],
+  'eu-porto':        ['Portugal', 'FC Porto', 'Porto'],
+  'eu-bilbao':       ['Spain', 'Athletic Bilbao'],
+  'eu-sporting':     ['Portugal', 'Sporting CP'],
+  'eu-feyenoord':    ['The Netherlands', 'Feyenoord'],
+  'eu-psv':          ['The Netherlands', 'PSV Eindhoven'],
+  'eu-lille':        ['France', 'Lille OSC', 'LOSC Lille', 'Losc Lille'],
+  'eu-shakhtar':     ['Ukraine', 'Shakhtar Donetsk'],
+  'eu-zagreb':       ['Croatia', 'Dinamo Zagreb'],
+  'eu-youngboys':    ['Switzerland', 'Young Boys'],
+  'eu-olympiacos':   ['Greece', 'Olympiacos'],
+  'eu-villa':        ['England', 'Aston Villa'],
+  'eu-monaco':       ['Monaco', 'Monaco', 'AS Monaco'],
+  'eu-stuttgart':    ['Germany', 'VfB Stuttgart'],
+  'eu-girona':       ['Spain', 'Girona'],
+  'eu-sparta':       ['Czechia', 'Sparta Prague'],
+  'eu-brest':        ['France', 'Brest'],
+  'eu-sturm':        ['Austria', 'Sturm Graz'],
+  'eu-slovan':       ['Slovakia', 'Slovan Bratislava'],
+  'eu-chelsea':      ['England', 'Chelsea'],
+  'eu-newcastle':    ['England', 'Newcastle United'],
+  'eu-napoli':       ['Italy', 'Napoli'],
+  'eu-marseille':    ['France', 'Marseille'],
+  'eu-galatasaray':  ['Turkey', 'Galatasaray'],
+  'eu-ajax':         ['The Netherlands', 'Ajax'],
+  'eu-brugge':       ['Belgium', 'Club Brugge'],
+  'eu-rangers':      ['Scotland', 'Rangers'],
 };
 
 const API = 'https://www.thesportsdb.com/api/v1/json/3/searchteams.php?t=';
@@ -40,7 +82,7 @@ const API = 'https://www.thesportsdb.com/api/v1/json/3/searchteams.php?t=';
 // Anchored on word boundaries. An unanchored "B" alternative matched the b in
 // "Maribor", threw away every real candidate, and left the youth side as the
 // only thing the search could still return.
-const RESERVE = /\b(youth|u1[5-9]|u2[0-3]|women|ladies|reserves?|academy|amateur)\b/i;
+const RESERVE = /\b(youth|juniors?|u1[5-9]|u2[0-3]|women|ladies|reserves?|academy|amateur|b team)\b/i;
 
 async function badgeFor(country, names) {
   for (const n of names) {
@@ -64,7 +106,11 @@ async function badgeFor(country, names) {
     const file = path.join(OUT, id + '.png');
     if (fs.existsSync(file) && !FORCE) { console.log(`${id.padEnd(15)} כבר קיים, מדלג`); continue; }
     try {
-      const found = await badgeFor(country, names);
+      let found = null;
+      for (let attempt = 0; attempt < 3 && !found; attempt++) {
+        if (attempt) await new Promise(r => setTimeout(r, 20000));   // 1015/429 backoff
+        found = await badgeFor(country, names);
+      }
       if (!found) { console.log(`${id.padEnd(15)} ❌ לא נמצא`); continue; }
       const img = await fetch(found.url + '/preview');
       const buf = Buffer.from(await img.arrayBuffer());
@@ -73,6 +119,6 @@ async function badgeFor(country, names) {
     } catch (e) {
       console.log(`${id.padEnd(15)} ❌ ${e.message}`);
     }
-    await new Promise(r => setTimeout(r, 400));   // be polite to a free API
+    await new Promise(r => setTimeout(r, 1200));  // the free tier throttles hard past ~30 calls
   }
 })();
