@@ -1,0 +1,132 @@
+/* ═══ CAREER ══════════════════════════════════════════════════════════════════
+   Ten seasons, one club. Everything here is themed off the same variables as
+   the rest of the site, so light mode needs no overrides of its own. */
+
+/* ── intro / rules ────────────────────────────────────────────────────────── */
+.cr-intro { margin-bottom: 16px; }
+.cr-intro-title { font-size: 1.25rem; font-weight: 900; text-align: center; margin-bottom: 8px; }
+.cr-intro-text { font-size: 0.92rem; color: var(--dim); text-align: center; line-height: 1.7; margin-bottom: 12px; }
+.cr-intro-text strong { color: var(--text); }
+.cr-rules { list-style: none; display: flex; flex-direction: column; gap: 7px; margin-bottom: 18px; }
+.cr-rules li {
+  font-size: 0.85rem; color: var(--dim); line-height: 1.55;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 9px; padding: 9px 11px;
+}
+.cr-rules strong { color: var(--text); }
+
+.cr-club-input { width: 150px; flex: none; text-align: right; }
+.cr-select { width: 150px; flex: none; }
+.cr-len-note { font-size: 12px; color: var(--dim); text-align: center; margin: 10px 0 12px; line-height: 1.6; }
+.cr-len-note strong { color: var(--accent); }
+.cr-best { text-align: center; font-size: 12px; color: var(--dim); margin-top: 14px; }
+
+/* ── run header ───────────────────────────────────────────────────────────── */
+.cr-header {
+  background: linear-gradient(160deg, var(--panel) 0%, var(--surface) 100%);
+  border: 1px solid var(--border); border-radius: 14px;
+  padding: 14px 16px; margin-bottom: 14px; text-align: center;
+}
+.cr-club { font-size: 1.3rem; font-weight: 900; color: var(--accent); letter-spacing: .5px; }
+.cr-meta {
+  display: flex; flex-wrap: wrap; justify-content: center; gap: 6px;
+  font-size: 12px; color: var(--dim); margin-top: 5px;
+}
+.cr-bar { height: 5px; background: var(--surface2); border-radius: 4px; margin-top: 11px; overflow: hidden; }
+.cr-bar-fill { height: 100%; background: linear-gradient(90deg, var(--accent2), var(--accent)); border-radius: 4px; transition: width .4s ease; }
+
+/* ── next season card ─────────────────────────────────────────────────────── */
+.cr-next-card { text-align: center; }
+.cr-next-label { font-size: 10px; letter-spacing: 3px; color: var(--dim); text-transform: uppercase; }
+.cr-next-season { font-size: 1.9rem; font-weight: 900; color: var(--text); margin: 2px 0 4px; }
+.cr-next-sub { font-size: 11.5px; color: var(--dim); line-height: 1.5; }
+.cr-next-kept { font-size: 12px; color: #22c55e; font-weight: 700; margin-top: 8px; }
+
+/* ── history ──────────────────────────────────────────────────────────────── */
+.cr-table { display: flex; flex-direction: column; gap: 6px; }
+.cr-row .lb-name { font-weight: 700; }
+
+/* ── transfer window ──────────────────────────────────────────────────────── */
+.cr-season-done {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  padding: 10px 12px; font-size: 13px; color: var(--dim); text-align: center; margin-bottom: 14px;
+}
+.cr-season-done strong { color: var(--text); }
+.cr-tw-title { margin-top: 4px; }
+.cr-tw-note { margin-bottom: 10px; font-size: 0.85rem; line-height: 1.6; }
+.cr-tw-note strong { color: var(--accent); }
+
+.cr-keep-count { text-align: center; font-size: 12px; font-weight: 800; color: var(--dim); margin-bottom: 10px; }
+.cr-keep-count.full { color: #22c55e; }
+
+.cr-players { display: flex; flex-direction: column; gap: 7px; margin-bottom: 14px; }
+.cr-p {
+  display: block; position: relative;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  padding: 10px 12px 10px 40px; cursor: pointer; transition: border-color .15s, opacity .15s;
+}
+.cr-p:hover { border-color: var(--accent2); }
+.cr-keep-box {
+  position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+  width: 18px; height: 18px; accent-color: #22c55e; cursor: pointer;
+}
+.cr-p-main { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.cr-p-slot {
+  font-size: 10px; font-weight: 900; color: var(--dim);
+  background: var(--surface2); border-radius: 5px; padding: 2px 6px; min-width: 34px; text-align: center;
+}
+.cr-p-name { font-size: 0.92rem; font-weight: 700; color: var(--text); flex: 1; min-width: 0; }
+.cr-p-ovr { font-size: 12px; color: var(--dim); white-space: nowrap; }
+.cr-p-ovr strong { color: var(--text); font-size: 13px; }
+.cr-p-sub { font-size: 11px; color: var(--dim); margin-top: 4px; display: flex; gap: 8px; flex-wrap: wrap; }
+
+.cr-up   { color: #22c55e; font-weight: 800; }
+.cr-down { color: #f85149; font-weight: 800; }
+.cr-flat { color: var(--dim); font-weight: 800; }
+.cr-move { color: var(--accent); font-weight: 700; }
+.cr-poschange { color: #f59e0b; font-weight: 700; }
+
+.cr-p-kept { border-color: #22c55e; background: #22c55e12; }
+.cr-p-blocked { opacity: .45; cursor: not-allowed; }
+.cr-p-blocked:hover { border-color: var(--border); }
+.cr-p-gone { opacity: .5; cursor: default; padding-left: 12px; }
+.cr-p-gone:hover { border-color: var(--border); }
+
+/* ── the end of a run ─────────────────────────────────────────────────────── */
+.cr-over { border-radius: 14px; padding: 18px 16px; text-align: center; margin-bottom: 16px; border: 1px solid var(--border); }
+.cr-over-dead { background: #f8514912; border-color: #f8514955; }
+.cr-over-done { background: #22c55e12; border-color: #22c55e55; }
+.cr-over-title { font-size: 1.35rem; font-weight: 900; color: var(--text); }
+.cr-over-sub { font-size: 0.87rem; color: var(--dim); margin-top: 6px; line-height: 1.6; }
+.cr-over-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 16px; }
+.cr-over-stats > div { display: flex; flex-direction: column; gap: 2px; font-size: 10px; color: var(--dim); }
+.cr-over-stats span { font-size: 1.25rem; font-weight: 900; color: var(--text); }
+
+/* ── the button on the results screen ─────────────────────────────────────── */
+.btn-career-next.cr-btn-dead {
+  background: #f85149; border-color: #f85149; color: #fff;
+}
+
+/* ── the way in, on the setup screen ──────────────────────────────────────── */
+.setup-mode-card {
+  display: flex; align-items: center; gap: 12px; width: 100%; text-align: right;
+  background: linear-gradient(135deg, #ffd7000f, var(--surface) 60%);
+  border: 1px solid var(--accent2); border-radius: 12px;
+  padding: 13px 14px; margin-bottom: 18px; cursor: pointer;
+  font-family: inherit; color: var(--text); transition: border-color .15s, transform .1s;
+}
+.setup-mode-card:hover { border-color: var(--accent); }
+.setup-mode-card:active { transform: scale(.99); }
+.smc-icon { font-size: 1.7rem; line-height: 1; }
+.smc-body { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; }
+.smc-title { font-size: 1rem; font-weight: 800; display: flex; align-items: center; gap: 6px; }
+.smc-new {
+  font-size: 9px; font-weight: 900; color: var(--accent-ink); background: var(--accent);
+  border-radius: 5px; padding: 2px 5px; letter-spacing: .5px;
+}
+.smc-sub { font-size: 0.78rem; color: var(--dim); line-height: 1.5; }
+.smc-arrow { color: var(--accent2); font-size: 1.1rem; }
+.smc-active { border-color: #22c55e; background: linear-gradient(135deg, #22c55e14, var(--surface) 60%); }
+.smc-active .smc-arrow { color: #22c55e; }
+/* a league or duel draft locks the setup screen — career is not on offer there */
+.league-locked .setup-mode-card { display: none; }

@@ -1,0 +1,201 @@
+/* ═══ MINI GAMES ══════════════════════════════════════════════════════════════
+   One shelf, three games. Themed off the shared variables, so light mode needs
+   no overrides of its own. */
+
+.mg-shelf-note { margin-bottom: 14px; }
+.mg-shelf { display: flex; flex-direction: column; gap: 10px; }
+.mg-card {
+  display: flex; align-items: center; gap: 12px; text-align: right;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  padding: 14px; cursor: pointer; font-family: inherit; color: var(--text);
+  transition: border-color .15s, transform .1s;
+}
+.mg-card:hover { border-color: var(--accent2); }
+.mg-card:active { transform: scale(.99); }
+.mg-card-icon { font-size: 1.9rem; line-height: 1; }
+.mg-card-body { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; }
+.mg-card-title { font-size: 1rem; font-weight: 800; }
+.mg-card-sub { font-size: 0.8rem; color: var(--dim); line-height: 1.5; }
+.mg-card-best { font-size: 11px; color: var(--accent); font-weight: 700; margin-top: 2px; }
+.mg-card-arrow { color: var(--dim); font-size: 1.1rem; }
+
+.mg-topbar { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+.mg-topbar-title { font-size: 0.9rem; font-weight: 800; color: var(--dim); }
+
+/* ── 🎯 guess the player ──────────────────────────────────────────────────── */
+.mgg-head { text-align: center; margin-bottom: 12px; }
+.mgg-title { font-size: 1.15rem; font-weight: 900; }
+.mgg-sub { font-size: 12px; color: var(--dim); margin-top: 4px; }
+.mgg-sub strong { color: var(--text); }
+
+.mgg-table { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
+.mgg-row {
+  display: grid; grid-template-columns: 68px 1fr 48px 40px; gap: 6px; align-items: center;
+  background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
+  padding: 8px 10px; font-size: 0.82rem;
+}
+.mgg-head-row { background: none; border: none; color: var(--dim); font-size: 10px; letter-spacing: 1px; padding-bottom: 0; }
+.mgg-row.masked { color: var(--dim); }
+.mgg-row.masked .mgg-club, .mgg-row.masked .mgg-pos, .mgg-row.masked .mgg-ovr { opacity: .45; letter-spacing: 2px; }
+.mgg-row.open { border-color: var(--accent2); }
+.mgg-season { color: var(--dim); font-weight: 700; }
+.mgg-club { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mgg-pos { font-size: 11px; color: var(--dim); text-align: center; }
+.mgg-ovr { font-weight: 900; text-align: center; }
+
+.mgg-extras { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 12px; }
+.mgg-extra { font-size: 12px; color: var(--dim); background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 4px 10px; }
+.mgg-extra b { color: var(--text); }
+
+.mgg-input-wrap { position: relative; margin-bottom: 12px; }
+.mgg-input-wrap .lg-input { width: 100%; }
+.mgg-sugg {
+  display: none; position: absolute; top: 100%; left: 0; right: 0; z-index: 40;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+  margin-top: 4px; overflow: hidden; box-shadow: 0 8px 24px #0007;
+}
+.mgg-sugg.open { display: block; }
+.mgg-sugg-item {
+  display: flex; justify-content: space-between; align-items: center; gap: 8px; width: 100%;
+  background: none; border: none; border-bottom: 1px solid var(--border); color: var(--text);
+  padding: 9px 11px; font-family: inherit; font-size: 0.85rem; cursor: pointer; text-align: right;
+}
+.mgg-sugg-item:last-child { border-bottom: none; }
+.mgg-sugg-item:hover { background: var(--hover); }
+.mgg-sugg-meta { font-size: 11px; color: var(--dim); white-space: nowrap; }
+
+.mgg-guesses { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.mgg-guess { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 9px 11px; }
+.mgg-guess-name { font-size: 0.88rem; font-weight: 700; }
+.mgg-guess-meta { font-size: 11px; color: var(--dim); font-weight: 400; }
+.mgg-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+.mgg-chip { font-size: 11px; font-weight: 700; border-radius: 20px; padding: 3px 8px; background: var(--surface2); color: var(--dim); }
+.mgg-chip.hit  { background: #22c55e22; color: #22c55e; }
+.mgg-chip.near { background: #f59e0b22; color: #f59e0b; }
+.mgg-chip.up, .mgg-chip.down { background: var(--surface2); color: var(--text); }
+
+.mgg-end { border-radius: 12px; padding: 16px; text-align: center; border: 1px solid var(--border); margin-bottom: 12px; }
+.mgg-end.win  { background: #22c55e12; border-color: #22c55e55; }
+.mgg-end.lose { background: #f8514912; border-color: #f8514955; }
+.mgg-end-title { font-size: 1rem; font-weight: 900; color: var(--dim); }
+.mgg-end-name { font-size: 1.5rem; font-weight: 900; margin: 4px 0 2px; }
+.mgg-end-meta { font-size: 12px; color: var(--dim); }
+.mgg-end-actions { display: flex; gap: 8px; margin-top: 14px; }
+.mgg-end-actions button { flex: 1; }
+
+/* ── ⚖️ who was better ────────────────────────────────────────────────────── */
+.mgv-scorebar { display: flex; justify-content: space-between; font-size: 12px; color: var(--dim); margin-bottom: 10px; }
+.mgv-scorebar strong { color: var(--accent); font-size: 14px; }
+.mgv-question { text-align: center; font-size: 0.95rem; font-weight: 700; margin-bottom: 12px; min-height: 20px; }
+.mgv-cards { display: flex; align-items: stretch; gap: 8px; }
+.mgv-vs { align-self: center; font-size: 12px; font-weight: 900; color: var(--dim); }
+.mgv-card {
+  flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 3px;
+  background: linear-gradient(160deg, var(--tc, #222) 0%, var(--surface) 65%);
+  border: 2px solid var(--border); border-radius: 14px; padding: 16px 8px;
+  cursor: pointer; font-family: inherit; color: var(--text); transition: border-color .15s, transform .1s;
+}
+.mgv-card:hover { border-color: var(--accent); }
+.mgv-card:active { transform: scale(.98); }
+.mgv-card.revealed { cursor: default; }
+.mgv-card.revealed.right { border-color: #22c55e; }
+.mgv-card.revealed.wrong.chosen { border-color: #f85149; }
+.mgv-badge { font-size: 1.5rem; }
+.mgv-name { font-size: 0.92rem; font-weight: 800; text-align: center; line-height: 1.3; }
+.mgv-club { font-size: 11px; color: var(--dim); text-align: center; }
+.mgv-season { font-size: 11px; color: var(--dim); }
+.mgv-pos { font-size: 10px; font-weight: 800; color: var(--dim); background: var(--surface2); border-radius: 5px; padding: 1px 6px; }
+.mgv-ovr { font-size: 1.8rem; font-weight: 900; color: var(--accent); margin-top: 4px; }
+.mgv-verdict { text-align: center; font-size: 0.9rem; font-weight: 700; margin: 14px 0 4px; min-height: 22px; }
+.mgv-verdict.ok  { color: #22c55e; }
+.mgv-verdict.bad { color: #f85149; }
+.mgv-actions { display: flex; flex-direction: column; gap: 8px; }
+
+/* ── 💰 auction ───────────────────────────────────────────────────────────── */
+.mga-intro-title { font-size: 1.15rem; font-weight: 900; text-align: center; margin-bottom: 8px; }
+.mga-intro-text { font-size: 0.88rem; color: var(--dim); text-align: center; line-height: 1.7; margin-bottom: 12px; }
+.mga-intro-text strong { color: var(--text); }
+
+.mga-bar {
+  display: flex; justify-content: space-between; align-items: center;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  padding: 9px 12px; font-size: 12px; color: var(--dim); margin-bottom: 10px;
+}
+.mga-bar strong { color: var(--accent); font-size: 15px; }
+.mga-last { font-size: 12px; text-align: center; color: var(--dim); margin-bottom: 10px; line-height: 1.5; }
+.mga-last.mine { color: #22c55e; font-weight: 700; }
+
+.mga-lot {
+  background: linear-gradient(160deg, var(--tc, #222) 0%, var(--surface) 70%);
+  border: 1px solid var(--border); border-radius: 14px; padding: 14px; margin-bottom: 12px;
+}
+.mga-lot-top { display: flex; justify-content: space-between; align-items: center; }
+.mga-lot-badge { font-size: 1.6rem; }
+.mga-lot-ovr { font-size: 2rem; font-weight: 900; color: var(--accent); }
+.mga-lot-name { font-size: 1.2rem; font-weight: 900; margin-top: 4px; }
+.mga-lot-meta { font-size: 12px; color: var(--dim); margin-top: 2px; }
+.mga-lot-base { font-size: 12px; color: var(--dim); margin-top: 8px; }
+.mga-lot-base strong { color: var(--text); font-size: 14px; }
+
+.mga-bidbox { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px; margin-bottom: 8px; }
+.mga-bid-row { display: flex; align-items: center; justify-content: center; gap: 14px; }
+.mga-bid { font-size: 2rem; font-weight: 900; color: var(--accent); min-width: 90px; text-align: center; }
+.mga-step {
+  width: 38px; height: 38px; border-radius: 50%; font-size: 1.3rem; font-weight: 900;
+  background: var(--surface2); border: 1px solid var(--border); color: var(--text); cursor: pointer; font-family: inherit;
+}
+.mga-range { width: 100%; margin: 10px 0; accent-color: var(--accent); }
+.mga-quick { display: flex; gap: 6px; margin-bottom: 10px; }
+.mga-quick button {
+  flex: 1; background: var(--surface2); border: 1px solid var(--border); color: var(--text);
+  border-radius: 8px; padding: 7px 4px; font-size: 11.5px; font-weight: 700; cursor: pointer; font-family: inherit;
+}
+.mga-quick button:hover { border-color: var(--accent2); }
+.mga-cant { text-align: center; font-size: 12px; color: var(--dim); padding: 10px 0; }
+
+.mga-squad { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; }
+.mga-sq-row {
+  display: grid; grid-template-columns: 44px 1fr 34px 62px; gap: 6px; align-items: center;
+  background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; font-size: 0.82rem;
+}
+.mga-sq-pos { font-size: 10px; font-weight: 900; color: var(--dim); text-align: center; }
+.mga-sq-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mga-sq-ovr { font-weight: 900; text-align: center; }
+.mga-sq-price { font-size: 11px; color: var(--dim); text-align: left; }
+
+.mga-done { background: var(--surface); border: 1px solid var(--accent2); border-radius: 14px; padding: 16px; text-align: center; margin-bottom: 14px; }
+.mga-done-title { font-size: 1.2rem; font-weight: 900; }
+.mga-done-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 14px; }
+.mga-done-stats > div { display: flex; flex-direction: column; gap: 2px; font-size: 10px; color: var(--dim); }
+.mga-done-stats span { font-size: 1.25rem; font-weight: 900; color: var(--text); }
+.mga-done-note { font-size: 12px; color: var(--dim); margin-top: 10px; }
+.mga-skipped { font-size: 11px; color: var(--dim); text-align: center; margin: -4px 0 10px; opacity: .8; line-height: 1.5; }
+
+/* ── ⚽ כדורדל ─────────────────────────────────────────────────────────────── */
+.mgw-head { text-align: center; margin-bottom: 12px; }
+.mgw-title { font-size: 1.25rem; font-weight: 900; }
+.mgw-sub { font-size: 12px; color: var(--dim); margin-top: 4px; line-height: 1.5; }
+
+.mgw-deck { display: flex; flex-direction: column; gap: 4px; margin-bottom: 14px; }
+.mgw-deck-item {
+  display: grid; grid-template-columns: 22px 26px 1fr auto; gap: 6px; align-items: center;
+  background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
+  padding: 7px 10px; font-size: 0.82rem;
+}
+.mgw-deck-n { font-size: 10px; font-weight: 900; color: var(--dim); text-align: center; }
+.mgw-deck-badge { font-size: 0.95rem; }
+.mgw-deck-club { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mgw-deck-season { font-size: 11px; color: var(--dim); }
+.mgw-rules { margin-bottom: 14px; }
+
+.mgw-result {
+  background: var(--surface); border: 1px solid var(--accent2); border-radius: 14px;
+  padding: 16px 14px; text-align: center; margin-bottom: 14px;
+}
+.mgw-grid { display: flex; justify-content: center; flex-wrap: wrap; gap: 3px; }
+.mgw-sq { font-size: 1.3rem; line-height: 1; }
+.mgw-result-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 16px; }
+.mgw-result-stats > div { display: flex; flex-direction: column; gap: 2px; font-size: 10px; color: var(--dim); }
+.mgw-result-stats span { font-size: 1.15rem; font-weight: 900; color: var(--text); }
+.mgw-tier { margin-top: 12px; font-size: 0.95rem; font-weight: 800; color: var(--accent); }
+.mgw-foot { font-size: 11px; margin-top: 10px; }

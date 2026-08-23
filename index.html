@@ -76,6 +76,8 @@
   <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css" />
   <link rel="stylesheet" href="css/gauntlet.css" />
+  <link rel="stylesheet" href="css/career.css" />
+  <link rel="stylesheet" href="css/minigames.css" />
 </head>
 <body>
 
@@ -84,6 +86,7 @@
     <div class="nav-logo" id="nav-home" dir="ltr" role="button" tabindex="0" title="לעמוד הראשי">36–0</div>
     <div class="nav-actions">
       <button class="nav-btn" id="nav-daily">🗓️ אתגרים</button>
+      <button class="nav-btn" id="nav-minigames">🎲 משחקונים <span class="nav-beta">בטא</span></button>
       <button class="nav-btn" id="nav-leagues">ליגות</button>
       <button class="nav-btn" id="nav-duel">1v1 <span class="nav-beta">בטא</span></button>
       <button class="nav-btn" id="nav-leaderboard">לוח שיאים</button>
@@ -172,7 +175,7 @@
       </button>
       <a class="btn-coffee btn-coffee-welcome" id="btn-coffee-welcome" href="https://ko-fi.com/360ligathaal" target="_blank" rel="noopener">☕ אוהב את המשחק? קנה לי קפה</a>
       <button class="wn-link" id="btn-whatsnew"><span id="wn-label">מה חדש!</span><span class="wn-dot" id="wn-dot"></span></button>
-      <div class="wn-version" id="wn-version" dir="ltr">v1.4</div>
+      <div class="wn-version" id="wn-version" dir="ltr">v1.45</div>
     </div>
     <footer class="site-disclaimer">
       <p>
@@ -208,6 +211,15 @@
         <div class="setup-logo"><span dir="ltr">36–0</span></div>
         <div class="setup-subtitle">ליגת העל הישראלית</div>
       </div>
+
+      <button class="setup-mode-card" id="setup-career-card">
+        <span class="smc-icon">👑</span>
+        <span class="smc-body">
+          <span class="smc-title">קריירה <span class="smc-new">חדש</span></span>
+          <span class="smc-sub" id="smc-career-sub">עשר עונות במועדון אחד — שומרים 6 שחקנים בין עונה לעונה</span>
+        </span>
+        <span class="smc-arrow">←</span>
+      </button>
 
       <section class="setup-section">
         <div class="setup-label" data-txt="lbl-formation">מערך</div>
@@ -629,6 +641,8 @@
       </div>
 
       <div class="results-actions">
+        <button class="btn-primary btn-career-next" id="btn-career-next" style="display:none">➡️ המשך</button>
+        <button class="btn-primary btn-mgw-next" id="btn-mgw-next" style="display:none">⚽ לתוצאת הכדורדל</button>
         <button class="btn-primary btn-europe" id="btn-europe">🇪🇺 המשך למוקדמות אירופה</button>
         <button class="btn-primary" id="btn-share">שתף תוצאה</button>
         <button class="btn-secondary" id="btn-restart">משחק חדש</button>
@@ -743,6 +757,28 @@
         <h2 class="page-title">⚔️ הקרב</h2>
       </div>
       <div id="gt-fight-body"></div>
+    </div>
+  </div>
+
+  <!-- ══ CAREER ════════════════════════════════════════════════════════════════ -->
+  <div id="screen-career" class="screen screen-page">
+    <div class="page-inner">
+      <div class="page-header">
+        <button class="back-btn" id="career-back">→ חזרה</button>
+        <h2 class="page-title">👑 קריירה</h2>
+      </div>
+      <div id="career-content"></div>
+    </div>
+  </div>
+
+  <!-- ══ MINI GAMES ════════════════════════════════════════════════════════════ -->
+  <div id="screen-minigames" class="screen screen-page">
+    <div class="page-inner">
+      <div class="page-header">
+        <button class="back-btn" id="minigames-back">→ חזרה</button>
+        <h2 class="page-title">🎲 משחקונים</h2>
+      </div>
+      <div id="mg-content"></div>
     </div>
   </div>
 
@@ -866,6 +902,12 @@
   <script src="js/league-sim.js"></script>
   <script src="js/player_nats.js"></script>
   <script src="js/challenges.js"></script>
+  <script src="js/career.js"></script>
+  <script src="js/minigames.js"></script>
+  <script src="js/mg-guess.js"></script>
+  <script src="js/mg-versus.js"></script>
+  <script src="js/mg-auction.js"></script>
+  <script src="js/mg-wordle.js"></script>
   <script src="js/theme.js"></script>
 </body>
 </html>

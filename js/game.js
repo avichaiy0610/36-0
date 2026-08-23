@@ -359,6 +359,8 @@ const state = {
   moveMode: false, movingFromIdx: null,
   leagueCode: null,
   duelCode: null,
+  career: null,                                                // { year, seasonIdx } while a career season is being played
+  deck: null, mgw: null,                                       // a fixed squad deck (כדורדל) + which daily it belongs to
   challenge: null, challengeDeck: null, challengeReqs: null,   // { period, key } + missions for challenge runs
 };
 
@@ -532,6 +534,8 @@ function showScreen(id) {
 function startGame() {
   state.leagueCode = null;   // a normal game from the welcome screen isn't for a league
   state.duelCode = null;
+  state.career = null;       // ...nor for a career: leaving one mid-run must not record this season into it
+  state.deck = null; state.mgw = null;   // ...nor for the fixed daily deck
   state.challenge = null; state.challengeDeck = null; state.challengeReqs = null;
   window._leagueReviewMode = null;
   window._duelReviewMode = null;
@@ -549,6 +553,7 @@ function startGame() {
 // formation chips and an empty season list.
 function prepareSetupScreen() {
   if (typeof saAttach === 'function') setTimeout(saAttach, 0);
+  if (typeof crSyncSetupCard === 'function') crSyncSetupCard();
   buildFormationCards();
   initOppSeasonSelect();
   syncEraSliderToState();
@@ -848,6 +853,9 @@ function saveDraftState() {
       v: 1,
       formationId: state.formationId,
       leagueCode: state.leagueCode || null,
+      career: state.career || null,
+      mgw: state.mgw || null,
+      deckIds: state.deck ? state.deck.map(sq => sq.id) : null,
       challenge: state.challenge || null,
       challengeReqs: state.challengeReqs || null,
       difficulty: state.difficulty,
@@ -938,6 +946,9 @@ function restoreDraftState() {
   Object.assign(state, {
     formationId: d.formationId, slots, picks,
     leagueCode: d.leagueCode ?? null,
+    career: d.career ?? null,
+    mgw: d.mgw ?? null,
+    deck: Array.isArray(d.deckIds) ? d.deckIds.map(id => bySquadId.get(id)).filter(Boolean) : null,
     challenge: d.challenge ?? null,
     difficulty: d.difficulty, showRatings: d.showRatings,
     draftMode: d.draftMode, peakMode: d.peakMode,
@@ -1268,12 +1279,22 @@ function challengeDrawNext(filter) {
 }
 
 function pickNextSquad() {
+  // A fixed deck (כדורדל): everyone is dealt the same clubs in the same order,
+  // so the only thing that separates two players is who they took out of them.
+  if (state.deck && state.deck.length) {
+    const sq = state.deck[Math.min(state.currentRound, state.deck.length - 1)];
+    if (sq) { state.usedSquadIds.add(sq.id); return sq; }
+  }
   if (state.challenge && state.challengeDeck) {
     const sq = challengeDrawNext();
     if (sq) return sq;
   }
   const pool = getEraFilteredSquads();
-  const unused = pool.filter(sq => !state.usedSquadIds.has(sq.id));
+  let unused = pool.filter(sq => !state.usedSquadIds.has(sq.id));
+  // A career season drafts out of ONE season's clubs — twelve to sixteen of
+  // them. Barring repeats there would leave the last rounds with a single club
+  // and no choice at all, so once the market thins out the clubs come back.
+  if (state.career && unused.length < 4) { state.usedSquadIds.clear(); unused = pool; }
   const draw = unused.length > 0 ? unused : pool;
   const sq = draw[rand(0, draw.length - 1)];
   state.usedSquadIds.add(sq.id);
@@ -1590,6 +1611,9 @@ function updateDraftOVR() {
 function rerollTeam() {
   if (state.isAnimating || state.teamRerollsLeft <= 0 || state.awaitingSlotPick) return;
   state.teamRerollsLeft--; updateRerollButtons();
+  // In a career the allowance belongs to the dynasty, so it is banked as it is
+  // spent rather than reset next season.
+  if (state.career && typeof crOnRerollUsed === 'function') crOnRerollUsed(state.teamRerollsLeft);
 
   const currentTeamId = state.currentSquad?.teamId;
   const currentSeason = state.currentSquad?.season;
@@ -1661,7 +1685,11 @@ function updateRerollButtons() {
   document.getElementById('team-reroll-count').textContent   = state.teamRerollsLeft;
   document.getElementById('season-reroll-count').textContent = state.seasonRerollsLeft;
   document.getElementById('btn-reroll-team').disabled   = state.teamRerollsLeft   <= 0 || noSquad;
-  document.getElementById('btn-reroll-season').disabled = state.seasonRerollsLeft <= 0 || noSquad;
+  // A draft locked to a single season — a career year — has no other season to
+  // swap to: the button could only ever redraw the same one.
+  const seasonBtn = document.getElementById('btn-reroll-season');
+  seasonBtn.style.display = state.eraMin === state.eraMax ? 'none' : '';
+  seasonBtn.disabled = state.seasonRerollsLeft <= 0 || noSquad;
 }
 
 // ─── Progress & Hint ───────────────────────────────────────────────────────────
@@ -2393,6 +2421,17 @@ function animateResults(ovr) {
   });
   const myRank = leagueTable.findIndex(t => t.us) + 1;
   wireEuropeButton(myRank);
+  // A career season is an ordinary season plus a consequence. This runs for
+  // restored seasons too (a refresh must not lose the result), so recording it
+  // is idempotent on the career's side.
+  if (typeof crOnSeasonEnd === 'function') {
+    crOnSeasonEnd({ rank: myRank, n: leagueTable.length, ovr,
+                    wins, draws, losses, gf: gfTotal, ga: gaTotal });
+  }
+  if (typeof mgwOnSeasonEnd === 'function') {
+    mgwOnSeasonEnd({ rank: myRank, n: leagueTable.length, ovr,
+                     wins, draws, losses, gf: gfTotal, ga: gaTotal });
+  }
 
   function makeMatchRow(m) {
     const rc = m.outcome==='W' ? 'win' : m.outcome==='D' ? 'draw' : 'loss';
@@ -2552,6 +2591,15 @@ function animateResults(ovr) {
 // Popup announcing where the season finished (shown after the reveal). onClose
 // runs when the user dismisses it (used to reveal the detailed results).
 function showPlacementPopup(tier, rank, onClose) {
+  // This is scheduled 350ms after the last match is revealed, but the buttons
+  // that leave the results screen (Europe, and now the career's next season)
+  // are live throughout the reveal. If the player already left, the popup would
+  // open on top of whatever screen he moved to — so reveal the summary behind
+  // him and skip it.
+  if (!document.getElementById('screen-results')?.classList.contains('active')) {
+    if (typeof onClose === 'function') onClose();
+    return;
+  }
   const td = tierDisplay(tier);
   let modal = document.getElementById('placement-modal');
   if (!modal) {
@@ -3036,6 +3084,8 @@ function restartGame() {
     oppSeasonChoice,
     oppSeason: oppSeasonChoice === 'random' ? resolveOppSeason('random') : oppSeason,
     challenge: null, challengeDeck: null, challengeReqs: null,
+    career: null,          // "new game" leaves the career; the run itself stays in storage
+    deck: null, mgw: null,
     slots:[], picks:[], currentRound:0,
     usedSquadIds:new Set(), usedPlayerKeys:new Set(), currentSquad:null,
     selectedPlayer:null, selectedSlotIdx:null,
