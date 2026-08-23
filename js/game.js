@@ -2215,11 +2215,17 @@ function wireEuropeButton(rank) {
     btn.style.display = 'none';
     return;
   }
-  const champ = rank === 1;
+  // The admin account gets in from any finishing position. Without this the
+  // Europe sandbox is unreachable: the panel lives inside the Europe screen, and
+  // the only way in was to actually win the league.
+  const admin = typeof euIsAdmin === 'function' && euIsAdmin();
+  const champ = rank === 1 || admin;
   btn.style.display = '';
   btn.classList.toggle('locked', !champ);
   btn.disabled = !champ;
-  btn.textContent = champ ? '🇪🇺 המשך למוקדמות אירופה' : '🇪🇺 אירופה - רק לאלופה';
+  btn.textContent = rank === 1 ? '🇪🇺 המשך למוקדמות אירופה'
+                  : admin      ? '🧪 אירופה (סנדבוקס - כניסה מכל מקום)'
+                               : '🇪🇺 אירופה - רק לאלופה';
   btn.onclick = champ ? () => euStart() : null;
 }
 
