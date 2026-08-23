@@ -60,6 +60,8 @@ function crBlank() {
     squad: null,               // the XI that finished the last season
     pending: null,             // the kept players waiting for the next draft
     history: [], titles: 0,
+    stay: {}, longestStay: 0,   // how long each man has been here, and the record
+    awarded: [],                // achievement keys already toasted for this run
     over: false, overReason: null,
   };
 }
@@ -419,6 +421,16 @@ function crOnSeasonEnd(res) {
       champion, europe: champion,
     });
     if (champion) run.titles++;
+    // Who has been here before, and for how long. Counted before the XI is
+    // overwritten, because that is the only moment both squads exist.
+    const before = new Set((run.squad || []).filter(Boolean).map(p => crNormName(p.name)));
+    const stay = {};
+    state.picks.filter(Boolean).forEach(p => {
+      const k = crNormName(p.player.name);
+      stay[k] = before.has(k) ? ((run.stay || {})[k] || 1) + 1 : 1;
+    });
+    run.stay = stay;
+    run.longestStay = Math.max(run.longestStay || 0, ...Object.values(stay), 0);
     run.squad   = crPacksPicks(state.picks);
     run.pending = null;
     run.phase   = 'played';
@@ -426,6 +438,7 @@ function crOnSeasonEnd(res) {
     else if (run.history.length >= crTotalSeasons(run)) { run.over = true; run.overReason = 'finished'; }
     crRecordBest(run);
     crSave();
+    crAward(run);
   }
 
   if (!btn) return;
@@ -440,6 +453,32 @@ function crOnSeasonEnd(res) {
     btn.textContent = `➡️ חלון העברות — ${yearToSeason(crYear(run) + 1)}`;
   }
   btn.onclick = () => showCareer();
+}
+
+/* ── what the career earned ───────────────────────────────────────────────── */
+// The run itself never leaves this device. What DOES go up is the handful of
+// facts an achievement hangs on, and the server clamps every one of them.
+// Signed out it does nothing — the career is fully playable without an account.
+async function crAward(run) {
+  if (typeof _supabase === 'undefined' || !_supabase) return;
+  if (typeof getCurrentUser !== 'function' || !getCurrentUser()) return;
+  try {
+    const { data, error } = await _supabase.rpc('award_career_achievements', {
+      p: {
+        seasons: run.history.length,
+        titles: run.titles,
+        longest_stay: run.longestStay || 0,
+        finished:  !!run.over && run.overReason === 'finished',
+        relegated: !!run.over && run.overReason === 'relegated',
+      },
+    });
+    if (error || !data) return;
+    const keys = data.achievements || [];
+    const fresh = keys.filter(k => !(run.awarded || []).includes(k));
+    run.awarded = keys;
+    crSave();
+    if (fresh.length && typeof showAchievementToasts === 'function') showAchievementToasts(fresh);
+  } catch (e) { /* an achievement is a decoration; a career is never lost to one */ }
 }
 
 /* ── the transfer window ──────────────────────────────────────────────────── */

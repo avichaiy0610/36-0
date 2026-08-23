@@ -294,10 +294,20 @@ function gtSimSegment(share, ctx) {
   if (f.boost) ['ovr', 'atk', 'mid', 'def', 'gk'].forEach(k => { me[k] += f.boost; });
   const a = simShrinkLines(me), b = simShrinkLines(f.opp);
   const mine = typeof gtXgMultiplier === 'function' ? gtXgMultiplier(ctx) : 1;
-  return {
-    gf: simDrawGoals(simExpectedGoals(a, b, f.home) * share * mine),
-    ga: simDrawGoals(simExpectedGoals(b, a, !f.home) * share),
-  };
+  const xgMe   = simExpectedGoals(a, b, f.home) * share * mine;
+  const xgThem = simExpectedGoals(b, a, !f.home) * share;
+  const out = { gf: simDrawGoals(xgMe), ga: simDrawGoals(xgThem) };
+  // Every submitted run so far is a first-fight loss, and replaying the exact
+  // line ratings the log records — in Node and in a browser — puts the player
+  // at ~85% to win them. The inputs check out, so the next thing to record is
+  // the xG the goals were actually drawn from.
+  (f.trace = f.trace || []).push({
+    s: Math.round(share * 100) / 100,
+    xg: Math.round(xgMe * 100) / 100, xga: Math.round(xgThem * 100) / 100,
+    gf: out.gf, ga: out.ga,
+    a: Math.round(a.ovr), b: Math.round(b.ovr),
+  });
+  return out;
 }
 
 function gtMinuteIn(from, to) {
@@ -549,7 +559,7 @@ function gtFinish(outcome) {
                  gf: res.gf, ga: res.ga, outcome: res.outcome,
                  me: line(f.me), them: line(f.opp),
                  home: !!f.home, by: res.decidedBy || null,
-                 boost: f.boost || 0, legs: f.legs });
+                 boost: f.boost || 0, legs: f.legs, trace: f.trace || null });
   run.locked = null;                    // the road is done, the next one opens
 
   if (res.outcome === 'W') {
