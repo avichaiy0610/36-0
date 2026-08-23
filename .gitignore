@@ -26,3 +26,8 @@ wiki_tables_cache.json
 
 # SEO pages pipeline (local; seo/ output is the deploy artifact)
 build_seo_pages.js
+
+# scratch data pulled from the API while debugging
+runs.json
+allruns.json
+taps_runs.txt

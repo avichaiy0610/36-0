@@ -536,10 +536,20 @@ function gtFinish(outcome) {
     res.insured = true;
   }
 
+  // The four line ratings BOTH sides actually fought with, plus who was at home.
+  // Ten submitted runs were first-fight losses whose squads the engine says
+  // should have won ~79% of the time, and nothing in the record could explain
+  // it: the log carried the headline numbers only. It carries the evidence now,
+  // so the next surprising result is a solved case rather than a mystery.
+  const line = t => t ? { ovr: Math.round(t.ovr), gk: Math.round(t.gk), def: Math.round(t.def),
+                          mid: Math.round(t.mid), atk: Math.round(t.atk) } : null;
   run.log.push({ row: f.row, eu: f.eu, teamId: f.node.teamId || f.node.id,
                  season: f.node.season || f.node.country,
                  ovr: f.eu !== null ? gtEuShownOvr(f.node) : gtShownOvr(f.node),
-                 gf: res.gf, ga: res.ga, outcome: res.outcome });
+                 gf: res.gf, ga: res.ga, outcome: res.outcome,
+                 me: line(f.me), them: line(f.opp),
+                 home: !!f.home, by: res.decidedBy || null,
+                 boost: f.boost || 0, legs: f.legs });
   run.locked = null;                    // the road is done, the next one opens
 
   if (res.outcome === 'W') {
