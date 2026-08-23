@@ -17,6 +17,10 @@ on:
         description: 'דיאגנוסטיקה — מי הבוט, יש webhook, ומה באמת ממתין בתור (לא צורך לחיצות)'
         type: boolean
         default: false
+      ping:
+        description: 'שולח הודעת בדיקה עם כפתור אחד מהבוט של האתגרים'
+        type: boolean
+        default: false
 
 # Shares the group with challenge-engine so the two never poll getUpdates at the
 # same time — they share one offset in engine_state, and a race would skip taps.
@@ -38,5 +42,6 @@ jobs:
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
           TELEGRAM_CHAL_BOT_TOKEN: ${{ secrets.TELEGRAM_CHAL_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          TAPS_ONLY: ${{ inputs.diag && '0' || '1' }}
+          TAPS_ONLY: ${{ (inputs.diag || inputs.ping) && '0' || '1' }}
           TAPS_DIAG: ${{ inputs.diag && '1' || '' }}
+          TAPS_PING: ${{ inputs.ping && '1' || '' }}
