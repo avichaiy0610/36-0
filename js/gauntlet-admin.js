@@ -163,6 +163,13 @@ function gtAdminHTML() {
         <button class="gt-admin-btn" id="ga-crests">🖼 כל הסמלים</button>
       </div>
 
+      <div class="gt-admin-row">
+        <label>אירופה</label>
+        <input class="gt-admin-in gt-admin-num" id="ga-eu-ovr" type="number" min="60" max="99"
+               placeholder="דירוג" value="88">
+        <button class="gt-admin-btn" id="ga-europe">🇪🇺 קפוץ לאירופה</button>
+      </div>
+
       <p class="gt-admin-state" id="ga-state"></p>
     </div>`;
 }
@@ -234,6 +241,18 @@ function gtWireAdmin(root) {
     after('אסימון עצירה שנייה פעיל');
   });
   on('ga-elite', () => { delete gtRun().elite; redraw(); });
+  // Europe without a season: fill an XI at the asked-for rating and open the
+  // campaign screen. Reaching it the honest way means drafting eleven players
+  // and sitting through a full season reveal, every single time.
+  on('ga-europe', () => {
+    const target = +(document.getElementById('ga-eu-ovr') || {}).value || 88;
+    gtAdminFillSquad(target);
+    gtMarkSandbox();
+    if (typeof euClear === 'function') euClear();
+    if (typeof _euCampaign !== 'undefined') _euCampaign = null;
+    if (typeof euStart === 'function') euStart();
+  });
+
   on('ga-crests', () => {
     const map = document.getElementById('gauntlet-map');
     if (!map) return;

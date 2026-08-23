@@ -548,6 +548,20 @@ function gmIntroHTML() {
     </div>`;
 }
 
+// The sandbox, for one account. It has to hang off EVERY branch of the gauntlet
+// screen, not just the map: the intro and the run-rule picker both return early,
+// and those are exactly the screens you land on with no run in progress — which
+// is when you most want to jump somewhere.
+function gmAttachSandbox(map) {
+  if (typeof gtAdminHTML !== 'function' || !map) return;
+  const panel = gtAdminHTML();
+  if (!panel) return;
+  const host = document.createElement('div');
+  host.innerHTML = panel;
+  map.appendChild(host);
+  if (typeof gtWireAdmin === 'function') gtWireAdmin(host);
+}
+
 function showGauntlet() {
   showScreen('gauntlet');
   const back = document.getElementById('gauntlet-back');
@@ -583,6 +597,7 @@ function showGauntlet() {
       }
       run.started = true; gtSave(); showGauntlet();
     };
+    gmAttachSandbox(map);
     return;
   }
   if (reset) {
@@ -597,6 +612,7 @@ function showGauntlet() {
     if (note) note.textContent = '';
     if (reset) reset.style.display = 'none';   // nothing has happened yet to reset
     gtWireModPicker(map, () => showGauntlet());
+    gmAttachSandbox(map);
     return;
   }
 
@@ -615,16 +631,7 @@ function showGauntlet() {
   const newRun = map.querySelector('#gt-new-run');
   if (newRun) newRun.onclick = () => { gtReset(); showGauntlet(); };
 
-  // the sandbox, for one account
-  if (typeof gtAdminHTML === 'function') {
-    const panel = gtAdminHTML();
-    if (panel) {
-      const host = document.createElement('div');
-      host.innerHTML = panel;
-      map.appendChild(host);
-      gtWireAdmin(host);
-    }
-  }
+  gmAttachSandbox(map);
 
   const choose = el => {
     if (typeof gtChoose === 'function') gtChoose(+el.dataset.row, +el.dataset.node);
