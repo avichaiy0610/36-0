@@ -1903,15 +1903,6 @@ body {
   color: var(--text, #e6edf3); transition: border-color .15s, background .15s;
 }
 .daily-welcome-card:hover { border-color: var(--accent); background: #ffd70008; }
-/* The daily is the reason to come back tomorrow, so it leads the screen: the
-   draft below it is what a first-time visitor plays, this is what a returning
-   one opens. */
-.dw-hero {
-  margin: 4px auto 12px; padding: 14px 16px;
-  border-color: #ffd70055; background: linear-gradient(160deg, #ffd7000a, var(--surface));
-}
-.dw-hero .dw-title { font-size: 16px; }
-.dw-hero .dw-sub { font-size: 12px; }
 .dw-streak {
   font-size: 12px; font-weight: 800; color: #f0a500;
   background: #ffd70014; border: 1px solid #ffd70033;
