@@ -155,10 +155,11 @@ function crRender() {
   const box = document.getElementById('career-content');
   if (!box) return;
   const run = crRun();
-  if (!crHasRun())       return crRenderSetup(box);
-  if (run.over)          return crRenderOver(box, run);
-  if (run.phase === 'played') return crRenderTransfer(box, run);
-  return crRenderDashboard(box, run);
+  if (!crHasRun()) return crRenderSetup(box);
+  if (run.over)               crRenderOver(box, run);
+  else if (run.phase === 'played') crRenderTransfer(box, run);
+  else                        crRenderDashboard(box, run);
+  crWireShare();   // the header carries the share button on all three screens
 }
 
 /* ── new career ───────────────────────────────────────────────────────────── */
@@ -288,7 +289,70 @@ function crHeaderHTML(run) {
         <span>${crEsc(FORMATIONS[run.formationId]?.label ?? run.formationId)}</span>
       </div>
       <div class="cr-bar"><div class="cr-bar-fill" style="width:${Math.round((played / total) * 100)}%"></div></div>
+      ${played && !run.over ? crShareButtonHTML('cr-share-btn') : ''}
     </div>`;
+}
+
+/* ── sharing a dynasty ────────────────────────────────────────────────────── */
+// Ten seasons do not fit in a sentence, so they go out as a strip — one square
+// per season, champion to relegated, in the order they happened. It is the
+// Wordle trick: unreadable to a stranger, obvious to anyone who has played, and
+// small enough to survive a WhatsApp forward.
+function crSeasonSquare(h, n) {
+  if (h.rank === 1) return '🏆';
+  if (h.rank <= 3) return '🟩';
+  if (h.rank <= Math.ceil(n / 2)) return '🟨';
+  if (h.rank > n - CR_RELEGATE) return '💀';
+  return '🟧';
+}
+
+function crShareText(run) {
+  const strip = run.history.map(h => crSeasonSquare(h, h.n || 14)).join('');
+  const points = run.history.reduce((s, h) => s + h.points, 0);
+  const lines = [
+    `👑 ${run.clubName} — ${run.history.length} עונות ב-36-0`,
+    `${yearToSeason(run.startYear)}–${yearToSeason(crYear(run))}`,
+    '',
+    strip,
+    `🏆 ${run.titles} אליפויות · ${points} נק׳`,
+  ];
+  // the man who stayed: a dynasty's best story is usually one player
+  const stay = Object.entries(run.stay || {}).sort((a, b) => b[1] - a[1])[0];
+  if (stay && stay[1] >= 3) {
+    const name = (run.squad || []).map(p => p && p.name)
+      .find(nm => nm && crNormName(nm) === stay[0]);
+    if (name) lines.push(`🧊 ${name} — ${stay[1]} עונות במועדון`);
+  }
+  if (run.over) lines.push(run.overReason === 'relegated' ? '💀 הסוף: ירידת ליגה' : '🏁 עשור שהושלם');
+  lines.push('', 'https://www.36-0.co.il/');
+  return lines.join('\n');
+}
+
+// Native share sheet where there is one (that is the WhatsApp button on a
+// phone), clipboard everywhere else. Never throws, never blocks the screen.
+async function crShare(btn) {
+  const run = crRun();
+  if (!crHasRun() || !run.history.length) return;
+  const text = crShareText(run);
+  const label = btn ? btn.textContent : '';
+  if (typeof track === 'function') track('share', 'career', String(run.history.length));
+  try {
+    if (navigator.share) { await navigator.share({ text }); return; }
+    await navigator.clipboard.writeText(text);
+    if (btn) { btn.textContent = '✓ הועתק — הדבק בוואטסאפ'; setTimeout(() => { btn.textContent = label; }, 2200); }
+  } catch (e) {
+    if (e && e.name === 'AbortError') return;      // the sheet was dismissed
+    if (btn) { btn.textContent = 'ההעתקה נכשלה'; setTimeout(() => { btn.textContent = label; }, 1800); }
+  }
+}
+
+// One button, wired wherever it appears.
+function crShareButtonHTML(cls) {
+  return `<button class="${cls}" id="cr-share">📤 שתף את הקריירה</button>`;
+}
+function crWireShare() {
+  const btn = document.getElementById('cr-share');
+  if (btn) btn.onclick = () => crShare(btn);
 }
 
 function crHistoryHTML(run) {
@@ -626,26 +690,14 @@ function crRenderOver(box, run) {
       </div>
     </div>
     ${crHistoryHTML(run)}
-    <button class="btn-secondary btn-full" id="cr-copy">📋 העתק סיכום</button>
-    <button class="btn-primary btn-full" id="cr-new" style="margin-top:8px">👑 קריירה חדשה</button>`;
+    ${crShareButtonHTML('btn-primary btn-full')}
+    <button class="btn-secondary btn-full" id="cr-new" style="margin-top:8px">👑 קריירה חדשה</button>`;
 
   document.getElementById('cr-new').onclick = () => {
     crClear();
     if (typeof clearDraftState === 'function') clearDraftState();
     state.career = null;
     crRender();
-  };
-  document.getElementById('cr-copy').onclick = async () => {
-    const btn = document.getElementById('cr-copy');
-    const lines = [
-      `👑 ${run.clubName} — קריירה ב-36-0`,
-      `${yearToSeason(run.startYear)}–${yearToSeason(crYear(run))} · ${run.history.length} עונות`,
-      `🏆 ${run.titles} אליפויות · ${run.history.reduce((s, h) => s + h.points, 0)} נקודות`,
-      dead ? '💀 הסוף: ירידת ליגה' : '🏁 הושלמה',
-      'https://www.36-0.co.il/',
-    ];
-    try { await navigator.clipboard.writeText(lines.join('\n')); btn.textContent = '✓ הועתק'; }
-    catch (e) { btn.textContent = 'ההעתקה נכשלה'; }
   };
 }
 

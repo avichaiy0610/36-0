@@ -154,6 +154,7 @@
     .us-table tr:last-child td { border-bottom: none; }
     .us-table .us-zero { color: #484f58; }
     .us-fin { color: #8b949e; font-size: 12px; }
+    .us-share { color: #d29922; font-size: 12px; }
     .us-h3 { font-size: 13.5px; color: #e6edf3; margin: 0 0 6px; font-weight: 800; }
     .pq-btn.copy { background: #21262d; color: #e6edf3; margin: 6px 0 2px; padding: 6px 14px; }
     .pq-c { border-color: #238636 !important; }
@@ -778,7 +779,8 @@ function usModesHTML(rows) {
   const body = days.map(d => `<tr><td>${htEsc(d)}</td>` + modes.map(m => {
     const r = at.get(d + '|' + m);
     if (!r || (!r.open_people && !r.finish_people)) return '<td><span class="us-zero">·</span></td>';
-    return `<td>${r.open_people}<span class="us-fin"> ← ${r.finish_people}</span></td>`;
+    const shared = r.share_people ? `<span class="us-share"> · 📤${r.share_people}</span>` : '';
+    return `<td>${r.open_people}<span class="us-fin"> ← ${r.finish_people}</span>${shared}</td>`;
   }).join('') + '</tr>').join('');
   return `<div class="us-h3">לפי מוד — כמה אנשים פתחו ← כמה סיימו</div>
     <div class="us-wrap"><table class="us-table">
@@ -793,7 +795,7 @@ function usDetailHTML(rows) {
   const body = rows.map(r => `<tr>
       <td>${htEsc(US_MODES[r.mode] || r.mode)}</td>
       <td>${htEsc(r.detail)}</td>
-      <td>${r.event === 'open' ? 'פתחו' : 'סיימו'}</td>
+      <td>${r.event === 'open' ? 'פתחו' : r.event === 'share' ? 'שיתפו' : 'סיימו'}</td>
       <td>${usNum(r.people)}</td><td>${usNum(r.events)}</td>
     </tr>`).join('');
   return `<div class="us-h3">פירוט בתוך כל מוד</div>

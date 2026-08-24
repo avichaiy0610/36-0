@@ -32,6 +32,13 @@
   display: flex; flex-wrap: wrap; justify-content: center; gap: 6px;
   font-size: 12px; color: var(--dim); margin-top: 5px;
 }
+.cr-share-btn {
+  margin-top: 11px; width: 100%; padding: 7px 0;
+  background: var(--surface2); color: var(--text);
+  border: 1px solid var(--border); border-radius: 9px;
+  font-family: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer;
+}
+.cr-share-btn:active { transform: translateY(1px); }
 .cr-bar { height: 5px; background: var(--surface2); border-radius: 4px; margin-top: 11px; overflow: hidden; }
 .cr-bar-fill { height: 100%; background: linear-gradient(90deg, var(--accent2), var(--accent)); border-radius: 4px; transition: width .4s ease; }
 
