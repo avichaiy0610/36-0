@@ -59,9 +59,15 @@ function gtBannerName(n) { return ['', 'באנר I', 'באנר II', 'באנר II
 
 // A blank run must be buildable without a run already existing, so nothing here
 // may go through gtRun() — hence gtStartCoinsFor(id) rather than gtStartCoins().
+// A run's own id, so the board can UPDATE the run as it goes instead of only
+// hearing about it once it is dead.
+function gtRid() {
+  return (Date.now().toString(36) + Math.random().toString(36).slice(2, 10)).slice(0, 40);
+}
+
 function gtBlank(carry) {
   const c = carry || {};
-  return { v: 2, at: 0, started: false, locked: null, formationId: null, picks: null,
+  return { v: 2, rid: gtRid(), at: 0, started: false, locked: null, formationId: null, picks: null,
            log: [], over: false, banner: c.banner || 0, managerId: c.managerId || null,
            modId: c.modId || null,
            coins: gtStartCoinsFor(c.managerId), relics: [], boosts: {}, peaks: [],
@@ -74,7 +80,8 @@ function gtRun() {
   // real error and then retry it, which turns one bug into a frozen tab.
   let raw = null;
   try { raw = JSON.parse(localStorage.getItem(GT_KEY)); } catch (e) { raw = null; }
-  if (raw && raw.v === 2) return (_gtRun = raw);
+  // a run started before runs had ids gets one now, so it can still report in
+  if (raw && raw.v === 2) { if (!raw.rid) raw.rid = gtRid(); return (_gtRun = raw); }
   // a v1 save predates coins and relics; it is still a real run, so it keeps its
   // progress and simply starts the economy at zero
   if (raw && raw.v === 1) return (_gtRun = { ...gtBlank(), ...raw, v: 2, coins: 0 });
@@ -573,6 +580,7 @@ function gtFinish(outcome) {
     } else {
       run.at = f.row + 1;                           // a shop row is a stop, not scenery
       if (run.at >= GM_RUN.length) { gtRecordRun(run, true); gtSubmitRun(run, true); }
+      else gtSubmitRun(run, false);                 // the board shows the run as it happens
     }
   } else if (res.insured) {
     run.log.pop();                                  // the policy buys the fight back
@@ -592,9 +600,16 @@ function gtFinish(outcome) {
 // and says nothing: the gauntlet is playable without an account, and the local
 // record book already holds the run.
 async function gtSubmitRun(run, cleared) {
-  if (run.submitted) return;
   if (run.sandbox) { run.submitted = true; gtSave(); return; }   // a rigged run is not a record
-  run.submitted = true;
+  const won = (run.log || []).filter(l => l.outcome === 'W').length;
+  const ending = !!cleared || !!run.over;
+  // Report every time the run gets DEEPER, and once more when it ends. The board
+  // used to hear about a run only at its death, so a player three fights in was
+  // invisible and one who simply closed the tab was never counted at all.
+  if (!ending && won <= (run.sentDepth ?? -1)) return;
+  if (ending && run.submitted) return;
+  run.sentDepth = won;
+  if (ending) run.submitted = true;
   gtSave();
   if (typeof _supabase === 'undefined' || !_supabase) return;
   try {
@@ -608,6 +623,8 @@ async function gtSubmitRun(run, cleared) {
     });
     await _supabase.rpc('submit_gauntlet_run', {
       p: {
+        rid: run.rid || null,
+        ended: !!cleared || !!run.over,
         depth: wins.length,
         cleared: !!cleared,
         banner: run.banner || 0,

@@ -95,7 +95,7 @@ function lbToggleSeasonFilters(show) {
 async function loadGauntletBoard(table) {
   const { data: rows, error } = await _supabase
     .from('gauntlet_runs')
-    .select('depth, cleared, banner, team_ovr, created_at, profiles(username, avatar_url)')
+    .select('depth, cleared, banner, team_ovr, ended, created_at, profiles(username, avatar_url)')
     .order('banner', { ascending: false })
     .order('depth', { ascending: false })
     .order('created_at', { ascending: true })
@@ -119,7 +119,7 @@ async function loadGauntletBoard(table) {
     const rank = i + 1;
     const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank;
     const date = new Date(row.created_at).toLocaleDateString('he-IL', { day: 'numeric', month: 'numeric', year: '2-digit' });
-    const sub = [row.cleared ? '🏆 המסע הושלם' : null,
+    const sub = [row.cleared ? '🏆 המסע הושלם' : row.ended === false ? '🔴 בריצה עכשיו' : null,
                  row.banner ? '🏴 ' + gtBannerName(row.banner) : null,
                  row.team_ovr ? 'OVR ' + row.team_ovr : null, date]
       .filter(Boolean).map(x => `<bdi>${esc(x)}</bdi>`).join(' · ');
