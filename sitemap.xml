@@ -351,6 +351,11 @@
     <priority>0.6</priority>
   </url>
   <url>
+    <loc>https://www.36-0.co.il/player/%D7%90%D7%93%D7%95%D7%90%D7%A8%D7%93%D7%95-%D7%9E%D7%A8%D7%A7%D7%A9/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
     <loc>https://www.36-0.co.il/player/%D7%90%D7%93%D7%95%D7%A8%D7%9D-%D7%A7%D7%99%D7%99%D7%A1%D7%99/</loc>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
@@ -1661,6 +1666,11 @@
     <priority>0.6</priority>
   </url>
   <url>
+    <loc>https://www.36-0.co.il/player/%D7%90%D7%A8%D7%AA%D7%95%D7%A8-%D7%90%D7%98%D7%A6%D7%96%D7%99%D7%90%D7%A0%D7%95%D7%91/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
     <loc>https://www.36-0.co.il/player/%D7%90%D7%A9%D7%A8%D7%A3-%D7%A8%D7%91%D7%90%D7%97/</loc>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
@@ -1762,6 +1772,11 @@
   </url>
   <url>
     <loc>https://www.36-0.co.il/player/%D7%91%D7%9F-%D7%9C%D7%95%D7%96/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://www.36-0.co.il/player/%D7%91%D7%9F-%D7%A1%D7%91%D7%99%D7%A8/</loc>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
@@ -1952,6 +1967,11 @@
   </url>
   <url>
     <loc>https://www.36-0.co.il/player/%D7%92%D7%95%D7%90%D7%9F-%D7%90%D7%95%D7%A9%D7%A0%D7%99%D7%90%D7%95%D7%95%D7%94/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://www.36-0.co.il/player/%D7%92%D7%95%D7%90%D7%9F-%D7%97%D7%9C%D7%91%D7%99/</loc>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
@@ -4546,6 +4566,11 @@
     <priority>0.6</priority>
   </url>
   <url>
+    <loc>https://www.36-0.co.il/player/%D7%9E%D7%A8%D7%99%D7%95-%D7%A4%D7%A6%D7%90%D7%9C%D7%A7%D7%94/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
     <loc>https://www.36-0.co.il/player/%D7%9E%D7%A8%D7%99%D7%95%D7%A1-%D7%91%D7%95%D7%A0%D7%93%D7%99%D7%90%D7%94/</loc>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
@@ -5342,6 +5367,11 @@
   </url>
   <url>
     <loc>https://www.36-0.co.il/player/%D7%A2%D7%93%D7%9F-%D7%A9%D7%9E%D7%99%D7%A8/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://www.36-0.co.il/player/%D7%A2%D7%93%D7%9F-%D7%A9%D7%A8%D7%9D/</loc>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
