@@ -1068,6 +1068,36 @@ function showChallengeSubmitNote(ch) {
 }
 
 // ─── Welcome-screen card + nav wiring ──────────────────────────────────────────
+/* ── the daily habit ──────────────────────────────────────────────────────── */
+// A streak is the whole reason a daily puzzle is played daily. It lives in the
+// browser, not the server, so it works signed out — which is how most of the
+// site is played — and it survives being offline.
+const CHAL_STREAK_KEY = '36-0-daily-streak';
+
+function chalStreak() {
+  try { return JSON.parse(localStorage.getItem(CHAL_STREAK_KEY)) || { key: null, n: 0, best: 0 }; }
+  catch (e) { return { key: null, n: 0, best: 0 }; }
+}
+// yesterday's daily key; the keys are plain YYYY-MM-DD in Israel time
+function chalPrevKey(key) {
+  const d = new Date(key + 'T12:00:00Z');
+  d.setUTCDate(d.getUTCDate() - 1);
+  return d.toISOString().slice(0, 10);
+}
+function chalPlayedToday() { return chalStreak().key === challengeKey('daily'); }
+
+// Called once per finished daily challenge. A gap of one day continues the run,
+// anything longer starts a new one.
+function chalRecordDaily() {
+  const key = challengeKey('daily');
+  const s = chalStreak();
+  if (s.key === key) return s;
+  const n = s.key === chalPrevKey(key) ? (s.n || 0) + 1 : 1;
+  const next = { key, n, best: Math.max(n, s.best || 0) };
+  try { localStorage.setItem(CHAL_STREAK_KEY, JSON.stringify(next)); } catch (e) {}
+  return next;
+}
+
 function fillChallengeWelcomeCard() {
   const numEl = document.getElementById('dw-num');
   const condEl = document.getElementById('dw-conditions');
@@ -1078,9 +1108,30 @@ function fillChallengeWelcomeCard() {
   const labelEl = document.getElementById('dw-label');
   if (labelEl) labelEl.textContent = challengeLabel('daily', key);
   const reqs = challengeRequirements('daily', key, s);
-  condEl.textContent = reqs.length
+  const conds = reqs.length
     ? '🎯 ' + reqs.map(challengeReqText).join(' · ')
     : 'תנאי היום: ' + challengeConditionChips(s).join(' · ');
+  // played today → say so, and point at the board instead of the conditions
+  condEl.textContent = '';
+  if (chalPlayedToday()) {
+    const done = document.createElement('span');
+    done.className = 'dw-done';
+    done.textContent = '✓ שיחקת היום';
+    condEl.appendChild(done);
+    condEl.appendChild(document.createTextNode(' — לצפייה בלוח של היום'));
+  } else {
+    condEl.textContent = conds;
+  }
+
+  const streakEl = document.getElementById('dw-streak');
+  if (streakEl) {
+    const st = chalStreak();
+    // a streak only counts while it is alive: today or yesterday
+    const alive = st.n > 0 && (st.key === key || st.key === chalPrevKey(key));
+    streakEl.textContent = alive ? `🔥 ${st.n}` : '';
+    streakEl.style.display = alive ? '' : 'none';
+    streakEl.title = alive ? `${st.n} ימים ברצף · השיא שלך ${st.best}` : '';
+  }
 }
 
 // Under the daily card, nudge the player about the weekly/monthly challenges

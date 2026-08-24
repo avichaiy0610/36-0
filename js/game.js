@@ -543,8 +543,12 @@ function showScreen(id) {
     // inside them report their own open, with their own name
     track('open', TRACK_SCREENS[id], (id === 'minigames' || id === 'daily') ? 'hub' : null);
   }
-  // refresh the "weekly/monthly available" hint whenever the welcome card shows
-  if (id === 'welcome' && typeof updateChallengeAvailability === 'function') updateChallengeAvailability();
+  // refresh the daily card whenever the welcome screen shows: the streak and the
+  // "played today" state change while the player is elsewhere on the site
+  if (id === 'welcome') {
+    if (typeof fillChallengeWelcomeCard === 'function') fillChallengeWelcomeCard();
+    if (typeof updateChallengeAvailability === 'function') updateChallengeAvailability();
+  }
   // on mobile the screens scroll as page flow, so reset the window too
   // (otherwise the results screen opens scrolled to the bottom)
   scrollPageTop();
@@ -2426,6 +2430,10 @@ function animateResults(ovr) {
       _supabase.rpc('increment_games_played').then(() => {}, () => {});
     }
     if (typeof track === 'function') track('finish', trackDraftMode());
+    // the daily streak — the reason to come back tomorrow
+    if (state.challenge && state.challenge.period === 'daily' && typeof chalRecordDaily === 'function') {
+      chalRecordDaily();
+    }
   }
   const { matches, inTopSix, leagueTable, playerStats } = season;
   ovr = season.ovr;
