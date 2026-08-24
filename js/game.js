@@ -523,6 +523,17 @@ const TRACK_SCREENS = {
   gauntlet: 'gauntlet', duel: 'duel', leagues: 'league', daily: 'challenge',
 };
 
+// Which mode the draft on screen belongs to. One definition, used both when a
+// draft starts and when its season ends, so the two can never disagree.
+// A career season returns null: it records itself in js/career.js, where the
+// run's own numbers are known.
+function trackDraftMode() {
+  if (state.career) return null;
+  return state.challenge ? 'challenge'
+       : state.leagueCode ? 'league'
+       : state.duelCode ? 'duel' : 'draft';
+}
+
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   const el = document.getElementById('screen-' + id);
@@ -990,6 +1001,10 @@ function restoreDraftState() {
       state.challenge.period, state.challenge.key, state.eraMin, state.eraMax,
       state.challengeReqs, chalRng(`chal|${state.challenge.period}|${state.challenge.key}|deck`));
   }
+
+  // a draft resumed from storage is a mode being played, even though nobody
+  // clicked a start button this visit
+  if (typeof track === 'function') track('open', trackDraftMode());
 
   const banner = document.getElementById('peak-mode-banner');
   if (banner) banner.style.display = state.peakMode ? 'block' : 'none';
@@ -2410,13 +2425,7 @@ function animateResults(ovr) {
     if (typeof getCurrentUser === 'function' && getCurrentUser()) {
       _supabase.rpc('increment_games_played').then(() => {}, () => {});
     }
-    // which mode this season belonged to — a career season records itself, in
-    // js/career.js, where the run's own numbers are known
-    if (typeof track === 'function' && !state.career) {
-      track('finish', state.challenge ? 'challenge'
-                    : state.leagueCode ? 'league'
-                    : state.duelCode ? 'duel' : 'draft');
-    }
+    if (typeof track === 'function') track('finish', trackDraftMode());
   }
   const { matches, inTopSix, leagueTable, playerStats } = season;
   ovr = season.ovr;
@@ -3126,6 +3135,9 @@ function restartGame() {
   clearDraftState();
   const moveBtn = document.getElementById('btn-move-player');
   if (moveBtn) { moveBtn.style.display = 'none'; moveBtn.classList.remove('move-active'); moveBtn.textContent = '⇄ הזז שחקן'; }
+  // "משחק חדש" is a draft that never passes through startGame(), which is why
+  // the board used to show more finished seasons than opened drafts
+  if (typeof track === 'function') track('open', trackDraftMode());
   prepareSetupScreen();
   showScreen('setup');
 }

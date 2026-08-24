@@ -35,8 +35,14 @@
     return cid;
   }
 
-  // Screens re-render, buttons get double-tapped: the same event within two
-  // seconds is the same event.
+  // An "open" is reach: how many people got as far as this mode on this visit.
+  // Counting it more than once per visit measures nothing but navigation — the
+  // gauntlet and the duel bounce between their own screens constantly, and used
+  // to report hundreds of opens for a handful of people. Volume is what `finish`
+  // is for.
+  const opened = new Set();
+  // Screens re-render and buttons get double-tapped: the same finish within two
+  // seconds is the same finish.
   const recent = new Map();
 
   // track('open' | 'finish', mode, detail?)
@@ -45,6 +51,10 @@
       if (!mode || typeof _supabase === 'undefined' || !_supabase) return;
       const key = event + '|' + mode + '|' + (detail == null ? '' : detail);
       const now = Date.now();
+      if (event === 'open') {
+        if (opened.has(key)) return;
+        opened.add(key);
+      }
       if (now - (recent.get(key) || 0) < 2000) return;
       recent.set(key, now);
       _supabase.rpc('track', {

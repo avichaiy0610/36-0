@@ -702,6 +702,11 @@ async function startDuelReveal(room) {
     }
   }
   duelRenderResult(room, result, myRole, oppRole);
+  // the duel is over — the reveal is computed once per room, so this fires once
+  if (typeof track === 'function') {
+    const mine = result[myRole], theirs = result[oppRole];
+    track('finish', 'duel', mine.pts > theirs.pts ? 'win' : mine.pts < theirs.pts ? 'loss' : 'draw');
+  }
 }
 
 function duelRenderResult(room, result, myRole, oppRole) {
