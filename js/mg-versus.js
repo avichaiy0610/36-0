@@ -54,6 +54,7 @@ function mgvDraw() {
 let _mgvRun = null;
 
 function mgVersusOpen() {
+  if (typeof track === 'function') track('open', 'minigame', 'versus');
   _mgvRun = { streak: 0, pair: mgvDraw(), picked: null, over: false };
   mgvRender();
 }
@@ -143,6 +144,8 @@ function mgvPick(side) {
     s.log.unshift({ a: a.name, aS: a.season, aO: a.ovr, b: b.name, bS: b.season, bO: b.ovr,
                     chose: side === 'a' ? a.name : b.name, at: new Date().toISOString().slice(0, 10) });
     s.log = s.log.slice(0, MGV_LOG_CAP);
+    // the streak the round died on — the score of a versus run
+    if (typeof track === 'function') track('finish', 'minigame', 'versus-' + run.streak);
   }
   mgvSave(s);
   mgvRender();

@@ -311,6 +311,11 @@ async function euSubmit(c) {
   c.submitted = true;
   // a sandbox 👑 שמינית הגמר is not an achievement
   if (typeof euSandboxActive === 'function' && euSandboxActive()) return;
+  // the campaign is simulated the moment it is built, so this IS the run —
+  // recorded whether or not anyone is signed in, unlike the badges below
+  if (typeof track === 'function') {
+    track('finish', 'europe', c.league ? String(c.league.rank) : 'qual');
+  }
   if (typeof getCurrentUser !== 'function' || !getCurrentUser()) return;
   const L = c.league;
   const giant = !!(L && L.matches.some(m => m.outcome === 'W' && m.ovr >= 96));

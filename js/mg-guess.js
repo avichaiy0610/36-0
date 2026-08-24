@@ -36,6 +36,7 @@ function mggRandomTarget() {
 let _mggRun = null;
 
 function mgGuessOpen() {
+  if (typeof track === 'function') track('open', 'minigame', 'guess');
   const s = mggState();
   const key = mgDayKey();
   if (s.dayKey !== key) { s.dayKey = key; s.guesses = []; s.done = null; mggSave(s); }
@@ -252,5 +253,6 @@ function mggSubmit(name) {
     }
     mggSave(s);
   }
+  if (run.done && typeof track === 'function') track('finish', 'minigame', 'guess-' + run.done);
   mggRender();
 }

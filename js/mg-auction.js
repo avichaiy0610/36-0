@@ -75,6 +75,7 @@ function mgaBuildLots(slots) {
 let _mgaRun = null;
 
 function mgAuctionOpen() {
+  if (typeof track === 'function') track('open', 'minigame', 'auction');
   _mgaRun = null;
   mgaRenderIntro();
 }
@@ -315,6 +316,7 @@ function mgaFinish() {
   run.over = true;
 
   const ovr = mgaSquadOvr(run);
+  if (typeof track === 'function') track('finish', 'minigame', 'auction');
   const s = mgaState();
   s.plays++;
   if (ovr > s.bestOvr) { s.bestOvr = ovr; s.bestSpent = run.spent; }

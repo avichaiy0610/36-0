@@ -516,10 +516,22 @@ function scrollPageTop() {
     .forEach(el => { el.scrollTop = 0; });
 }
 
+// The screens that ARE a mode: opening one is the only signal some of them
+// (career, the mini-games, Europe) leave anywhere. See js/track.js.
+const TRACK_SCREENS = {
+  career: 'career', minigames: 'minigame', europe: 'europe',
+  gauntlet: 'gauntlet', duel: 'duel', leagues: 'league', daily: 'challenge',
+};
+
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   const el = document.getElementById('screen-' + id);
   if (el) { el.classList.add('active'); el.scrollTop = 0; }
+  if (TRACK_SCREENS[id] && typeof track === 'function') {
+    // the two screens that are a menu rather than the thing itself: the games
+    // inside them report their own open, with their own name
+    track('open', TRACK_SCREENS[id], (id === 'minigames' || id === 'daily') ? 'hub' : null);
+  }
   // refresh the "weekly/monthly available" hint whenever the welcome card shows
   if (id === 'welcome' && typeof updateChallengeAvailability === 'function') updateChallengeAvailability();
   // on mobile the screens scroll as page flow, so reset the window too
@@ -543,6 +555,7 @@ function startGame() {
   document.getElementById('duel-review-chrome')?.remove();
   document.getElementById('screen-setup').classList.remove('league-locked');
   const note = document.getElementById('lg-setup-note'); if (note) note.style.display = 'none';
+  if (typeof track === 'function') track('open', 'draft');
   prepareSetupScreen();
   showScreen('setup');
 }
@@ -2397,6 +2410,13 @@ function animateResults(ovr) {
     if (typeof getCurrentUser === 'function' && getCurrentUser()) {
       _supabase.rpc('increment_games_played').then(() => {}, () => {});
     }
+    // which mode this season belonged to — a career season records itself, in
+    // js/career.js, where the run's own numbers are known
+    if (typeof track === 'function' && !state.career) {
+      track('finish', state.challenge ? 'challenge'
+                    : state.leagueCode ? 'league'
+                    : state.duelCode ? 'duel' : 'draft');
+    }
   }
   const { matches, inTopSix, leagueTable, playerStats } = season;
   ovr = season.ovr;
@@ -2648,6 +2668,7 @@ async function submitLeagueDraft(ovr) {
   showLeagueSubmitModal('sending');
   if (typeof getCurrentUser === 'function' && getCurrentUser())
     _supabase.rpc('increment_games_played').then(() => {}, () => {});
+  if (typeof track === 'function') track('finish', 'league');
   const ok = await submitResult();      // payload carries state.leagueCode
   if (!ok) { showLeagueSubmitModal('error', code); return; }  // keep the draft to retry
   clearDraftState();                    // one-shot: nothing to resume, no results screen

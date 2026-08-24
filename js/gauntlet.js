@@ -611,6 +611,8 @@ async function gtSubmitRun(run, cleared) {
   run.sentDepth = won;
   if (ending) run.submitted = true;
   gtSave();
+  // the run itself — how deep it got, signed in or not, unlike the board below
+  if (ending && typeof track === 'function') track('finish', 'gauntlet', String(won));
   if (typeof _supabase === 'undefined' || !_supabase) return;
   try {
     const { data: { user } = {} } = await _supabase.auth.getUser();

@@ -439,6 +439,13 @@ function crOnSeasonEnd(res) {
     crRecordBest(run);
     crSave();
     crAward(run);
+    // how far careers actually get: the season number, with F for a full ten and
+    // R for a run that ended in relegation ("3", "10F", "5R"). Signed out too —
+    // most of the career is played without an account.
+    if (typeof track === 'function') {
+      track('finish', 'career', String(run.history.length) +
+        (run.over ? (run.overReason === 'relegated' ? 'R' : 'F') : ''));
+    }
   }
 
   if (!btn) return;

@@ -792,6 +792,7 @@ async function startChallenge(period) {
   document.getElementById('league-review-back')?.remove();
   document.getElementById('duel-review-chrome')?.remove();
 
+  if (typeof track === 'function') track('open', 'challenge', period);
   state.challenge   = { period, key };
   state.formationId = s.formationId;
   state.difficulty  = s.difficulty;

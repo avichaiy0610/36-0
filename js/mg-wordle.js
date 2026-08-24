@@ -44,6 +44,7 @@ function mgwDeck(key) {
 
 /* ── the screen ───────────────────────────────────────────────────────────── */
 function mgWordleOpen() {
+  if (typeof track === 'function') track('open', 'minigame', 'wordle');
   const today = mgwToday();
   if (today && today.done) return mgwRenderResult(today);
   mgwRenderIntro();
@@ -162,6 +163,7 @@ function mgwOnSeasonEnd(res) {
     };
     next.best = Math.max(s.best, next.streak);
     mgwSave(next);
+    if (typeof track === 'function') track('finish', 'minigame', 'wordle');
   }
 
   if (!btn) return;

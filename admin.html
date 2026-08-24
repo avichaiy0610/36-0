@@ -145,6 +145,16 @@
     .pq-comment { background: #0d1f17; border: 1px solid #238636; border-radius: 8px; padding: 8px 10px; margin-bottom: 8px; font-size: 13.5px; line-height: 1.6; }
     .pq-comment b { color: #3fb950; font-size: 12px; }
     .pq-lbl { font-size: 12px; color: #8b949e; margin-bottom: 4px; }
+    .us-controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+    .us-wrap { overflow-x: auto; background: #161b22; border: 1px solid #30363d; border-radius: 10px; margin-bottom: 16px; }
+    .us-table { width: 100%; border-collapse: collapse; font-size: 13px; white-space: nowrap; }
+    .us-table th, .us-table td { padding: 7px 10px; text-align: center; border-bottom: 1px solid #21262d; }
+    .us-table th { background: #0d1117; color: #8b949e; font-size: 12px; font-weight: 700; position: sticky; top: 0; }
+    .us-table td:first-child, .us-table th:first-child { text-align: start; color: #e6edf3; font-weight: 700; }
+    .us-table tr:last-child td { border-bottom: none; }
+    .us-table .us-zero { color: #484f58; }
+    .us-fin { color: #8b949e; font-size: 12px; }
+    .us-h3 { font-size: 13.5px; color: #e6edf3; margin: 0 0 6px; font-weight: 800; }
     .pq-btn.copy { background: #21262d; color: #e6edf3; margin: 6px 0 2px; padding: 6px 14px; }
     .pq-c { border-color: #238636 !important; }
     .hist-editwrap { margin-top: 12px; }
@@ -187,6 +197,27 @@
   </div>
 
   <div id="editor" style="display:none">
+    <div id="usage-section" style="display:none">
+      <h2>📊 מה משחקים</h2>
+      <div class="chal-note">
+        כמה אנשים פתחו כל מוד וכמה מהם באמת סיימו ריצה — כולל קריירה, משחקונים ואירופה,
+        שלא משאירים שום שורה אחרת בשרת, וכולל מי שמשחק בלי חשבון. הפער בין "פתחו" ל"סיימו"
+        הוא העיקר: מוד שכולם פותחים ואף אחד לא מסיים זו בעיה אחרת ממוד שאף אחד לא פותח.
+        הנתונים אנונימיים (מזהה אקראי לדפדפן) ונראים רק לחשבון הזה.
+      </div>
+      <div class="us-controls">
+        <label>טווח</label>
+        <select id="usage-days" class="tp-select" style="max-width:130px">
+          <option value="7">7 ימים</option>
+          <option value="30" selected>30 ימים</option>
+          <option value="90">90 ימים</option>
+        </select>
+        <button id="usage-refresh" class="seo-btn ghost">↻ רענן</button>
+        <span id="usage-status" class="chal-status"></span>
+      </div>
+      <div id="usage-out"></div>
+    </div>
+
     <div id="hist-section" style="display:none">
       <h2>🏆 סגלים וטבלאות אמיתיות (לשיווק)</h2>
       <div class="chal-note">בחר עונה וקבוצה — ההרכב יופיע על המגרש כמו במשחק (ניתן לערוך כל שחקן) לצד הטבלה האמיתית. מיועד לצילום מסך ופרסום. הנתונים אמיתיים מ-Transfermarkt; הדירוגים בסגל הם שלנו.</div>
@@ -679,12 +710,96 @@ async function init() {
   loadContactMessages();
   // real squads/tables viewer — admin account only
   if (session.user && session.user.email === 'avichaiy0610@outlook.com') {
+    document.getElementById('usage-section').style.display = 'block';
+    initUsage();
     document.getElementById('hist-section').style.display = 'block';
     initHistViewer();
     initSeoEditor();
     document.getElementById('pq-section').style.display = 'block';
     loadPostQueue();
   }
+}
+
+/* ─── What gets played (admin only) ───────────────────────────────────────── */
+// Reads the three aggregate RPCs; the raw usage_events rows are unreachable to
+// everyone, this account included. See migrations/20260824000001_usage_events.sql
+const US_MODES = {
+  draft: 'דראפט', challenge: 'אתגר', career: 'קריירה', minigame: 'משחקונים',
+  gauntlet: 'גאונטלט', europe: 'אירופה', duel: 'דו-קרב', league: 'ליגות',
+};
+
+function initUsage() {
+  document.getElementById('usage-refresh').onclick = loadUsage;
+  document.getElementById('usage-days').onchange = loadUsage;
+  loadUsage();
+}
+
+function usStatus(msg, ok) {
+  const el = document.getElementById('usage-status');
+  el.textContent = msg;
+  el.className = 'chal-status' + (ok === true ? ' ok' : ok === false ? ' err' : '');
+}
+
+async function loadUsage() {
+  const days = Number(document.getElementById('usage-days').value) || 30;
+  usStatus('טוען…');
+  const [daily, stats, detail] = await Promise.all([
+    _supabase.rpc('usage_daily',  { p_days: days }),
+    _supabase.rpc('usage_stats',  { p_days: days }),
+    _supabase.rpc('usage_detail', { p_days: days }),
+  ]);
+  const err = daily.error || stats.error || detail.error;
+  if (err) { usStatus('טעינה נכשלה: ' + err.message, false); return; }
+  usStatus('');
+  document.getElementById('usage-out').innerHTML =
+    usDailyHTML(daily.data ?? []) + usModesHTML(stats.data ?? []) + usDetailHTML(detail.data ?? []);
+}
+
+function usNum(n) { return n ? String(n) : '<span class="us-zero">·</span>'; }
+
+function usDailyHTML(rows) {
+  if (!rows.length) return '<div class="chal-note">אין עדיין נתונים בטווח הזה.</div>';
+  const body = rows.map(r => `<tr>
+      <td>${htEsc(r.day)}</td><td>${usNum(r.people)}</td>
+      <td>${usNum(r.signed_in)}</td><td>${usNum(r.events)}</td>
+    </tr>`).join('');
+  return `<div class="us-h3">אנשים ליום (כל המודים יחד)</div>
+    <div class="us-wrap"><table class="us-table">
+      <thead><tr><th>תאריך</th><th>אנשים</th><th>מתוכם מחוברים</th><th>אירועים</th></tr></thead>
+      <tbody>${body}</tbody></table></div>`;
+}
+
+// One row per day, one column per mode: "פתחו → סיימו", both in people.
+function usModesHTML(rows) {
+  if (!rows.length) return '';
+  const modes = Object.keys(US_MODES).filter(m => rows.some(r => r.mode === m));
+  const days = [...new Set(rows.map(r => r.day))];
+  const at = new Map(rows.map(r => [r.day + '|' + r.mode, r]));
+  const body = days.map(d => `<tr><td>${htEsc(d)}</td>` + modes.map(m => {
+    const r = at.get(d + '|' + m);
+    if (!r || (!r.open_people && !r.finish_people)) return '<td><span class="us-zero">·</span></td>';
+    return `<td>${r.open_people}<span class="us-fin"> ← ${r.finish_people}</span></td>`;
+  }).join('') + '</tr>').join('');
+  return `<div class="us-h3">לפי מוד — כמה אנשים פתחו ← כמה סיימו</div>
+    <div class="us-wrap"><table class="us-table">
+      <thead><tr><th>תאריך</th>${modes.map(m => `<th>${US_MODES[m]}</th>`).join('')}</tr></thead>
+      <tbody>${body}</tbody></table></div>`;
+}
+
+// The breakdown inside a mode: which mini-game, which challenge period, how far
+// careers got ("3" = עונה שלישית, "10F" = קריירה מלאה, "5R" = ירידת ליגה).
+function usDetailHTML(rows) {
+  if (!rows.length) return '';
+  const body = rows.map(r => `<tr>
+      <td>${htEsc(US_MODES[r.mode] || r.mode)}</td>
+      <td>${htEsc(r.detail)}</td>
+      <td>${r.event === 'open' ? 'פתחו' : 'סיימו'}</td>
+      <td>${usNum(r.people)}</td><td>${usNum(r.events)}</td>
+    </tr>`).join('');
+  return `<div class="us-h3">פירוט בתוך כל מוד</div>
+    <div class="us-wrap"><table class="us-table">
+      <thead><tr><th>מוד</th><th>פירוט</th><th>אירוע</th><th>אנשים</th><th>פעמים</th></tr></thead>
+      <tbody>${body}</tbody></table></div>`;
 }
 
 /* ─── Real squads + league tables viewer (admin only) ─────────────────────── */
