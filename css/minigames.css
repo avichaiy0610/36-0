@@ -199,3 +199,56 @@
 .mgw-result-stats span { font-size: 1.15rem; font-weight: 900; color: var(--text); }
 .mgw-tier { margin-top: 12px; font-size: 0.95rem; font-weight: 800; color: var(--accent); }
 .mgw-foot { font-size: 11px; margin-top: 10px; }
+
+/* ── 🧩 צומת ──────────────────────────────────────────────────────────────── */
+.mgt-intro { text-align: center; margin-bottom: 14px; }
+.mgt-title { font-size: 1.15rem; font-weight: 900; }
+.mgt-title span { color: var(--accent); }
+.mgt-sub { font-size: 12px; color: var(--dim); line-height: 1.6; margin-top: 6px; }
+.mgt-sub b { color: var(--text); }
+
+.mgt-grid {
+  display: grid; grid-template-columns: 66px repeat(3, minmax(0, 1fr)); gap: 5px;
+  margin-bottom: 12px; width: 100%;
+}
+.mgt-corner { }
+/* grid items default to min-width:auto, which lets a long club name push the
+   whole board past the screen edge */
+.mgt-head, .mgt-cell { min-width: 0; }
+.mgt-head {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 3px; padding: 5px 2px; text-align: center;
+}
+.mgt-crest { width: 28px; height: 28px; object-fit: contain; }
+.mgt-head-label { font-size: 9.5px; font-weight: 700; line-height: 1.25; color: var(--dim); overflow-wrap: anywhere; }
+.mgt-head-cond { color: var(--accent); font-size: 11px; }
+.mgt-row-head { min-height: 74px; }
+
+.mgt-cell {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  min-height: 74px; padding: 6px 4px; cursor: pointer; font-family: inherit;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  color: var(--text); transition: border-color .15s, background .15s;
+}
+.mgt-cell:disabled { cursor: default; }
+.mgt-cell.picking { border-color: var(--accent); background: #ffd7000d; }
+.mgt-cell.ok  { border-color: #22c55e66; background: #22c55e12; }
+.mgt-cell.bad { border-color: #f8514966; background: #f8514910; }
+.mgt-cell-plus { font-size: 1.4rem; color: var(--dim); font-weight: 300; }
+.mgt-cell-name { font-size: 10.5px; font-weight: 700; line-height: 1.25; overflow-wrap: anywhere; }
+.mgt-cell-mark { font-size: 0.95rem; font-weight: 900; }
+.mgt-cell.ok .mgt-cell-mark  { color: #22c55e; }
+.mgt-cell.bad .mgt-cell-mark { color: #f85149; }
+.mgt-cell-rate { font-size: 9px; color: var(--dim); }
+
+.mgt-status { text-align: center; font-size: 13px; color: var(--dim); margin-bottom: 10px; }
+.mgt-status b { color: var(--accent); font-size: 1.1rem; }
+.mgt-answers { margin-top: 16px; }
+.mgt-answer {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  padding: 9px 11px; margin-bottom: 7px;
+}
+.mgt-answer-head { font-size: 11.5px; font-weight: 800; color: var(--dim); }
+.mgt-answer-head span { color: var(--accent); margin: 0 3px; }
+.mgt-answer-names { font-size: 12.5px; margin-top: 3px; line-height: 1.6; }
+.mgt-perfect { text-align: center; font-size: 1rem; font-weight: 800; color: var(--accent); margin-top: 14px; }

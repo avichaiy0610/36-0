@@ -174,9 +174,17 @@
         <span class="dw-sub" id="dw-conditions">אותם תנאים לכולם — פעם ביום</span>
         <span class="dw-more" id="dw-avail" style="display:none"></span>
       </button>
+      <button id="btn-week-league" class="daily-welcome-card wl-card" style="display:none">
+        <span class="dw-top">
+          <span class="dw-icon">🏆</span>
+          <span class="dw-title">הליגה הציבורית <span class="wl-theme" id="wl-theme"></span></span>
+          <span class="dw-arrow">←</span>
+        </span>
+        <span class="dw-sub" id="wl-sub">ליגה פתוחה לכולם, נושא חדש בכל שבוע</span>
+      </button>
       <a class="btn-coffee btn-coffee-welcome" id="btn-coffee-welcome" href="https://ko-fi.com/360ligathaal" target="_blank" rel="noopener">☕ אוהב את המשחק? קנה לי קפה</a>
       <button class="wn-link" id="btn-whatsnew"><span id="wn-label">מה חדש!</span><span class="wn-dot" id="wn-dot"></span></button>
-      <div class="wn-version" id="wn-version" dir="ltr">v1.45</div>
+      <div class="wn-version" id="wn-version" dir="ltr">v1.46</div>
     </div>
     <footer class="site-disclaimer">
       <p>
@@ -804,6 +812,7 @@
         <button class="lb-tab selected" data-tab="ovr">🏅 OVR</button>
         <button class="lb-tab" data-tab="points">⚽ נקודות</button>
         <button class="lb-tab" data-tab="gauntlet">🗺 גאונטלט</button>
+        <button class="lb-tab" data-tab="career">👑 שושלות</button>
       </div>
       <div class="lb-filters">
         <button class="lb-filter selected" data-period="all">כל הזמנים</button>
@@ -905,11 +914,13 @@
   <script src="js/player_nats.js"></script>
   <script src="js/challenges.js"></script>
   <script src="js/career.js"></script>
+  <script src="js/career-admin.js"></script>
   <script src="js/minigames.js"></script>
   <script src="js/mg-guess.js"></script>
   <script src="js/mg-versus.js"></script>
   <script src="js/mg-auction.js"></script>
   <script src="js/mg-wordle.js"></script>
+  <script src="js/mg-grid.js"></script>
   <script src="js/theme.js"></script>
 </body>
 </html>

@@ -962,6 +962,7 @@ async function renderChallengeHome(period) {
 
   document.getElementById('daily-play').onclick = () => startChallenge(period);
   wireChallengeArchive();
+  if (period === 'daily') chalSeedStreakFromServer();
 
   clearInterval(_chalCountdownTimer);
   _chalCountdownTimer = setInterval(() => {
@@ -1076,6 +1077,36 @@ function chalArchiveHTML() {
       <div class="chal-week-hint">${lgEsc(chalText('chal-week-hint',
         'יום שהוחמץ אפשר להשלים — הרצף נשמר, אבל התוצאה לא נכנסת לטבלה של אותו יום.'))}</div>
     </div>`;
+}
+
+// A day played before this browser kept a record — or on another device — is
+// still a day played. For a signed-in player the server knows: challenge_results
+// holds one row per daily challenge they entered. Seeded once per session.
+let _chalSeeded = false;
+async function chalSeedStreakFromServer() {
+  if (_chalSeeded) return;
+  const user = (typeof getCurrentUser === 'function') ? getCurrentUser() : null;
+  if (!user || typeof _supabase === 'undefined' || !_supabase) return;   // retry once signed in
+  _chalSeeded = true;
+  try {
+    const { data } = await _supabase.from('challenge_results')
+      .select('challenge_key')
+      .eq('user_id', user.id).eq('period', 'daily')
+      .order('challenge_key', { ascending: false })
+      .limit(CHAL_STREAK_KEEP);
+    if (!data || !data.length) return;
+    const store = chalStreakStore();
+    const before = new Set(store.days).size;
+    data.forEach(r => { if (r.challenge_key) store.days.push(r.challenge_key); });
+    if (new Set(store.days).size === before) return;      // nothing new to learn
+    chalSaveStreak(store);
+    const info = chalStreakInfo();
+    if (info.n > (store.best || 0)) { store.best = info.n; chalSaveStreak(store); }
+    // repaint whatever is on screen with the fuller history
+    const card = document.querySelector('.chal-week');
+    if (card) { card.outerHTML = chalArchiveHTML(); wireChallengeArchive(); }
+    if (typeof fillChallengeWelcomeCard === 'function') fillChallengeWelcomeCard();
+  } catch (e) { /* the strip is still right about this device */ }
 }
 
 function wireChallengeArchive() {

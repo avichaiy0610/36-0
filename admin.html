@@ -727,6 +727,7 @@ async function init() {
 const US_MODES = {
   draft: 'דראפט', challenge: 'אתגר', career: 'קריירה', minigame: 'משחקונים',
   gauntlet: 'גאונטלט', europe: 'אירופה', duel: 'דו-קרב', league: 'ליגות',
+  entry: 'מאיפה הגיעו',
 };
 
 function initUsage() {
@@ -798,7 +799,8 @@ function usDetailHTML(rows) {
       <td>${r.event === 'open' ? 'פתחו' : r.event === 'share' ? 'שיתפו' : 'סיימו'}</td>
       <td>${usNum(r.people)}</td><td>${usNum(r.events)}</td>
     </tr>`).join('');
-  return `<div class="us-h3">פירוט בתוך כל מוד</div>
+  const days = Number(document.getElementById('usage-days').value) || 30;
+  return `<div class="us-h3">פירוט בתוך כל מוד — סה"כ ב-${days} הימים האחרונים (לא לפי יום)</div>
     <div class="us-wrap"><table class="us-table">
       <thead><tr><th>מוד</th><th>פירוט</th><th>אירוע</th><th>אנשים</th><th>פעמים</th></tr></thead>
       <tbody>${body}</tbody></table></div>`;

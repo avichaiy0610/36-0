@@ -92,6 +92,32 @@ function lbToggleSeasonFilters(show) {
   });
 }
 
+// The dynasty board: ten seasons at one club, ranked by titles. The run itself
+// lives in the player's browser; only its shape reaches career_runs.
+async function loadCareerBoardTab(table) {
+  const { data: rows, error } = await _supabase.rpc('career_board', { p_limit: 100 });
+  // the board opens with the migration; until then this is "not yet", not "broken"
+  if (error || !rows || !rows.length) {
+    table.innerHTML = `<div class="page-note">
+      עוד לא הסתיימה אף קריירה — סיים עשור במועדון אחד והיה הראשון על הלוח 👑
+    </div>`;
+    return;
+  }
+  const user = typeof getCurrentUser === 'function' ? getCurrentUser() : null;
+  table.innerHTML = rows.map(r => {
+    const me = user && r.user_id === user.id;
+    const ending = r.relegated ? '💀' : r.finished ? '🏁' : '';
+    return `
+      <div class="lb-row${me ? ' lgsim-me' : ''}">
+        <span class="lb-rank ${r.rank <= 3 ? 'lb-rank-top' : ''}">${r.rank}</span>
+        <span class="lb-name">${esc(r.username || 'אנונימי')}${me ? ' (אתה)' : ''}
+          <span class="cr-board-club">${esc(r.club_name)} ${ending}</span></span>
+        <span class="lb-stat">🏆 ${r.titles}</span>
+        <span class="lb-sub" dir="rtl"><bdi>${r.seasons} עונות</bdi> · <bdi>${r.points} נק׳</bdi></span>
+      </div>`;
+  }).join('');
+}
+
 async function loadGauntletBoard(table) {
   const { data: rows, error } = await _supabase
     .from('gauntlet_runs')
@@ -139,8 +165,10 @@ async function loadLeaderboard() {
   const table = document.getElementById('leaderboard-table');
   table.innerHTML = '<div class="page-loading">טוען...</div>';
 
-  lbToggleSeasonFilters(lbTab !== 'gauntlet');
+  // neither the gauntlet nor a dynasty has seasons, formats or periods
+  lbToggleSeasonFilters(lbTab !== 'gauntlet' && lbTab !== 'career');
   if (lbTab === 'gauntlet') return loadGauntletBoard(table);
+  if (lbTab === 'career')   return loadCareerBoardTab(table);
 
   const orderCol = lbTab === 'ovr' ? 'ovr' : 'points';
   let query = _supabase

@@ -20,6 +20,73 @@ async function showLeagues() {
   renderLeaguesHome();
 }
 
+/* ── the public league of the week ────────────────────────────────────────── */
+// One open league a week, one tap to enter, everybody on the same conditions.
+// The code and the settings are derived from the weekly challenge boundary, so
+// every client computes the same league for the same week without asking the
+// server what this week is.
+const LG_PUBLIC_THEMES = [
+  { id: 'classic', name: 'קלאסי',        note: 'תנאים רגילים — רק אתה, ההגרלה, וכל השאר.',                 settings: {} },
+  { id: 'blind',   name: 'עיוור',        note: 'הדירוגים מוסתרים. מי שמכיר את הליגה מנצח, לא מי שקורא מספרים.', settings: { ratings_visible: false } },
+  { id: 'peak',    name: 'מצב שיא ⚡',    note: 'כל שחקן בשיא הקריירה שלו — הרכב חלומות אמיתי.',              settings: { peak_mode: true } },
+  { id: 'hard',    name: 'קשה',          note: 'הגרלה אכזרית, בלי החלפות. לא לחלשים.',                       settings: { difficulty: 'hard' } },
+  { id: 'both',    name: 'עיוור + שיא',  note: 'דירוגים מוסתרים, כולם בשיאם. השבוע הכי קשה לקרוא.',          settings: { peak_mode: true, ratings_visible: false } },
+];
+
+function lgPublicCode() {
+  if (typeof challengeKey !== 'function') return null;
+  const key = challengeKey('weekly');            // that week's Sunday, Israel time
+  return 'PUB' + String(key).replace(/-/g, '');
+}
+function lgPublicTheme() {
+  const n = (typeof challengeNumber === 'function')
+    ? challengeNumber('weekly', typeof challengeKey === 'function' ? challengeKey('weekly') : null)
+    : 1;
+  return LG_PUBLIC_THEMES[Math.abs(n) % LG_PUBLIC_THEMES.length];
+}
+function lgPublicName(theme) { return 'הליגה הציבורית — ' + theme.name; }
+
+async function lgRenderPublicCard() {
+  const box = document.getElementById('lg-public');
+  const code = lgPublicCode();
+  if (!box || !code) return;
+  const theme = lgPublicTheme();
+  let members = 0, played = 0;
+  try {
+    const { data } = await _supabase.rpc('public_league_info', { p_code: code });
+    if (data && data[0]) { members = data[0].members; played = data[0].played; }
+  } catch (e) { /* not created yet, or the RPC is not deployed — the card still invites */ }
+
+  box.innerHTML = `
+    <div class="lg-card lg-public">
+      <div class="lg-public-top">
+        <span class="lg-public-badge">השבוע</span>
+        <span class="lg-card-title" style="margin:0">🏆 הליגה הציבורית</span>
+      </div>
+      <div class="lg-public-theme">${lgEsc(theme.name)}</div>
+      <div class="lg-public-note">${lgEsc(theme.note)}</div>
+      <div class="lg-public-meta">${members ? `${members} משתתפים · ${played} כבר שיחקו` : 'היה הראשון שנכנס השבוע'}</div>
+      <button class="btn-primary lg-btn" id="lg-public-go" style="width:100%">⚽ תפוס מקום בליגה של השבוע</button>
+      <div class="lg-public-hint">בלי קוד ובלי לחכות לחברים — כולם מקבלים את אותם תנאים, והטבלה נסגרת בסוף השבוע.</div>
+    </div>`;
+
+  document.getElementById('lg-public-go').onclick = async () => {
+    const btn = document.getElementById('lg-public-go');
+    btn.disabled = true; btn.textContent = 'רגע…';
+    try {
+      const { data, error } = await _supabase.rpc('join_public_league', {
+        p_code: code, p_name: lgPublicName(theme), p_settings: theme.settings,
+      });
+      if (error) throw error;
+      openLeague(code);
+    } catch (e) {
+      btn.disabled = false; btn.textContent = '⚽ תפוס מקום בליגה של השבוע';
+      const msg = document.getElementById('lg-msg');
+      if (msg) msg.textContent = 'ההצטרפות נכשלה — נסה שוב';
+    }
+  };
+}
+
 async function renderLeaguesHome() {
   const box = document.getElementById('leagues-content');
   const user = getCurrentUser();
@@ -34,6 +101,7 @@ async function renderLeaguesHome() {
   }
 
   box.innerHTML = `
+    <div id="lg-public"></div>
     <div class="lg-card">
       <div class="lg-card-title">➕ צור ליגה חדשה</div>
       <div class="lg-row">
@@ -72,6 +140,8 @@ async function renderLeaguesHome() {
       b.onclick = () => { el.querySelectorAll('button').forEach(x => x.classList.remove('on')); b.classList.add('on'); cb(b.dataset.v); };
     });
   };
+  lgRenderPublicCard();
+
   wireMini('lg-diff', _lgCreate.difficulty, v => _lgCreate.difficulty = v);
   wireMini('lg-peak', _lgCreate.peak ? 'on' : 'off', v => _lgCreate.peak = v === 'on');
   wireMini('lg-ratings', _lgCreate.ratings ? 'on' : 'off', v => _lgCreate.ratings = v === 'on');
@@ -144,12 +214,20 @@ async function openLeague(code) {
   ]);
   if (error || !info?.length) { box.innerHTML = '<div class="page-note">טעינת הליגה נכשלה</div>'; return; }
   const meta = info[0];
-  const complete = meta.is_complete;
+  // The public league is a different animal from a friends' league: it has no
+  // fixed roster to wait for, so it can never be "complete" and its table is
+  // open from the first season played. Suspense is for six people who know each
+  // other; a ladder of strangers just wants to know where it stands.
+  const isPublic = lgIsPublicCode(code);
+  const complete = isPublic ? false : meta.is_complete;
   const members = [...(data ?? [])];
 
   // Status line + play button
   let statusHtml, playHtml = '';
-  if (complete) {
+  if (isPublic) {
+    statusHtml = `<div class="lg-status">${meta.members} משתתפים · ${meta.played_count} כבר שיחקו
+      <br><span class="lg-status-hint">🏆 הטבלה פתוחה — נכנסים אליה ברגע ששולחים הרכב. נסגרת בסוף השבוע.</span></div>`;
+  } else if (complete) {
     statusHtml = `<div class="lg-status complete">🏆 הליגה הסתיימה — הטבלה מוכנה לחשיפה!</div>`;
   } else {
     statusHtml = `<div class="lg-status">${meta.members}/${meta.max_players} שחקנים · ${meta.played_count} סיימו דראפט
@@ -166,11 +244,12 @@ async function openLeague(code) {
   let html = `
     <button class="back-btn lg-inner-back" id="lg-back-home">→ הליגות שלי</button>
     <div class="lg-league-name">${lgEsc(meta.name)}</div>
+    ${isPublic ? '' : `
     <div class="lg-share">
       <span class="lg-share-lbl">קוד הליגה:</span>
       <span class="lg-share-code" id="lg-share-code" dir="ltr">${lgEsc(code)}</span>
       <button class="lg-copy" id="lg-copy">העתק הזמנה</button>
-    </div>
+    </div>`}
     ${statusHtml}
     ${playHtml}
     <div class="section-label" style="margin-top:14px">טבלת הליגה</div>
@@ -179,10 +258,11 @@ async function openLeague(code) {
   box.innerHTML = html;
 
   document.getElementById('lg-back-home').onclick = renderLeaguesHome;
-  document.getElementById('lg-copy').onclick = async () => {
+  const copyBtn = document.getElementById('lg-copy');
+  if (copyBtn) copyBtn.onclick = async () => {
     const link = location.origin + '/?league=' + code;
-    try { await navigator.clipboard.writeText(link); document.getElementById('lg-copy').textContent = '✓ הועתק'; }
-    catch (e) { document.getElementById('lg-copy').textContent = code; }
+    try { await navigator.clipboard.writeText(link); copyBtn.textContent = '✓ הועתק'; }
+    catch (e) { copyBtn.textContent = code; }
   };
   const playBtn = document.getElementById('lg-play');
   if (playBtn) playBtn.onclick = () => startLeagueDraft(code, meta.settings);
@@ -190,12 +270,45 @@ async function openLeague(code) {
   if (leaveBtn) leaveBtn.onclick = () => leaveLeagueFlow(code);
 
   const area = document.getElementById('lg-table-area');
-  if (complete) {
+  if (isPublic) {
+    renderPublicLadder(area, members);
+  } else if (complete) {
     const myName = (document.getElementById('nav-username')?.textContent || '').trim();
     renderLeagueComplete(area, code, members, myName, meta.settings);
   } else {
     renderLeagueWaiting(area, members);
   }
+}
+
+function lgIsPublicCode(code) { return /^PUB\d{8}$/.test(String(code || '').toUpperCase()); }
+
+// The public ladder: everyone who has played, best first, and your own row is
+// always visible even if it is not in the top fifty.
+function renderPublicLadder(area, members) {
+  const played = members.filter(r => r.points != null)
+    .sort((a, b) => (b.points - a.points) || (b.ovr - a.ovr));
+  if (!played.length) {
+    area.innerHTML = '<div class="page-note">עוד אף אחד לא שלח הרכב השבוע — היה הראשון 🏁</div>';
+    return;
+  }
+  const myName = (document.getElementById('nav-username')?.textContent || '').trim();
+  const myIdx = played.findIndex(r => (r.username || '') === myName);
+  const shown = played.slice(0, 50);
+  const rowHtml = (r, i) => `
+    <div class="lb-row${(r.username || '') === myName ? ' lgsim-me' : ''}">
+      <span class="lb-rank ${i < 3 ? 'lb-rank-top' : ''}">${i + 1}</span>
+      <span class="lb-name">${lgEsc(r.username ?? 'אנונימי')}</span>
+      <span class="lb-stat">${r.points} נק׳</span>
+      <span class="lb-sub" dir="rtl"><bdi>OVR ${r.ovr}</bdi> · <bdi>${r.wins}נ ${r.draws}ת ${r.losses}ה</bdi></span>
+    </div>`;
+  let h = '<div class="lb-table lg-table">' + shown.map(rowHtml).join('');
+  if (myIdx >= 50) h += '<div class="lg-ladder-gap">···</div>' + rowHtml(played[myIdx], myIdx);
+  h += '</div>';
+  const waiting = members.length - played.length;
+  if (waiting > 0) h += `<div class="lg-ladder-waiting">${waiting === 1
+    ? '⏳ עוד משתתף אחד טרם שיחק'
+    : `⏳ עוד ${waiting} משתתפים טרם שיחקו`}</div>`;
+  area.innerHTML = h;
 }
 
 // Before the league is complete: show only who's ready vs. still drafting —
@@ -307,4 +420,32 @@ document.addEventListener('DOMContentLoaded', () => {
   if (!m) return;
   _pendingLeagueCode = m[1].toUpperCase();
   setTimeout(() => { if (typeof showLeagues === 'function') showLeagues(); }, 1400);
+});
+
+// The same league, on the front page: the daily challenge brings people back
+// tomorrow, this brings them back next week. Hidden until we know it is worth
+// showing — a card that says nothing is worse than no card.
+async function lgFillWelcomeCard() {
+  const card = document.getElementById('btn-week-league');
+  if (!card) return;
+  const code = lgPublicCode();
+  if (!code) return;
+  const theme = lgPublicTheme();
+  document.getElementById('wl-theme').textContent = '· ' + theme.name;
+  card.style.display = '';
+  card.onclick = () => { showLeagues(); };
+  try {
+    const { data } = await _supabase.rpc('public_league_info', { p_code: code });
+    const sub = document.getElementById('wl-sub');
+    if (sub && data && data[0] && data[0].members) {
+      sub.textContent = `${data[0].members} כבר בפנים · ${theme.note}`;
+    } else if (sub) {
+      sub.textContent = theme.note;
+    }
+  } catch (e) { /* the card still invites without a count */ }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  // after the rest of the boot, so challengeKey() is defined
+  setTimeout(lgFillWelcomeCard, 400);
 });

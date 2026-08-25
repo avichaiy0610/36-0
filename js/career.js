@@ -11,9 +11,10 @@
 // his club, or retired. The most emotional screen in the mode is therefore a
 // pure read of the data we already ship.
 //
-// The run is drafted, played and stored entirely on this device. Nothing here
-// touches Supabase — a career leaderboard would need a migration, and that is a
-// production change that has not been asked for yet.
+// The run is drafted, played and stored entirely on this device. The only
+// things that ever leave it are the achievements a run earns and, when a
+// dynasty ENDS, its shape — seasons, titles, points — for the board in
+// career_runs. Ten seasons of squad state stay here.
 
 const CR_KEY       = '36-0-career';
 const CR_BEST_KEY  = '36-0-career-best';
@@ -155,11 +156,20 @@ function crRender() {
   const box = document.getElementById('career-content');
   if (!box) return;
   const run = crRun();
-  if (!crHasRun()) return crRenderSetup(box);
-  if (run.over)               crRenderOver(box, run);
+  const fresh = !crHasRun();
+  if (fresh)                       crRenderSetup(box);
+  else if (run.over)               crRenderOver(box, run);
   else if (run.phase === 'played') crRenderTransfer(box, run);
-  else                        crRenderDashboard(box, run);
+  else                             crRenderDashboard(box, run);
   crWireShare();   // the header carries the share button on all three screens
+  if (typeof crAdminPanelHTML === 'function' && crIsAdmin()) {
+    box.insertAdjacentHTML('beforeend', crAdminPanelHTML());
+    crWireAdminPanel();
+  }
+  if (!fresh && run.over) { crSubmitRun(run); crMaybeSharePrompt(run); }
+  // the board belongs where a dynasty is decided: before one starts, and when
+  // one ends. Mid-run it would only be noise.
+  if (fresh || run.over) crRenderBoard();
 }
 
 /* ── new career ───────────────────────────────────────────────────────────── */
@@ -208,7 +218,8 @@ function crRenderSetup(box) {
       <button class="btn-primary lg-btn" id="cr-start" style="width:100%">התחל קריירה ⚽</button>
     </div>
 
-    ${best.seasons ? `<div class="cr-best">🏅 השיא שלך: ${best.seasons} עונות · ${best.titles} אליפויות</div>` : ''}`;
+    ${best.seasons ? `<div class="cr-best">🏅 השיא שלך: ${best.seasons} עונות · ${best.titles} אליפויות</div>` : ''}
+    <div id="cr-board"></div>`;
 
   const diffBox = document.getElementById('cr-diff');
   const rerollNote = document.getElementById('cr-reroll-note');
@@ -293,6 +304,73 @@ function crHeaderHTML(run) {
     </div>`;
 }
 
+/* ── the dynasty board ────────────────────────────────────────────────────── */
+const CR_BEST_NOTE = 'שיא חדש — השושלת הזאת נכנסה ללוח 🏆';
+// The run itself still never leaves the device. What goes up when a dynasty
+// ENDS is its shape — seasons, titles, points, how it finished — so that ten
+// seasons of work can finally be measured against everybody else's.
+let _crBoardBest = false;
+async function crSubmitRun(run) {
+  if (typeof _supabase === 'undefined' || !_supabase) return;
+  if (typeof getCurrentUser !== 'function' || !getCurrentUser()) return;
+  if (!run || !run.over || run.boardSent) return;
+  if (run.sandbox) return;              // a sandbox decade is not a record
+  run.boardSent = true;
+  crSave();
+  try {
+    const best = run.history.reduce((b, h) => (!b || h.rank < b.rank ? h : b), null);
+    const { data, error } = await _supabase.rpc('submit_career_run', {
+      p: {
+        club_name:    run.clubName,
+        start_year:   run.startYear,
+        seasons:      run.history.length,
+        titles:       run.titles,
+        points:       run.history.reduce((s, h) => s + h.points, 0),
+        best_rank:    best ? best.rank : null,
+        longest_stay: run.longestStay || 0,
+        finished:     run.overReason === 'finished',
+        relegated:    run.overReason === 'relegated',
+      },
+    });
+    if (error) { run.boardSent = false; crSave(); return; }
+    if (data && data.best) {
+      _crBoardBest = true;
+      const el = document.getElementById('cr-board-note');
+      if (el) el.textContent = CR_BEST_NOTE;
+    }
+  } catch (e) { run.boardSent = false; crSave(); }
+}
+
+// Rendered on the career screen: before a run, as the thing to beat; after one,
+// as the place your dynasty landed.
+async function crRenderBoard() {
+  const box = document.getElementById('cr-board');
+  if (!box) return;
+  if (typeof _supabase === 'undefined' || !_supabase) { box.innerHTML = ''; return; }
+  try {
+    const { data, error } = await _supabase.rpc('career_board', { p_limit: 25 });
+    if (error || !data || !data.length) { box.innerHTML = ''; return; }
+    const user = (typeof getCurrentUser === 'function') ? getCurrentUser() : null;
+    const rows = data.map(r => {
+      const me = user && r.user_id === user.id;
+      const ending = r.relegated ? '💀' : r.finished ? '🏁' : '';
+      return `
+        <div class="lb-row cr-row${me ? ' lgsim-me' : ''}">
+          <span class="lb-rank ${r.rank <= 3 ? 'lb-rank-top' : ''}">${r.rank}</span>
+          <span class="lb-name">${crEsc(r.username || 'אנונימי')}${me ? ' (אתה)' : ''}
+            <span class="cr-board-club">${crEsc(r.club_name)} ${ending}</span></span>
+          <span class="lb-stat">🏆 ${r.titles}</span>
+          <span class="lb-sub" dir="rtl"><bdi>${r.seasons} עונות</bdi> · <bdi>${r.points} נק׳</bdi></span>
+        </div>`;
+    }).join('');
+    box.innerHTML = `
+      <div class="section-label" style="margin-top:16px">👑 לוח השושלות</div>
+      <div class="cr-board-hint">מדורג לפי אליפויות, ואז נקודות. נשמרת הקריירה הטובה ביותר של כל שחקן.</div>
+      <div class="cr-board-note" id="cr-board-note">${_crBoardBest ? CR_BEST_NOTE : ''}</div>
+      <div class="lb-table cr-table">${rows}</div>`;
+  } catch (e) { box.innerHTML = ''; }
+}
+
 /* ── sharing a dynasty ────────────────────────────────────────────────────── */
 // Ten seasons do not fit in a sentence, so they go out as a strip — one square
 // per season, champion to relegated, in the order they happened. It is the
@@ -316,12 +394,13 @@ function crShareText(run) {
     strip,
     `🏆 ${run.titles} אליפויות · ${points} נק׳`,
   ];
-  // the man who stayed: a dynasty's best story is usually one player
+  // the man who stayed. A dynasty's best story is usually one player, and he
+  // signs off as what he became: the club's legend.
   const stay = Object.entries(run.stay || {}).sort((a, b) => b[1] - a[1])[0];
   if (stay && stay[1] >= 3) {
     const name = (run.squad || []).map(p => p && p.name)
       .find(nm => nm && crNormName(nm) === stay[0]);
-    if (name) lines.push(`🧊 ${name} — ${stay[1]} עונות במועדון`);
+    if (name) lines.push(`❤️ אגדת המועדון: ${name} — ${stay[1]} עונות`);
   }
   if (run.over) lines.push(run.overReason === 'relegated' ? '💀 הסוף: ירידת ליגה' : '🏁 עשור שהושלם');
   lines.push('', 'https://www.36-0.co.il/');
@@ -335,6 +414,7 @@ async function crShare(btn) {
   if (!crHasRun() || !run.history.length) return;
   const text = crShareText(run);
   const label = btn ? btn.textContent : '';
+  run.shared = true; crSave();
   if (typeof track === 'function') track('share', 'career', String(run.history.length));
   try {
     if (navigator.share) { await navigator.share({ text }); return; }
@@ -344,6 +424,53 @@ async function crShare(btn) {
     if (e && e.name === 'AbortError') return;      // the sheet was dismissed
     if (btn) { btn.textContent = 'ההעתקה נכשלה'; setTimeout(() => { btn.textContent = label; }, 1800); }
   }
+}
+
+/* ── the one prompt ───────────────────────────────────────────────────────── */
+// A dynasty ends once. That is the single moment worth interrupting for — and
+// only that moment: once per run, never mid-run, never twice, gone on a tap
+// anywhere outside it, and it shows the strip so there is nothing to imagine.
+// If the player already shared this run, it does not appear at all.
+const CR_NO_PROMPT_KEY = '36-0-career-noprompt';
+function crPromptMuted() {
+  try { return localStorage.getItem(CR_NO_PROMPT_KEY) === '1'; } catch (e) { return false; }
+}
+
+function crMaybeSharePrompt(run) {
+  if (!run || !run.over || run.sharePrompted || run.shared) return;
+  if (!run.history.length || crPromptMuted()) return;
+  run.sharePrompted = true;
+  crSave();
+
+  const wrap = document.createElement('div');
+  wrap.className = 'modal-overlay cr-share-modal';
+  wrap.innerHTML = `
+    <div class="modal-box cr-share-box">
+      <button class="modal-close" id="cr-sp-close" aria-label="סגירה">✕</button>
+      <div class="modal-title">${run.overReason === 'relegated' ? '💀 סוף השושלת' : '🏁 עשור שהושלם'}</div>
+      <div class="cr-sp-strip" dir="rtl">${crEsc(run.history.map(h => crSeasonSquare(h, h.n || 14)).join(''))}</div>
+      <div class="cr-sp-sub">${run.history.length} עונות · ${run.titles} אליפויות ב${crEsc(run.clubName)}</div>
+      <div class="cr-sp-warn">אל תאבד את הקבוצה שלך — שתף אותה כדי לשמור אותה. ברגע שתתחיל קריירה חדשה, העשור הזה נעלם.</div>
+      <button class="btn-primary btn-full" id="cr-sp-share">📤 שתף את השושלת</button>
+      <button class="cr-sp-later" id="cr-sp-later">אחר כך</button>
+      <label class="cr-sp-mute"><input type="checkbox" id="cr-sp-mute"> אל תציע לי יותר</label>
+    </div>`;
+  document.body.appendChild(wrap);
+
+  // the checkbox is honoured whichever way the box is closed, sharing included
+  const close = () => {
+    if (wrap.querySelector('#cr-sp-mute').checked) {
+      try { localStorage.setItem(CR_NO_PROMPT_KEY, '1'); } catch (e) {}
+    }
+    wrap.remove();
+  };
+  wrap.querySelector('#cr-sp-close').onclick = close;
+  wrap.querySelector('#cr-sp-later').onclick = close;
+  wrap.onclick = e => { if (e.target === wrap) close(); };
+  wrap.querySelector('#cr-sp-share').onclick = async () => {
+    await crShare(wrap.querySelector('#cr-sp-share'));
+    close();
+  };
 }
 
 // One button, wired wherever it appears.
@@ -691,6 +818,7 @@ function crRenderOver(box, run) {
     </div>
     ${crHistoryHTML(run)}
     ${crShareButtonHTML('btn-primary btn-full')}
+    <div id="cr-board"></div>
     <button class="btn-secondary btn-full" id="cr-new" style="margin-top:8px">👑 קריירה חדשה</button>`;
 
   document.getElementById('cr-new').onclick = () => {
