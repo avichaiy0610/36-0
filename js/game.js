@@ -952,8 +952,10 @@ function restoreDraftState() {
   let d;
   try { d = JSON.parse(localStorage.getItem(DRAFT_SAVE_KEY)); } catch (e) { return false; }
   if (!d || d.v !== 1 || !FORMATIONS[d.formationId]) return false;
-  // A challenge draft whose period rolled over is void — the challenge changed
-  if (d.challenge && typeof challengeKey === 'function' &&
+  // A challenge draft whose period rolled over is void — the challenge changed.
+  // An archive run is the exception: its key is a past day on purpose, so it
+  // must survive a refresh like any other draft.
+  if (d.challenge && !d.challenge.archive && typeof challengeKey === 'function' &&
       d.challenge.key !== challengeKey(d.challenge.period)) {
     clearDraftState();
     return false;
@@ -2430,9 +2432,10 @@ function animateResults(ovr) {
       _supabase.rpc('increment_games_played').then(() => {}, () => {});
     }
     if (typeof track === 'function') track('finish', trackDraftMode());
-    // the daily streak — the reason to come back tomorrow
+    // the daily streak — the reason to come back tomorrow. An archive run counts
+    // for the day it belongs to, which is the whole point of making one up.
     if (state.challenge && state.challenge.period === 'daily' && typeof chalRecordDaily === 'function') {
-      chalRecordDaily();
+      chalRecordDaily(state.challenge.key);
     }
   }
   const { matches, inTopSix, leagueTable, playerStats } = season;
@@ -3009,6 +3012,16 @@ function generateShareText() {
         : null;
     })(),
     fillTemplate(st('share-line-record', '{wins}נ-{draws}ת-{losses}ה | {points} נקודות'), vars),
+    // in a challenge everyone gets the same eleven squads, so the interesting
+    // brag is not the score — it is who you saw that nobody else did
+    (state.challenge && window._chalRarity && window._chalRarity.rarest)
+      ? fillTemplate(st(window._chalRarity.rarest.pct > 0 ? 'share-line-rarity' : 'share-line-rarity-solo',
+            window._chalRarity.rarest.pct > 0
+              ? '🔎 נדירות {score} · {name} — רק {pct}% לקחו אותו'
+              : '🔎 נדירות {score} · {name} — אף אחד אחר לא לקח אותו'),
+          { ...vars, score: window._chalRarity.score,
+            name: window._chalRarity.rarest.name, pct: window._chalRarity.rarest.pct })
+      : null,
     tierDisplay(t).name,
     grid,
     fillTemplate(st('share-footer', 'https://www.36-0.co.il/'), vars),
@@ -3167,7 +3180,9 @@ async function submitResult() {
   const isPublic = document.getElementById('share-squad-checkbox')?.checked ?? false;
 
   // a challenge run only counts for the challenge board if every mission was met
-  const challengeDone = state.challenge &&
+  // — and an archive run (a missed day, made up later) never counts at all: that
+  // board closed at midnight and must stay closed
+  const challengeDone = state.challenge && !state.challenge.archive &&
     (typeof challengeReqsMet !== 'function' || challengeReqsMet());
   const payload = {
     league_code: state.leagueCode || undefined,

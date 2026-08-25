@@ -779,9 +779,15 @@ function challengeReqsMet() {
 }
 
 // ── Start playing a challenge (skips the setup screen — everything locked) ─────
-async function startChallenge(period) {
+// `keyOverride` plays a past day from the archive: every condition, mission and
+// deck is derived from the key, so an old day reproduces exactly. Such a run is
+// marked `archive` and is never submitted to that day's closed board — it exists
+// to keep a streak alive, not to change history.
+async function startChallenge(period, keyOverride) {
   await loadChallengeOverrides();
-  const key = challengeKey(period);
+  const liveKey = challengeKey(period);
+  const key = keyOverride || liveKey;
+  const archive = key !== liveKey;
   const s = challengeSettings(period, key);
 
   // leave any league/duel/review context, exactly like startGame() does
@@ -792,8 +798,8 @@ async function startChallenge(period) {
   document.getElementById('league-review-back')?.remove();
   document.getElementById('duel-review-chrome')?.remove();
 
-  if (typeof track === 'function') track('open', 'challenge', period);
-  state.challenge   = { period, key };
+  if (typeof track === 'function') track('open', 'challenge', archive ? 'archive' : period);
+  state.challenge   = archive ? { period, key, archive: true } : { period, key };
   state.formationId = s.formationId;
   state.difficulty  = s.difficulty;
   state.showRatings = s.ratingsVisible;
@@ -849,14 +855,18 @@ function renderChallengeReqsPreseason() {
   const reqs = state.challenge ? (state.challengeReqs ?? []) : [];
   if (!reqs.length) { box.style.display = 'none'; return; }
   const allMet = challengeReqsMet();
+  // an archive run never reaches a board, so it must not promise one
+  const archive = !!(state.challenge && state.challenge.archive);
   box.style.display = 'block';
   box.innerHTML = `
     <div class="chalreq-title">${lgEsc(chalText('chal-panel-title', '🎯 משימות האתגר'))}</div>
     ${reqs.map(challengeReqLineHTML).join('')}
-    <div class="chalreq-verdict ${allMet ? 'ok' : 'bad'}">
-      ${lgEsc(allMet
-        ? chalText('chal-pre-ok', '✓ כל המשימות הושלמו — התוצאה תיכנס לטבלת האתגר')
-        : chalText('chal-pre-bad', '⚠ המשימות לא הושלמו — העונה תרוץ, אבל התוצאה לא תיכנס לטבלת האתגר'))}
+    <div class="chalreq-verdict ${archive ? 'ok' : allMet ? 'ok' : 'bad'}">
+      ${lgEsc(archive
+        ? chalText('chal-pre-archive', '↺ השלמה של יום שהוחמץ — שומרת על הרצף, לא נכנסת לטבלה של אותו יום')
+        : allMet
+          ? chalText('chal-pre-ok', '✓ כל המשימות הושלמו — התוצאה תיכנס לטבלת האתגר')
+          : chalText('chal-pre-bad', '⚠ המשימות לא הושלמו — העונה תרוץ, אבל התוצאה לא תיכנס לטבלת האתגר'))}
     </div>`;
 }
 
@@ -945,10 +955,13 @@ async function renderChallengeHome(period) {
       <div class="daily-countdown" id="daily-countdown">${challengeCountdownText(period)}</div>
     </div>
     ${user ? '' : `<p class="page-note">${lgEsc(chalText('chal-login-note', 'אפשר לשחק בלי חשבון — אבל רק מחוברים נכנסים לטבלה.'))}</p>`}
+    ${period === 'daily' ? chalArchiveHTML() : ''}
+    <div id="daily-rarity"></div>
     <div class="section-label" style="margin-top:14px">${lgEsc(boardTitle)}</div>
     <div id="daily-board"><div class="page-loading">טוען...</div></div>`;
 
   document.getElementById('daily-play').onclick = () => startChallenge(period);
+  wireChallengeArchive();
 
   clearInterval(_chalCountdownTimer);
   _chalCountdownTimer = setInterval(() => {
@@ -981,7 +994,7 @@ async function loadChallengeBoard(period, key, user) {
   let mine = user ? rows.find(r => r.user_id === user.id) : null;
   if (user && !mine) {
     const { data: own } = await _supabase.from('challenge_results')
-      .select('points, ovr, attempts')
+      .select('points, ovr, attempts, players')
       .eq('period', period).eq('challenge_key', key).eq('user_id', user.id).maybeSingle();
     if (own) mine = own;
   }
@@ -1023,6 +1036,157 @@ async function loadChallengeBoard(period, key, user) {
     table.appendChild(row);
   });
   board.appendChild(table);
+
+  renderChallengeRarity(period, key, rows, mine);
+}
+
+/* ── the week, and the days you missed ────────────────────────────────────── */
+// A streak dies to one busy evening, and a dead streak is a player who stops
+// coming. Every daily puzzle worth its habit lets you make a day up — the run
+// still counts, it just never touches that day's closed board.
+const CHAL_DAY_NAMES = ['א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ש'];
+
+function chalArchiveHTML() {
+  const info = chalStreakInfo();
+  const today = challengeKey('daily');
+  let cells = '';
+  for (let i = 6; i >= 0; i--) {
+    const k = chalShiftKey(today, -i);
+    const done = info.days.has(k);
+    const isToday = k === today;
+    const wd = CHAL_DAY_NAMES[new Date(k + 'T12:00:00Z').getUTCDay()];
+    cells += `
+      <button class="chal-day${done ? ' done' : ''}${isToday ? ' today' : ''}" data-key="${k}"
+              title="${lgEsc(k)}">
+        <span class="chal-day-wd">${wd}</span>
+        <span class="chal-day-mark">${done ? '✓' : isToday ? '●' : '↺'}</span>
+      </button>`;
+  }
+  const streak = info.n > 0
+    ? chalText('chal-streak-line', '🔥 {n} ימים ברצף · השיא שלך {best}')
+        .replace('{n}', info.n).replace('{best}', info.best)
+    : chalText('chal-streak-none', 'סיים אתגר יומי כדי להתחיל רצף');
+  return `
+    <div class="lg-card chal-week">
+      <div class="chal-week-top">
+        <span class="chal-week-title">${lgEsc(chalText('chal-week-title', 'השבוע שלך'))}</span>
+        <span class="chal-week-streak">${lgEsc(streak)}</span>
+      </div>
+      <div class="chal-days" id="chal-days">${cells}</div>
+      <div class="chal-week-hint">${lgEsc(chalText('chal-week-hint',
+        'יום שהוחמץ אפשר להשלים — הרצף נשמר, אבל התוצאה לא נכנסת לטבלה של אותו יום.'))}</div>
+    </div>`;
+}
+
+function wireChallengeArchive() {
+  const box = document.getElementById('chal-days');
+  if (!box) return;
+  const today = challengeKey('daily');
+  box.querySelectorAll('.chal-day').forEach(btn => {
+    btn.onclick = () => {
+      const k = btn.dataset.key;
+      startChallenge('daily', k === today ? undefined : k);
+    };
+  });
+}
+
+/* ── who did everyone take ────────────────────────────────────────────────── */
+// The points table answers "who built the best XI". This answers the question
+// people actually argue about: who did everybody take, and what did you see
+// that they didn't. It is Immaculate Grid's rarity score, on our own daily.
+//
+// Names in the stored squads carry the same directional marks and apostrophes
+// as everywhere else, so every comparison goes through here.
+function chalNormName(s) {
+  return String(s ?? '')
+    .replace(/[‎‏‪-‮⁦-⁩]/g, '')
+    .replace(/[׳’`´']/g, "'")
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// Percentage of entrants who picked each player. Prefers the RPC, which sees
+// every entry; falls back to the rows the board already loaded, which is the
+// same population while a challenge has fewer entries than the board's limit.
+async function chalPickRates(period, key, rows) {
+  try {
+    const { data, error } = await _supabase.rpc('challenge_pick_rates', { p_period: period, p_key: key });
+    if (!error && Array.isArray(data) && data.length) {
+      const m = new Map();
+      data.forEach(r => m.set(chalNormName(r.name), Number(r.pct)));
+      return m;
+    }
+  } catch (e) { /* the RPC may not be deployed yet — fall through */ }
+
+  const counts = new Map();
+  rows.forEach(r => {
+    const seen = new Set();
+    (r.players ?? []).forEach(p => {
+      const k = chalNormName(p.name);
+      if (!k || seen.has(k)) return;      // one entry, one vote per player
+      seen.add(k);
+      counts.set(k, (counts.get(k) ?? 0) + 1);
+    });
+  });
+  const out = new Map();
+  counts.forEach((c, k) => out.set(k, Math.round(1000 * c / Math.max(rows.length, 1)) / 10));
+  return out;
+}
+
+async function renderChallengeRarity(period, key, rows, mine) {
+  const box = document.getElementById('daily-rarity');
+  if (!box) return;
+  box.innerHTML = '';
+  // percentages over four people are noise, not a finding
+  if (!rows || rows.length < 5) return;
+
+  const rates = await chalPickRates(period, key, rows);
+  if (!rates.size) return;
+  const pctOf = name => rates.get(chalNormName(name)) ?? 0;
+
+  const top = [...rates.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
+  const nameOf = new Map();     // normalised → the display name as stored
+  rows.forEach(r => (r.players ?? []).forEach(p => {
+    const k = chalNormName(p.name);
+    if (!nameOf.has(k)) nameOf.set(k, p.name);
+  }));
+
+  const bar = pct => `<span class="rar-bar"><span style="width:${Math.min(100, pct)}%"></span></span>`;
+  // 0% is not a percentage anyone should read — it means nobody else took him
+  const line = (name, pct) => `
+    <div class="rar-row">
+      <span class="rar-name">${lgEsc(name)}</span>
+      ${bar(pct)}
+      <span class="rar-pct" dir="ltr">${pct > 0 ? pct + '%' : '—'}</span>
+    </div>`;
+
+  let html = '';
+
+  // My XI, rarest first, with the score the whole thing exists for.
+  const minePlayers = (mine && mine.players) || [];
+  if (minePlayers.length) {
+    const list = minePlayers
+      .map(p => ({ name: p.name, pct: pctOf(p.name) }))
+      .sort((a, b) => a.pct - b.pct);
+    const score = Math.round(list.reduce((s, p) => s + p.pct, 0));
+    html += `
+      <div class="lg-card rar-card">
+        <div class="rar-title">🔎 ${lgEsc(chalText('chal-rar-mine', 'ההרכב שלך מול כולם'))}</div>
+        <div class="rar-score">${lgEsc(chalText('chal-rar-score', 'ציון נדירות'))}:
+          <b dir="ltr">${score}</b>
+          <span class="rar-hint">${lgEsc(chalText('chal-rar-hint', 'ככל שנמוך יותר — ההרכב מקורי יותר'))}</span>
+        </div>
+        ${list.map(p => line(p.name, p.pct)).join('')}
+      </div>`;
+  }
+
+  html += `
+    <div class="lg-card rar-card">
+      <div class="rar-title">👥 ${lgEsc(chalText('chal-rar-top', 'הכי נבחרים'))}</div>
+      ${top.map(([k, pct]) => line(nameOf.get(k) ?? k, pct)).join('')}
+    </div>`;
+
+  box.innerHTML = html;
 }
 
 // ─── Results-screen extras for a challenge run ─────────────────────────────────
@@ -1036,10 +1200,15 @@ function setupChallengeResultsUI() {
 
   const reqs = state.challengeReqs ?? [];
   const allMet = challengeReqsMet();
+  const archive = !!state.challenge.archive;
+  const verdict = archive
+    ? `<div class="chalreq-verdict ok">${lgEsc(chalText('chal-result-archive', '↺ יום שהושלם — הרצף שלך נשמר. התוצאה לא נכנסת לטבלה של אותו יום.'))}</div>`
+    : allMet ? ''
+    : `<div class="chalreq-verdict bad">${lgEsc(chalText('chal-result-unmet', '❌ המשימות לא הושלמו — התוצאה לא נכנסה לטבלת האתגר (נשמרה כמשחק רגיל)'))}</div>`;
   const reqsHtml = reqs.length ? `
     <div class="chal-reqs-result">
       ${reqs.map(challengeReqLineHTML).join('')}
-      ${allMet ? '' : `<div class="chalreq-verdict bad">${lgEsc(chalText('chal-result-unmet', '❌ המשימות לא הושלמו — התוצאה לא נכנסה לטבלת האתגר (נשמרה כמשחק רגיל)'))}</div>`}
+      ${verdict}
     </div>` : '';
 
   const wrap = document.createElement('div');
@@ -1048,11 +1217,52 @@ function setupChallengeResultsUI() {
   wrap.innerHTML = `
     ${reqsHtml}
     <div class="daily-result-note" id="daily-result-note"></div>
+    <div class="daily-rarity-note" id="daily-rarity-note"></div>
     <button class="btn-primary" id="daily-retry">${lgEsc(chalText('chal-retry-btn', '🔁 עוד ניסיון ב{challenge}').replace('{challenge}', challengeLabel(period, key)))}</button>
     <button class="btn-secondary" id="daily-to-board">${lgEsc(chalText('chal-to-board-btn', '📊 לטבלת האתגר'))}</button>`;
   actions.parentNode.insertBefore(wrap, actions);
-  wrap.querySelector('#daily-retry').onclick = () => { clearDraftState(); startChallenge(period); };
+  // retrying an archive run must replay THAT day, not today's challenge
+  const retryKey = state.challenge.archive ? key : undefined;
+  wrap.querySelector('#daily-retry').onclick = () => { clearDraftState(); startChallenge(period, retryKey); };
   wrap.querySelector('#daily-to-board').onclick = () => showChallenges(period);
+  chalLoadRarityForRun();
+}
+
+// How original was this XI? Filled in after the season, for the result line and
+// for the share text. A garnish: it fails silently and never blocks anything.
+async function chalLoadRarityForRun() {
+  window._chalRarity = null;
+  if (!state.challenge || !Array.isArray(state.picks)) return;
+  const { period, key } = state.challenge;
+  try {
+    const { data: rows } = await _supabase.from('challenge_results')
+      .select('user_id, players')
+      .eq('period', period).eq('challenge_key', key)
+      .order('points', { ascending: false }).limit(200);
+    if (!rows || rows.length < 5) return;
+    const rates = await chalPickRates(period, key, rows);
+    const mine = state.picks.filter(Boolean).map(pk => ({
+      name: pk.player.name,
+      pct: rates.get(chalNormName(pk.player.name)) ?? 0,
+    }));
+    if (!mine.length) return;
+    mine.sort((a, b) => a.pct - b.pct);
+    window._chalRarity = {
+      score: Math.round(mine.reduce((s, p) => s + p.pct, 0)),
+      rarest: mine[0],
+    };
+    const el = document.getElementById('daily-rarity-note');
+    if (el) {
+      el.textContent = mine[0].pct > 0
+        ? chalText('chal-rarity-note', '🔎 ציון נדירות {score} · הכי נדיר בהרכב שלך: {name} ({pct}%)')
+            .replace('{score}', window._chalRarity.score)
+            .replace('{name}', mine[0].name)
+            .replace('{pct}', mine[0].pct)
+        : chalText('chal-rarity-note-solo', '🔎 ציון נדירות {score} · {name} — אף אחד אחר לא לקח אותו')
+            .replace('{score}', window._chalRarity.score)
+            .replace('{name}', mine[0].name);
+    }
+  } catch (e) { /* no rarity line, no harm */ }
 }
 
 // Called by submitResult() with the server's verdict on a challenge submission.
@@ -1072,30 +1282,60 @@ function showChallengeSubmitNote(ch) {
 // A streak is the whole reason a daily puzzle is played daily. It lives in the
 // browser, not the server, so it works signed out — which is how most of the
 // site is played — and it survives being offline.
-const CHAL_STREAK_KEY = '36-0-daily-streak';
+const CHAL_STREAK_KEY  = '36-0-daily-streak';
+const CHAL_STREAK_KEEP = 60;     // days remembered; the archive only offers seven
 
-function chalStreak() {
-  try { return JSON.parse(localStorage.getItem(CHAL_STREAK_KEY)) || { key: null, n: 0, best: 0 }; }
-  catch (e) { return { key: null, n: 0, best: 0 }; }
-}
-// yesterday's daily key; the keys are plain YYYY-MM-DD in Israel time
-function chalPrevKey(key) {
+// daily keys are plain YYYY-MM-DD in Israel time — shift one by whole days
+function chalShiftKey(key, delta) {
   const d = new Date(key + 'T12:00:00Z');
-  d.setUTCDate(d.getUTCDate() - 1);
+  d.setUTCDate(d.getUTCDate() + delta);
   return d.toISOString().slice(0, 10);
 }
-function chalPlayedToday() { return chalStreak().key === challengeKey('daily'); }
+function chalPrevKey(key) { return chalShiftKey(key, -1); }
 
-// Called once per finished daily challenge. A gap of one day continues the run,
-// anything longer starts a new one.
-function chalRecordDaily() {
-  const key = challengeKey('daily');
-  const s = chalStreak();
-  if (s.key === key) return s;
-  const n = s.key === chalPrevKey(key) ? (s.n || 0) + 1 : 1;
-  const next = { key, n, best: Math.max(n, s.best || 0) };
-  try { localStorage.setItem(CHAL_STREAK_KEY, JSON.stringify(next)); } catch (e) {}
-  return next;
+// Stored as the set of days played, not as a counter: a counter cannot answer
+// "which day did I miss", and missing days is the thing the archive fixes.
+function chalStreakStore() {
+  let raw = null;
+  try { raw = JSON.parse(localStorage.getItem(CHAL_STREAK_KEY)); } catch (e) { raw = null; }
+  if (!raw || typeof raw !== 'object') return { v: 2, days: [], best: 0 };
+  if (raw.v === 2 && Array.isArray(raw.days)) return raw;
+  // v1 held one key and a run length; that is enough to rebuild the days.
+  const days = [];
+  if (raw.key) for (let i = (raw.n || 1) - 1; i >= 0; i--) days.push(chalShiftKey(raw.key, -i));
+  return { v: 2, days, best: Math.max(raw.best || 0, raw.n || 0) };
+}
+
+function chalSaveStreak(store) {
+  store.days = [...new Set(store.days)].sort().slice(-CHAL_STREAK_KEEP);
+  try { localStorage.setItem(CHAL_STREAK_KEY, JSON.stringify(store)); } catch (e) {}
+}
+
+// The run of consecutive days ending today — or ending yesterday, while today
+// is still open. That is what keeps a streak "alive" until midnight.
+function chalStreakInfo() {
+  const store = chalStreakStore();
+  const days = new Set(store.days);
+  const today = challengeKey('daily');
+  const playedToday = days.has(today);
+  let n = 0;
+  let cur = playedToday ? today : chalPrevKey(today);
+  while (days.has(cur)) { n++; cur = chalPrevKey(cur); }
+  return { n, best: Math.max(store.best || 0, n), playedToday, days };
+}
+
+function chalPlayedToday() { return chalStreakInfo().playedToday; }
+
+// Called once per finished daily challenge — today's or a day being made up.
+function chalRecordDaily(key) {
+  const k = key || challengeKey('daily');
+  const store = chalStreakStore();
+  if (store.days.includes(k)) return chalStreakInfo();
+  store.days.push(k);
+  chalSaveStreak(store);
+  const info = chalStreakInfo();
+  if (info.n > (store.best || 0)) { store.best = info.n; chalSaveStreak(store); }
+  return info;
 }
 
 function fillChallengeWelcomeCard() {
@@ -1125,12 +1365,12 @@ function fillChallengeWelcomeCard() {
 
   const streakEl = document.getElementById('dw-streak');
   if (streakEl) {
-    const st = chalStreak();
-    // a streak only counts while it is alive: today or yesterday
-    const alive = st.n > 0 && (st.key === key || st.key === chalPrevKey(key));
-    streakEl.textContent = alive ? `🔥 ${st.n}` : '';
-    streakEl.style.display = alive ? '' : 'none';
-    streakEl.title = alive ? `${st.n} ימים ברצף · השיא שלך ${st.best}` : '';
+    // chalStreakInfo() only counts a run that reaches today or yesterday, so any
+    // streak it reports is by definition still alive
+    const st = chalStreakInfo();
+    streakEl.textContent = st.n > 0 ? `🔥 ${st.n}` : '';
+    streakEl.style.display = st.n > 0 ? '' : 'none';
+    streakEl.title = st.n > 0 ? `${st.n} ימים ברצף · השיא שלך ${st.best}` : '';
   }
 }
 

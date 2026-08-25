@@ -1926,6 +1926,34 @@ body {
   font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px;
   background: #ffd70010; border: 1px solid #ffd70040; color: var(--accent);
 }
+/* the week strip: what you played, and what you can still make up */
+.chal-week { margin-top: 12px; padding: 12px 14px; }
+.chal-week-top { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-bottom: 9px; }
+.chal-week-title { font-size: 13.5px; font-weight: 800; }
+.chal-week-streak { font-size: 12px; color: var(--dim); margin-inline-start: auto; }
+.chal-days { display: flex; gap: 6px; }
+.chal-day {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 7px 0; border-radius: 9px; cursor: pointer; font-family: inherit;
+  background: var(--surface2); border: 1px solid var(--border); color: var(--dim);
+}
+.chal-day-wd { font-size: 10.5px; opacity: .75; }
+.chal-day-mark { font-size: 14px; font-weight: 800; }
+.chal-day.done { color: #22c55e; border-color: #22c55e44; background: #22c55e0f; }
+.chal-day.today { color: var(--accent); border-color: #ffd70055; }
+.chal-week-hint { font-size: 11px; color: var(--dim); margin-top: 8px; line-height: 1.5; }
+
+/* rarity: what everyone took, and what you saw that they didn't */
+.rar-card { margin-top: 12px; padding: 12px 14px; }
+.rar-title { font-size: 13.5px; font-weight: 800; margin-bottom: 8px; }
+.rar-score { font-size: 13px; color: var(--dim); margin-bottom: 10px; }
+.rar-score b { color: var(--accent); font-size: 15px; }
+.rar-hint { display: block; font-size: 11px; opacity: .8; margin-top: 2px; }
+.rar-row { display: flex; align-items: center; gap: 8px; font-size: 12.5px; padding: 3px 0; }
+.rar-name { flex: 0 0 38%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rar-bar { flex: 1; height: 6px; background: var(--surface2); border-radius: 4px; overflow: hidden; }
+.rar-bar > span { display: block; height: 100%; background: linear-gradient(90deg, var(--accent2), var(--accent)); }
+.rar-pct { flex: 0 0 44px; text-align: start; color: var(--dim); font-variant-numeric: tabular-nums; }
 .daily-mine { font-size: 13px; color: var(--dim); margin-bottom: 10px; min-height: 18px; }
 .daily-mine b { color: #22c55e; }
 .daily-mine-rank { font-weight: 900; color: var(--accent); margin-inline-end: 4px; }
@@ -1938,6 +1966,7 @@ body {
 .daily-result-note { font-size: 13px; font-weight: 700; text-align: center; min-height: 0; }
 .daily-result-note.ok { color: #22c55e; }
 .daily-result-note.meh { color: var(--dim); }
+.daily-rarity-note { font-size: 12.5px; color: var(--accent); text-align: center; }
 .dw-more { display: block; font-size: 10.5px; color: var(--dim); margin-top: 3px; opacity: .85; }
 .chal-tabs { margin-bottom: 12px; }
 
