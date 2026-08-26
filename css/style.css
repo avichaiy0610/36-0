@@ -2295,3 +2295,343 @@ body {
   font-size: 11.5px; color: var(--dim); margin-top: 8px; cursor: pointer;
 }
 .sp-mute input { accent-color: var(--accent); cursor: pointer; }
+
+/* ── chemistry: the men who really played together ────────────────────────── */
+.pc-chem {
+  display: block; font-size: 10.5px; font-weight: 700; margin-top: 2px;
+  color: #22d3ee; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pc-chem.chem-t3 { color: #a78bfa; }
+.pc-chem.chem-t2 { color: #22d3ee; }
+.pc-chem.chem-t1 { color: #7dd3fc; }
+
+/* A pair on the pitch simply glows — one look for every tier, because the
+   strength is already written next to the rating. */
+.slot-token.tok-chem .slot-circle {
+  box-shadow: 0 0 0 3px #22d3ee, 0 0 14px 2px #22d3eeaa;
+}
+.slot-chem-plus {
+  color: #22d3ee; font-size: 0.72em; font-weight: 900; margin-inline-start: 2px;
+}
+.chem-summary {
+  margin: 8px auto 0; max-width: 520px; text-align: center;
+  font-size: 12.5px; color: #22d3ee;
+  background: #22d3ee12; border: 1px solid #22d3ee44; border-radius: 10px; padding: 7px 12px;
+}
+.chem-summary b { font-size: 14px; }
+.chem-summary-names { display: block; font-size: 11px; color: var(--dim); margin-top: 3px; }
+
+/* ── tags: what a player actually did ─────────────────────────────────────── */
+.tag-strip { display: inline-flex; gap: 3px; margin-inline-start: 5px; vertical-align: middle; }
+.tag-chip {
+  display: inline-flex; align-items: center; gap: 1px;
+  font-size: 10px; line-height: 1; padding: 2px 3px; border-radius: 5px;
+  background: var(--surface2); border: 1px solid var(--border); opacity: .75;
+}
+/* a tag that actually does something in the slot he is standing in */
+.tag-chip.tag-live { opacity: 1; border-color: #f0a50088; background: #f0a5001a; }
+.tag-x { font-size: 8px; font-weight: 900; color: var(--dim); }
+.tag-chip.tag-live .tag-x { color: var(--accent); }
+.tag-full {
+  display: inline-block; font-size: 11px; margin-inline-end: 6px;
+  color: var(--dim); white-space: nowrap;
+}
+
+/* ── The player card ──────────────────────────────────────────────────────────
+   Opens beside a player on hover, and as a sheet on touch. It has to be
+   readable over the pitch, so it is opaque and carries its own shadow rather
+   than borrowing the panel behind it. */
+.pcard {
+  display: none;
+  position: fixed;
+  z-index: 900;
+  width: 330px;
+  max-width: calc(100vw - 20px);
+  max-height: 78vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  /* A shadow that appears at whichever edge still has content behind it, and
+     nowhere else: the two `local` layers scroll with the content and cover the
+     `scroll` shadows once you reach an end. A tall card has to LOOK scrollable
+     or it reads as a card that simply ends. */
+  background-color: var(--panel);
+  background-image:
+    linear-gradient(var(--panel) 40%, transparent),
+    linear-gradient(transparent, var(--panel) 60%),
+    radial-gradient(farthest-side at 50% 0, #0007, transparent),
+    radial-gradient(farthest-side at 50% 100%, #0007, transparent);
+  background-position: 0 0, 0 100%, 0 0, 0 100%;
+  background-repeat: no-repeat;
+  background-size: 100% 22px, 100% 22px, 100% 9px, 100% 9px;
+  background-attachment: local, local, scroll, scroll;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 18px 44px #000a, 0 0 0 1px #0004;
+  padding: 12px 13px 11px;
+  font-size: 13px;
+  line-height: 1.5;
+  animation: pcIn .13s ease-out;
+}
+@keyframes pcIn { from { opacity: 0; transform: translateY(4px); } }
+/* The sheet is centred with a transform of its own, so it may only fade — an
+   animated `transform` would replace the centring for the length of the run
+   and throw it across the screen on the way in. */
+@keyframes pcFade { from { opacity: 0; } }
+
+.pcard-bd {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 899;
+  background: #000a;
+  backdrop-filter: blur(2px);
+}
+.pcard.pcard-modal {
+  left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  width: min(360px, calc(100vw - 24px));
+  max-height: 82vh;
+  animation-name: pcFade;
+}
+.pc-x {
+  position: absolute;
+  inset-inline-start: 8px;
+  top: 8px;
+  width: 30px; height: 30px;
+  min-height: 30px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface2);
+  color: var(--dim);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+/* header */
+.pc-head {
+  position: relative;
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+  padding-inline-end: 46px;
+}
+.pc-h-name { font-size: 16px; font-weight: 800; }
+.pc-h-sub  { font-size: 11.5px; color: var(--dim); margin-top: 2px; }
+.pc-h-sub img { height: 11px; vertical-align: -1px; border-radius: 2px; }
+.pc-h-ovr {
+  position: absolute;
+  inset-inline-end: 0; top: 0;
+  min-width: 38px;
+  padding: 3px 0;
+  text-align: center;
+  border-radius: 8px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 800;
+  font-size: 15px;
+}
+
+/* sections */
+.pc-sec { margin-bottom: 10px; }
+.pc-sec:last-child { margin-bottom: 0; }
+.pc-sec-t {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  color: var(--dim);
+  text-transform: uppercase;
+  margin-bottom: 5px;
+}
+.pc-stat { margin-bottom: 3px; }
+.pc-stat b { color: var(--accent); font-size: 14px; }
+.pc-stat i { font-style: normal; color: var(--dim); font-size: 11.5px; }
+.pc-note { color: var(--dim); font-size: 10.5px; line-height: 1.45; margin-top: 5px; }
+
+/* the season rows */
+.pc-seasons { display: flex; flex-wrap: wrap; gap: 4px; margin: 5px 0 2px; }
+.pc-sn {
+  padding: 2px 7px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.pc-sn i { font-style: normal; color: var(--dim); }
+.pc-sn.pc-first { border-color: #f0a50088; background: #f0a5001a; }
+
+/* clubs */
+.pc-clubs { display: flex; flex-wrap: wrap; gap: 4px; }
+.pc-club {
+  padding: 2px 7px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  font-size: 11px;
+}
+.pc-club i { font-style: normal; color: var(--accent); font-weight: 700; }
+
+/* tags, spelled out */
+.pc-tag {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 5px 7px;
+  margin-bottom: 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  opacity: .72;
+}
+.pc-tag-live { opacity: 1; border-color: #f0a50088; background: #f0a5001a; }
+.pc-tag-story { opacity: .82; }
+.pc-tag-i { font-size: 15px; line-height: 1.3; }
+.pc-tag-b { display: flex; flex-direction: column; min-width: 0; }
+.pc-tag-n { font-weight: 700; font-size: 12.5px; }
+.pc-tag-e { font-size: 11px; color: var(--dim); }
+.pc-tag-live .pc-tag-e { color: var(--accent2); }
+.pc-tag-w { font-size: 10.5px; color: var(--dim); opacity: .8; }
+
+/* duos */
+.pc-duos { display: flex; flex-wrap: wrap; gap: 4px; }
+.pc-duo {
+  padding: 2px 7px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  font-size: 11px;
+}
+.pc-duo-on { border-color: #4ade80aa; background: #4ade8022; color: #86efac; }
+
+/* the ⓘ that opens it where there is no hover */
+.pc-info {
+  display: none;
+  margin-inline-start: 5px;
+  width: 19px; height: 19px;
+  min-height: 19px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--surface2);
+  color: var(--dim);
+  font-size: 11px;
+  line-height: 1;
+  vertical-align: middle;
+  cursor: pointer;
+}
+@media (hover: none), (pointer: coarse) {
+  .pc-info { display: inline-block; }
+}
+
+/* a line of career, where the scorer lists have nothing to say */
+.pc-story {
+  margin-top: 4px;
+  font-size: 11.5px;
+  color: var(--dim);
+}
+.pc-story::before { content: '· '; opacity: .6; }
+
+/* the man covering out of his position — the 7% the line bar takes off him */
+.slot-oop {
+  position: absolute;
+  inset-inline-start: -2px;
+  top: -2px;
+  width: 15px; height: 15px;
+  line-height: 15px;
+  text-align: center;
+  border-radius: 50%;
+  background: #b45309;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  box-shadow: 0 0 0 1.5px var(--bg);
+  cursor: help;
+  z-index: 3;
+}
+
+/* the same warning, but where the player is chosen rather than after */
+.pc-oop {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-inline-start: 5px;
+  padding: 1px 5px;
+  border: 1px solid #b4530988;
+  border-radius: 6px;
+  background: #b4530922;
+  color: #fbbf24;
+  font-size: 10.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: help;
+}
+
+/* ── Tactics ──────────────────────────────────────────────────────────────────
+   The three shapes a plain central midfield can take. Only shown for formations
+   where the choice exists, so the row appears and disappears with the pick. */
+.tactic-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+.tactic-chip {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+}
+.tactic-chip:hover { background: var(--hover); }
+.tactic-chip.selected {
+  border-color: var(--accent);
+  background: #ffd7000f;
+}
+.tactic-name { font-size: 13px; font-weight: 700; }
+.tactic-chip.selected .tactic-name { color: var(--accent); }
+.tactic-note { font-size: 10.5px; color: var(--dim); text-align: center; }
+
+/* the man the tactic moved, on the mini pitch */
+.mini-dot.mini-role {
+  background: var(--accent);
+  box-shadow: 0 0 0 2px #ffd70055;
+}
+
+.tactic-trade {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--accent2);
+  opacity: .55;
+}
+.tactic-chip.selected .tactic-trade { opacity: 1; }
+
+/* "חדש" on a setting nobody is looking for yet. It pulses rather than sits,
+   because a static chip in a screen full of chips is invisible — and it is the
+   only way anyone discovers they can turn the new mechanics off. */
+.label-new {
+  display: inline-block;
+  margin-inline-start: 6px;
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: .5px;
+  vertical-align: middle;
+  animation: labelNewPulse 1.9s ease-in-out infinite;
+}
+@keyframes labelNewPulse {
+  0%, 100% { box-shadow: 0 0 0 0 #ffd70099; }
+  50%      { box-shadow: 0 0 0 6px #ffd70000; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .label-new { animation: none; box-shadow: 0 0 0 2px #ffd70055; }
+}

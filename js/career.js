@@ -53,7 +53,7 @@ function crNormName(s) {
 function crBlank() {
   return {
     v: 1,
-    startYear: null, clubName: '', formationId: '4-3-3',
+    startYear: null, clubName: '', formationId: '4-3-3', tactic: 'bal', classic: false,
     difficulty: 'normal',
     rerolls: CR_REROLLS.normal,   // club swaps left for the WHOLE career
     seasonIdx: 0,
@@ -127,9 +127,9 @@ function crFindPlayerIn(year, name) {
 function crPacksPicks(picks) {
   return picks.map(p => p ? { squadId: p.squad.id, name: p.player.name } : null);
 }
-function crRebuildPicks(list, formationId) {
+function crRebuildPicks(list, formationId, tactic) {
   if (!Array.isArray(list)) return null;
-  const slots = FORMATIONS[formationId]?.slots;
+  const slots = formationSlots(formationId, tacticOf(tactic));
   if (!slots || list.length !== slots.length) return null;
   const bySquad = new Map(SQUADS.map(s => [s.id, s]));
   const picks = new Array(slots.length).fill(null);
@@ -173,13 +173,18 @@ function crRender() {
 }
 
 /* ── new career ───────────────────────────────────────────────────────────── */
-let _crSetup = { startYear: 1999, difficulty: 'normal', formationId: '4-3-3' };
+let _crSetup = { startYear: 1999, difficulty: 'normal', formationId: '4-3-3', tactic: 'bal', classic: false };
 
 function crRenderSetup(box) {
   const years = ALL_SEASON_YEARS.map(y =>
     `<option value="${y}"${y === _crSetup.startYear ? ' selected' : ''}>${crEsc(yearToSeason(y))}</option>`).join('');
   const forms = Object.keys(FORMATIONS).map(k =>
     `<option value="${crEsc(k)}"${k === _crSetup.formationId ? ' selected' : ''}>${crEsc(FORMATIONS[k].label)}</option>`).join('');
+  // A dynasty is 20-odd seasons in one shape, so the tactic matters more here
+  // than anywhere. Hidden for the formations that already fix their own midfield.
+  const tacts = TACTIC_KEYS.map(k =>
+    `<option value="${crEsc(k)}"${k === _crSetup.tactic ? ' selected' : ''}>${
+      crEsc(TACTICS[k].label)} — ${crEsc(TACTICS[k].note)}</option>`).join('');
   const best = crBest();
 
   box.innerHTML = `
@@ -208,6 +213,13 @@ function crRenderSetup(box) {
           <select id="cr-year" class="lg-input cr-select">${years}</select></div>
         <div class="lg-config-row"><span>מערך</span>
           <select id="cr-formation" class="lg-input cr-select">${forms}</select></div>
+        <div class="lg-config-row" id="cr-tactic-row"><span>טקטיקה</span>
+          <select id="cr-tactic" class="lg-input cr-select">${tacts}</select></div>
+        <div class="lg-config-row"><span>סגנון</span>
+          <select id="cr-mode" class="lg-input cr-select">
+            <option value="full"${_crSetup.classic ? '' : ' selected'}>מלא — כימיה, תגיות וטקטיקה</option>
+            <option value="classic"${_crSetup.classic ? ' selected' : ''}>קלאסי — דירוגים בלבד</option>
+          </select></div>
         <div class="lg-config-row"><span>קושי</span>
           <div class="lg-mini" id="cr-diff">
             <button data-v="easy">קל</button><button data-v="normal">רגיל</button><button data-v="hard">קשה</button>
@@ -240,6 +252,18 @@ function crRenderSetup(box) {
   });
   syncRerollNote();
 
+  // the tactic row belongs only to shapes that leave the middle open
+  const formSel = document.getElementById('cr-formation');
+  const tacticRow = document.getElementById('cr-tactic-row');
+  const modeSel = document.getElementById('cr-mode');
+  const syncTacticRow = () => {
+    const classic = modeSel && modeSel.value === 'classic';
+    if (tacticRow) tacticRow.style.display = (!classic && formationTactical(formSel.value)) ? '' : 'none';
+  };
+  if (formSel) { formSel.addEventListener('change', syncTacticRow); }
+  if (modeSel) { modeSel.addEventListener('change', syncTacticRow); }
+  syncTacticRow();
+
   const yearSel = document.getElementById('cr-year');
   const note = document.getElementById('cr-len-note');
   const updateNote = () => {
@@ -256,6 +280,9 @@ function crRenderSetup(box) {
     const run = crBlank();
     run.startYear   = parseInt(yearSel.value, 10);
     run.formationId = document.getElementById('cr-formation').value;
+    run.classic     = (document.getElementById('cr-mode')?.value === 'classic');
+    run.tactic      = (!run.classic && formationTactical(run.formationId))
+      ? tacticOf(document.getElementById('cr-tactic')?.value) : 'bal';
     run.difficulty  = _crSetup.difficulty;
     run.rerolls     = CR_REROLLS[_crSetup.difficulty] ?? CR_REROLLS.normal;
     run.clubName    = (document.getElementById('cr-club').value || '').trim().slice(0, 24) || 'המועדון שלי';
@@ -268,7 +295,7 @@ function crRenderSetup(box) {
 /* ── dashboard ────────────────────────────────────────────────────────────── */
 function crRenderDashboard(box, run) {
   const year = crYear(run);
-  const pending = run.pending ? crRebuildPicks(run.pending, run.formationId) : null;
+  const pending = run.pending ? crRebuildPicks(run.pending, run.formationId, run.tactic) : null;
   box.innerHTML = `
     ${crHeaderHTML(run)}
     <div class="lg-card cr-next-card">
@@ -531,14 +558,16 @@ function crApplyStateFor(run) {
   state.oppSeasonChoice = String(year);
   state.leagueFormat    = 'authentic';
   state.formationId = FORMATIONS[run.formationId] ? run.formationId : '4-3-3';
+  state.tactic      = tacticOf(run.tactic);
+  state.classic     = run.classic === true;
 }
 
 function crStartDraft() {
   const run = crRun();
   crApplyStateFor(run);
-  const kept = run.pending ? crRebuildPicks(run.pending, state.formationId) : null;
+  const kept = run.pending ? crRebuildPicks(run.pending, state.formationId, state.tactic) : null;
   if (kept && kept.some(Boolean)) crBeginDraftWithKept(kept);
-  else beginDraftWithState();
+  else beginDraftWithState({ classic: state.classic, tactic: state.tactic });
   // The season is the one thing a career draft cannot swap — the whole market
   // is that single year. The club swaps are whatever the dynasty has left.
   state.seasonRerollsLeft = 0;
@@ -563,7 +592,7 @@ function crOnRerollUsed(left) {
 function crBeginDraftWithKept(picks) {
   state.teamRerollsLeft   = crRerollsLeft();
   state.seasonRerollsLeft = 0;              // one season, nothing to swap it for
-  state.slots  = FORMATIONS[state.formationId].slots;
+  state.slots  = formationSlots(state.formationId, state.tactic);
   state.picks  = picks;
   state.currentRound   = picks.filter(Boolean).length;
   state.usedSquadIds   = new Set(picks.filter(Boolean).map(p => p.squad.id));
@@ -684,8 +713,8 @@ async function crAward(run) {
 // picked, read straight out of next season's squads.
 function crAgeingReport(run) {
   const nextYear = crYear(run) + 1;
-  const slots = FORMATIONS[run.formationId].slots;
-  const current = crRebuildPicks(run.squad, run.formationId) || [];
+  const slots = formationSlots(run.formationId, tacticOf(run.tactic));
+  const current = crRebuildPicks(run.squad, run.formationId, run.tactic) || [];
   return slots.map((slot, i) => {
     const cur = current[i];
     if (!cur) return { slot, gone: true, reason: 'לא אויש' };
@@ -728,8 +757,18 @@ function crRenderTransfer(box, run) {
                 : `<span class="cr-flat">=</span>`;
     const move = r.moved ? `<span class="cr-move">✈️ ${crEsc(r.newClub)}</span>` : '';
     const pos  = r.posChanged ? `<span class="cr-poschange">${crEsc(r.cur.player.position)} → ${crEsc(r.next.player.position)}</span>` : '';
+    // Keeping a man who is half of a pair keeps the pair. This is the decision
+    // the transfer window is FOR, so the link has to be on the row.
+    let chem = '';
+    if (typeof chemPair === 'function') {
+      const mate = report.find((o, j) => j !== i && !o.gone && o.next && chemPair(r.next.player.name, o.next.player.name));
+      if (mate) {
+        const pr = chemPair(r.next.player.name, mate.next.player.name);
+        chem = `<span class="cr-chem" title="${crEsc(chemWhy({ seasons: pr[1], titles: pr[2] }))}">🔗 צמד עם ${crEsc(playerShortName(mate.next.player.name))} +${pr[0]}</span>`;
+      }
+    }
     return `
-      <label class="cr-p" data-i="${i}">
+      <label class="cr-p${chem ? ' cr-p-chem' : ''}" data-i="${i}">
         <input type="checkbox" class="cr-keep-box" data-i="${i}">
         <div class="cr-p-main">
           <span class="cr-p-slot">${crEsc(r.slot.pos)}</span>
@@ -737,6 +776,7 @@ function crRenderTransfer(box, run) {
           <span class="cr-p-ovr">${r.cur.player.ovr} → <strong>${r.next.player.ovr}</strong> ${arrow}</span>
         </div>
         <div class="cr-p-sub">${crEsc(r.oldClub)} ${move} ${pos}</div>
+        ${chem}
       </label>`;
   }).join('');
 
@@ -781,7 +821,7 @@ function crRenderTransfer(box, run) {
 }
 
 function crConfirmKeep(run, report, keepIdxs) {
-  const slots = FORMATIONS[run.formationId].slots;
+  const slots = formationSlots(run.formationId, tacticOf(run.tactic));
   const pending = new Array(slots.length).fill(null);
   keepIdxs.forEach(i => {
     const r = report[i];

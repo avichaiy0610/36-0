@@ -80,13 +80,18 @@ function mgIndex() {
   });
   idx.forEach(e => {
     e.rows.sort((a, b) => a.y - b.y || b.ovr - a.ovr);
+    // `all` is every appearance; `rows` is the tidy one-a-year career. The clubs
+    // must come from `all`, or the dedupe quietly erases the club that lost the
+    // tie-break in a split season — 213 players, Vermouth's Maccabi Tel Aviv and
+    // both of Abuksis's among them — and the grid then rejects a right answer.
+    e.all     = e.rows.slice();
+    e.clubs   = [...new Set(e.all.map(r => r.teamId))];
     const seen = new Set();
     e.rows = e.rows.filter(r => seen.has(r.y) ? false : (seen.add(r.y), true));
     e.peak    = Math.max(...e.rows.map(r => r.ovr));
     e.seasons = e.rows.length;
     e.first   = e.rows[0];
     e.last    = e.rows[e.rows.length - 1];
-    e.clubs   = [...new Set(e.rows.map(r => r.teamId))];
     // the position he spent most of his career in
     const byPos = {};
     e.rows.forEach(r => { byPos[r.pos] = (byPos[r.pos] ?? 0) + 1; });

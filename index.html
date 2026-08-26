@@ -184,7 +184,7 @@
       </button>
       <a class="btn-coffee btn-coffee-welcome" id="btn-coffee-welcome" href="https://ko-fi.com/360ligathaal" target="_blank" rel="noopener">☕ אוהב את המשחק? קנה לי קפה</a>
       <button class="wn-link" id="btn-whatsnew"><span id="wn-label">מה חדש!</span><span class="wn-dot" id="wn-dot"></span></button>
-      <div class="wn-version" id="wn-version" dir="ltr">v1.46</div>
+      <div class="wn-version" id="wn-version" dir="ltr">v1.5</div>
     </div>
     <footer class="site-disclaimer">
       <p>
@@ -236,6 +236,7 @@
           <div id="formation-preview" class="formation-preview"></div>
           <div id="formation-chips" class="formation-chips"></div>
         </div>
+        <div id="tactic-row" class="tactic-row" style="display:none"></div>
       </section>
 
       <section class="setup-section lg-lockable">
@@ -294,6 +295,20 @@
           <button class="opt-btn selected" data-val="off">
             <div class="opt-title" data-txt="peak-off">כבוי</div>
             <div class="opt-sub" data-txt="peak-off-sub">דירוג אמיתי לפי עונה</div>
+          </button>
+        </div>
+      </section>
+
+      <section class="setup-section lg-lockable">
+        <div class="setup-label" data-txt="lbl-mode">סגנון משחק <span class="label-new">חדש</span></div>
+        <div class="option-row" id="mode-row">
+          <button class="opt-btn selected" data-val="full">
+            <div class="opt-title" data-txt="mode-full">מלא</div>
+            <div class="opt-sub" data-txt="mode-full-sub">כימיה, תגיות וטקטיקה</div>
+          </button>
+          <button class="opt-btn" data-val="classic">
+            <div class="opt-title" data-txt="mode-classic">קלאסי</div>
+            <div class="opt-sub" data-txt="mode-classic-sub">דירוגים בלבד, כמו פעם</div>
           </button>
         </div>
       </section>
@@ -414,6 +429,7 @@
           <div id="pitch-slots"></div>
         </div>
       </div>
+      <div id="chem-summary"></div>
     </div>
 
   </div>
@@ -428,6 +444,7 @@
           <div id="preseason-pitch-slots"></div>
         </div>
       </div>
+      <div id="chem-summary-pre"></div>
     </div>
 
     <!-- RIGHT: Odds panel -->
@@ -903,6 +920,10 @@
   <script src="js/gauntlet-spoils.js"></script>
   <script src="js/leagues.js"></script>
   <script src="js/duel.js"></script>
+  <script src="js/tag-data.js"></script>
+  <script src="js/tags.js"></script>
+  <script src="js/chem-data.js"></script>
+  <script src="js/chemistry.js"></script>
   <script src="js/data.js"></script>
   <script src="js/sim-engine.js"></script>
   <script src="js/game.js"></script>
@@ -921,6 +942,7 @@
   <script src="js/mg-auction.js"></script>
   <script src="js/mg-wordle.js"></script>
   <script src="js/mg-grid.js"></script>
+  <script src="js/player-card.js"></script>
   <script src="js/theme.js"></script>
 </body>
 </html>

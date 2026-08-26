@@ -174,3 +174,5 @@
   font-size: 11.5px; color: var(--dim); margin-top: 10px; cursor: pointer;
 }
 .cr-sp-mute input { accent-color: var(--accent); cursor: pointer; }
+.cr-chem { display: block; font-size: 11px; font-weight: 700; color: #22d3ee; margin-top: 4px; }
+.cr-p-chem { border-color: #22d3ee55; }

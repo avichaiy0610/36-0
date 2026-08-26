@@ -17,8 +17,14 @@ const MGT_TRIES = 40;     // draws to attempt before falling back
 /* ── the conditions ───────────────────────────────────────────────────────── */
 // Each is { id, label, test(entry) }. `_set` caches the players that match.
 function mgtClubCriteria() {
+  // Which clubs are big enough to be a heading is CONTENT: the roster feeds the
+  // seeded shuffle, so changing it redraws every past and in-progress board.
+  // It is therefore counted the way it has always been counted — off the tidy
+  // one-a-year career. Whether a player ANSWERS a heading is correctness, and
+  // that reads `clubs`, which now includes the club he joined mid-season.
   const counts = {};
-  mgIndex().forEach(e => e.clubs.forEach(c => { counts[c] = (counts[c] ?? 0) + 1; }));
+  mgIndex().forEach(e =>
+    [...new Set(e.rows.map(r => r.teamId))].forEach(c => { counts[c] = (counts[c] ?? 0) + 1; }));
   return Object.keys(counts)
     .filter(id => counts[id] >= 60 && TEAMS[id])          // a club with a real history
     .sort()                                               // stable before the seeded shuffle
@@ -107,34 +113,42 @@ function mgtBuildGrid(dayKey) {
   const clubs  = mgShuffled(mgtClubCriteria(), rng);
   const others = mgShuffled(mgtOtherCriteria(), rng);
 
-  for (let t = 0; t < MGT_TRIES; t++) {
-    const rows = [clubs[(t * 4) % clubs.length],
-                  clubs[(t * 4 + 1) % clubs.length],
-                  clubs[(t * 4 + 2) % clubs.length]];
-    const cols = [clubs[(t * 4 + 3) % clubs.length],
-                  others[(t * 2) % others.length],
-                  others[(t * 2 + 1) % others.length]];
-    const ids = new Set([...rows, ...cols].map(c => c.id));
-    if (ids.size !== 6) continue;                       // no condition twice
-    let ok = true;
+  // Draw the columns, then keep only the clubs that can answer all three of
+  // them — three such clubs make a board that is valid BY CONSTRUCTION. The old
+  // draw guessed whole boards and, when forty guesses missed, shipped an
+  // unchecked one: over 180 days that handed out seven squares with literally
+  // no correct answer, nearly all of them a young club crossed with 85+.
+  const pack = (rows, cols) => {
     const answers = [];
-    for (const r of rows) {
-      for (const c of cols) {
-        const a = mgtAnswers(r, c);
-        if (a.length < MGT_MIN) { ok = false; break; }
-        answers.push(a);
+    rows.forEach(r => cols.forEach(c => answers.push(mgtAnswers(r, c))));
+    return { rows, cols, answers };
+  };
+  let best = null;                                   // fallback: the least-bad board
+
+  const nClub = Math.min(clubs.length, MGT_TRIES);
+  const nOther = Math.min(others.length - 1, MGT_TRIES);
+  for (let ci = 0; ci < nClub; ci++) {
+    for (let oi = 0; oi < nOther; oi++) {
+      const cols = [clubs[ci], others[oi], others[oi + 1]];
+      if (new Set(cols.map(c => c.id)).size !== 3) continue;
+      const fits = [];
+      let bestMin = -1, bestRows = null;
+      for (const r of clubs) {
+        if (r.id === cols[0].id) continue;
+        let min = Infinity;
+        for (const c of cols) min = Math.min(min, mgtAnswers(r, c).length);
+        if (min >= MGT_MIN) fits.push(r);
+        else if (min > bestMin) { bestMin = min; bestRows = r; }
+        if (fits.length === 3) break;
       }
-      if (!ok) break;
+      if (fits.length === 3) return pack(fits, cols);
+      // remember the best partial board in case no combination ever works
+      if (!best && fits.length + (bestRows ? 1 : 0) >= 3)
+        best = pack(fits.concat(bestRows ? [bestRows] : []).slice(0, 3), cols);
     }
-    if (ok) return { rows, cols, answers };
   }
-  // Never leave a player without a puzzle: the loosest possible board.
-  const rows = clubs.slice(0, 3);
-  const cols = [clubs[3], others.find(c => c.id === 'dec:2010') || others[0],
-                          others.find(c => c.id === 'peak85') || others[1]];
-  const answers = [];
-  rows.forEach(r => cols.forEach(c => answers.push(mgtAnswers(r, c))));
-  return { rows, cols, answers };
+  // Nothing clean anywhere — still never leave a player without a puzzle.
+  return best || pack(clubs.slice(0, 3), [clubs[3], others[0], others[1]]);
 }
 
 let _mgtGrid = null;
@@ -142,14 +156,26 @@ function mgtGrid() {
   const key = mgDayKey();
   if (_mgtGrid && _mgtGrid.key === key) return _mgtGrid;
   const g = mgtBuildGrid(key);
-  return (_mgtGrid = { key, ...g });
+  // What this day's board actually is. Saved alongside a run so a board that
+  // was drawn under different data can never be scored against new headings.
+  const sig = g.rows.map(c => c.id).join(',') + '/' + g.cols.map(c => c.id).join(',');
+  return (_mgtGrid = { key, sig, ...g });
 }
 
 /* ── state ────────────────────────────────────────────────────────────────── */
 function mgtState() {
   const s = mgLoad(MGT_KEY, null);
   const key = mgDayKey();
-  if (!s || s.dayKey !== key) return { dayKey: key, cells: Array(9).fill(null), played: 0, best: (s && s.best) || 0 };
+  const sig = mgtGrid().sig;
+  const fresh = { dayKey: key, sig, cells: Array(9).fill(null), played: 0, best: (s && s.best) || 0 };
+  if (!s || s.dayKey !== key) return fresh;
+  // Same day, different board: the answers on file belong to a puzzle that no
+  // longer exists — better a clean grid than nine cells judged by the wrong
+  // headings. Anything the fix widens (a club a player really did play for)
+  // lands here exactly once, and only for a board still in progress.
+  // A save from before signatures existed was drawn against the old data, so it
+  // gets the same treatment rather than the benefit of the doubt.
+  if (s.sig !== sig) return fresh;
   return s;
 }
 function mgtSave(s) { mgSave(MGT_KEY, s); }

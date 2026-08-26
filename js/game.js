@@ -164,7 +164,11 @@ function normalizePos(pos) { return POS_NORMALIZE[pos] ?? pos; }
 const COMPAT = {
   GK:  ['GK'],
   RB:  ['RB'],  CB: ['CB'],  LB: ['LB'],
-  CDM: ['CDM','CM'], CM: ['CM','CDM','CAM'], CAM: ['CAM','CM'],
+  // One central midfield. A holding player, a box-to-box and a playmaker are
+  // three labels on the same job here: any of them fills any central slot at
+  // full value. The four formations that field a CDM or a CAM slot still shape
+  // the pitch, they just do not gatekeep who may stand there.
+  CDM: ['CDM','CM','CAM'], CM: ['CM','CDM','CAM'], CAM: ['CAM','CM','CDM'],
   RM:  ['RM','RW'],  LM: ['LM','LW'],
   RW:  ['RW','RM'],  LW: ['LW','LM'],
   CF:  ['CF','ST'],  ST: ['ST','CF'],
@@ -177,6 +181,106 @@ const POS_HE = {
   RM:'קשר ימין', LM:'קשר שמאל', RW:'כנף ימני', LW:'כנף שמאלי',
   CF:'חלוץ', ST:'חלוץ',
 };
+
+// ─── Classic ───────────────────────────────────────────────────────────────────
+//
+// The game as it was before chemistry, tags and tactics: eleven ratings and the
+// simulation, nothing else. It is not a nostalgia setting — it is the honest
+// answer to "am I winning because I drafted well, or because I stacked bonuses",
+// and it keeps the older way of playing available to anyone who preferred it.
+//
+// Bug fixes are NOT rolled back by it. A centre-back who could not be placed
+// next to a holding midfielder, or a CAM docked 7% for standing in midfield,
+// were mistakes rather than features, and classic should be the old GAME, not
+// the old bugs.
+function classicMode() {
+  return typeof state !== 'undefined' && state.classic === true;
+}
+
+// ─── Tactics ───────────────────────────────────────────────────────────────────
+//
+// A shape like 4-3-3 says how many men are in each band, not what they are asked
+// to do. The tactic takes the most central midfielder and pushes him forward or
+// drops him back, which is a real trade in the simulation: CAM is scored in the
+// attacking line, CDM in the defensive one, so a third of your midfield moves to
+// one end of the pitch and the middle gets thinner either way.
+//
+// Deliberately NOT new FORMATIONS keys: the daily challenge draws its formation
+// from that list, and adding to it would rewrite challenges people already
+// played. A tactic is a separate field that defaults to balanced, so every save,
+// league and challenge that predates it keeps meaning exactly what it meant.
+// Why a modifier and not simply a CAM slot: the lines are AVERAGES, so moving a
+// midfielder into the attack just drags that average toward his own rating. It
+// was measured over 400 XIs — attack moved +0.15 and the defensive shape made the
+// defence 0.15 WORSE, the opposite of what it promises. So the shape is what you
+// see and the trade is explicit.
+//
+// The numbers are lopsided on purpose. The engine weights the defensive rating
+// about 2.8x the attacking one (KD 0.125 against KA 0.045), so ±3 attack against
+// ∓1 defence is what makes the two directions an even trade rather than one
+// obviously correct answer: roughly +14% of your own goals against +13% of
+// theirs, and the mirror of that going the other way.
+const TACTICS = {
+  att: { label: 'התקפית', note: 'עם קשר התקפי',  role: 'CAM', dy: -9, atk: +3, def: -1 },
+  bal: { label: 'מאוזנת', note: 'שלושה קשרים',   role: null,  dy: 0,  atk: 0,  def: 0 },
+  def: { label: 'הגנתית', note: 'עם קשר הגנתי',  role: 'CDM', dy: +9, atk: -3, def: +1 },
+};
+// how the trade reads on the chip, under the shape
+function tacticTrade(k) {
+  const t = TACTICS[k];
+  if (!t || (!t.atk && !t.def)) return '';
+  // the sign has to stay glued to its number, or RTL renders "+3" as "3+"
+  const bit = (n, name) => n ? `<span dir="ltr">${n > 0 ? '+' : ''}${n}</span> ${name}` : '';
+  return [bit(t.atk, 'התקפה'), bit(t.def, 'הגנה')].filter(Boolean).join(' · ');
+}
+const TACTIC_KEYS = ['att', 'bal', 'def'];
+
+// Only shapes that field a plain central pair or trio get the choice. The four
+// that already declare a CAM or a CDM have made it themselves.
+function formationTactical(formationId) {
+  const f = FORMATIONS[formationId];
+  if (!f) return false;
+  const cms = f.slots.filter(s => s.pos === 'CM').length;
+  const fixed = f.slots.some(s => s.pos === 'CAM' || s.pos === 'CDM');
+  return cms >= 2 && !fixed;
+}
+
+// The man who moves: the most central midfielder, and of those the deepest when
+// he is dropping back and the highest when he is pushing on. Ties broken by slot
+// order so the same formation always reshapes the same way.
+function tacticSlotIdx(slots, tactic) {
+  let best = -1, bestKey = null;
+  slots.forEach((s, i) => {
+    if (s.pos !== 'CM') return;
+    const centrality = Math.abs(s.x - 50);
+    const depth = tactic === 'def' ? -s.y : s.y;
+    const key = [centrality, depth];
+    if (bestKey === null || key[0] < bestKey[0] ||
+        (key[0] === bestKey[0] && key[1] < bestKey[1])) { best = i; bestKey = key; }
+  });
+  return best;
+}
+
+// The slots a formation actually fields under a tactic. Everything that builds a
+// pitch goes through here so the preview, the draft and the results all agree.
+function formationSlots(formationId, tactic) {
+  const f = FORMATIONS[formationId];
+  if (!f) return [];
+  const t = TACTICS[tactic];
+  if (!t || !t.role || !formationTactical(formationId)) return f.slots;
+  const idx = tacticSlotIdx(f.slots, tactic);
+  if (idx < 0) return f.slots;
+  // `pos` stays CM — every compatibility and rating rule treats the centre as one
+  // position anyway, so changing it here would only double-count the tactic.
+  return f.slots.map((s, i) => i !== idx ? s : {
+    ...s,
+    role: t.role,
+    label: POS_HE[t.role] ?? s.label,
+    y: Math.max(6, Math.min(92, s.y + t.dy)),
+  });
+}
+
+function tacticOf(id) { return TACTIC_KEYS.includes(id) ? id : 'bal'; }
 
 // Reverse COMPAT: playerPos -> slot types they fit
 const PLAYER_FITS = (() => {
@@ -230,8 +334,12 @@ const GOAL_W = {
 // goals against ~22 for a weak one. Raising it much further makes a great striker
 // break the league record most seasons.
 const GOAL_QUALITY_K = 0.015;
-const goalWeight   = p => (GOAL_W[p.slotPos]   ?? 0) * Math.exp(GOAL_QUALITY_K * (p.ovr - 80));
-const assistWeight = p => (ASSIST_W[p.slotPos] ?? 0) * Math.exp(GOAL_QUALITY_K * (p.ovr - 80));
+// Tags tilt who scores, never whether you win: the scoreline is settled by the
+// line ratings before these are consulted.
+const goalWeight   = p => (GOAL_W[p.slotPos]   ?? 0) * Math.exp(GOAL_QUALITY_K * (p.ovr - 80))
+  * (!classicMode() && typeof tagGoalMult   === 'function' ? tagGoalMult(p.name, p.slotPos)   : 1);
+const assistWeight = p => (ASSIST_W[p.slotPos] ?? 0) * Math.exp(GOAL_QUALITY_K * (p.ovr - 80))
+  * (!classicMode() && typeof tagAssistMult === 'function' ? tagAssistMult(p.name, p.slotPos) : 1);
 const ASSIST_W = {
   ST:1, CF:1.5, RW:5, LW:5, CAM:6,
   RM:4, LM:4, CM:3.5, CDM:1.5,
@@ -351,7 +459,7 @@ const state = {
   eraMin: YEAR_MIN, eraMax: YEAR_MAX,
   oppSeason: null, oppSeasonChoice: 'latest',   // null = the latest season's league
   leagueFormat: 'authentic',                    // 'authentic' = the chosen season's real format · 'modern' = today's
-  formationId: null, slots: [], picks: [], currentRound: 0,
+  formationId: null, tactic: 'bal', classic: false, slots: [], picks: [], currentRound: 0,
   usedSquadIds: new Set(), usedPlayerKeys: new Set(), currentSquad: null,
   selectedPlayer: null, selectedSlotIdx: null,
   teamRerollsLeft: 1, seasonRerollsLeft: 1,
@@ -424,16 +532,41 @@ function compatibleEmptySlots(player) {
 // `ovrAt` lets a caller price the same XI on its own terms — the gauntlet passes
 // one that folds in shop upgrades and relics. Left out, it is plain playerOVR
 // and nothing about the league game changes.
+// Every rating in the game goes through here or through calcGroupOVR, so
+// chemistry is added in both rather than threaded through a dozen call sites.
+// It also stacks on top of a caller's own ovrAt (the gauntlet's relics), which
+// is right: a relic and a real partnership are different things.
+function chemAt(i) {
+  if (classicMode()) return 0;
+  return (typeof chemBonusAt === 'function') ? chemBonusAt(i) : 0;
+}
+
+// Is this his position, or is he really out of it?
+//
+// A player is in position whenever the slot suits ANY position he plays — his
+// main one or a secondary. A striker who also plays as an attacking midfielder
+// IS an attacking midfielder when he stands there; docking him for it was the
+// game arguing with its own data, and it read absurdly on the pitch ("חלוץ
+// בעמדת קשר — נספר כ-76" for a man whose own card lists CAM).
+//
+// The 7% survives for one case only, and it is a real one: a career run whose
+// formation changes between seasons re-slots the XI by index, so a man can end
+// up somewhere he genuinely cannot play. Nothing in a normal draft can reach
+// this branch, because the draft will not let you place him there to begin with.
+function inNaturalPos(player, slotPos) {
+  return playerFitsSlot(player, slotPos);
+}
+const OUT_OF_POS = 0.93;
+
 function teamOVR(ovrAt) {
   let total = 0, weight = 0;
   state.picks.forEach((pick, i) => {
     if (!pick) return;
     const slot = state.slots[i];
     const w = POS_WEIGHT[slot.pos] ?? 1;
-    const ovr = ovrAt ? ovrAt(pick, i) : playerOVR(pick.player);
-    const pp = playerPositions(pick.player);
-    const inPos = (COMPAT[slot.pos] ?? []).slice(0, 2).includes(pp[0]) || pp.includes(slot.pos);
-    total += (inPos ? ovr : Math.round(ovr * 0.93)) * w;
+    const ovr = (ovrAt ? ovrAt(pick, i) : playerOVR(pick.player)) + chemAt(i);
+    const inPos = inNaturalPos(pick.player, slot.pos);
+    total += (inPos ? ovr : Math.round(ovr * OUT_OF_POS)) * w;
     weight += w;
   });
   return weight > 0 ? Math.round(total / weight) : 0;
@@ -449,11 +582,9 @@ function calcGroupOVR(positions, ovrAt) {
   const ovrs = state.picks
     .map((pick, i) => {
       if (!pick || !positions.includes(state.slots[i].pos)) return null;
-      const ovr = ovrAt ? ovrAt(pick, i) : playerOVR(pick.player);
-      const pp  = playerPositions(pick.player);
-      const slotPos = state.slots[i].pos;
-      const inPos = (COMPAT[slotPos] ?? []).slice(0, 2).includes(pp[0]) || pp.includes(slotPos);
-      return inPos ? ovr : Math.round(ovr * 0.93);
+      const ovr = (ovrAt ? ovrAt(pick, i) : playerOVR(pick.player)) + chemAt(i);
+      return inNaturalPos(pick.player, state.slots[i].pos)
+        ? ovr : Math.round(ovr * OUT_OF_POS);
     })
     .filter(n => n !== null);
   return ovrs.length ? Math.round(ovrs.reduce((a,b) => a+b, 0) / ovrs.length) : null;
@@ -463,14 +594,63 @@ function calcGroupOVR(positions, ovrAt) {
 // that draws the four bars on the results card, so what the player sees is
 // literally what the simulation uses. An unfilled line falls back to the
 // overall rating.
+// What a squad full of finishers is worth to the SCOREBOARD.
+//
+// Tag effects were attribution only: they decided whose name went next to a
+// goal the team was always going to score. That is backwards for a man who
+// scored 35 in a season — he should make the team score more, not take the
+// same goals off his team-mates. So the finishers in the XI also lift the
+// attacking line, which is what the simulation turns into chances.
+//
+// Weighted by how much the man actually shoots from where he stands: a golden
+// boot at centre-back keeps his tag and his share of whatever the team scores,
+// but he is not the reason the team scores more — the striker is. GOAL_W already
+// ranks that, so the same table does the work here.
+//
+// Scaled against the tag ceilings, not fixed to them: the multipliers were cut
+// roughly sixfold, so the same PER would have made this invisible. The greatest
+// finisher in the data is worth about +1 attack up front (~4.5% more goals), and
+// no XI can buy more than +2 however it is stacked.
+const TAG_ATK_PER = 7.5;
+const TAG_ATK_CAP = 2;
+function tagAtkBoost() {
+  if (classicMode()) return 0;
+  if (typeof tagGoalMult !== 'function' || typeof state === 'undefined') return 0;
+  let excess = 0;
+  (state.picks || []).forEach((pick, i) => {
+    if (!pick || !pick.player) return;
+    const pos = state.slots[i] && state.slots[i].pos;
+    const share = (GOAL_W[pos] ?? 0) / GOAL_W.ST;      // how much he shoots at all
+    excess += Math.max(0, tagGoalMult(pick.player.name, pos) - 1) * share;
+  });
+  return Math.min(TAG_ATK_CAP, TAG_ATK_PER * excess);
+}
+
+// What the four bars must show. They used to read calcGroupOVR straight, which
+// stopped being the truth the moment a tactic or a finisher's bonus could move a
+// line: the bar said 85 while the season was played at 88. Everything that draws
+// a line rating goes through here now — the same warning sim-engine.js already
+// carries about keeping the card and the simulation on the same numbers.
+function shownLineOVR(positions) {
+  const L = myLineRatings();
+  const same = a => Array.isArray(positions) && Array.isArray(a) &&
+    a.length === positions.length && a.every((p, i) => p === positions[i]);
+  if (same(ATK_POS)) return Math.round(L.atk);
+  if (same(MID_POS)) return Math.round(L.mid);
+  if (same(DEF_POS)) return Math.round(L.def);
+  if (same(['GK']))  return Math.round(L.gk);
+  return calcGroupOVR(positions);
+}
+
 function myLineRatings(ovrAt) {
   const ovr = teamOVR(ovrAt);
   const line = (positions) => calcGroupOVR(positions, ovrAt) ?? ovr;
+  const t = TACTICS[tacticOf(typeof state !== 'undefined' ? state.tactic : 'bal')] || TACTICS.bal;
   return {
     ovr,
-    atk: line(SIM2_LINES.atk.pos),
+    atk: line(SIM2_LINES.atk.pos) + t.atk + tagAtkBoost(),
     mid: line(SIM2_LINES.mid.pos),
-    def: line(SIM2_LINES.def.pos),
+    def: line(SIM2_LINES.def.pos) + t.def,
     gk:  line(SIM2_LINES.gk.pos),
   };
 }
@@ -613,6 +793,7 @@ function startLeagueDraft(code, settings) {
   pick('ratings-row', s.ratings_visible === false ? 'off' : 'on');
   pick('peakmode-row', s.peak_mode ? 'on' : 'off');
   pick('draftmode-row', s.draft_mode || 'squad-first');
+  pick('mode-row', 'full');          // a league is one contest — same style for all
   const oppSel = document.getElementById('opp-season-sel');
   if (oppSel) { oppSel.value = 'latest'; updateOppSeasonNote(); }
   document.getElementById('screen-setup').classList.add('league-locked');
@@ -635,19 +816,59 @@ function buildFormationCards() {
   });
 }
 
+let _selectedTactic = 'bal';
+
 function setFormationSelection(key) {
   _selectedFormationKey = key;
   document.querySelectorAll('.formation-chip').forEach(c =>
     c.classList.toggle('selected', c.dataset.key === key)
   );
-  // update the single live preview pitch
-  const preview = document.getElementById('formation-preview');
-  if (preview) preview.innerHTML = miniPitchHTML(FORMATIONS[key]);
+  buildTacticCards();
+  refreshFormationPreview();
 }
 
-function miniPitchHTML(f) {
-  const dots = f.slots.map(s =>
-    `<div class="mini-dot ${s.pos==='GK'?'gk':''}" style="left:${s.x}%;top:${s.y}%"></div>`
+// The three shapes a plain midfield can take, each saying plainly what it is.
+// Shown only where the choice exists — 4-2-3-1 has already made it.
+function buildTacticCards() {
+  const row = document.getElementById('tactic-row');
+  if (!row) return;
+  const classicPicked = (document.querySelector('#mode-row .opt-btn.selected')?.dataset.val) === 'classic';
+  if (classicPicked || !formationTactical(_selectedFormationKey)) {
+    row.style.display = 'none';
+    row.innerHTML = '';
+    _selectedTactic = 'bal';
+    return;
+  }
+  row.style.display = '';
+  row.innerHTML = TACTIC_KEYS.map(k => `
+    <button class="tactic-chip${k === _selectedTactic ? ' selected' : ''}" data-tactic="${k}">
+      <span class="tactic-name">${TACTICS[k].label}</span>
+      <span class="tactic-note">${TACTICS[k].note}</span>
+      ${tacticTrade(k) ? `<span class="tactic-trade">${tacticTrade(k)}</span>` : ''}
+    </button>`).join('');
+  row.querySelectorAll('.tactic-chip').forEach(btn =>
+    btn.addEventListener('click', () => setTacticSelection(btn.dataset.tactic)));
+}
+
+function setTacticSelection(key) {
+  _selectedTactic = tacticOf(key);
+  document.querySelectorAll('.tactic-chip').forEach(c =>
+    c.classList.toggle('selected', c.dataset.tactic === _selectedTactic));
+  refreshFormationPreview();
+}
+
+function refreshFormationPreview() {
+  const preview = document.getElementById('formation-preview');
+  if (preview) preview.innerHTML = miniPitchHTML(formationSlots(_selectedFormationKey, _selectedTactic));
+}
+
+// The dot for the man the tactic moved is marked, so the choice is visible on
+// the preview and not just in the label.
+function miniPitchHTML(slots) {
+  const list = Array.isArray(slots) ? slots : (slots && slots.slots) || [];
+  const dots = list.map(s =>
+    `<div class="mini-dot ${s.pos === 'GK' ? 'gk' : ''}${
+      s.role ? ' mini-role' : ''}" style="left:${s.x}%;top:${s.y}%"></div>`
   ).join('');
   return `<div class="mini-pitch-inner">${dots}</div>`;
 }
@@ -823,7 +1044,9 @@ function beginDraft() {
   state.showRatings = (ratingsEl?.dataset.val ?? 'on') === 'on';
   state.draftMode   = draftModeEl?.dataset.val ?? 'squad-first';
   state.peakMode    = (peakModeEl?.dataset.val ?? 'off') === 'on';
+  const classicPick = (document.querySelector('#mode-row .opt-btn.selected')?.dataset.val ?? 'full') === 'classic';
   state.formationId = _selectedFormationKey;
+  const tacticPick  = (!classicPick && formationTactical(_selectedFormationKey)) ? _selectedTactic : 'bal';
   state.challenge   = null; state.challengeDeck = null; state.challengeReqs = null;   // the setup screen never starts a challenge run
 
   // Opponents league — league drafts always face the latest season (shared fairness)
@@ -836,17 +1059,27 @@ function beginDraft() {
   state.leagueFormat = (state.leagueCode || state.duelCode) ? 'modern'
     : formatOf(document.getElementById('league-format-sel')?.value);
 
-  beginDraftWithState();
+  beginDraftWithState({ classic: classicPick, tactic: tacticPick });
 }
 
 // Starts the draft from whatever is already in `state` (formation, difficulty,
 // era, ratings, peak, challenge/deck) — used by beginDraft after reading the
 // setup screen, and directly by the challenges which lock everything.
-function beginDraftWithState() {
+function beginDraftWithState(style) {
+  // `state` is shared by every mode, so a field nobody sets is a field that
+  // carries over. The challenge, the gauntlet and the daily deck each set every
+  // other setting by hand for exactly that reason — and a style left behind
+  // would have been worse than a stale toggle: a daily challenge played in
+  // classic is a different simulation from everyone else's, scored on the same
+  // board. So the style is an ARGUMENT with a safe default, and a caller that
+  // wants something else has to say so.
+  state.classic = !!(style && style.classic);
+  state.tactic  = tacticOf(style && style.tactic);
+
   const rerolls = { easy:3, normal:1, hard:0 };
   state.teamRerollsLeft   = rerolls[state.difficulty] ?? 1;
   state.seasonRerollsLeft = rerolls[state.difficulty] ?? 1;
-  state.slots          = FORMATIONS[state.formationId].slots;
+  state.slots          = formationSlots(state.formationId, state.tactic);
   state.picks          = new Array(state.slots.length).fill(null);
   state.currentRound   = 0;
   state.usedSquadIds   = new Set();
@@ -880,6 +1113,8 @@ function saveDraftState() {
     localStorage.setItem(DRAFT_SAVE_KEY, JSON.stringify({
       v: 1,
       formationId: state.formationId,
+      tactic: state.tactic || 'bal',
+      classic: !!state.classic,
       leagueCode: state.leagueCode || null,
       career: state.career || null,
       mgw: state.mgw || null,
@@ -960,7 +1195,9 @@ function restoreDraftState() {
     clearDraftState();
     return false;
   }
-  const slots = FORMATIONS[d.formationId].slots;
+  const tactic = tacticOf(d.tactic);
+  const classic = d.classic === true;
+  const slots = formationSlots(d.formationId, tactic);
   if (!Array.isArray(d.picks) || d.picks.length !== slots.length) return false;
 
   const bySquadId = new Map(SQUADS.map(s => [s.id, s]));
@@ -974,7 +1211,7 @@ function restoreDraftState() {
   if (d.picks.some((p, i) => p && !picks[i])) return false;
 
   Object.assign(state, {
-    formationId: d.formationId, slots, picks,
+    formationId: d.formationId, tactic, classic, slots, picks,
     leagueCode: d.leagueCode ?? null,
     career: d.career ?? null,
     mgw: d.mgw ?? null,
@@ -1055,13 +1292,26 @@ function restoreDraftState() {
 // Markup shared by every filled token (draft pitch, pre-season, results) so the
 // three surfaces can't drift apart. showOvr is false wherever hiding ratings is
 // the point of the run.
-function filledTokenHTML(player, squad, showOvr) {
+function filledTokenHTML(player, squad, showOvr, slotPos) {
   const team    = getTeam(squad.teamId);
   const peakTag = state.peakMode && player.peak_ovr && player.peak_ovr > player.ovr ? '⚡' : '';
   const ovrHTML = showOvr ? `<span class="slot-ovr">${peakTag}${playerOVR(player)}</span>` : '';
+  // A man covering out of his position is worth 7% less to the team, and until
+  // now nothing on screen said so — the circle read 88 while the line bar used
+  // 82, and the arithmetic looked broken to anyone who checked it.
+  let oopHTML = '';
+  if (slotPos != null && !inNaturalPos(player, slotPos)) {
+    const own = (POS_HE[playerPositions(player)[0]] ?? playerPositions(player)[0]);
+    const here = (POS_HE[slotPos] ?? slotPos);
+    const eff = Math.round(playerOVR(player) * OUT_OF_POS);
+    const why = showOvr
+      ? `${own} בעמדת ${here} — נספר כ-${eff}`
+      : `${own} בעמדת ${here} — לא בעמדה הטבעית שלו`;
+    oopHTML = `<span class="slot-oop" title="${why}">⇄</span>`;
+  }
   return `
-    <div class="slot-circle filled-circle">
-      ${ovrHTML}
+    <div class="slot-circle filled-circle${oopHTML ? ' circle-oop' : ''}">
+      ${ovrHTML}${oopHTML}
       <span class="slot-player-short">${playerShortName(player.name)}</span>
     </div>
     <div class="slot-name-label">${player.name}</div>
@@ -1081,13 +1331,18 @@ function buildPitch(containerId, clickable) {
     token.dataset.idx = idx;
     token.innerHTML = `
       <div class="slot-circle">
-        <span class="slot-pos-label">${slot.pos}</span>
+        <span class="slot-pos-label">${slot.role ?? slot.pos}</span>
       </div>
       <div class="slot-name-label">${slot.label}</div>
     `;
     if (clickable) token.addEventListener('click', () => handleSlotClick(idx));
     container.appendChild(token);
   });
+  // Rebuilding the pitch wipes it, so whatever chemistry was drawn under the old
+  // XI has to go with it. Doing this here rather than at each call site is the
+  // point: a fresh draft forgot to, and the line still read "5 צמדים בהרכב"
+  // over eleven empty circles.
+  if (containerId === 'pitch-slots') chemPaint();
 }
 
 function getToken(idx) {
@@ -1102,7 +1357,8 @@ function fillToken(idx, player, squad) {
   token.style.setProperty('--tc', team.primaryColor);
   token.style.setProperty('--ts', team.secondaryColor);
   token.style.setProperty('--tx', textColorFor(team.primaryColor));
-  token.innerHTML = filledTokenHTML(player, squad, state.showRatings);
+  token.innerHTML = filledTokenHTML(player, squad, state.showRatings, state.slots[idx] && state.slots[idx].pos);
+  chemPaint();                     // a new man can complete a pair with anyone
   fitShortNames(token);
 }
 
@@ -1277,18 +1533,32 @@ function refreshAllTokens() {
       token.style.setProperty('--tc', team.primaryColor);
       token.style.setProperty('--ts', team.secondaryColor);
       token.style.setProperty('--tx', textColorFor(team.primaryColor));
-      token.innerHTML = filledTokenHTML(player, squad, state.showRatings);
+      token.innerHTML = filledTokenHTML(player, squad, state.showRatings, slot.pos);
     } else {
       token.className = 'slot-token empty';
       token.style.removeProperty('--tc');
       token.style.removeProperty('--ts');
       token.innerHTML = `
-        <div class="slot-circle"><span class="slot-pos-label">${slot.pos}</span></div>
+        <div class="slot-circle"><span class="slot-pos-label">${slot.role ?? slot.pos}</span></div>
         <div class="slot-name-label">${slot.label}</div>
       `;
     }
   });
+  chemPaint();
   fitShortNames();
+}
+
+// One entry point for everything chemistry draws on the draft screen: the rings,
+// the +N on each rating, and the line under the pitch.
+function chemPaint() {
+  if (classicMode()) {
+    const el = document.getElementById('chem-summary');
+    if (el) el.innerHTML = '';
+    return;
+  }
+  if (typeof chemPaintTokens !== 'function') return;
+  chemPaintTokens('pitch-slots');
+  if (typeof chemRenderSummary === 'function') chemRenderSummary('chem-summary');
 }
 
 // ─── Draft: Round management ───────────────────────────────────────────────────
@@ -1486,9 +1756,52 @@ function renderSquadPlayers(squad, filterSlotIdx = null) {
         natHTML = `<span class="pc-nats${hit ? ' pc-nats-hit' : ''}">${hit ? '🎯 ' : ''}${label}</span>`;
       }
     }
+    // A link has to be visible BEFORE the choice, or it is not a decision.
+    let chemHTML = '';
+    if (!classicMode() && typeof chemPreview === 'function') {
+      const link = chemPreview(player, state.picks);
+      if (link) {
+        const who = typeof playerShortName === 'function' ? playerShortName(link.with) : link.with;
+        const plus = state.showRatings === false ? '' : ` +${chemFmt(chemBonusOf(link.tier))}`;
+        chemHTML = `<span class="pc-chem chem-t${link.tier}" title="${chemWhy(link)}">🔗 צמד עם ${who}${plus}</span>`;
+      }
+    }
+    // Only the tags that would actually DO something for him, in his own
+    // position — the honours and the long-service badges are on his card, and
+    // putting them here as well buries the two icons a pick turns on.
+    // With a slot already chosen, judge the tags against that slot; otherwise
+    // against every position he plays, or a striker filed under CM|ST would show
+    // an empty row while his golden boots sit one slot away.
+    const tagWhere = filterSlotIdx !== null ? state.slots[filterSlotIdx].pos : fits;
+    const tagHTML = (!classicMode() && typeof tagStripHTML === 'function')
+      ? tagStripHTML(player.name, tagWhere, 3, true)
+      : '';
+    // A 7% cut belongs where the decision is made, not on the pitch afterwards.
+    // With a slot already chosen we know exactly what he would cost; picking the
+    // player first, we only warn when EVERY open slot he fits would dock him,
+    // because otherwise it is still his own choice to place him properly.
+    let oopHTML = '';
+    if (!unavailable) {
+      const targets = filterSlotIdx !== null
+        ? [state.slots[filterSlotIdx].pos]
+        : compatibleEmptySlots(player).map(i => state.slots[i].pos);
+      if (targets.length && targets.every(pos => !inNaturalPos(player, pos))) {
+        const eff  = Math.round(playerOVR(player) * OUT_OF_POS);
+        const cost = state.showRatings === false ? '' : ` ${eff}`;
+        const where = filterSlotIdx !== null
+          ? `בעמדת ${POS_HE[targets[0]] ?? targets[0]}`
+          : 'בכל עמדה פנויה שמתאימה לו';
+        const num = state.showRatings === false ? '' : ` — נספר כ-${eff} במקום ${playerOVR(player)}`;
+        oopHTML = `<span class="pc-oop" title="${player.name} משחק ${posLabel} · ${where}${num}">⇄${cost}</span>`;
+      }
+    }
+    // On a mouse the whole card is the trigger; on a touch screen there is no
+    // hover, so the ⓘ is the way in (and CSS hides it where hover exists).
+    const infoHTML = classicMode() ? ''
+      : `<button class="pc-info" aria-label="הכרטיס של ${player.name}">ⓘ</button>`;
     card.innerHTML = `
       <span class="pc-pos-badge" title="${posLabel}">${posShort}</span>
-      <span class="pc-name">${player.name}${natHTML}</span>
+      <span class="pc-name">${player.name}${infoHTML}${natHTML}${oopHTML}${tagHTML}${chemHTML}</span>
       ${ovrHTML}
     `;
     if (!unavailable) card.addEventListener('click', () => handlePlayerClick(player, card));
@@ -1619,7 +1932,7 @@ function updateDraftOVR() {
   if (!container) return;
   container.style.display = 'block';
   lines.forEach(({ id, label, pos, color }) => {
-    const val = calcGroupOVR(pos);
+    const val = calcGroupOVR(pos) === null ? null : shownLineOVR(pos);
     if (val === null) { const row = document.getElementById(id); if (row) row.style.display = 'none'; return; }
     let row = document.getElementById(id);
     if (!row) {
@@ -2052,7 +2365,7 @@ function buildOVRCard(overall) {
   if (!container) return;
   container.innerHTML = '';
   lines.forEach(line => {
-    const val = calcGroupOVR(line.pos);
+    const val = calcGroupOVR(line.pos) === null ? null : shownLineOVR(line.pos);
     if (val === null) return;
     const pct = Math.max(8, Math.min(100, ((val - 55) / 42) * 100));
     const row = document.createElement('div');
@@ -2096,9 +2409,13 @@ function buildPlayerStatsTable(ps) {
     const type = POS_TYPE(p.slotPos);
     const row = document.createElement('div');
     row.className = 'stats-row';
+    // the season just told a story; the tags say why he was the one telling it —
+    // and in a classic season they did not, so they are not offered as a reason
+    const tags = (!classicMode() && typeof tagStripHTML === 'function')
+      ? tagStripHTML(p.name, p.slotPos, 3) : '';
     row.innerHTML = `
       <span class="st-pos-badge ${type}">${p.slotPos}</span>
-      <span class="st-name">${playerShortName(p.name)}</span>
+      <span class="st-name">${playerShortName(p.name)}${tags}</span>
       <span class="st-num ${p.goals  > 0 ? 'green'  : ''}">${p.goals  > 0 ? p.goals  : '·'}</span>
       <span class="st-num ${p.assists> 0 ? 'yellow' : ''}">${p.assists> 0 ? p.assists: '·'}</span>
       <span class="st-num ${p.cs     > 0 ? 'cyan'   : ''}">${p.cs     > 0 ? p.cs     : '·'}</span>
@@ -2355,6 +2672,7 @@ function buildPitchInContainer(containerId) {
     const pick = state.picks[idx];
     const token = document.createElement('div');
     token.className = 'slot-token ' + (pick ? 'filled' : 'empty');
+    token.dataset.idx = idx;
     token.style.left = slot.x + '%';
     token.style.top  = slot.y + '%';
     if (pick) {
@@ -2362,15 +2680,19 @@ function buildPitchInContainer(containerId) {
       token.style.setProperty('--tc', team.primaryColor);
       token.style.setProperty('--ts', team.secondaryColor);
       token.style.setProperty('--tx', textColorFor(team.primaryColor));
-      token.innerHTML = filledTokenHTML(pick.player, pick.squad, showOvr);
+      token.innerHTML = filledTokenHTML(pick.player, pick.squad, showOvr, slot.pos);
     } else {
       token.innerHTML = `
-        <div class="slot-circle"><span class="slot-pos-label">${slot.pos}</span></div>
+        <div class="slot-circle"><span class="slot-pos-label">${slot.role ?? slot.pos}</span></div>
         <div class="slot-name-label">${slot.label}</div>
       `;
     }
     container.appendChild(token);
   });
+  if (typeof chemPaintTokens === 'function') chemPaintTokens(container);
+  if (typeof chemRenderSummary === 'function' && containerId === 'preseason-pitch-slots') {
+    chemRenderSummary('chem-summary-pre');
+  }
   fitShortNames(container);
 }
 
@@ -2814,19 +3136,30 @@ function renderSeasonStory(r) {
     { key: 'qual-cat-def', def: 'הגנה',  pos: DEF_POS },
     { key: 'qual-cat-gk',  def: 'שוער',  pos: ['GK'] },
   ];
-  const rated = cats.map(c => ({ ...c, val: calcGroupOVR(c.pos) })).filter(c => c.val !== null);
+  const rated = cats.map(c => ({ ...c, val: calcGroupOVR(c.pos) === null ? null : shownLineOVR(c.pos) }))
+    .filter(c => c.val !== null);
   const chipsEl = document.getElementById('res-qual-chips');
   chipsEl.innerHTML = rated.map(c => {
     const t = qualTier(c.val);
     return `<div class="qual-chip"><span class="qc-cat">${st(c.key, c.def)}</span>`
          + `<span class="qc-val" style="color:${t.color}">${st(t.key, t.def)}</span></div>`;
   }).join('');
-  // one-line summary: strongest + weakest line
-  const best  = rated.reduce((a, b) => b.val > a.val ? b : a);
-  const worst = rated.reduce((a, b) => b.val < a.val ? b : a);
-  document.getElementById('res-qual-summary').textContent =
-    fillTemplate(st('qual-summary-tmpl', 'החוזק הגדול היה ה{best}, והחוליה החלשה — ה{worst}.'),
-      { best: st(best.key, best.def), worst: st(worst.key, worst.def) });
+  // one-line summary: strongest + weakest line.
+  // Guarded because the reveal is animated: start a new draft while the results
+  // are still coming in and the XI is already gone, at which point every line is
+  // null, the reduce throws on an empty array, and everything after it on the
+  // screen — the strength bars included — never renders.
+  const summaryEl = document.getElementById('res-qual-summary');
+  if (summaryEl) {
+    if (!rated.length) summaryEl.textContent = '';
+    else {
+      const best  = rated.reduce((a, b) => b.val > a.val ? b : a);
+      const worst = rated.reduce((a, b) => b.val < a.val ? b : a);
+      summaryEl.textContent =
+        fillTemplate(st('qual-summary-tmpl', 'החוזק הגדול היה ה{best}, והחוליה החלשה — ה{worst}.'),
+          { best: st(best.key, best.def), worst: st(worst.key, worst.def) });
+    }
+  }
 
   // 3) Narrative recap — template chosen by outcome
   const pts = r.wins * 3 + r.draws;
@@ -3436,7 +3769,9 @@ document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('.opt-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       const row = btn.closest('.option-row');
-      if (row) selectOption(row.id, btn.dataset.val);
+      if (!row) return;
+      selectOption(row.id, btn.dataset.val);
+      if (row.id === 'mode-row') buildTacticCards();   // classic has no tactics
     });
   });
 });
