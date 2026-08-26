@@ -2622,7 +2622,11 @@ function animateResults(ovr) {
       });
     }
     // Show the placement popup first; only reveal the finish/stats once it's closed.
-    setTimeout(() => showPlacementPopup(tier, myRank, revealSummary), 350);
+    setTimeout(() => showPlacementPopup(tier, myRank, () => {
+      revealSummary();
+      // a beat after the summary appears, so it is a follow-up and not a wall
+      setTimeout(maybeSeasonSharePrompt, 1200);
+    }), 350);
   }
   if (skipBtn) skipBtn.onclick = endReveal;
   timer = setTimeout(revealOne, 200);
@@ -2881,6 +2885,53 @@ function renderSeasonStory(r) {
     div.textContent = c;  // safe: no HTML injection from templates/data
     coEl.appendChild(div);
   });
+}
+
+/* ── the one nudge, at the end of a season ────────────────────────────────── */
+// The career learned this first: people share what they are proud of, but only
+// if they are asked at the moment they feel it — and only once. This is the
+// same offer for an ordinary season, after the placement popup has been read,
+// with a box that turns it off for good.
+const SEASON_SHARE_KEY = '36-0-share-noprompt';
+
+function seasonPromptMuted() {
+  try { return localStorage.getItem(SEASON_SHARE_KEY) === '1'; } catch (e) { return false; }
+}
+
+function maybeSeasonSharePrompt() {
+  const r = window._lastResult, t = window._lastTier;
+  if (!r || !t || seasonPromptMuted()) return;
+  if (state.career) return;                 // a dynasty has its own, better, prompt
+  if (document.querySelector('.season-share-modal')) return;
+  // only while the player is still looking at the season they just played
+  if (!document.getElementById('screen-results')?.classList.contains('active')) return;
+
+  const wrap = document.createElement('div');
+  wrap.className = 'modal-overlay season-share-modal';
+  wrap.innerHTML = `
+    <div class="modal-box sp-box">
+      <button class="modal-close" id="sp-close" aria-label="סגירה">✕</button>
+      <div class="modal-title">🏁 ${typeof esc === 'function' ? esc(tierDisplay(t).name) : tierDisplay(t).name}</div>
+      <div class="sp-line" dir="rtl">
+        <b dir="ltr">${r.wins}-${r.draws}-${r.losses}</b> · ${r.wins * 3 + r.draws} נקודות · דירוג ${r.ovr}
+      </div>
+      <div class="sp-warn">אל תאבד את ההרכב שלך — שתף אותו כדי לשמור אותו.</div>
+      <button class="btn-primary btn-full" id="sp-share">📤 שתף את ההרכב</button>
+      <button class="sp-later" id="sp-later">אחר כך</button>
+      <label class="sp-mute"><input type="checkbox" id="sp-mute"> אל תציע לי יותר</label>
+    </div>`;
+  document.body.appendChild(wrap);
+
+  const close = () => {
+    if (wrap.querySelector('#sp-mute').checked) {
+      try { localStorage.setItem(SEASON_SHARE_KEY, '1'); } catch (e) {}
+    }
+    wrap.remove();
+  };
+  wrap.querySelector('#sp-close').onclick = close;
+  wrap.querySelector('#sp-later').onclick = close;
+  wrap.onclick = e => { if (e.target === wrap) close(); };
+  wrap.querySelector('#sp-share').onclick = () => { close(); openShareModal(); };
 }
 
 // ─── Share modal ───────────────────────────────────────────────────────────────
