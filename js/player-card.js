@@ -326,8 +326,10 @@ function pcHTML(player, slotPos) {
   if (f.goals.length) {
     const tot = f.goals.reduce((s, r) => s + r[1], 0);
     const boots = f.goals.filter(r => r[2] === 1).length;
-    rows.push(`<div class="pc-stat"><b>${tot}</b> ${pcN(tot, 'שער', 'שערים')} ב-${
-      f.goals.length} ${pcN(f.goals.length, 'עונה שנרשמה', 'עונות שנרשמו')}${
+    // "ב-2 עונות שנרשמו" was read as "we only have two seasons on him" — the
+    // count belongs to the TABLE, not to his career, and the career says 8.
+    rows.push(`<div class="pc-stat"><b>${tot}</b> ${pcN(tot, 'שער', 'שערים')} בטבלת המבקיעים · ${
+      f.goals.length} ${pcN(f.goals.length, 'עונה', 'עונות')}${
       boots ? ` · ${boots}× מלך שערים` : ''}</div>`);
     rows.push(`<div class="pc-seasons">${f.goals.slice(0, 6).map(r =>
       `<span class="pc-sn${r[2] === 1 ? ' pc-first' : ''}"><i dir="ltr">${r[0]}</i> ${r[1]} ${r[2] === 1 ? '👑' : `#${r[2]}`}</span>`).join('')}</div>`);
@@ -335,8 +337,8 @@ function pcHTML(player, slotPos) {
   if (f.assists.length) {
     const tot = f.assists.reduce((s, r) => s + r[1], 0);
     const kings = f.assists.filter(r => r[2] === 1).length;
-    rows.push(`<div class="pc-stat"><b>${tot}</b> ${pcN(tot, 'בישול', 'בישולים')} ב-${
-      f.assists.length} ${pcN(f.assists.length, 'עונה שנרשמה', 'עונות שנרשמו')}${
+    rows.push(`<div class="pc-stat"><b>${tot}</b> ${pcN(tot, 'בישול', 'בישולים')} בטבלת הבישולים · ${
+      f.assists.length} ${pcN(f.assists.length, 'עונה', 'עונות')}${
       kings ? ` · ${kings}× מלך בישולים` : ''}</div>`);
     rows.push(`<div class="pc-seasons">${f.assists.slice(0, 6).map(r =>
       `<span class="pc-sn${r[2] === 1 ? ' pc-first' : ''}"><i dir="ltr">${r[0]}</i> ${r[1]} ${r[2] === 1 ? '🎯' : `#${r[2]}`}</span>`).join('')}</div>`);
@@ -355,7 +357,7 @@ function pcHTML(player, slotPos) {
   }
   const realBlock = rows.length
     ? `<div class="pc-sec"><div class="pc-sec-t">במציאות</div>${rows.join('')}
-       <div class="pc-note">מתוך טבלאות מלכי השערים והבישולים של הליגה — רק העונות שבהן נכנס לרשימה.</div></div>`
+       <div class="pc-note">אלה הטבלאות של מלכי השערים והבישולים — הן סופרות רק עונות שבהן נכנס לרשימה, לא את כל הקריירה. הקריירה המלאה למטה.</div></div>`
     : '';   // no numbers is not a fact about him — say nothing, not sorry
 
   /* the career itself */
