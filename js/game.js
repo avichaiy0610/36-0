@@ -1318,9 +1318,15 @@ function filledTokenHTML(player, squad, showOvr, slotPos) {
       : `${own} בעמדת ${here} — לא בעמדה הטבעית שלו`;
     oopHTML = `<span class="slot-oop" title="${why}">⇄</span>`;
   }
+  // Without this a phone can reach a player's card only while he is still in the
+  // list: the pitch relies on hover, and a placed man is gone from the list.
+  // Same button and the same handler as the list card, so tapping it opens the
+  // sheet and never counts as tapping the token underneath.
+  const infoHTML = classicMode() ? ''
+    : `<button class="pc-info" aria-label="הכרטיס של ${player.name}">ⓘ</button>`;
   return `
     <div class="slot-circle filled-circle${oopHTML ? ' circle-oop' : ''}">
-      ${ovrHTML}${oopHTML}
+      ${ovrHTML}${oopHTML}${infoHTML}
       <span class="slot-player-short">${playerShortName(player.name)}</span>
     </div>
     <div class="slot-name-label">${player.name}</div>
