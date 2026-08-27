@@ -84,24 +84,36 @@
   <!-- ══ NAV BAR ═══════════════════════════════════════════════════════════════ -->
   <nav id="app-nav" class="app-nav">
     <div class="nav-logo" id="nav-home" dir="ltr" role="button" tabindex="0" title="לעמוד הראשי">36–0</div>
-    <div class="nav-actions">
-      <button class="nav-btn" id="nav-daily">🗓️ אתגרים</button>
-      <button class="nav-btn" id="nav-minigames">🎲 משחקונים <span class="nav-beta">בטא</span></button>
-      <button class="nav-btn" id="nav-leagues">ליגות</button>
-      <button class="nav-btn" id="nav-duel">1v1 <span class="nav-beta">בטא</span></button>
-      <button class="nav-btn" id="nav-leaderboard">לוח שיאים</button>
-      <button class="nav-btn" id="nav-achievements">הישגים</button>
-      <button class="nav-btn" id="nav-profile">👤 פרופיל</button>
-      <button class="nav-btn" id="nav-gauntlet">🗺 גאונטלט <span class="nav-beta">בטא</span></button>
-      <button class="nav-btn nav-btn-icon" id="nav-theme" title="עיצוב" aria-label="עיצוב">⚙️</button>
-      <div class="nav-user" id="nav-user" style="display:none">
-        <img class="nav-avatar" id="nav-avatar" src="" alt="" style="display:none">
-        <span class="nav-username" id="nav-username"></span>
-        <button class="nav-btn nav-btn-sm" id="nav-logout">יציאה</button>
+    <!-- On a phone .nav-actions IS the drawer: same buttons, same ids, same
+         listeners — only the box around them changes. Nothing is duplicated,
+         so auth.js can keep setting display on #nav-user / #nav-login and the
+         site-text selectors keep resolving. -->
+    <!-- Inside the nav on purpose: .app-nav is position:fixed with a z-index, so
+         it is a stacking context. A backdrop placed outside it would paint over
+         the drawer no matter how high its z-index went. -->
+    <div class="nav-bd" id="nav-bd" hidden></div>
+    <div class="nav-right">
+      <div class="nav-actions" id="nav-actions">
+        <button class="nav-btn" id="nav-daily">🗓️ אתגרים</button>
+        <button class="nav-btn" id="nav-minigames">🎲 משחקונים <span class="nav-beta">בטא</span></button>
+        <button class="nav-btn" id="nav-leagues">ליגות</button>
+        <button class="nav-btn" id="nav-duel">1v1 <span class="nav-beta">בטא</span></button>
+        <button class="nav-btn" id="nav-leaderboard">לוח שיאים</button>
+        <button class="nav-btn" id="nav-achievements">הישגים</button>
+        <button class="nav-btn" id="nav-profile">👤 פרופיל</button>
+        <button class="nav-btn" id="nav-gauntlet">🗺 גאונטלט <span class="nav-beta">בטא</span></button>
+        <button class="nav-btn nav-btn-icon" id="nav-theme" title="עיצוב" aria-label="עיצוב">⚙️</button>
+        <div class="nav-user" id="nav-user" style="display:none">
+          <img class="nav-avatar" id="nav-avatar" src="" alt="" style="display:none">
+          <span class="nav-username" id="nav-username"></span>
+          <button class="nav-btn nav-btn-sm" id="nav-logout">יציאה</button>
+        </div>
+        <div id="theme-panel" class="theme-panel" style="display:none"></div>
       </div>
       <button class="nav-btn nav-btn-primary" id="nav-login">התחבר</button>
+      <button class="nav-burger" id="nav-burger" aria-expanded="false"
+              aria-controls="nav-actions" aria-label="תפריט">☰</button>
     </div>
-    <div id="theme-panel" class="theme-panel" style="display:none"></div>
   </nav>
 
   <!-- ══ AUTH MODAL ════════════════════════════════════════════════════════════ -->
@@ -181,6 +193,16 @@
           <span class="dw-arrow">←</span>
         </span>
         <span class="dw-sub" id="wl-sub">ליגה פתוחה לכולם, נושא חדש בכל שבוע</span>
+      </button>
+      <!-- The gauntlet's second door. Until now the nav button was its only one,
+           and on a phone that button sat a full screen past the right edge. -->
+      <button id="btn-gauntlet-card" class="daily-welcome-card gt-card">
+        <span class="dw-top">
+          <span class="dw-icon">🗺</span>
+          <span class="dw-title">גאונטלט <span class="nav-beta">בטא</span></span>
+          <span class="dw-arrow">←</span>
+        </span>
+        <span class="dw-sub" id="gt-card-sub">ריצה אחת, תחנה אחרי תחנה — כמה רחוק תגיע?</span>
       </button>
       <a class="btn-coffee btn-coffee-welcome" id="btn-coffee-welcome" href="https://ko-fi.com/360ligathaal" target="_blank" rel="noopener">☕ אוהב את המשחק? קנה לי קפה</a>
       <button class="wn-link" id="btn-whatsnew"><span id="wn-label">מה חדש!</span><span class="wn-dot" id="wn-dot"></span></button>
@@ -944,5 +966,6 @@
   <script src="js/mg-grid.js"></script>
   <script src="js/player-card.js"></script>
   <script src="js/theme.js"></script>
+  <script src="js/nav-drawer.js"></script>
 </body>
 </html>
