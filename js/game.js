@@ -164,11 +164,12 @@ function normalizePos(pos) { return POS_NORMALIZE[pos] ?? pos; }
 const COMPAT = {
   GK:  ['GK'],
   RB:  ['RB'],  CB: ['CB'],  LB: ['LB'],
-  // One central midfield. A holding player, a box-to-box and a playmaker are
-  // three labels on the same job here: any of them fills any central slot at
-  // full value. The four formations that field a CDM or a CAM slot still shape
-  // the pitch, they just do not gatekeep who may stand there.
-  CDM: ['CDM','CM','CAM'], CM: ['CM','CDM','CAM'], CAM: ['CAM','CM','CDM'],
+  // The centre is one job with two ends, and CM is the bridge between them: a
+  // holding player and a playmaker both slot into midfield, and a midfielder
+  // covers either end. But the two ends do not swap with each other — asking a
+  // playmaker to sit in front of the back four, or a holder to play between the
+  // lines, is not a near-enough move, it is a different footballer.
+  CDM: ['CDM','CM'], CM: ['CM','CDM','CAM'], CAM: ['CAM','CM'],
   RM:  ['RM','RW'],  LM: ['LM','LW'],
   RW:  ['RW','RM'],  LW: ['LW','LM'],
   CF:  ['CF','ST'],  ST: ['ST','CF'],
@@ -673,16 +674,31 @@ function tagCleanBoost() {
 }
 const TAG_CLEAN_CAP = 1.25;      // no XI buys more than a quarter again
 
+// What a room full of winners is worth. Applied to the four lines the season is
+// played with, and deliberately NOT to the headline rating: the number on the
+// card and on the leaderboard stays the squad you actually drafted.
+const TAG_WINNER_EACH = 0.05;
+const TAG_WINNER_CAP  = 0.5;
+function tagWinnerBoost() {
+  if (classicMode() || typeof tagsOf !== 'function' || typeof state === 'undefined') return 0;
+  let n = 0;
+  (state.picks || []).forEach(p => {
+    if (p && p.player && tagsOf(p.player.name).some(t => t.key === 'serial_winner')) n++;
+  });
+  return Math.min(TAG_WINNER_CAP, n * TAG_WINNER_EACH);
+}
+
 function myLineRatings(ovrAt) {
   const ovr = teamOVR(ovrAt);
   const line = (positions) => calcGroupOVR(positions, ovrAt) ?? ovr;
   const t = TACTICS[tacticOf(typeof state !== 'undefined' ? state.tactic : 'bal')] || TACTICS.bal;
+  const win = tagWinnerBoost();
   return {
     ovr,
-    atk: line(SIM2_LINES.atk.pos) + t.atk + tagAtkBoost(),
-    mid: line(SIM2_LINES.mid.pos),
-    def: line(SIM2_LINES.def.pos) + t.def,
-    gk:  line(SIM2_LINES.gk.pos),
+    atk: line(SIM2_LINES.atk.pos) + t.atk + tagAtkBoost() + win,
+    mid: line(SIM2_LINES.mid.pos) + win,
+    def: line(SIM2_LINES.def.pos) + t.def + win,
+    gk:  line(SIM2_LINES.gk.pos) + win,
     cs:  tagCleanBoost(),
   };
 }

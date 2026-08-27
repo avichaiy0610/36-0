@@ -38,7 +38,15 @@ const TAG_DEFS = {
   wall:          { icon: '🧱', name: 'הגנה איתנה', clean: 0.007 },
   gk_wall:       { icon: '🧤', name: 'שער נעול',   clean: 0.02 },
   poty:          { icon: '🏅', name: 'כדורגלן העונה' },
-  serial_winner: { icon: '🏆', name: 'זוכה אליפויות' },
+  // This one does not touch the player at all — it nudges the SIDE. A dressing
+  // room of men who have won before finishes a little higher, which is the only
+  // honest way to model it: a title is a threshold, not a slope. Measured, one
+  // rating point is worth nothing to a mid-table squad, twenty-four percentage
+  // points to one sitting exactly on the cusp, and nothing again to a squad that
+  // already wins every year — so no fixed "+x% to win the league" could ever be
+  // true. What the tag gives is a small, honest push; where a season is close it
+  // decides some of them, and where it is not it changes nothing.
+  serial_winner: { icon: '🏆', name: 'זוכה אליפויות', team: true },
   one_club:      { icon: '❤️', name: 'נאמן למועדון' },
   ironman:       { icon: '🗿', name: 'ותיק הליגה' },
   three_decades: { icon: '🕰', name: 'שלושה עשורים' },

@@ -293,6 +293,9 @@ function pcTagEffect(t, slotPos) {
   // Worth the same whether he did it once or five times — the ×5 beside the name
   // is the story, this line is the effect.
   const pct = n => Math.round(n * 1000) / 10;
+  // A tag that lifts the side, not the man, cannot be written as his percentage.
+  if (d.team) return { live: true, story: false,
+    text: 'הקבוצה שלו מסיימת מעט גבוה יותר' };
   if (d.clean) return { live: true, story: false, text: `סיכוי גבוה ב-${pct(d.clean)}% לשער נקי` };
   const verb = d.goal ? 'יבקיע' : 'יבשל';
   return { live: true, story: false,
