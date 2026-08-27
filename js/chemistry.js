@@ -189,7 +189,9 @@ function chemSummaryHTML(picks) {
   const more = list.length > 3 ? ' ועוד ' + (list.length - 3) : '';
   const blind = (typeof state !== 'undefined') && state.showRatings === false;
   const rating = (delta > 0 && !blind)
-    ? ' · דירוג הקבוצה <b>' + (teamOVR() - delta) + ' → ' + teamOVR() + '</b>'
+    // dir="ltr" or the bidi algorithm lays the two numbers out right-to-left and
+    // the arrow ends up pointing at the OLD rating — "87 → 88" reads as 88 → 87.
+    ? ' · דירוג הקבוצה <b dir="ltr">' + (teamOVR() - delta) + ' → ' + teamOVR() + '</b>'
     : '';
   return '<div class="chem-summary">🔗 <b>' + list.length +
     (list.length === 1 ? ' צמד' : ' צמדים') + '</b> בהרכב' + rating +

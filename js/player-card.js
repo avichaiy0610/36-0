@@ -324,7 +324,14 @@ function pcHTML(player, slotPos) {
   let head = '';
   const pos = typeof player === 'object' && typeof playerPositions === 'function'
     ? playerPositions(player).join(' | ') : (e ? e.pos : '');
+  // Two different numbers, and the badge must be the one the game is played
+  // with — the list said 79 while the card said 85, and a player checking the
+  // arithmetic had no way to know the card had quietly switched measure. The
+  // career best is a fact ABOUT him, so it goes in the career section, named.
   const peak = e ? e.peak : (typeof player === 'object' ? (player.peak_ovr || player.ovr) : 0);
+  const inPlay = (typeof player === 'object' && player && typeof playerOVR === 'function')
+    ? playerOVR(player) : null;
+  const headOVR = inPlay == null ? peak : inPlay;
   const showR = typeof state === 'undefined' || state.showRatings !== false;
   // Second citizenships come from Transfermarkt's flag titles and are not
   // something we can stand behind about a real person, so the card shows what
@@ -343,7 +350,7 @@ function pcHTML(player, slotPos) {
     <div class="pc-head">
       <div class="pc-h-name">${pcEsc(name)}</div>
       <div class="pc-h-sub">${pcEsc(pos)}${nats ? ' · ' + nats : ''}</div>
-      ${showR && peak ? `<div class="pc-h-ovr"><span dir="ltr">${peak}</span></div>` : ''}
+      ${showR && headOVR ? `<div class="pc-h-ovr"><span dir="ltr">${headOVR}</span></div>` : ''}
     </div>`;
 
   /* what he did, with numbers */
@@ -386,11 +393,15 @@ function pcHTML(player, slotPos) {
     : '';   // no numbers is not a fact about him — say nothing, not sorry
 
   /* the career itself */
+  // rows are sorted by year, so this is the FIRST season he was at his best
+  const peakSeason = e ? (e.rows.find(r => r.ovr === e.peak) || {}).season : '';
   const career = e ? `
     <div class="pc-sec">
       <div class="pc-sec-t">בליגה</div>
       <div class="pc-stat"><b>${e.seasons}</b> ${pcN(e.seasons, 'עונה', 'עונות')} · <i dir="ltr">${e.first.season}–${e.last.season}</i> · ${
         e.clubs.length} ${e.clubs.length === 1 ? 'מועדון' : 'מועדונים'}</div>
+      ${showR && e.peak ? `<div class="pc-stat">שיא קריירה <b>${e.peak}</b>${
+        peakSeason ? ` · <i dir="ltr">${pcEsc(peakSeason)}</i>` : ''}</div>` : ''}
       <div class="pc-clubs">${f.byClub.map(c =>
         `<span class="pc-club">${badge(c.teamId)} ${pcEsc(club(c.teamId))} <i>${c.n}</i></span>`).join('')}</div>
       ${pcStoryLines(name, e).map(l => `<div class="pc-story">${pcEsc(l)}</div>`).join('')}

@@ -773,7 +773,7 @@ function crRenderTransfer(box, run) {
         <div class="cr-p-main">
           <span class="cr-p-slot">${crEsc(r.slot.pos)}</span>
           <span class="cr-p-name">${crEsc(r.next.player.name)}</span>
-          <span class="cr-p-ovr">${r.cur.player.ovr} → <strong>${r.next.player.ovr}</strong> ${arrow}</span>
+          <span class="cr-p-ovr"><span dir="ltr">${r.cur.player.ovr} → <strong>${r.next.player.ovr}</strong></span> ${arrow}</span>
         </div>
         <div class="cr-p-sub">${crEsc(r.oldClub)} ${move} ${pos}</div>
         ${chem}
