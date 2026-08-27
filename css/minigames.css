@@ -252,3 +252,38 @@
 .mgt-answer-head span { color: var(--accent); margin: 0 3px; }
 .mgt-answer-names { font-size: 12.5px; margin-top: 3px; line-height: 1.6; }
 .mgt-perfect { text-align: center; font-size: 1rem; font-weight: 800; color: var(--accent); margin-top: 14px; }
+
+/* ── The auction: who you are actually bidding against ────────────────────────
+   The rivals were named on the intro screen and then vanished, so from the first
+   lot onward it read as bidding into the void. Their money and their remaining
+   holes are what decide whether they can take a player off you. */
+.mga-rivals { margin: 8px 0 4px; }
+.mga-rivals-t {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .05em;
+  color: var(--dim);
+  margin-bottom: 4px;
+}
+.mga-rivals-row { display: flex; gap: 6px; }
+.mga-rival {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 5px 6px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  min-width: 0;
+}
+.mga-rival b {
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mga-rival i { font-style: normal; font-size: 10px; color: var(--dim); }
+.mga-rival-out { opacity: .45; }
+.mga-rival-out i { color: var(--dim); }

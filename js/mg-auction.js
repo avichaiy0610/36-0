@@ -143,6 +143,28 @@ function mgaRivalBid(rival, lot, slots) {
 }
 
 /* ── one lot ──────────────────────────────────────────────────────────────── */
+// Who you are bidding against, and the only two things about them that decide
+// whether they can take a lot off you: what is left in their pocket and how many
+// holes they still have to fill. A rival with 40 coins and six slots cannot
+// outbid you here, and knowing that is the whole game — the blind part is the
+// BID, not the identity of the man across the table. Their appetite (`greed`)
+// stays hidden, which is what keeps any single lot a guess.
+function mgaRivalsHTML(run) {
+  if (!run.rivals || !run.rivals.length) return '';
+  return `<div class="mga-rivals">
+    <div class="mga-rivals-t">מולך במכרז</div>
+    <div class="mga-rivals-row">${run.rivals.map(r => {
+      const need = mgaNeed(r.picks);
+      const spent = done => done ? ' mga-rival-out' : '';
+      const out = need === 0 || r.budget < 1;
+      return `<span class="mga-rival${spent(out)}">
+        <b>${mgEsc(r.name)}</b>
+        <i>${out ? 'סיים' : '💰 ' + r.budget + ' · ' + need + ' משבצות'}</i>
+      </span>`;
+    }).join('')}</div>
+  </div>`;
+}
+
 function mgaRenderLot() {
   const run = _mgaRun;
   const box = document.getElementById('mg-content');
@@ -163,6 +185,7 @@ function mgaRenderLot() {
       <span>פריט ${run.at + 1}/${run.lots.length}</span>
       <span>משבצות: <strong>${mgaNeed(run.picks)}</strong></span>
     </div>
+    ${mgaRivalsHTML(run)}
     ${run.last ? `<div class="mga-last ${run.last.mine ? 'mine' : ''}">${mgEsc(run.last.text)}</div>` : ''}
     ${(run.skipped && run.skipped.length) ? `<div class="mga-skipped">בזמן שחיכית: ${
       run.skipped.slice(0, 3).map(t => mgEsc(t.replace(/^[✅❌] /, ''))).join(' · ')}</div>` : ''}
