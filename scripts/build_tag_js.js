@@ -57,11 +57,31 @@ for (const r of rows) {
 // Only what actually happened: the goals and assists a player was credited with
 // in the real season lists, and who won the league / conceded fewest that year.
 // Nothing is estimated, and a player who never made a list simply has none.
-const real = {};
+// Same guard as the tag generator: a scorer row belongs to the man who was at
+// that club that season, not to everyone who happens to share his name. Without
+// it Rafi Cohen the goalkeeper carried 31 league goals scored by Rafi Cohen the
+// striker, in seasons the two of them spent at different clubs.
+const SQ = new Function(R('js/data.js') + ';\nreturn SQUADS;')();
+// Where two men shared a name our squads carry a suffix (רפי כהן השוער /
+// רפי כהן החלוץ, the way טל בן חיים was always split). The league tables know
+// nothing of that, so a row is matched on the bare name and then on the club and
+// season — which is exactly what tells the two of them apart.
+const SPLIT_SUFFIX = /\s+(?:השוער|החלוץ|הבלם|הקשר)$/;
+const bare = n => norm(n).replace(SPLIT_SUFFIX, '');
+// bare name + season + club → the full name we file the numbers under
+const placed = new Map();
+SQ.forEach(sq => sq.players.forEach(p =>
+  placed.set(bare(p.name) + '|' + sq.season + '|' + sq.teamId, norm(p.name))));
+
+const real = {}, orphan = [];
 const addReal = (table, field) => Object.keys(table || {}).forEach(season =>
   (table[season] || []).forEach(r => {
-    const k = norm(r.name);
-    (real[k] = real[k] || { g: [], a: [] })[field].push([season, r.n, r.r]);
+    const who = placed.get(bare(r.name) + '|' + season + '|' + r.teamId);
+    if (!who) {
+      orphan.push(`${season} ${r.name} (${r.teamId})`);
+      return;
+    }
+    (real[who] = real[who] || { g: [], a: [] })[field].push([season, r.n, r.r]);
   }));
 addReal(LT.LEAGUE_SCORERS, 'g');
 addReal(LT.LEAGUE_ASSISTS, 'a');
@@ -101,5 +121,7 @@ const PLAYER_REAL = ${JSON.stringify(real, null, 0)};
 const SEASON_FACTS = ${JSON.stringify(seasons, null, 0)};
 `, 'utf8');
 
+if (orphan.length) console.log(`  ${orphan.length} table rows had no matching squad place and were left out` +
+  (orphan.length <= 6 ? ': ' + orphan.join(' | ') : ''));
 console.log(`wrote ${names.length} players (${rows.length} tags), ` +
   `${Object.keys(real).length} with real season numbers, to js/tag-data.js`);

@@ -86,7 +86,7 @@ const TAG_ORDER = ['poty', 'golden_boot', 'playmaker', 'ten_goals', 'ten_assists
 // this is simply "does it carry an effect" — the honours and the long-service
 // badges are story, the four that move goals and assists are not.
 function tagFires(tag) {
-  return !!(tag.def.goal || tag.def.assist || tag.def.clean);
+  return !!(tag.def.goal || tag.def.assist || tag.def.clean || tag.def.team);
 }
 
 /* ── what they change ─────────────────────────────────────────────────────── */

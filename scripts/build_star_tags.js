@@ -26,6 +26,13 @@ const LT = new Function(R('js/league_tables.js') +
 
 const clean = n => String(n).replace(/[‎‏]/g, '').trim();
 
+// Where two men shared a name our squads carry a suffix (רפי כהן השוער /
+// רפי כהן החלוץ, the way טל בן חיים was always split). The league tables know
+// nothing of that, so a table row is matched on the bare name and then on the
+// club and season, which is what tells the two of them apart.
+const SPLIT_SUFFIX = /\s+(?:השוער|החלוץ|הבלם|הקשר)$/;
+const bare = n => clean(n).replace(SPLIT_SUFFIX, '');
+
 /* ── who the stars are ────────────────────────────────────────────────────── */
 const P = new Map();
 for (const sq of SQUADS) {
@@ -46,16 +53,23 @@ Object.keys(LT.LEAGUE_TABLES).forEach(s => {
   const first = (LT.LEAGUE_TABLES[s] || []).find(r => r.pos === 1);
   if (first) champOf[s] = first.teamId;
 });
+// The club travels with the row, and it has to: two men can share a name. Rafi
+// Cohen the striker scored 18 for Maccabi Haifa in 1999/00 while Rafi Cohen the
+// goalkeeper was at Hapoel Petah Tikva, and matching on the name alone handed a
+// keeper 31 league goals and a "double-digit scorer" tag.
 const crown = (table) => {
   const out = new Map();
   Object.keys(table || {}).forEach(s => {
     (table[s] || []).filter(r => r.r === 1).forEach(r => {
-      const n = clean(r.name);
-      out.set(n, (out.get(n) || []).concat([{ season: s, n: r.n }]));
+      const n = bare(r.name);
+      out.set(n, (out.get(n) || []).concat([{ season: s, n: r.n, team: r.teamId }]));
     });
   });
   return out;
 };
+// was this the man who was actually there that year?
+const wasAt = (e, row) => !row.team || e.rows.some(r => r.season === row.season && r.team === row.team);
+const his = (map, e) => (map.get(bare(e.name)) || []).filter(row => wasAt(e, row));
 const goldenBoots = crown(LT.LEAGUE_SCORERS);
 const playmakers  = crown(LT.LEAGUE_ASSISTS);
 
@@ -103,6 +117,7 @@ const POTY = [
   ['2025/26', 'קינגס קנגאווה', 'hapoel-beersheba'],
 ];
 const norm = n => String(n).replace(/[‎‏]/g, '').replace(/[׳’`´']/g, "'").replace(/\s+/g, ' ').trim();
+
 
 // And WHICH keeper kept those clean sheets. We have no minutes, so the first
 // choice is taken to be the best-rated keeper in that squad — which the data
@@ -161,8 +176,8 @@ for (const [season, name, team] of POTY) {
 const seasonGoals = new Map(), seasonAssists = new Map();
 const tally = (table, into) => Object.keys(table || {}).forEach(s =>
   (table[s] || []).forEach(r => {
-    const n = clean(r.name);
-    into.set(n, (into.get(n) || []).concat([{ season: s, n: r.n }]));
+    const n = bare(r.name);
+    into.set(n, (into.get(n) || []).concat([{ season: s, n: r.n, team: r.teamId }]));
   }));
 tally(LT.LEAGUE_SCORERS, seasonGoals);
 tally(LT.LEAGUE_ASSISTS, seasonAssists);
@@ -171,13 +186,13 @@ tally(LT.LEAGUE_ASSISTS, seasonAssists);
 const TAGS = [
   { key: 'golden_boot', name: 'מלך שערים',    icon: '👑',
     why: 'סיים עונה כמלך השערים של הליגה',
-    test: e => (goldenBoots.get(e.name) || []).length,
-    detail: e => (goldenBoots.get(e.name) || []).map(x => `${x.season} (${x.n})`).join(' · ') },
+    test: e => his(goldenBoots, e).length,
+    detail: e => his(goldenBoots, e).map(x => `${x.season} (${x.n})`).join(' · ') },
 
   { key: 'playmaker', name: 'מלך בישולים',    icon: '🎯',
     why: 'סיים עונה כמלך הבישולים של הליגה',
-    test: e => (playmakers.get(e.name) || []).length,
-    detail: e => (playmakers.get(e.name) || []).map(x => `${x.season} (${x.n})`).join(' · ') },
+    test: e => his(playmakers, e).length,
+    detail: e => his(playmakers, e).map(x => `${x.season} (${x.n})`).join(' · ') },
 
   { key: 'serial_winner', name: 'זוכה אליפויות', icon: '🏆',
     why: 'שלוש אליפויות ומעלה',
@@ -222,14 +237,14 @@ const TAGS = [
 
   { key: 'ten_goals', name: 'מבקיע דו ספרתי', icon: '⚽',
     why: 'עשרה שערים ומעלה בעונה',
-    test: e => (seasonGoals.get(e.name) || []).filter(x => x.n >= 10).length,
-    detail: e => (seasonGoals.get(e.name) || []).filter(x => x.n >= 10)
+    test: e => his(seasonGoals, e).filter(x => x.n >= 10).length,
+    detail: e => his(seasonGoals, e).filter(x => x.n >= 10)
       .map(x => `${x.season} (${x.n})`).join(' · ') },
 
   { key: 'ten_assists', name: 'מבשל דו ספרתי', icon: '🅰️',
     why: 'עשרה בישולים ומעלה בעונה',
-    test: e => (seasonAssists.get(e.name) || []).filter(x => x.n >= 10).length,
-    detail: e => (seasonAssists.get(e.name) || []).filter(x => x.n >= 10)
+    test: e => his(seasonAssists, e).filter(x => x.n >= 10).length,
+    detail: e => his(seasonAssists, e).filter(x => x.n >= 10)
       .map(x => `${x.season} (${x.n})`).join(' · ') },
 
   { key: 'three_decades', name: 'שלושה עשורים', icon: '🕰',
@@ -253,8 +268,8 @@ const TAGS = [
 // assister, belongs on this list whatever number we happened to give him.
 function hasHonour(e) {
   return (potyBy.get(norm(e.name)) || []).length
-      || (goldenBoots.get(e.name) || []).length
-      || (playmakers.get(e.name) || []).length
+      || his(goldenBoots, e).length
+      || his(playmakers, e).length
       // keeping the league's meanest defence is an honour too, and the men who
       // did it are not always rated 85: Goresh peaks at 84, Haimov at 82.
       || e.rows.some(r => bestDefenceKeeper[r.season] === norm(e.name));
@@ -281,8 +296,8 @@ if (belowCut.length) {
   console.error(`  + ${belowCut.length} in on an honour rather than a rating:`);
   belowCut.forEach(e => console.error(`      ${e.name} (${e.peak}) — ` +
     [(potyBy.get(norm(e.name)) || []).length ? 'כדורגלן העונה' : '',
-     (goldenBoots.get(e.name) || []).length ? 'מלך שערים' : '',
-     (playmakers.get(e.name) || []).length ? 'מלך בישולים' : ''].filter(Boolean).join(' · ')));
+     his(goldenBoots, e).length ? 'מלך שערים' : '',
+     his(playmakers, e).length ? 'מלך בישולים' : ''].filter(Boolean).join(' · ')));
 }
 if (gkUnclear.length) console.error('  ⚠ seasons with no keeper credited (too close to call): ' + gkUnclear.join(' | '));
 if (potyBad.length) console.error('  ⚠ POTY rows that did NOT verify: ' + potyBad.join(' | '));

@@ -289,7 +289,7 @@ function pcTagEffect(t, slotPos) {
   // not promise an effect the simulation will never apply.
   if (typeof classicMode === 'function' && classicMode()) return { text: '', live: false, story: true };
   // A tag with no effect needs no sentence — the name and the seasons say it.
-  if (!d.goal && !d.assist && !d.clean) return { text: '', live: false, story: true };
+  if (!d.goal && !d.assist && !d.clean && !d.team) return { text: '', live: false, story: true };
   // Worth the same whether he did it once or five times — the ×5 beside the name
   // is the story, this line is the effect.
   const pct = n => Math.round(n * 1000) / 10;
@@ -416,7 +416,7 @@ function pcHTML(player, slotPos) {
         : ''}
       <div class="pc-note">${classic
         ? 'במשחק קלאסי התגיות הן היסטוריה בלבד ואינן משפיעות על העונה.'
-        : 'התגיות משנות מי מבקיע ומי מבשל — לא את תוצאת המשחק.'}</div>
+        : 'רוב התגיות קובעות מי מבקיע ומי מבשל. זוכה אליפויות והתגיות ההגנתיות משפיעות גם על התוצאה.'}</div>
     </div>` : '';
 
   /* who he played with */
