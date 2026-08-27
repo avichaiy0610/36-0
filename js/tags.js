@@ -24,12 +24,19 @@
 // it decided one — a squad of them scored at will. A tag should colour the story
 // of a year, not win it, so the ceilings are 8% for the two crowns and 5% for
 // the double-digit seasons.
+// A tag is a tag. Winning it four times is a bigger story and the card says so,
+// but it is not four times the effect — the number below is what it is worth,
+// once, however many times he earned it. That keeps a fifteen-year career from
+// compounding into a different game, and it is why none of these need a ceiling.
 const TAG_DEFS = {
-  golden_boot:   { icon: '👑', name: 'מלך שערים',       goal: 0.04, goalCap: 1.08 },
-  ten_goals:     { icon: '⚽', name: 'מבקיע דו ספרתי',   goal: 0.015, goalCap: 1.05 },
-  playmaker:     { icon: '🎯', name: 'מלך בישולים',     assist: 0.04, assistCap: 1.08 },
-  ten_assists:   { icon: '🅰️', name: 'מבשל דו ספרתי',    assist: 0.015, assistCap: 1.05 },
-  wall:          { icon: '🧱', name: 'הגנה איתנה' },
+  golden_boot:   { icon: '👑', name: 'מלך שערים',       goal: 0.08 },
+  ten_goals:     { icon: '⚽', name: 'מבקיע דו ספרתי',   goal: 0.05 },
+  playmaker:     { icon: '🎯', name: 'מלך בישולים',     assist: 0.08 },
+  ten_assists:   { icon: '🅰️', name: 'מבשל דו ספרתי',    assist: 0.05 },
+  // A back four can hold three or four of these men at once, which is why a
+  // defender's is small. There is only ever one keeper, so his is worth more.
+  wall:          { icon: '🧱', name: 'הגנה איתנה', clean: 0.007 },
+  gk_wall:       { icon: '🧤', name: 'שער נעול',   clean: 0.02 },
   poty:          { icon: '🏅', name: 'כדורגלן העונה' },
   serial_winner: { icon: '🏆', name: 'זוכה אליפויות' },
   one_club:      { icon: '❤️', name: 'נאמן למועדון' },
@@ -64,33 +71,40 @@ function tagsOf(name) {
 
 // the order they read best in: what he won, then what he did, then how long
 const TAG_ORDER = ['poty', 'golden_boot', 'playmaker', 'ten_goals', 'ten_assists',
-                   'wall', 'serial_winner', 'one_club', 'ironman', 'three_decades',
-                   'nomad', 'prime90'];
+                   'gk_wall', 'wall', 'serial_winner', 'one_club', 'ironman',
+                   'three_decades', 'nomad', 'prime90'];
 
 // Does this tag change anything at all? Position no longer enters into it, so
 // this is simply "does it carry an effect" — the honours and the long-service
 // badges are story, the four that move goals and assists are not.
 function tagFires(tag) {
-  return !!(tag.def.goal || tag.def.assist);
+  return !!(tag.def.goal || tag.def.assist || tag.def.clean);
 }
 
 /* ── what they change ─────────────────────────────────────────────────────── */
 // A multiplier on this player's share of the team's goals / assists. 1 = nothing.
-function tagGoalMult(name, slotPos) {
-  let m = 1;
-  tagsOf(name).forEach(t => {
-    if (!t.def.goal) return;
-    m *= Math.min(1 + t.def.goal * t.count, t.def.goalCap);
-  });
-  return m;
+// Two tags that describe the same season from two angles — a golden boot always
+// scored ten as well — should not both be paid in full. The strongest counts
+// whole and every one after it counts half, which brings a top scorer who also
+// had double-digit years from 13.4% down to 10.5%.
+function tagStack(values) {
+  if (!values.length) return 1;
+  const v = values.slice().sort((a, b) => b - a);
+  return 1 + v[0] + v.slice(1).reduce((s, x) => s + x / 2, 0);
 }
+
+function tagGoalMult(name, slotPos) {
+  return tagStack(tagsOf(name).filter(t => t.def.goal).map(t => t.def.goal));
+}
+// A defender's side of the same idea: how much likelier this man's team is to
+// concede nothing. It multiplies the chance of a nil, not the defensive rating —
+// see simDrawGoals for why those are different promises.
+function tagCleanMult(name) {
+  return tagStack(tagsOf(name).filter(t => t.def.clean).map(t => t.def.clean));
+}
+
 function tagAssistMult(name, slotPos) {
-  let m = 1;
-  tagsOf(name).forEach(t => {
-    if (!t.def.assist) return;
-    m *= Math.min(1 + t.def.assist * t.count, t.def.assistCap);
-  });
-  return m;
+  return tagStack(tagsOf(name).filter(t => t.def.assist).map(t => t.def.assist));
 }
 
 /* ── how they read ────────────────────────────────────────────────────────── */

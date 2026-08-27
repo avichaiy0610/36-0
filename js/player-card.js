@@ -259,6 +259,26 @@ function pcStoryLines(name, e) {
   return lines.slice(0, 3);
 }
 
+// Two tags of the same kind do not simply add up — the strongest counts whole
+// and the rest count half — so a card that lists 8% and 5% and stops there
+// invites the reader to do the wrong sum. This is the real number.
+function pcCombined(name) {
+  const list = typeof tagsOf === 'function' ? tagsOf(name) : [];
+  const kinds = [
+    { key: 'goal',   label: 'לשערים',   mult: typeof tagGoalMult   === 'function' ? tagGoalMult   : null },
+    { key: 'assist', label: 'לבישולים', mult: typeof tagAssistMult === 'function' ? tagAssistMult : null },
+    { key: 'clean',  label: 'לשער נקי', mult: typeof tagCleanMult  === 'function' ? tagCleanMult  : null },
+  ];
+  const out = [];
+  kinds.forEach(k => {
+    if (!k.mult) return;
+    if (list.filter(t => t.def[k.key]).length < 2) return;   // one tag sums to itself
+    const pct = Math.round((k.mult(name) - 1) * 1000) / 10;
+    if (pct > 0) out.push(`<span dir="ltr">+${pct}%</span> ${k.label}`);
+  });
+  return out;
+}
+
 /* ── how a tag reads in words ─────────────────────────────────────────────── */
 // The strip shows an icon. Here we owe the player a sentence: what it is, what
 // it is worth, and — the part that decides a pick — whether it does anything at
@@ -269,12 +289,14 @@ function pcTagEffect(t, slotPos) {
   // not promise an effect the simulation will never apply.
   if (typeof classicMode === 'function' && classicMode()) return { text: '', live: false, story: true };
   // A tag with no effect needs no sentence — the name and the seasons say it.
-  if (!d.goal && !d.assist) return { text: '', live: false, story: true };
+  if (!d.goal && !d.assist && !d.clean) return { text: '', live: false, story: true };
+  // Worth the same whether he did it once or five times — the ×5 beside the name
+  // is the story, this line is the effect.
+  const pct = n => Math.round(n * 1000) / 10;
+  if (d.clean) return { live: true, story: false, text: `סיכוי גבוה ב-${pct(d.clean)}% לשער נקי` };
   const verb = d.goal ? 'יבקיע' : 'יבשל';
-  const raw  = d.goal ? d.goal : d.assist;
-  const cap  = d.goal ? d.goalCap : d.assistCap;
-  const pct  = Math.round((Math.min(1 + raw * t.count, cap) - 1) * 100);
-  return { live: true, story: false, text: `סיכוי גבוה ב-${pct}% שהוא ${verb}` };
+  return { live: true, story: false,
+           text: `סיכוי גבוה ב-${pct(d.goal || d.assist)}% שהוא ${verb}` };
 }
 
 // "1 עונות" is the kind of thing that makes a card look machine-made.
@@ -386,6 +408,9 @@ function pcHTML(player, slotPos) {
           </span>
         </div>`;
       }).join('')}
+      ${(!classic && pcCombined(name).length)
+        ? `<div class="pc-combined">יחד: ${pcCombined(name).join(' · ')}<span class="pc-combined-why">התגית החזקה נספרת במלואה, כל אחת אחריה בחצי</span></div>`
+        : ''}
       <div class="pc-note">${classic
         ? 'במשחק קלאסי התגיות הן היסטוריה בלבד ואינן משפיעות על העונה.'
         : 'התגיות משנות מי מבקיע ומי מבשל — לא את תוצאת המשחק.'}</div>

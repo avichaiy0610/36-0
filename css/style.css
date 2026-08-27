@@ -2636,3 +2636,19 @@ body {
   .label-new { animation: none; box-shadow: 0 0 0 2px #ffd70055; }
 }
 
+
+/* the real total, where two tags of a kind would otherwise invite a wrong sum */
+.pc-combined {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-top: 6px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  background: #f0a5001a;
+  border: 1px solid #f0a50044;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent2);
+}
+.pc-combined-why { font-size: 10px; font-weight: 400; color: var(--dim); }

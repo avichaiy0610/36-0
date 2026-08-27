@@ -89,7 +89,8 @@ function simFormSwing() {
 // keeps its own object, which the results card still renders unmodified.
 function simApplySeasonForm(me) {
   const f = SIM2_SEASON_FORM_SD * simFormSwing();
-  return { ovr: me.ovr, atk: me.atk + f, mid: me.mid + f, def: me.def + f, gk: me.gk + f };
+  return { ovr: me.ovr, atk: me.atk + f, mid: me.mid + f, def: me.def + f, gk: me.gk + f,
+           cs: me.cs };            // a clean-sheet bonus is not form, it travels
 }
 
 // A real club's four line ratings: the best N at each line, averaged.
@@ -139,8 +140,17 @@ function simExpectedGoals(me, opp, home) {
 // Goals as chances x conversion. Binomial rather than Poisson: its variance is
 // np(1-p) instead of np, and Poisson's spread makes a 36-win season impossible
 // at any believable goal level.
-function simDrawGoals(xg) {
-  const p = Math.min(0.97, xg / SIM2.CHANCES);
+// `csMult` multiplies the chance of conceding NOTHING. A clean-sheet bonus is a
+// promise about one outcome — the nil — so it is applied to exactly that:
+// P(0) = (1-p)^CHANCES is scaled and the per-chance probability solved back out
+// of it. Lifting the defensive rating instead would have moved every scoreline a
+// little and the nil hardly at all, which is not what the tag says.
+function simDrawGoals(xg, csMult) {
+  let p = Math.min(0.97, xg / SIM2.CHANCES);
+  if (csMult && csMult !== 1) {
+    const keepAll = Math.pow(csMult, 1 / SIM2.CHANCES) * (1 - p);
+    p = Math.min(0.97, Math.max(0, 1 - keepAll));
+  }
   let goals = 0;
   for (let i = 0; i < SIM2.CHANCES; i++) if (Math.random() < p) goals++;
   return goals;
@@ -151,7 +161,7 @@ function simulateMatchV2(me, opp, homeOverride = null) {
   const home = homeOverride !== null ? homeOverride : Math.random() > 0.5;
   const a = simShrinkLines(me), b = simShrinkLines(opp);
   const gf = simDrawGoals(simExpectedGoals(a, b, home));
-  const ga = simDrawGoals(simExpectedGoals(b, a, !home));
+  const ga = simDrawGoals(simExpectedGoals(b, a, !home), me.cs);
   const outcome = gf > ga ? 'W' : gf === ga ? 'D' : 'L';
   return { outcome, gf, ga, opponent: opp.name, home };
 }

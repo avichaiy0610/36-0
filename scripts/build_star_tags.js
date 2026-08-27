@@ -59,13 +59,14 @@ const crown = (table) => {
 const goldenBoots = crown(LT.LEAGUE_SCORERS);
 const playmakers  = crown(LT.LEAGUE_ASSISTS);
 
-// the tightest defence of a season, from the real tables — the keeper's tag
+// the tightest defence of a season, from the real tables
 const bestDefence = {};
 Object.keys(LT.LEAGUE_TABLES).forEach(s => {
   const rows = (LT.LEAGUE_TABLES[s] || []).filter(r => typeof r.ga === 'number');
   if (!rows.length) return;
   bestDefence[s] = rows.reduce((a, b) => (b.ga < a.ga ? b : a)).teamId;
 });
+
 
 
 /* ── כדורגלן העונה — the one researched list ──────────────────────────────── */
@@ -102,6 +103,51 @@ const POTY = [
   ['2025/26', 'קינגס קנגאווה', 'hapoel-beersheba'],
 ];
 const norm = n => String(n).replace(/[‎‏]/g, '').replace(/[׳’`´']/g, "'").replace(/\s+/g, ' ').trim();
+
+// And WHICH keeper kept those clean sheets. We have no minutes, so the first
+// choice is taken to be the best-rated keeper in that squad — which the data
+// makes an easy call: in 26 of the 27 seasons he is clear of the next keeper by
+// two rating points or more, and usually by twenty (a first choice is 87, a
+// third is the filler 65). The man who never left the bench is simply not this
+// tag.
+//
+// Two seasons the rating cannot call, and one it calls wrongly, so they are
+// answered from the record instead. Hapoel Be'er Sheva's three title defences:
+// Goresh played 36 league games in 2015/16 and 21 in 2016/17 before Barak Bachar
+// moved him aside in February 2017, and in 2017/18 it was Haimov — 25 games and
+// 14 clean sheets against Goresh's 9 games and one.
+//   sources: sports.walla.co.il/item/3053050 · sport1.maariv.co.il/.../799651
+const GK_FIRST_CHOICE = {
+  '2015/16': 'דודו גורש',
+  '2016/17': 'דודו גורש',
+  '2017/18': 'גיא חיימוב',
+};
+// A keeper this close to his understudy cannot be told apart by rating alone, so
+// unless the record answers it, nobody is credited. A tag on the wrong man is
+// worse than no tag.
+const GK_CLEAR_BY = 4;
+
+const bestDefenceKeeper = {};
+const gkUnclear = [];
+Object.keys(bestDefence).forEach(season => {
+  const sq = SQUADS.find(x => x.season === season && x.teamId === bestDefence[season]);
+  if (!sq) return;
+  const gks = sq.players.filter(p => p.position === 'GK').sort((a, b) => b.ovr - a.ovr);
+  if (!gks.length) return;
+  const told = GK_FIRST_CHOICE[season];
+  if (told) {
+    const on = sq.players.some(p => norm(p.name) === norm(told));
+    if (on) { bestDefenceKeeper[season] = norm(told); return; }
+    gkUnclear.push(`${season}: ${told} is not in that squad`);
+    return;
+  }
+  const gap = gks.length > 1 ? gks[0].ovr - gks[1].ovr : 99;
+  if (gap < GK_CLEAR_BY) {
+    gkUnclear.push(`${season} ${sq.teamId}: ${gks[0].name} ${gks[0].ovr} vs ${gks[1].name} ${gks[1].ovr}`);
+    return;
+  }
+  bestDefenceKeeper[season] = norm(gks[0].name);
+});
 const potyBy = new Map();
 const potyBad = [];
 for (const [season, name, team] of POTY) {
@@ -154,13 +200,19 @@ const TAGS = [
     detail: e => e.rows.length + ' עונות' },
 
   { key: 'wall', name: 'הגנה איתנה',          icon: '🧱',
-    why: 'שוער או בלם בקבוצה שספגה הכי מעט בעונה',
+    why: 'בלם בקבוצה שספגה הכי מעט בעונה',
     test: e => {
       const line = Object.keys(e.pos).sort((a, b) => e.pos[b] - e.pos[a])[0];
-      if (!['GK', 'CB'].includes(line)) return 0;
+      if (line !== 'CB') return 0;                 // the keeper has his own below
       return e.rows.filter(r => bestDefence[r.season] === r.team).length;
     },
     detail: e => e.rows.filter(r => bestDefence[r.season] === r.team).map(r => r.season).join(' ') },
+
+  { key: 'gk_wall', name: 'שער נעול',          icon: '🧤',
+    why: 'השוער של ההגנה שספגה הכי מעט בליגה באותה עונה',
+    test: e => e.rows.filter(r => bestDefenceKeeper[r.season] === norm(e.name)).length,
+    detail: e => e.rows.filter(r => bestDefenceKeeper[r.season] === norm(e.name))
+                       .map(r => r.season).join(' ') },
 
 
   { key: 'poty', name: 'כדורגלן העונה',   icon: '🏅',
@@ -168,13 +220,13 @@ const TAGS = [
     test: e => (potyBy.get(norm(e.name)) || []).length,
     detail: e => (potyBy.get(norm(e.name)) || []).join(' ') },
 
-  { key: 'ten_goals', name: 'עונת עשרייה', icon: '⚽',
+  { key: 'ten_goals', name: 'מבקיע דו ספרתי', icon: '⚽',
     why: 'עשרה שערים ומעלה בעונה',
     test: e => (seasonGoals.get(e.name) || []).filter(x => x.n >= 10).length,
     detail: e => (seasonGoals.get(e.name) || []).filter(x => x.n >= 10)
       .map(x => `${x.season} (${x.n})`).join(' · ') },
 
-  { key: 'ten_assists', name: 'עשרייה בבישולים', icon: '🅰️',
+  { key: 'ten_assists', name: 'מבשל דו ספרתי', icon: '🅰️',
     why: 'עשרה בישולים ומעלה בעונה',
     test: e => (seasonAssists.get(e.name) || []).filter(x => x.n >= 10).length,
     detail: e => (seasonAssists.get(e.name) || []).filter(x => x.n >= 10)
@@ -202,7 +254,10 @@ const TAGS = [
 function hasHonour(e) {
   return (potyBy.get(norm(e.name)) || []).length
       || (goldenBoots.get(e.name) || []).length
-      || (playmakers.get(e.name) || []).length;
+      || (playmakers.get(e.name) || []).length
+      // keeping the league's meanest defence is an honour too, and the men who
+      // did it are not always rated 85: Goresh peaks at 84, Haimov at 82.
+      || e.rows.some(r => bestDefenceKeeper[r.season] === norm(e.name));
 }
 const stars = [...P.values()].filter(e => e.peak >= PEAK_STAR || hasHonour(e))
   .sort((a, b) => b.peak - a.peak || a.name.localeCompare(b.name, 'he'));
@@ -229,6 +284,7 @@ if (belowCut.length) {
      (goldenBoots.get(e.name) || []).length ? 'מלך שערים' : '',
      (playmakers.get(e.name) || []).length ? 'מלך בישולים' : ''].filter(Boolean).join(' · ')));
 }
+if (gkUnclear.length) console.error('  ⚠ seasons with no keeper credited (too close to call): ' + gkUnclear.join(' | '));
 if (potyBad.length) console.error('  ⚠ POTY rows that did NOT verify: ' + potyBad.join(' | '));
 else console.error('  ✓ all 27 Footballer of the Season winners verified against our squads');
 TAGS.forEach(t => {

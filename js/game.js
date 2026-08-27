@@ -328,12 +328,20 @@ const GOAL_W = {
 };
 
 // Goals and assists also lean on who the player actually is, not only where he
-// stands: weights get multiplied by exp(GOAL_QUALITY_K * (ovr - 80)). Without it
-// a 78-rated striker outscored a 94-rated one on the same pitch. Kept deliberately
-// gentle — at 0.015 a 94 is worth 1.24x an 80, which lifts a star striker to ~26
-// goals against ~22 for a weak one. Raising it much further makes a great striker
-// break the league record most seasons.
-const GOAL_QUALITY_K = 0.015;
+// stands: weights get multiplied by exp(GOAL_QUALITY_K * (ovr - 80)).
+//
+// This was 0.015, which was too shy by half. At that value a 95 was worth 1.25x
+// an 80 while the position alone was worth 2.5x, so where a man stood mattered
+// twice as much as who he was — and a modest striker took the golden boot off a
+// pitch full of better men 76% of the time. Measured on one real XI over 4,000
+// seasons: Dean David 85 finishing ahead of Zahavi 95 and his four tags, every
+// time, because he was the one in the middle.
+//
+// At 0.045 the striker still leads more often than not — he is the striker —
+// but only 54% of the time, and a great winger takes it one season in four. The
+// tallies barely move (25.4 goals to 23.0), so this spreads the honour without
+// inflating it: it is about WHO tops the table, not by how much.
+const GOAL_QUALITY_K = 0.045;
 // Tags tilt who scores, never whether you win: the scoreline is settled by the
 // line ratings before these are consulted.
 const goalWeight   = p => (GOAL_W[p.slotPos]   ?? 0) * Math.exp(GOAL_QUALITY_K * (p.ovr - 80))
@@ -651,6 +659,20 @@ function shownLineOVR(positions) {
   return calcGroupOVR(positions);
 }
 
+// The XI's chance of a clean sheet, multiplied. Every defender and keeper who
+// spent a season in the league's meanest defence brings a little of it with him,
+// and they compound — eleven men who never conceded are a wall, not a rota.
+function tagCleanBoost() {
+  if (classicMode() || typeof tagCleanMult !== 'function' || typeof state === 'undefined') return 1;
+  let m = 1;
+  (state.picks || []).forEach(pick => {
+    if (!pick || !pick.player) return;
+    m *= tagCleanMult(pick.player.name);
+  });
+  return Math.min(m, TAG_CLEAN_CAP);
+}
+const TAG_CLEAN_CAP = 1.25;      // no XI buys more than a quarter again
+
 function myLineRatings(ovrAt) {
   const ovr = teamOVR(ovrAt);
   const line = (positions) => calcGroupOVR(positions, ovrAt) ?? ovr;
@@ -661,6 +683,7 @@ function myLineRatings(ovrAt) {
     mid: line(SIM2_LINES.mid.pos),
     def: line(SIM2_LINES.def.pos) + t.def,
     gk:  line(SIM2_LINES.gk.pos),
+    cs:  tagCleanBoost(),
   };
 }
 
