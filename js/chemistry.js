@@ -18,10 +18,13 @@ const CHEM_SECOND = 0.25;      // what a player's second link is worth
 
 // What a tier is actually worth in rating points. The tier is the STRENGTH of
 // the record (how long they played together, what they won); this is the price
-// list, and it was halved because a squad stitched together out of famous duos
-// was walking to the title. Keep the two apart: the tier is a fact about them,
-// the bonus is a balance decision.
-const CHEM_BONUS = { 1: 0.5, 2: 1, 3: 1.5 };
+// list. Keep the two apart: the tier is a fact about them, the bonus is a
+// balance decision, and it has now been made twice — halved before release
+// because a squad stitched together out of famous duos was walking to the
+// title, and trimmed again after the first live day, when chemistry and the
+// finishers together were worth +2.45 attack to a peak-mode XI and pushed
+// hundred-goal seasons from 26% of the top bracket to 44%.
+const CHEM_BONUS = { 1: 0.4, 2: 0.7, 3: 1 };
 function chemBonusOf(tier) { return CHEM_BONUS[tier] ?? 0; }
 // "+1" and "+1.5", never "+1.0"
 function chemFmt(n) { return (Math.round(n * 10) / 10).toString(); }

@@ -608,11 +608,20 @@ function calcGroupOVR(positions, ovrAt) {
 // ranks that, so the same table does the work here.
 //
 // Scaled against the tag ceilings, not fixed to them: the multipliers were cut
-// roughly sixfold, so the same PER would have made this invisible. The greatest
-// finisher in the data is worth about +1 attack up front (~4.5% more goals), and
-// no XI can buy more than +2 however it is stacked.
-const TAG_ATK_PER = 7.5;
-const TAG_ATK_CAP = 2;
+// roughly sixfold, so the same PER would have made this invisible.
+//
+// Halved again after the first day of live seasons, which is the only place a
+// number like this can really be set. At PER 7.5 / CAP 2 the top of the rating
+// range came back +10 goals a season and the share of seasons past 100 goals
+// went from 26% to 44% — a tag was rewriting the record book rather than
+// colouring a year. Peak mode is what exposed it: an XI of career-best cards is
+// full of tagged men, so the ceiling was reached every time instead of
+// approached. The greatest finisher in the data is now worth about +0.54 attack
+// up front, and no XI can buy more than +0.6 however it is stacked — a tight
+// ceiling on purpose, because the failure mode was a squad of famous names all
+// contributing at once, not any single one of them.
+const TAG_ATK_PER = 4;
+const TAG_ATK_CAP = 0.6;
 function tagAtkBoost() {
   if (classicMode()) return 0;
   if (typeof tagGoalMult !== 'function' || typeof state === 'undefined') return 0;
