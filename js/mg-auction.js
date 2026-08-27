@@ -12,7 +12,7 @@
 const MGA_KEY       = '36-0-mg-auction';
 const MGA_BUDGET    = 500;
 const MGA_FORMATION = '4-3-3';
-const MGA_RIVALS    = ['מכבי הכסף', 'הפועל התקציב', 'בני המזומן'];
+const MGA_RIVALS    = ['נשיא המועדון', 'מני מזומני', 'בני המזומן'];
 const MGA_LOT_BAND  = { min: 76, max: 96 };   // the lots worth bidding on
 const MGA_FILL_MAX  = 70;                     // free agents are strictly worse than any lot
 const MGA_RESERVE   = 18;                     // kept aside per unfilled slot — the cheapest lot costs 18
