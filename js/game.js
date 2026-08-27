@@ -1318,15 +1318,13 @@ function filledTokenHTML(player, squad, showOvr, slotPos) {
       : `${own} בעמדת ${here} — לא בעמדה הטבעית שלו`;
     oopHTML = `<span class="slot-oop" title="${why}">⇄</span>`;
   }
-  // Without this a phone can reach a player's card only while he is still in the
-  // list: the pitch relies on hover, and a placed man is gone from the list.
-  // Same button and the same handler as the list card, so tapping it opens the
-  // sheet and never counts as tapping the token underneath.
-  const infoHTML = classicMode() ? ''
-    : `<button class="pc-info" aria-label="הכרטיס של ${player.name}">ⓘ</button>`;
+  // No ⓘ here, deliberately. The whole token — 73x63 on a phone, with the next
+  // one 14px away — is the target for moving a man, so any button placed on it
+  // is stolen from that. The card is reached by holding the token instead; see
+  // js/player-card.js.
   return `
     <div class="slot-circle filled-circle${oopHTML ? ' circle-oop' : ''}">
-      ${ovrHTML}${oopHTML}${infoHTML}
+      ${ovrHTML}${oopHTML}
       <span class="slot-player-short">${playerShortName(player.name)}</span>
     </div>
     <div class="slot-name-label">${player.name}</div>
@@ -1499,7 +1497,11 @@ function handleMoveClick(slotIdx) {
     state.selectedPlayer = null;
     clearAllHighlights();
     highlightMoveTargets(slotIdx);
-    setHint('בחר עמדה מוארת — לחץ שוב על השחקן לביטול');
+    // The hold gesture is invisible until someone is told about it, and this is
+    // the moment they are looking at a placed player anyway.
+    const holdTip = (typeof pcHasHover === 'function' && !pcHasHover() && !classicMode())
+      ? ' · לחיצה ארוכה = הכרטיס שלו' : '';
+    setHint('בחר עמדה מוארת — לחץ שוב על השחקן לביטול' + holdTip);
   } else {
     const fromIdx = state.movingFromIdx;
     state.movingFromIdx = null;

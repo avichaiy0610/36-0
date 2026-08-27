@@ -531,7 +531,39 @@ function pcInit() {
     // reading it — a card this tall is meant to be scrolled, not glanced at
     _pcTimer = setTimeout(pcHide, 300);
   });
-  // touch: the ⓘ opens it as a sheet, and never counts as picking the player
+  // Touch, on the pitch: HOLD a player to open his card.
+  //
+  // A tap cannot be it. The whole token is the target for moving a man, and on a
+  // phone the next token is fourteen pixels away — a button placed on it would
+  // be taken straight out of the move, which is the thing people are actually
+  // doing there. Holding is free: nothing else on the pitch uses it.
+  //
+  // The press is cancelled by any movement (that is a scroll, not a hold), and
+  // the click that follows the release is swallowed, so the man never starts
+  // moving behind the card that just opened.
+  let holdTimer = null, held = false;
+  document.addEventListener('touchstart', ev => {
+    const el = ev.target.closest && ev.target.closest('.slot-token.filled');
+    if (!el) return;
+    const p = pcPlayerFor(el);
+    if (!p) return;
+    held = false;
+    clearTimeout(holdTimer);
+    holdTimer = setTimeout(() => {
+      held = true;
+      pcShow(p, el, pcSlotOf(el), true);
+    }, 420);
+  }, { passive: true });
+  ['touchmove', 'touchend', 'touchcancel'].forEach(t =>
+    document.addEventListener(t, () => clearTimeout(holdTimer), { passive: true }));
+  document.addEventListener('click', ev => {
+    if (!held) return;
+    held = false;
+    ev.stopPropagation();
+    ev.preventDefault();
+  }, true);
+
+  // touch: the ⓘ on a list card opens it as a sheet, and never counts as picking
   document.addEventListener('click', ev => {
     const info = ev.target.closest && ev.target.closest('.pc-info');
     if (!info) return;

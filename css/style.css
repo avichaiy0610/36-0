@@ -2636,25 +2636,3 @@ body {
   .label-new { animation: none; box-shadow: 0 0 0 2px #ffd70055; }
 }
 
-/* The same ⓘ, on a man already on the pitch. Both top corners of the circle are
-   taken (rating, and the out-of-position mark), so it sits at the bottom. Touch
-   only — a mouse just hovers the token. */
-.slot-circle .pc-info {
-  position: absolute;
-  bottom: -4px;
-  inset-inline-end: -4px;
-  margin: 0;
-  width: 17px; height: 17px;
-  min-height: 17px;
-  align-items: center;
-  justify-content: center;
-  background: #0d1117;
-  border-color: #ffffff66;
-  color: #dfe6ee;
-  font-size: 10px;
-  z-index: 4;
-}
-[data-theme="light"] .slot-circle .pc-info { background: #ffffff; color: #444; }
-@media (hover: none), (pointer: coarse) {
-  .slot-circle .pc-info { display: flex; }
-}
