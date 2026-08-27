@@ -4,10 +4,17 @@
 // are willing to pay, which is a different question and a harder one: the
 // budget is 500 and three rivals are spending theirs on the same lots.
 //
-// Bids are blind and simultaneous — one decision per lot instead of a tapping
-// war — and a tie goes to the human. Whatever is still empty at the end is
-// filled for free with players nobody wanted, so the XI always gets to play a
-// real season on the ordinary engine.
+// It is an ASCENDING auction with a maximum, the way a real one works. You name
+// the most you would pay; the lot climbs while people are still willing; and the
+// moment somebody goes past your maximum you are told who, and asked whether to
+// come back over the top or let him have it. The rivals do the same to each
+// other, so a player you never bid on is still fought over.
+//
+// The price is settled the way an ascending auction settles: the highest
+// maximum wins, and pays one step above the second-highest — so bidding your
+// true maximum is safe, and a lot nobody else wants goes for the asking price.
+// A tie goes to the human. Whatever is still empty at the end is filled for free
+// with players nobody wanted, so the XI always gets to play a real season.
 
 const MGA_KEY       = '36-0-mg-auction';
 const MGA_BUDGET    = 500;
@@ -115,6 +122,8 @@ function mgaStart() {
     at: 0,
     bid: 0,
     last: null,                       // the outcome of the lot just closed
+    outbid: null,                     // a lot still open, waiting on your answer
+    vals: null,                       // what the rivals will pay for the open lot
     rivals: MGA_RIVALS.map(name => ({
       name, budget: MGA_BUDGET, picks: new Array(slots.length).fill(null),
       greed: 0.85 + Math.random() * 0.45,
@@ -132,14 +141,34 @@ function mgaCeiling(budget, slotsLeft) {
   return Math.max(0, budget - Math.max(0, slotsLeft - 1) * MGA_RESERVE);
 }
 
-function mgaRivalBid(rival, lot, slots) {
-  const open = mgaEmptyFor(rival.picks, slots, lot.player);
-  if (!open.length) return null;
-  if (Math.random() > MGA_RIVAL_IN) return null;          // not every rival wants every player
-  const value = Math.round(lot.base * rival.greed * (MGA_RIVAL_VAL.min + Math.random() * MGA_RIVAL_VAL.span));
-  const cap   = mgaCeiling(rival.budget, mgaNeed(rival.picks));
-  const bid   = Math.min(value, cap);
-  return bid > 0 ? { bid, slot: open[0] } : null;
+// What each rival would pay for THIS lot, at most. Rolled once when the lot
+// opens and then fixed — a valuation that moved every round would mean a rival
+// could beat any number you named, which is not an auction, it is a wall.
+function mgaValuations(run, lot) {
+  return run.rivals.map(rival => {
+    const open = mgaEmptyFor(rival.picks, run.slots, lot.player);
+    if (!open.length) return { rival, slot: -1, max: 0 };
+    if (Math.random() > MGA_RIVAL_IN) return { rival, slot: open[0], max: 0 };
+    const value = Math.round(lot.base * rival.greed * (MGA_RIVAL_VAL.min + Math.random() * MGA_RIVAL_VAL.span));
+    const cap   = mgaCeiling(rival.budget, mgaNeed(rival.picks));
+    return { rival, slot: open[0], max: Math.max(0, Math.min(value, cap)) };
+  });
+}
+
+// The step the room climbs in. Small money moves in small money.
+function mgaStep(price) { return Math.max(2, Math.round(price * 0.08)); }
+
+// Settle the room at the maximums on the table. Highest maximum takes it, one
+// step above the second — capped by his own maximum, because nobody pays more
+// than he was willing to. Ties go to the human.
+function mgaSettleRoom(lot, myMax, vals) {
+  const table = vals.filter(v => v.max >= lot.base).map(v => ({ who: v.rival.name, max: v.max, v }));
+  if (myMax >= lot.base) table.push({ who: 'me', max: myMax, mine: true, v: null });
+  if (!table.length) return { unsold: true };
+  table.sort((a, b) => b.max - a.max || (a.mine ? -1 : b.mine ? 1 : 0));
+  const win = table[0], next = table[1];
+  const price = next ? Math.min(win.max, next.max + mgaStep(next.max)) : lot.base;
+  return { win, next, price: Math.max(lot.base, price), table };
 }
 
 /* ── one lot ──────────────────────────────────────────────────────────────── */
@@ -174,8 +203,10 @@ function mgaRenderLot() {
   const lot = run.lots[run.at];
   const open = mgaEmptyFor(run.picks, run.slots, lot.player);
   const ceiling = Math.min(run.budget, mgaCeiling(run.budget, mgaNeed(run.picks)));
-  const canBid = open.length > 0 && ceiling >= lot.base;
-  if (run.bid < lot.base || run.bid > ceiling) run.bid = Math.min(Math.max(lot.base, 0), ceiling);
+  // Once the room has started climbing, the floor is the price to beat.
+  const floor = run.outbid ? run.outbid.next : lot.base;
+  const canBid = open.length > 0 && ceiling >= floor;
+  if (run.bid < floor || run.bid > ceiling) run.bid = Math.min(Math.max(floor, 0), ceiling);
   const team = typeof getTeam === 'function' ? getTeam(lot.squad.teamId) : { primaryColor: '#222', secondaryColor: '#fff' };
 
   box.innerHTML = `
@@ -198,6 +229,11 @@ function mgaRenderLot() {
       <div class="mga-lot-meta">${mgEsc(mgClub(lot.squad.teamId))} · <span dir="ltr">${mgEsc(lot.squad.season)}</span> · ${mgEsc(normalizePos(lot.player.position))}</div>
       <div class="mga-lot-base">מחיר פתיחה: <strong>${lot.base}</strong></div>
     </div>
+    ${run.outbid ? `
+      <div class="mga-outbid">
+        <div class="mga-outbid-who">🔨 <strong>${mgEsc(run.outbid.by)}</strong> הציע <strong>${run.outbid.price}</strong></div>
+        <div class="mga-outbid-sub">עברת את התקרה שלך. להחזיר?</div>
+      </div>` : ''}
     ${canBid ? `
       <div class="mga-bidbox">
         <div class="mga-bid-row">
@@ -205,16 +241,18 @@ function mgaRenderLot() {
           <div class="mga-bid" id="mga-bid">${run.bid}</div>
           <button class="mga-step" id="mga-plus">+</button>
         </div>
-        <input type="range" id="mga-range" class="mga-range" min="${lot.base}" max="${ceiling}" value="${run.bid}">
+        <input type="range" id="mga-range" class="mga-range" min="${floor}" max="${ceiling}" value="${run.bid}">
         <div class="mga-quick">
-          <button data-v="base">מחיר פתיחה</button>
+          <button data-v="base">${run.outbid ? 'צעד אחד' : 'מחיר פתיחה'}</button>
           <button data-v="mid">בטוח</button>
           <button data-v="max">הכל על זה</button>
         </div>
-        <button class="btn-primary btn-full" id="mga-offer">הצע ${run.bid} 💰</button>
+        <button class="btn-primary btn-full" id="mga-offer">${
+          run.outbid ? `העלה ל-${run.bid} 💰` : `הצע עד ${run.bid} 💰`}</button>
       </div>`
     : `<div class="mga-cant">${open.length ? 'אין לך מספיק תקציב לפריט הזה' : 'אין לך משבצת מתאימה'}</div>`}
-    <button class="btn-secondary btn-full" id="mga-pass">ויתור על הפריט</button>
+    <button class="btn-secondary btn-full" id="mga-pass">${
+      run.outbid ? 'שיהיה לו — ויתור' : 'ויתור על הפריט'}</button>
     ${mgaSquadHTML(run)}`;
 
   mgWireBack();
@@ -222,20 +260,20 @@ function mgaRenderLot() {
   const range = document.getElementById('mga-range');
   const offer = document.getElementById('mga-offer');
   const sync = v => {
-    run.bid = Math.min(ceiling, Math.max(lot.base, Math.round(v)));
+    run.bid = Math.min(ceiling, Math.max(floor, Math.round(v)));
     if (bidEl) bidEl.textContent = run.bid;
     if (range) range.value = run.bid;
-    if (offer) offer.textContent = `הצע ${run.bid} 💰`;
+    if (offer) offer.textContent = run.outbid ? `העלה ל-${run.bid} 💰` : `הצע עד ${run.bid} 💰`;
   };
   if (range) range.oninput = () => sync(+range.value);
   document.getElementById('mga-minus') && (document.getElementById('mga-minus').onclick = () => sync(run.bid - 5));
   document.getElementById('mga-plus')  && (document.getElementById('mga-plus').onclick  = () => sync(run.bid + 5));
   box.querySelectorAll('.mga-quick button').forEach(b => {
-    b.onclick = () => sync(b.dataset.v === 'base' ? lot.base
-                        : b.dataset.v === 'mid' ? lot.base * 1.35 : ceiling);
+    b.onclick = () => sync(b.dataset.v === 'base' ? floor
+                        : b.dataset.v === 'mid' ? floor * 1.35 : ceiling);
   });
   if (offer) offer.onclick = () => mgaResolve(run.bid);
-  document.getElementById('mga-pass').onclick = () => mgaResolve(0);
+  document.getElementById('mga-pass').onclick = () => (run.outbid ? mgaConcede() : mgaResolve(0));
 }
 
 function mgaSquadHTML(run) {
@@ -270,47 +308,77 @@ function mgaAutoSkip(run) {
   return skipped;
 }
 
-function mgaResolve(myBid) {
+function mgaResolve(myMax) {
   const run = _mgaRun;
-  run.last = mgaSettle(run, myBid);
+  const out = mgaSettle(run, myMax);
+  // Not a result — a question. Hold the lot open and let him answer it.
+  if (out && out.outbid) {
+    run.outbid = out;
+    run.bid = out.next;
+    mgaRenderLot();
+    return;
+  }
+  run.outbid = null;
+  run.last = out;
   run.bid = 0;
   run.skipped = mgaAutoSkip(run);
   mgaRenderLot();
 }
 
-// Settles the lot at run.at and advances. Returns what happened, without
-// touching the DOM, so the auto-skip can run it in a loop.
-function mgaSettle(run, myBid) {
+// Walking away from a lot you were beaten on: the room finishes without you.
+function mgaConcede() {
+  const run = _mgaRun;
+  run.outbid = null;
+  run.last = mgaSettle(run, 0);
+  run.bid = 0;
+  run.skipped = mgaAutoSkip(run);
+  mgaRenderLot();
+}
+
+// Settles the lot at run.at against the maximum the human has named. Either it
+// closes — he wins it, or somebody outbid him and it is gone — or it comes back
+// as `outbid`, which is not a result but a question: this man has gone past you,
+// do you want him at one step more? Nothing is committed until it closes.
+function mgaSettle(run, myMax) {
   const lot = run.lots[run.at];
   if (!lot) return null;
-  const bids = [];
-  if (myBid > 0) bids.push({ who: 'me', bid: myBid });
-  run.rivals.forEach(r => {
-    const b = mgaRivalBid(r, lot, run.slots);
-    if (b) bids.push({ who: r.name, bid: b.bid, rival: r, slot: b.slot });
-  });
-  // A tie goes to the human: losing a player on a coin flip you cannot see is
-  // the one outcome a blind auction must not have.
-  bids.sort((a, b) => b.bid - a.bid || (a.who === 'me' ? -1 : 1));
-  const winner = bids[0];
+  if (!run.vals) run.vals = mgaValuations(run, lot);
 
-  let out;
-  if (!winner) {
-    out = { unsold: true, mine: false, text: `${lot.player.name} — אף אחד לא הציע.` };
-  } else if (winner.who === 'me') {
-    const open = mgaEmptyFor(run.picks, run.slots, lot.player);
-    run.picks[open[0]] = { player: lot.player, squad: lot.squad, price: winner.bid };
-    run.budget -= winner.bid;
-    run.spent  += winner.bid;
-    const second = bids[1];
-    out = { mine: true, text: `✅ ${lot.player.name} שלך תמורת ${winner.bid}${second ? ` (ההצעה הבאה: ${second.bid})` : ' — בלי מתחרים'}` };
-  } else {
-    winner.rival.picks[winner.slot] = { player: lot.player, squad: lot.squad };
-    winner.rival.budget -= winner.bid;
-    out = { mine: false, text: `❌ ${lot.player.name} הלך ל${winner.who} תמורת ${winner.bid}${myBid ? ` — הצעת ${myBid}` : ''}` };
+  const r = mgaSettleRoom(lot, myMax, run.vals);
+
+  if (r.unsold) {
+    run.at++; run.vals = null;
+    return { unsold: true, mine: false, text: `${lot.player.name} — אף אחד לא הציע.` };
   }
+
+  // Beaten, and still able to answer: ask rather than settle.
+  if (!r.win.mine) {
+    const step = mgaStep(r.price);
+    const ceiling = Math.min(run.budget, mgaCeiling(run.budget, mgaNeed(run.picks)));
+    const canAnswer = mgaEmptyFor(run.picks, run.slots, lot.player).length > 0
+      && r.price + step <= ceiling;
+    if (canAnswer && myMax >= lot.base) {
+      return { outbid: true, by: r.win.who, price: r.price, next: r.price + step, ceiling };
+    }
+  }
+
+  // Closing.
+  run.vals = null;
+  if (r.win.mine) {
+    const open = mgaEmptyFor(run.picks, run.slots, lot.player);
+    run.picks[open[0]] = { player: lot.player, squad: lot.squad, price: r.price };
+    run.budget -= r.price;
+    run.spent  += r.price;
+    const under = r.next ? ` (${r.next.who} עצר ב-${r.next.max})` : ' — בלי מתחרים';
+    run.at++;
+    return { mine: true, text: `✅ ${lot.player.name} שלך תמורת ${r.price}${under}` };
+  }
+  const w = r.win.v;
+  w.rival.picks[w.slot] = { player: lot.player, squad: lot.squad };
+  w.rival.budget -= r.price;
   run.at++;
-  return out;
+  return { mine: false, text: `❌ ${lot.player.name} הלך ל${r.win.who} תמורת ${r.price}${
+    myMax >= lot.base ? ` — עצרת ב-${myMax}` : ''}` };
 }
 
 /* ── the end of the window ────────────────────────────────────────────────── */

@@ -287,3 +287,17 @@
 .mga-rival i { font-style: normal; font-size: 10px; color: var(--dim); }
 .mga-rival-out { opacity: .45; }
 .mga-rival-out i { color: var(--dim); }
+
+/* Someone has gone over your maximum. This is a question, not a result, so it
+   reads louder than the line that reports a closed lot. */
+.mga-outbid {
+  margin: 8px 0 6px;
+  padding: 9px 11px;
+  border: 1px solid #f0a50066;
+  border-radius: var(--radius);
+  background: #f0a5001a;
+  text-align: center;
+}
+.mga-outbid-who { font-size: 14px; }
+.mga-outbid-who strong { color: var(--accent); }
+.mga-outbid-sub { font-size: 11.5px; color: var(--dim); margin-top: 2px; }
