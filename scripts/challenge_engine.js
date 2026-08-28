@@ -263,10 +263,13 @@ function compose(period, f) {
   const derby = derbyOf(f.homeId, f.awayId);
   const big = prestige(f.homeId) >= prestige(f.awayId) ? f.homeId : f.awayId;
   const other = big === f.homeId ? f.awayId : f.homeId;
-  const n = period === 'daily' ? 2 : 3;
-  const reqs = f.undated
+  // Both clubs, always. The daily used to name one fixture in the headline and
+  // then ask only for the bigger side — "ביתר ירושלים נגד מכבי נתניה" whose only
+  // mission was two from ביתר, which reads as a mistake because it is one. The
+  // undated branch had it right all along; the dated one now matches it.
+  const reqs = f.undated || period === 'daily'
     ? [clubMission(f.homeId, 2), clubMission(f.awayId, 2)].filter(Boolean)
-    : [clubMission(big, n), period !== 'daily' ? clubMission(other, 1) : null].filter(Boolean);
+    : [clubMission(big, 3), clubMission(other, 1)].filter(Boolean);
   if (!reqs.length) return null;
   const when = period === 'daily' ? 'ערב' : period === 'weekly' ? 'שבוע' : 'חודש';
   const rivalry = f.undated ? derbyOf(f.homeId, f.awayId) : null;
@@ -278,7 +281,11 @@ function compose(period, f) {
     : `${f.date} ${f.time} · ${f.home} vs ${f.away}`;
   const s = { label, requirements: reqs, note };
   if (period !== 'daily') s.difficulty = 'hard';
-  if (period === 'monthly') s.requirements.push({ type: 'max_team_ovr', ovr: 84 });
+  // `x`, not `ovr`: challengeReqText and the checker both read req.x, so an
+  // `ovr` key rendered "דירוג ההרכב הסופי — עד " with nothing after it and made
+  // `cur <= undefined` false forever — an unwinnable mission. No monthly was ever
+  // approved, so it never reached anyone.
+  if (period === 'monthly') s.requirements.push({ type: 'max_team_ovr', x: 84 });
   return s;
 }
 
