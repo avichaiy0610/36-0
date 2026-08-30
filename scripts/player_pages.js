@@ -26,6 +26,51 @@ function load() {
     '\n;return {TEAMS, SQUADS};')();
 }
 
+// What the player CARD in the game already knows and these pages did not.
+// A page of nothing but a four-row ratings table is a template with a name
+// swapped into it, which is what Google's scaled-content policy is aimed at —
+// and ours came to a median of 102 words. Everything added below is a fact
+// about THIS player that no other page repeats: the titles he was in the squad
+// for, the seasons he finished top of the scorers' table, the year he peaked.
+let _facts = null;
+function factsData() {
+  if (_facts) return _facts;
+  try {
+    _facts = new Function(fs.readFileSync(path.join(BASE, 'js', 'tag-data.js'), 'utf8') +
+      '\n;return { PLAYER_REAL: typeof PLAYER_REAL !== "undefined" ? PLAYER_REAL : {},' +
+      '           SEASON_FACTS: typeof SEASON_FACTS !== "undefined" ? SEASON_FACTS : {} };')();
+  } catch (e) { _facts = { PLAYER_REAL: {}, SEASON_FACTS: {} }; }
+  return _facts;
+}
+
+// season → the club that won it / kept the tightest defence, matched against
+// the seasons he was actually registered there. A mid-season move must not hand
+// him two titles for one championship, so a season counts once.
+function playerFacts(e) {
+  const { PLAYER_REAL, SEASON_FACTS } = factsData();
+  const real = PLAYER_REAL[clean(e.name)] || { g: [], a: [] };
+  const titles = [], walls = [];
+  const seen = new Set();
+  for (const c of e.career) {
+    const f = SEASON_FACTS[c.season];
+    if (!f || seen.has(c.season)) continue;
+    if (f[0] === c.teamId) { titles.push(c.season); seen.add(c.season); }
+    if (f[1] === c.teamId) walls.push({ season: c.season, ga: f[2] });
+  }
+  const peakRow = e.career.filter(c => c.ovr === e.peak)
+    .sort((a, b) => a.season.localeCompare(b.season))[0];
+  const byClub = {};
+  e.career.forEach(c => { (byClub[c.teamId] = byClub[c.teamId] || new Set()).add(c.season); });
+  const home = Object.entries(byClub).map(([id, s]) => ({ id, n: s.size }))
+    .sort((a, b) => b.n - a.n)[0];
+  return {
+    titles, walls, home, peakRow,
+    goals:   (real.g || []).slice().sort((a, b) => b[1] - a[1]),
+    assists: (real.a || []).slice().sort((a, b) => b[1] - a[1]),
+    seasons: new Set(e.career.map(c => c.season)).size,
+  };
+}
+
 // name -> { name, career:[{teamId,season,ovr,position}], peak, mainTeam, teams[] }
 function buildIndex(SQUADS) {
   const idx = {};
@@ -69,6 +114,52 @@ function pageHtml(TEAMS, e) {
   const clubLinks = e.teams.map(id => TEAMS[id]
     ? `<a class="chip" href="/team/${id}/">${esc(TEAMS[id].name)}</a>` : '').join('');
 
+  /* ── what actually happened to him, in prose and in numbers ─────────────── */
+  const F = playerFacts(e);
+  const nm = n => (TEAMS[n] ? TEAMS[n].name : n);
+  // Hebrew, not a template: "ב-1 עונות" and a list joined by repeated "ו" are
+  // exactly what makes generated prose read as generated.
+  const inS  = n => (n === 1 ? 'בעונה אחת' : `ב-${n} עונות`);
+  const nS   = n => (n === 1 ? 'עונה אחת' : `${n} עונות`);
+  // "ו2024/25" is wrong; before a numeral the vav takes a maqaf.
+  const vav = s => (/^[0-9]/.test(s) ? 'ו-' : 'ו') + s;
+  const list = a => (a.length === 1 ? a[0] : a.slice(0, -1).join(', ') + ' ' + vav(a[a.length - 1]));
+  const sentences = [];
+  sentences.push(`${name} רשום אצלנו ${inS(F.seasons)} של ליגת העל` +
+    (F.home ? (e.teams.length > 1
+      ? `, רובן ב${esc(nm(F.home.id))} (${nS(F.home.n)})`
+      : (F.seasons > 1 ? `, כולן ב${esc(nm(F.home.id))}` : `, ב${esc(nm(F.home.id))}`)) : '') + '.');
+  if (F.peakRow) sentences.push(`הדירוג הגבוה ביותר שלו, ${e.peak}, נרשם בעונת ${esc(F.peakRow.season)} ב${esc(nm(F.peakRow.teamId))}.`);
+  if (F.titles.length) sentences.push(`הוא היה בסגל האלוף ${inS(F.titles.length)}: ${list(F.titles.map(esc))}.`);
+  if (F.goals.length) {
+    const tot = F.goals.reduce((s, r) => s + r[1], 0);
+    const boots = F.goals.filter(r => r[2] === 1).length;
+    sentences.push(`בטבלת המבקיעים הוא נרשם עם ${tot} שערים ${inS(F.goals.length)}` +
+      (boots ? `, ${boots === 1 ? 'ובאחת מהן סיים מלך שערים' : `וב-${boots} מהן סיים מלך שערים`}` : '') + '.');
+  }
+  if (F.assists.length) {
+    const tot = F.assists.reduce((s, r) => s + r[1], 0);
+    const kings = F.assists.filter(r => r[2] === 1).length;
+    sentences.push(`בטבלת הבישולים נרשמו לו ${tot} בישולים ${inS(F.assists.length)}` +
+      (kings ? `, ${kings === 1 ? 'ובאחת מהן היה ראשון' : `וב-${kings} מהן היה ראשון`}` : '') + '.');
+  }
+  if (F.walls.length) sentences.push(
+    `הקבוצה שבה שיחק סיימה עם ההגנה הטובה בליגה ${list(F.walls.map(w => `ב-${esc(w.season)} (${w.ga} ספיגות)`))}.`);
+  const intro = `<p class="lede">${sentences.join(' ')}</p>`;
+
+  const factRow = (label, value) => `<tr><td class="fk">${label}</td><td>${value}</td></tr>`;
+  const factRows = [
+    factRow('עונות בליגה', F.seasons),
+    factRow('דירוג שיא', `<b class="ovr">${e.peak}</b>${F.peakRow ? ` · ${esc(F.peakRow.season)} · ${esc(nm(F.peakRow.teamId))}` : ''}`),
+    F.home ? factRow('הכי הרבה עונות', `${esc(nm(F.home.id))} · ${F.home.n}`) : '',
+    F.titles.length ? factRow('אליפויות בסגל', `${F.titles.length} · ${F.titles.map(esc).join(', ')}`) : '',
+    F.goals.length ? factRow('שערים בטבלת המבקיעים',
+      `${F.goals.reduce((s, r) => s + r[1], 0)} · ${F.goals.map(r => `${esc(r[0])} (${r[1]}${r[2] === 1 ? ' 👑' : ''})`).join(' · ')}`) : '',
+    F.assists.length ? factRow('בישולים בטבלת הבישולים',
+      `${F.assists.reduce((s, r) => s + r[1], 0)} · ${F.assists.map(r => `${esc(r[0])} (${r[1]}${r[2] === 1 ? ' 👑' : ''})`).join(' · ')}`) : '',
+  ].filter(Boolean).join('');
+  const factsHtml = `<h2>העובדות על ${esc(name)}</h2><table class="facts">${factRows}</table>`;
+
   const jsonld = {
     '@context': 'https://schema.org', '@type': 'Person', name,
     jobTitle: 'שחקן כדורגל', nationality: 'IL', url,
@@ -104,7 +195,10 @@ function pageHtml(TEAMS, e) {
     table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
     th, td { padding: 8px 10px; border-bottom: 1px solid #21262d; text-align: right; } th { color: #8b949e; font-size: 12px; }
     td a { color: #58a6ff; text-decoration: none; }
-    td.ovr { color: #FFD700; font-weight: 800; }
+    td.ovr, .ovr { color: #FFD700; font-weight: 800; }
+    .lede { color: #c9d1d9; font-size: 15.5px; margin: 18px 0 4px; }
+    table.facts td { vertical-align: top; }
+    table.facts td.fk { color: #8b949e; font-size: 13px; white-space: nowrap; width: 1%; }
     .chips { display: flex; flex-wrap: wrap; gap: 8px; }
     .chip { background: #161b22; border: 1px solid #30363d; border-radius: 50px; padding: 6px 14px; font-size: 13.5px; color: #e6edf3; text-decoration: none; }
     .foot { margin-top: 44px; border-top: 1px solid #30363d; padding-top: 16px; font-size: 12px; color: #5a6472; } .foot a { color: #8b949e; }
@@ -121,6 +215,9 @@ function pageHtml(TEAMS, e) {
     <div style="text-align:center;margin:6px 0 8px">
       <a class="cta" href="/team/${esc(e.mainTeam)}/">בנה את הרכב כל הזמנים של ${esc(mtName)} ←</a>
     </div>
+
+    ${intro}
+    ${factsHtml}
 
     <h2>${esc(name)} עונה אחר עונה</h2>
     <table>
@@ -143,11 +240,14 @@ function pageHtml(TEAMS, e) {
 }
 
 // write one player's page if it doesn't exist yet. returns {slug, created}
-function writePlayer(TEAMS, e) {
+function writePlayer(TEAMS, e, force) {
   const slug = slugFor(e.name);
   const dir = path.join(BASE, 'player', slug);
   const file = path.join(dir, 'index.html');
-  if (fs.existsSync(file)) return { slug, created: false };
+  // Normally a page is written once and left alone — the Action calls this for
+  // players in the news and must not rewrite the library every run. `force` is
+  // for the times the TEMPLATE changed and every existing page is now stale.
+  if (fs.existsSync(file) && !force) return { slug, created: false };
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(file, pageHtml(TEAMS, e));
   return { slug, created: true };
@@ -248,6 +348,18 @@ if (require.main === module) {
   const idx = buildIndex(SQUADS);
   const arg = process.argv[2];
   if (arg === '--sitemap' || arg === '--index') { writeSitemap(); writeIndex(); console.log('wrote sitemap.xml + players/'); }
+  else if (arg === '--rebuild') {
+    // rewrite every page that already exists, with the current template
+    const onDisk = new Set(fs.readdirSync(path.join(BASE, 'player'), { withFileTypes: true })
+      .filter(x => x.isDirectory()).map(x => x.name));
+    let n = 0;
+    for (const e of Object.values(idx)) {
+      if (!onDisk.has(slugFor(e.name))) continue;
+      writePlayer(TEAMS, e, true); n++;
+    }
+    writeSitemap(); writeIndex();
+    console.log(`rebuilt ${n} of ${onDisk.size} player page(s)`);
+  }
   else if (arg === '--backfill') {
     const n = parseInt(process.argv[3] || '5', 10);
     const missing = Object.values(idx).filter(e => e.career.length >= 2)
