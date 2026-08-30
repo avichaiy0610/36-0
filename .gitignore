@@ -3,6 +3,7 @@
 *.py
 *.txt
 !robots.txt
+!ads.txt
 *.log
 __pycache__/
 scraped_squads.json
