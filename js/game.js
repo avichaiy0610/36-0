@@ -3177,6 +3177,7 @@ function renderSeasonStory(r) {
     const line = (typeof salWageLine === 'function') ? salWageLine() : '';
     wageEl.style.display = line ? 'block' : 'none';
     wageEl.textContent = line;
+    if (line && typeof salAward === 'function') salAward(r);
   }
 
   // 1) Projected vs actual

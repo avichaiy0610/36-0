@@ -141,6 +141,9 @@
   function salRelease(idx) {
     if (!salActive() || !state.picks[idx]) return;
     const p = state.picks[idx];
+    // the best man a release let go, for the "sold the star" award
+    const ovr = (typeof playerOVR === 'function') ? playerOVR(p.player) : p.player.ovr;
+    state.salSoldOvr = Math.max(state.salSoldOvr || 0, ovr || 0);
     state.usedPlayerKeys.delete(p.player.name);
     state.picks[idx] = null;
     if (typeof saveDraftState === 'function') saveDraftState();
@@ -220,4 +223,27 @@
   global.salFreeAgent = salFreeAgent;
   global.salFillEmptySlots = salFillEmptySlots;
   global.salWageLine = salWageLine;
+})(typeof window !== 'undefined' ? window : globalThis);
+
+/* ── awarding ──────────────────────────────────────────────────────────────── */
+// Fired once when a capped season is rendered. Every number is clamped again on
+// the server — this call cannot claim a budget it never had.
+(function (global) {
+  function salAward(r) {
+    if (!salActive() || !r) return;
+    if (typeof getCurrentUser !== 'function' || !getCurrentUser()) return;
+    if (typeof _supabase === 'undefined' || !_supabase) return;
+    try {
+      _supabase.rpc('award_salary_achievements', {
+        p: {
+          budget: salBudget(state.difficulty),
+          spent: salSpent(state.picks.filter(x => x && !x.free)),
+          wins: r.wins | 0, draws: r.draws | 0, losses: r.losses | 0,
+          champion: r.myRank === 1,
+          sold_ovr: state.salSoldOvr || 0,
+        },
+      }).then(() => {}, () => {});
+    } catch (e) { /* an award never breaks the results screen */ }
+  }
+  global.salAward = salAward;
 })(typeof window !== 'undefined' ? window : globalThis);
