@@ -2815,3 +2815,5 @@ body {
 .sal-q b { color: var(--text); font-variant-numeric: tabular-nums; }
 .sal-q-full { border-color: #ef4444; color: #ef4444; }
 .sal-q-full b { color: #ef4444; }
+
+.sal-chip-free { background: #2f3b46; color: #9fb0c0; }
