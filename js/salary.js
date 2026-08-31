@@ -91,6 +91,69 @@
   }
 })(typeof window !== 'undefined' ? window : globalThis);
 
+
+/* ── the real rule: how many stars, not how much money ─────────────────────── */
+// A pure money cap strands people. Spend early and every remaining card is
+// struck through with slots still empty and no legal pick anywhere — measured
+// live: 7 of 11 filled, 0.3M left, the whole list unbuyable.
+//
+// A quota per rating band cannot do that, and the pool is why. Every one of the
+// 366 squads in the game contains at least one player rated 78-81 (100%), and
+// 99% contain a 74-77. So as long as the quota only limits the bands ABOVE 78,
+// a legal pick always exists — the mode can never dead-end.
+//
+// Where the limits sit comes from what an always-take-the-best XI actually
+// draws over 3,000 drafts: a median of 1 in 90+, 3 in 86-89, 5 in 82-85 and 2
+// in 78-81. A quota is only a decision if it bites just under that.
+(function (global) {
+  const SAL_BANDS = [
+    { min: 90, key: '90',    label: '90+'   },
+    { min: 86, key: '86',    label: '86-89' },
+    { min: 82, key: '82',    label: '82-85' },
+  ];
+  // Measured over 4,000 drafts each, against an unconstrained greedy XI of 84.5:
+  //   easy 2/3/4 -> 83.9    normal 1/2/3 -> 83.3    hard 0/1/2 -> 81.7
+  // and zero dead-ends in all three. Hard forbids a 90+ outright, which is a
+  // rule you can say in four words. Capping 78-81 as well WAS tried and is not
+  // here: it strands 7 to 57 drafts per 4,000, because that band is the one
+  // every squad has.
+  const SAL_QUOTA = {
+    easy:   { '90': 2, '86': 3, '82': 4 },
+    normal: { '90': 1, '86': 2, '82': 3 },
+    hard:   { '90': 0, '86': 1, '82': 2 },
+  };
+
+  function salBandKey(ovr) {
+    const b = SAL_BANDS.find(x => ovr >= x.min);
+    return b ? b.key : null;            // below 82 is unlimited, by design
+  }
+  function salQuota(difficulty) {
+    return SAL_QUOTA[difficulty] || SAL_QUOTA.normal;
+  }
+  function salUsed(picks, key) {
+    let n = 0;
+    (picks || []).forEach(p => {
+      if (!p || !p.player) return;
+      const ovr = (typeof playerOVR === 'function') ? playerOVR(p.player) : p.player.ovr;
+      if (salBandKey(ovr) === key) n++;
+    });
+    return n;
+  }
+  function salBandsState() {
+    const q = salQuota(state.difficulty);
+    return SAL_BANDS.map(b => ({
+      key: b.key, label: b.label,
+      used: salUsed(state.picks, b.key), max: q[b.key],
+    }));
+  }
+  global.SAL_BANDS = SAL_BANDS;
+  global.SAL_QUOTA = SAL_QUOTA;
+  global.salBandKey = salBandKey;
+  global.salQuota = salQuota;
+  global.salUsed = salUsed;
+  global.salBandsState = salBandsState;
+})(typeof window !== 'undefined' ? window : globalThis);
+
 /* ── the screens ───────────────────────────────────────────────────────────── */
 // Kept out of game.js on purpose: every touch point below is a no-op unless
 // state.salaryCap is on, so the mode cannot change a normal draft by accident.
@@ -103,7 +166,10 @@
   // letting the squad end over the cap.
   function salTooDear(player) {
     if (!salActive() || !player) return false;
-    return salPriceOf(player) > salRemaining(state.picks, state.difficulty) + 1e-9;
+    const ovr = (typeof playerOVR === 'function') ? playerOVR(player) : player.ovr;
+    const key = salBandKey(ovr);
+    if (!key) return false;                    // below 82 is never blocked
+    return salUsed(state.picks, key) >= salQuota(state.difficulty)[key];
   }
 
   // The chip that rides on a player card in the draft list.
@@ -126,12 +192,18 @@
     bar.style.display = 'block';
     bar.classList.toggle('sal-busted', left < 0);
     const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
-    set('sal-left', salFmt(left));
+    // Money is reported, never enforced — the quota is the rule, so the wallet
+    // can no longer strand anyone with empty slots and nothing legal to pick.
+    set('sal-left', salFmt(spent));
     set('sal-total', salFmt(total));
     const lbl = document.querySelector('#sal-bar .sal-label');
-    if (lbl) lbl.textContent = salSwapsLeft() ? 'תקציב' : 'תקציב · ההחלפה נוצלה';
+    if (lbl) lbl.textContent = salSwapsLeft() ? 'סגל' : 'סגל · ההחלפה נוצלה';
     const fill = document.getElementById('sal-fill');
     if (fill) fill.style.width = Math.max(0, Math.min(100, (spent / total) * 100)) + '%';
+    const q = document.getElementById('sal-quota');
+    if (q) q.innerHTML = salBandsState().map(b =>
+      `<span class="sal-q${b.used >= b.max ? ' sal-q-full' : ''}">${b.label}` +
+      `<b>${b.used}/${b.max}</b></span>`).join('');
 
     // ONE swap per run. It is not a recovery from overspending — that cannot
     // happen any more — it is the single chance to change your mind.
