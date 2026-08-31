@@ -2785,3 +2785,9 @@ body {
 }
 .sal-rel:hover { border-color: #ef4444; }
 .sal-rel span { color: var(--dim); font-variant-numeric: tabular-nums; font-size: 12px; }
+
+.sal-wage {
+  margin: 10px 0 4px; padding: 8px 12px; border-radius: 10px;
+  background: var(--surface2, #161b22); border: 1px solid var(--border);
+  font-size: 13px; font-weight: 700; color: var(--text); text-align: center;
+}

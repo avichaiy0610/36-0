@@ -1970,6 +1970,10 @@ function assignPlayer(slotIdx, player) {
   if (state.currentRound >= state.slots.length) {
     // Squad complete — no further roulette will run, so release the gate here.
     state.isAnimating = false;
+    // Salary cap: a slot left empty by a release is closed here, not left open.
+    // teamOVR averages, so an empty slot would RAISE the rating and releasing
+    // your weakest man would be a free upgrade — the exact opposite of the mode.
+    if (typeof salFillEmptySlots === 'function') salFillEmptySlots();
     // A duel draft skips the solo preseason — it submits the squad and waits.
     if (state.duelCode && typeof submitDuelSquad === 'function') setTimeout(() => submitDuelSquad(), 500);
     // a gauntlet draft skips the pre-season too — the XI goes straight into a fight
@@ -3166,6 +3170,14 @@ const VERDICT_PTS_BAND = 5;
 
 function renderSeasonStory(r) {
   const st = typeof siteText === 'function' ? siteText : (_k, d) => d;
+
+  // salary cap: what the XI cost, and how many slots a release left to close
+  const wageEl = document.getElementById('res-wage');
+  if (wageEl) {
+    const line = (typeof salWageLine === 'function') ? salWageLine() : '';
+    wageEl.style.display = line ? 'block' : 'none';
+    wageEl.textContent = line;
+  }
 
   // 1) Projected vs actual
   document.getElementById('res-finish').textContent    = placeLabel(r.myRank);

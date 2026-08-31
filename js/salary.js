@@ -161,3 +161,63 @@
   global.salSyncBar = salSyncBar;
   global.salRelease = salRelease;
 })(typeof window !== 'undefined' ? window : globalThis);
+
+/* ── free agents ───────────────────────────────────────────────────────────── */
+// The reason a released slot is a punishment and not a trick. teamOVR is an
+// AVERAGE, so an empty slot quietly RAISES the team's rating — releasing your
+// weakest man would have made the side better, which is the exact opposite of
+// what this mode is for. A free agent rated 70 or less closes the slot and puts
+// the cost back where it belongs. The same idea, and the same ceiling, as
+// mg-auction.js: "an empty slot is always a punishment and never a strategy".
+(function (global) {
+  const SAL_FREE_MAX = 70;
+
+  function salFreeAgent(slotPos, taken) {
+    if (typeof SQUADS === 'undefined') return null;
+    for (let i = 0; i < 500; i++) {
+      const sq = SQUADS[Math.floor(Math.random() * SQUADS.length)];
+      if (!sq || !sq.players) continue;
+      const cands = sq.players.filter(p =>
+        p.ovr <= SAL_FREE_MAX &&
+        !taken.has(p.name) &&
+        (typeof playerFitsSlot !== 'function' || playerFitsSlot(p, slotPos)));
+      if (!cands.length) continue;
+      return { player: cands[Math.floor(Math.random() * cands.length)], squad: sq, free: true };
+    }
+    return null;
+  }
+
+  // Called once, when the draft ends. Returns the names signed, for the report.
+  function salFillEmptySlots() {
+    if (!salActive() || typeof state === 'undefined') return [];
+    const taken = new Set(state.picks.filter(Boolean).map(p => p.player.name));
+    const signed = [];
+    state.picks.forEach((pick, i) => {
+      if (pick) return;
+      const slot = state.slots[i];
+      const fa = salFreeAgent(slot ? slot.pos : null, taken);
+      if (!fa) return;
+      state.picks[i] = fa;
+      taken.add(fa.player.name);
+      if (state.usedPlayerKeys) state.usedPlayerKeys.add(fa.player.name);
+      if (typeof fillToken === 'function') fillToken(i, fa.player, fa.squad);
+      signed.push(fa.player.name);
+    });
+    if (signed.length && typeof saveDraftState === 'function') saveDraftState();
+    return signed;
+  }
+
+  // What the results screen says about the money.
+  function salWageLine() {
+    if (!salActive() || typeof state === 'undefined') return '';
+    const spent = salSpent(state.picks.filter(p => p && !p.free));
+    const free = state.picks.filter(p => p && p.free).length;
+    return `💰 שכר ההרכב: ₪${salFmt(spent)}מ׳ מתוך ₪${salFmt(salBudget(state.difficulty))}מ׳` +
+      (free ? ` · ${free} ${free === 1 ? 'שחקן חופשי' : 'שחקנים חופשיים'}` : '');
+  }
+
+  global.SAL_FREE_MAX = SAL_FREE_MAX;
+  global.salFreeAgent = salFreeAgent;
+  global.salFillEmptySlots = salFillEmptySlots;
+  global.salWageLine = salWageLine;
+})(typeof window !== 'undefined' ? window : globalThis);
