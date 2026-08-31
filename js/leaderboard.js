@@ -118,6 +118,34 @@ async function loadCareerBoardTab(table) {
   }).join('');
 }
 
+// The salary-cap board. Points first — but the budgets differ by difficulty, so
+// ranking on points alone would just rank the budgets. The CHEAPER squad wins a
+// tie, which is the question the mode actually asks: how much can you win with
+// how little.
+async function loadSalaryBoardTab(table) {
+  const { data: rows, error } = await _supabase.rpc('salary_board', { p_limit: 100 });
+  if (error || !rows || !rows.length) {
+    table.innerHTML = `<div class="page-note">
+      עוד לא שוחקה עונה בתקרת שכר — סיים אחת והיה הראשון על הלוח 💰
+    </div>`;
+    return;
+  }
+  const DIFF = { easy: 'קל', normal: 'רגיל', hard: 'קשה' };
+  const user = typeof getCurrentUser === 'function' ? getCurrentUser() : null;
+  table.innerHTML = rows.map(r => {
+    const me = user && r.user_id === user.id;
+    const free = r.free_agents ? ` · ${r.free_agents} חופשיים` : '';
+    return `
+      <div class="lb-row${me ? ' lgsim-me' : ''}">
+        <span class="lb-rank ${r.rank <= 3 ? 'lb-rank-top' : ''}">${r.rank}</span>
+        <span class="lb-name">${esc(r.username || 'אנונימי')}${me ? ' (אתה)' : ''}
+          <span class="cr-board-club">₪${r.spent}מ׳ מתוך ₪${r.budget}מ׳ · ${DIFF[r.difficulty] || r.difficulty}${free}</span></span>
+        <span class="lb-stat">${r.points} נק׳</span>
+        <span class="lb-sub" dir="rtl"><bdi>OVR ${r.ovr}</bdi> · <bdi>${r.wins}-${r.draws}-${r.losses}</bdi></span>
+      </div>`;
+  }).join('');
+}
+
 async function loadGauntletBoard(table) {
   const { data: rows, error } = await _supabase
     .from('gauntlet_runs')
@@ -169,6 +197,7 @@ async function loadLeaderboard() {
   lbToggleSeasonFilters(lbTab !== 'gauntlet' && lbTab !== 'career');
   if (lbTab === 'gauntlet') return loadGauntletBoard(table);
   if (lbTab === 'career')   return loadCareerBoardTab(table);
+  if (lbTab === 'salary')   return loadSalaryBoardTab(table);
 
   const orderCol = lbTab === 'ovr' ? 'ovr' : 'points';
   let query = _supabase

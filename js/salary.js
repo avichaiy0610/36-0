@@ -229,6 +229,21 @@
     if (!salActive() || !r) return;
     if (typeof getCurrentUser !== 'function' || !getCurrentUser()) return;
     if (typeof _supabase === 'undefined' || !_supabase) return;
+    // The board. Points are recomputed server-side from W/D/L, so this is a
+    // report of what happened rather than a claim about where it ranks.
+    try {
+      _supabase.rpc('submit_salary_run', {
+        p: {
+          difficulty: state.difficulty,
+          budget: salBudget(state.difficulty),
+          spent: salSpent(state.picks.filter(x => x && !x.free)),
+          free_agents: state.picks.filter(x => x && x.free).length,
+          ovr: (typeof teamOVR === 'function' ? teamOVR() : 0),
+          wins: r.wins | 0, draws: r.draws | 0, losses: r.losses | 0,
+          gf: r.gfTotal | 0, ga: r.gaTotal | 0,
+        },
+      }).then(() => {}, () => {});
+    } catch (e) { /* a board never breaks the results screen */ }
     try {
       _supabase.rpc('award_salary_achievements', {
         p: {
