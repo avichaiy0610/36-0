@@ -2791,3 +2791,17 @@ body {
   background: var(--surface2, #161b22); border: 1px solid var(--border);
   font-size: 13px; font-weight: 700; color: var(--text); text-align: center;
 }
+
+/* A man you cannot pay for: struck through, not merely dimmed, so the reason he
+   is unavailable is different from "already taken". */
+.player-card.card-toodear .pc-name,
+.player-card.card-toodear .pc-ovr { text-decoration: line-through; }
+.player-card.card-toodear .sal-chip { background: #5a1f1f; color: #ffd7d7; text-decoration: none; }
+
+.sal-swap-btn {
+  width: 100%; margin-top: 6px; padding: 7px 10px; border-radius: 8px;
+  background: var(--surface2, #161b22); border: 1px solid var(--border);
+  color: var(--text); font-family: inherit; font-size: 12.5px; font-weight: 700;
+  cursor: pointer;
+}
+.sal-swap-btn:hover { border-color: var(--accent); color: var(--accent); }

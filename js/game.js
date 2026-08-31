@@ -1794,10 +1794,14 @@ function renderSquadPlayers(squad, filterSlotIdx = null) {
     if (filterSlotIdx !== null && !playerFitsSlot(player, state.slots[filterSlotIdx].pos)) return;
     const isUsed    = state.usedPlayerKeys.has(player.name);
     const hasSlot   = compatibleEmptySlots(player).length > 0;
-    const unavailable = isUsed || !hasSlot;
+    // Salary cap: a man you cannot pay for is not an option. Letting the pick
+    // through and asking the player to dismantle afterwards meant a draft could
+    // end over the cap, which it must never do.
+    const tooDear   = (typeof salTooDear === 'function') && salTooDear(player);
+    const unavailable = isUsed || !hasSlot || tooDear;
 
     const card = document.createElement('div');
-    card.className = 'player-card' + (unavailable ? ' card-unavailable' : '');
+    card.className = 'player-card' + (unavailable ? ' card-unavailable' : '') + (tooDear ? ' card-toodear' : '');
     card.dataset.pos = playerPositions(player).join(',');
     const dispOVR = playerOVR(player);
     const peakTag = state.peakMode && player.peak_ovr && player.peak_ovr > player.ovr ? '⚡' : '';

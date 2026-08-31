@@ -99,6 +99,13 @@
     return typeof state !== 'undefined' && !!state.salaryCap;
   }
 
+  // A player costs more than what is left. The draft refuses him rather than
+  // letting the squad end over the cap.
+  function salTooDear(player) {
+    if (!salActive() || !player) return false;
+    return salPriceOf(player) > salRemaining(state.picks, state.difficulty) + 1e-9;
+  }
+
   // The chip that rides on a player card in the draft list.
   function salChip(player) {
     if (!salActive() || !player) return '';
@@ -121,19 +128,40 @@
     const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
     set('sal-left', salFmt(left));
     set('sal-total', salFmt(total));
+    const lbl = document.querySelector('#sal-bar .sal-label');
+    if (lbl) lbl.textContent = salSwapsLeft() ? 'תקציב' : 'תקציב · ההחלפה נוצלה';
     const fill = document.getElementById('sal-fill');
     if (fill) fill.style.width = Math.max(0, Math.min(100, (spent / total) * 100)) + '%';
 
+    // ONE swap per run. It is not a recovery from overspending — that cannot
+    // happen any more — it is the single chance to change your mind.
     const over = document.getElementById('sal-over');
     if (!over) return;
-    if (left >= 0) { over.style.display = 'none'; over.innerHTML = ''; return; }
+    const picked = state.picks.filter(Boolean).length;
+    const swaps = salSwapsLeft();
+    if (!swaps || !picked || state.salSwapOpen !== true) {
+      over.innerHTML = swaps && picked
+        ? `<button class="sal-swap-btn" id="sal-swap-open">🔄 החלפה אחת נותרה</button>`
+        : '';
+      over.style.display = over.innerHTML ? 'block' : 'none';
+      return;
+    }
     over.style.display = 'block';
-    const opts = salReleaseOptions(state.picks, state.difficulty).slice(0, 4);
+    const opts = state.picks
+      .map((p, i) => (p ? { idx: i, player: p.player, price: salPriceOf(p.player) } : null))
+      .filter(Boolean)
+      .sort((a, b) => b.price - a.price);
     over.innerHTML =
-      `<div class="sal-over-t">חרגת ב-₪${salFmt(-left)}מ׳ — שחרר שחקן כדי לשחק</div>` +
+      `<div class="sal-over-t">שחרר שחקן — הכסף חוזר והעמדה נפתחת מחדש</div>` +
       opts.map(o =>
         `<button class="sal-rel" data-idx="${o.idx}">` +
-        `${o.player.name} <span>₪${salFmt(o.price)}מ׳</span></button>`).join('');
+        `${o.player.name} <span>₪${salFmt(o.price)}מ׳</span></button>`).join('') +
+      `<button class="sal-swap-btn" id="sal-swap-cancel">ביטול</button>`;
+  }
+
+  function salSwapsLeft() {
+    if (typeof state === 'undefined') return 0;
+    return state.salSwaps == null ? 1 : state.salSwaps;
   }
 
   // Releasing empties the slot. It is NOT re-drafted — at kick-off an empty slot
@@ -146,14 +174,24 @@
     state.salSoldOvr = Math.max(state.salSoldOvr || 0, ovr || 0);
     state.usedPlayerKeys.delete(p.player.name);
     state.picks[idx] = null;
+    state.salSwaps = salSwapsLeft() - 1;
+    state.salSwapOpen = false;
+    // Give the round back. Without this the draft still believed it was on
+    // round 11 of 11, so the freed position never came round again and the only
+    // way to use it was to move another player into it.
+    if (typeof state.currentRound === 'number' && state.currentRound > 0) state.currentRound--;
     if (typeof saveDraftState === 'function') saveDraftState();
     if (typeof refreshAllTokens === 'function') refreshAllTokens();
     if (typeof updateDraftOVR === 'function') updateDraftOVR();
     salSyncBar();
+    if (typeof startRound === 'function') setTimeout(() => startRound(), 250);
   }
 
   document.addEventListener('click', ev => {
-    const b = ev.target.closest && ev.target.closest('.sal-rel');
+    if (!ev.target.closest) return;
+    if (ev.target.closest('#sal-swap-open'))   { ev.preventDefault(); state.salSwapOpen = true;  salSyncBar(); return; }
+    if (ev.target.closest('#sal-swap-cancel')) { ev.preventDefault(); state.salSwapOpen = false; salSyncBar(); return; }
+    const b = ev.target.closest('.sal-rel');
     if (!b) return;
     ev.preventDefault();
     salRelease(+b.dataset.idx);
@@ -161,6 +199,8 @@
 
   global.salActive = salActive;
   global.salChip = salChip;
+  global.salTooDear = salTooDear;
+  global.salSwapsLeft = salSwapsLeft;
   global.salSyncBar = salSyncBar;
   global.salRelease = salRelease;
 })(typeof window !== 'undefined' ? window : globalThis);
