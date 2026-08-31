@@ -1982,6 +1982,10 @@ function assignPlayer(slotIdx, player) {
     if (state.duelCode && typeof submitDuelSquad === 'function') setTimeout(() => submitDuelSquad(), 500);
     // a gauntlet draft skips the pre-season too — the XI goes straight into a fight
     else if (state.gauntlet && typeof gtFight === 'function') setTimeout(() => gtFight(), 500);
+    // Salary cap pauses on a complete XI instead of simulating: the one swap is
+    // only worth anything once you can see all eleven together.
+    else if (typeof salActive === 'function' && salActive() && typeof salShowReview === 'function')
+      setTimeout(() => salShowReview(), 500);
     else setTimeout(() => showPreseason(teamOVR()), 500);
   } else setTimeout(startRound, 400);
 }

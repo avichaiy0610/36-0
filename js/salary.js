@@ -254,3 +254,67 @@
   global.salWageLine = salWageLine;
   global.salAward = salAward;
 })(typeof window !== 'undefined' ? window : globalThis);
+
+/* ── the review, before the whistle ────────────────────────────────────────── */
+// A complete XI used to go straight into the season. But the one swap is only
+// worth anything once all eleven are on the pitch together — that is when you
+// can see the hole, not while the roulette is still spinning. So the run stops
+// here and asks.
+(function (global) {
+  function salReviewEl() { return document.getElementById('sal-review'); }
+
+  function salShowReview() {
+    const box = salReviewEl();
+    if (!box) { if (typeof showPreseason === 'function') showPreseason(teamOVR()); return; }
+    const spent = salSpent(state.picks.filter(p => p && !p.free));
+    const total = salBudget(state.difficulty);
+    const free = state.picks.filter(p => p && p.free).length;
+    const sub = document.getElementById('sal-review-sub');
+    if (sub) sub.textContent =
+      `דירוג ${teamOVR()} · ₪${salFmt(spent)}מ׳ מתוך ₪${salFmt(total)}מ׳` +
+      (free ? ` · ${free} ${free === 1 ? 'שחקן חופשי' : 'שחקנים חופשיים'}` : '');
+
+    const swapBox = document.getElementById('sal-review-swap');
+    if (swapBox) {
+      if (!salSwapsLeft()) {
+        swapBox.innerHTML = '<div class="sal-review-none">ההחלפה שלך כבר נוצלה</div>';
+      } else {
+        const opts = state.picks
+          .map((p, i) => (p ? { idx: i, player: p.player, price: salPriceOf(p.player) } : null))
+          .filter(Boolean).sort((a, b) => b.price - a.price);
+        swapBox.innerHTML =
+          '<div class="sal-review-t">נותרה לך החלפה אחת — שחרר מישהו והעמדה תיפתח מחדש</div>' +
+          '<div class="sal-review-list">' + opts.map(o =>
+            `<button class="sal-rel" data-idx="${o.idx}">${o.player.name} ` +
+            `<span>${o.price ? '₪' + salFmt(o.price) + 'מ׳' : 'חופשי'}</span></button>`).join('') +
+          '</div>';
+      }
+    }
+    box.style.display = 'flex';
+  }
+
+  function salHideReview() {
+    const box = salReviewEl();
+    if (box) box.style.display = 'none';
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const go = document.getElementById('sal-review-go');
+    if (go) go.addEventListener('click', () => {
+      salHideReview();
+      if (typeof showPreseason === 'function') showPreseason(teamOVR());
+    });
+  });
+
+  // A release from inside the review closes it: salRelease already hands the
+  // round back and restarts the draft, and the review will open again when the
+  // eleven are complete a second time.
+  document.addEventListener('click', ev => {
+    if (!ev.target.closest) return;
+    if (!ev.target.closest('#sal-review .sal-rel')) return;
+    salHideReview();
+  }, true);
+
+  global.salShowReview = salShowReview;
+  global.salHideReview = salHideReview;
+})(typeof window !== 'undefined' ? window : globalThis);
