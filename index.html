@@ -204,6 +204,17 @@
         </span>
         <span class="dw-sub" id="gt-card-sub">ריצה אחת, תחנה אחרי תחנה — כמה רחוק תגיע?</span>
       </button>
+      <!-- Shown only when the browser says it can install, and never to someone
+           who already did. Hidden by default so it cannot flash on desktop. -->
+      <button id="btn-install-card" class="daily-welcome-card install-card" style="display:none">
+        <span class="dw-top">
+          <span class="dw-icon">📲</span>
+          <span class="dw-title">התקן את המשחק</span>
+          <span class="dw-arrow">←</span>
+        </span>
+        <span class="dw-sub" id="install-sub">מסך מלא, אייקון במסך הבית, בלי חנות ובלי הורדה</span>
+        <span class="install-x" id="install-x" role="button" tabindex="0">לא עכשיו</span>
+      </button>
       <a class="btn-coffee btn-coffee-welcome" id="btn-coffee-welcome" href="https://ko-fi.com/360ligathaal" target="_blank" rel="noopener">☕ אוהב את המשחק? קנה לי קפה</a>
       <button class="wn-link" id="btn-whatsnew"><span id="wn-label">מה חדש!</span><span class="wn-dot" id="wn-dot"></span></button>
       <div class="wn-version" id="wn-version" dir="ltr">v1.5</div>
@@ -969,5 +980,6 @@
   <script src="js/player-card.js"></script>
   <script src="js/theme.js"></script>
   <script src="js/nav-drawer.js"></script>
+  <script src="js/install.js"></script>
 </body>
 </html>
