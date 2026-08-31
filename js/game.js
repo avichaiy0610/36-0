@@ -755,6 +755,10 @@ const TRACK_SCREENS = {
 // draft starts and when its season ends, so the two can never disagree.
 // A career season returns null: it records itself in js/career.js, where the
 // run's own numbers are known.
+// Set by the salary-cap card on the setup screen and cleared by a plain
+// "start", so the mode can never leak into the next draft.
+let _salaryCapPick = false;
+
 function trackDraftMode() {
   if (state.career) return null;
   return state.challenge ? 'challenge'
@@ -1092,6 +1096,8 @@ function beginDraft() {
   state.showRatings = (ratingsEl?.dataset.val ?? 'on') === 'on';
   state.draftMode   = draftModeEl?.dataset.val ?? 'squad-first';
   state.peakMode    = (peakModeEl?.dataset.val ?? 'off') === 'on';
+  // set by the salary-cap card on the setup screen; a plain draft clears it
+  state.salaryCap   = !!_salaryCapPick;
   const classicPick = (document.querySelector('#mode-row .opt-btn.selected')?.dataset.val ?? 'full') === 'classic';
   state.formationId = _selectedFormationKey;
   const tacticPick  = (!classicPick && formationTactical(_selectedFormationKey)) ? _selectedTactic : 'bal';
@@ -1796,6 +1802,9 @@ function renderSquadPlayers(squad, filterSlotIdx = null) {
     const dispOVR = playerOVR(player);
     const peakTag = state.peakMode && player.peak_ovr && player.peak_ovr > player.ovr ? '⚡' : '';
     const ovrHTML = state.showRatings ? `<span class="pc-ovr" dir="ltr">${peakTag}${dispOVR}</span>` : '';
+    // salary cap: the price rides beside the rating, so the trade is visible
+    // BEFORE the pick rather than after it
+    const salHTML = (typeof salChip === 'function') ? salChip(player) : '';
     // Show the player's OWN positions (primary + secondaries from the data),
     // not every slot he could be squeezed into via the compatibility rules.
     const fits = playerPositions(player);
@@ -1857,7 +1866,7 @@ function renderSquadPlayers(squad, filterSlotIdx = null) {
       : `<button class="pc-info" aria-label="הכרטיס של ${player.name}">ⓘ</button>`;
     card.innerHTML = `
       <span class="pc-pos-badge" title="${posLabel}">${posShort}</span>
-      <span class="pc-name">${player.name}${infoHTML}${natHTML}${oopHTML}${tagHTML}${chemHTML}</span>
+      <span class="pc-name">${player.name}${infoHTML}${natHTML}${oopHTML}${tagHTML}${chemHTML}${salHTML}</span>
       ${ovrHTML}
     `;
     if (!unavailable) card.addEventListener('click', () => handlePlayerClick(player, card));
@@ -1971,6 +1980,7 @@ function assignPlayer(slotIdx, player) {
 
 function updateDraftOVR() {
   if (typeof updateChallengeReqsUI === 'function') updateChallengeReqsUI();
+  if (typeof salSyncBar === 'function') salSyncBar();
   const picked = state.picks.filter(Boolean).length;
   if (picked === 0) return;
   const hidden = !state.showRatings;   // hide numbers until the season is simulated
@@ -2100,6 +2110,9 @@ function updateProgress() {
   const done = state.currentRound, total = state.slots.length;
   document.getElementById('progress-text').textContent = `שחקן ${done + 1} מתוך ${total}`;
   document.getElementById('progress-fill').style.width = ((done / total) * 100) + '%';
+  // The budget belongs here rather than in updateDraftOVR, which returns early
+  // while nothing is picked — exactly when the budget is most worth reading.
+  if (typeof salSyncBar === 'function') salSyncBar();
 }
 
 function setHint(text) { document.getElementById('pick-hint').textContent = text; }
@@ -3781,7 +3794,17 @@ document.addEventListener('DOMContentLoaded', () => {
   window.addEventListener('resize', () => fitShortNames());
 
   document.getElementById('btn-start').addEventListener('click', startGame);
-  document.getElementById('btn-start-draft').addEventListener('click', beginDraft);
+  // A plain start always clears the mode; the salary card sets it and starts
+  // the same draft, so the two entries cannot disagree about which is on.
+  document.getElementById('btn-start-draft').addEventListener('click', () => {
+    _salaryCapPick = false;
+    beginDraft();
+  });
+  document.getElementById('setup-salary-card')?.addEventListener('click', () => {
+    _salaryCapPick = true;
+    if (typeof track === 'function') track('open', 'salarycap');
+    beginDraft();
+  });
   document.getElementById('btn-reroll-team').addEventListener('click', rerollTeam);
   document.getElementById('btn-reroll-season').addEventListener('click', rerollSeason);
   document.getElementById('btn-share').addEventListener('click', openShareModal);

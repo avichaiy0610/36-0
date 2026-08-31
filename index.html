@@ -264,6 +264,15 @@
         <span class="smc-arrow">←</span>
       </button>
 
+      <button class="setup-mode-card" id="setup-salary-card">
+        <span class="smc-icon">💰</span>
+        <span class="smc-body">
+          <span class="smc-title">תקרת שכר <span class="smc-new">חדש</span></span>
+          <span class="smc-sub" id="smc-salary-sub">לכל שחקן יש מחיר — כוכב אחד עולה כמו תשעה בינוניים</span>
+        </span>
+        <span class="smc-arrow">←</span>
+      </button>
+
       <section class="setup-section">
         <div class="setup-label" data-txt="lbl-formation">מערך</div>
         <div class="formation-picker">
@@ -458,6 +467,15 @@
           <div class="progress-bar-fill" id="progress-fill"></div>
         </div>
         <div id="draft-ovr-lines" style="display:none"></div>
+        <!-- salary cap mode only; hidden everywhere else -->
+        <div id="sal-bar" class="sal-bar" style="display:none">
+          <div class="sal-top">
+            <span class="sal-label">תקציב</span>
+            <span class="sal-nums"><b id="sal-left">—</b> נותרו מתוך <span id="sal-total">—</span> מ׳ ₪</span>
+          </div>
+          <div class="sal-track"><div class="sal-fill" id="sal-fill"></div></div>
+          <div class="sal-over" id="sal-over" style="display:none"></div>
+        </div>
       </div>
       <div class="pitch-container">
         <div class="pitch" id="draft-pitch">
@@ -980,6 +998,7 @@
   <script src="js/player-card.js"></script>
   <script src="js/theme.js"></script>
   <script src="js/nav-drawer.js"></script>
+  <script src="js/salary.js"></script>
   <script src="js/install.js"></script>
 </body>
 </html>

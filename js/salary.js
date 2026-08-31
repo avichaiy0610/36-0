@@ -90,3 +90,74 @@
     module.exports = { salPrice, salBudget, salFmt, salSpent, salRemaining, salOverCap, salReleaseOptions, BUDGETS };
   }
 })(typeof window !== 'undefined' ? window : globalThis);
+
+/* ── the screens ───────────────────────────────────────────────────────────── */
+// Kept out of game.js on purpose: every touch point below is a no-op unless
+// state.salaryCap is on, so the mode cannot change a normal draft by accident.
+(function (global) {
+  function salActive() {
+    return typeof state !== 'undefined' && !!state.salaryCap;
+  }
+
+  // The chip that rides on a player card in the draft list.
+  function salChip(player) {
+    if (!salActive() || !player) return '';
+    const p = salPriceOf(player);
+    const left = salRemaining(state.picks, state.difficulty);
+    const cls = p > left ? ' sal-chip-over' : '';
+    return `<span class="sal-chip${cls}">₪${salFmt(p)}מ׳</span>`;
+  }
+
+  // The budget bar under the draft progress.
+  function salSyncBar() {
+    const bar = document.getElementById('sal-bar');
+    if (!bar) return;
+    if (!salActive()) { bar.style.display = 'none'; return; }
+    const total = salBudget(state.difficulty);
+    const left = salRemaining(state.picks, state.difficulty);
+    const spent = salSpent(state.picks);
+    bar.style.display = 'block';
+    bar.classList.toggle('sal-busted', left < 0);
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+    set('sal-left', salFmt(left));
+    set('sal-total', salFmt(total));
+    const fill = document.getElementById('sal-fill');
+    if (fill) fill.style.width = Math.max(0, Math.min(100, (spent / total) * 100)) + '%';
+
+    const over = document.getElementById('sal-over');
+    if (!over) return;
+    if (left >= 0) { over.style.display = 'none'; over.innerHTML = ''; return; }
+    over.style.display = 'block';
+    const opts = salReleaseOptions(state.picks, state.difficulty).slice(0, 4);
+    over.innerHTML =
+      `<div class="sal-over-t">חרגת ב-₪${salFmt(-left)}מ׳ — שחרר שחקן כדי לשחק</div>` +
+      opts.map(o =>
+        `<button class="sal-rel" data-idx="${o.idx}">` +
+        `${o.player.name} <span>₪${salFmt(o.price)}מ׳</span></button>`).join('');
+  }
+
+  // Releasing empties the slot. It is NOT re-drafted — at kick-off an empty slot
+  // is filled by a free agent, which is what makes a star cost a starter.
+  function salRelease(idx) {
+    if (!salActive() || !state.picks[idx]) return;
+    const p = state.picks[idx];
+    state.usedPlayerKeys.delete(p.player.name);
+    state.picks[idx] = null;
+    if (typeof saveDraftState === 'function') saveDraftState();
+    if (typeof refreshAllTokens === 'function') refreshAllTokens();
+    if (typeof updateDraftOVR === 'function') updateDraftOVR();
+    salSyncBar();
+  }
+
+  document.addEventListener('click', ev => {
+    const b = ev.target.closest && ev.target.closest('.sal-rel');
+    if (!b) return;
+    ev.preventDefault();
+    salRelease(+b.dataset.idx);
+  });
+
+  global.salActive = salActive;
+  global.salChip = salChip;
+  global.salSyncBar = salSyncBar;
+  global.salRelease = salRelease;
+})(typeof window !== 'undefined' ? window : globalThis);

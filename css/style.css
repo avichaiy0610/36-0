@@ -2752,3 +2752,36 @@ body {
   color: var(--accent2);
 }
 .pc-combined-why { font-size: 10px; font-weight: 400; color: var(--dim); }
+
+
+/* ── תקרת שכר ─────────────────────────────────────────────────────────────── */
+.sal-chip {
+  display: inline-block; margin-inline-start: 6px; padding: 1px 7px;
+  border-radius: 999px; font-size: 11px; font-weight: 800;
+  background: #2a5225; color: #d7f5cf; white-space: nowrap;
+}
+.sal-chip-over { background: #5a1f1f; color: #ffd7d7; }
+
+.sal-bar { margin-top: 8px; }
+.sal-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 12px; }
+.sal-label { color: var(--dim); font-weight: 700; }
+.sal-nums { color: var(--text); font-variant-numeric: tabular-nums; }
+.sal-nums b { color: var(--accent); }
+.sal-track {
+  height: 6px; margin-top: 4px; border-radius: 4px;
+  background: var(--panel2, #1b2330); overflow: hidden;
+}
+.sal-fill { height: 100%; background: var(--accent); transition: width .18s; }
+.sal-busted .sal-fill { background: #ef4444; }
+.sal-busted .sal-nums b { color: #ef4444; }
+
+.sal-over { margin-top: 8px; display: flex; flex-direction: column; gap: 5px; }
+.sal-over-t { font-size: 12px; font-weight: 800; color: #ef4444; }
+.sal-rel {
+  display: flex; justify-content: space-between; align-items: center; gap: 10px;
+  background: var(--surface2, #161b22); border: 1px solid var(--border);
+  border-radius: 8px; padding: 7px 10px; cursor: pointer;
+  color: var(--text); font-family: inherit; font-size: 13px; font-weight: 600;
+}
+.sal-rel:hover { border-color: #ef4444; }
+.sal-rel span { color: var(--dim); font-variant-numeric: tabular-nums; font-size: 12px; }
