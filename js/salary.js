@@ -227,6 +227,12 @@
   /* ── awarding ────────────────────────────────────────────────────────────── */
   function salAward(r) {
     if (!salActive() || !r) return;
+    // The mode tracked its opens and not its finishes, so the admin panel read
+    // "19 opened, 0 finished" while nineteen seasons sat on the board. Signed
+    // out too — most of the game is played without an account.
+    if (typeof track === 'function') {
+      track('finish', 'salarycap', state.difficulty || 'normal');
+    }
     if (typeof getCurrentUser !== 'function' || !getCurrentUser()) return;
     if (typeof _supabase === 'undefined' || !_supabase) return;
     // The board. Points are recomputed server-side from W/D/L, so this is a
