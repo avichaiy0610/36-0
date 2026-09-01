@@ -193,8 +193,10 @@ async function loadLeaderboard() {
   const table = document.getElementById('leaderboard-table');
   table.innerHTML = '<div class="page-loading">טוען...</div>';
 
-  // neither the gauntlet nor a dynasty has seasons, formats or periods
-  lbToggleSeasonFilters(lbTab !== 'gauntlet' && lbTab !== 'career');
+  // The gauntlet, a dynasty and a capped season have no seasons, formats or
+  // periods. Leaving the filters up made them look broken: the salary board
+  // ignores them, so every option redrew the same table.
+  lbToggleSeasonFilters(lbTab !== 'gauntlet' && lbTab !== 'career' && lbTab !== 'salary');
   if (lbTab === 'gauntlet') return loadGauntletBoard(table);
   if (lbTab === 'career')   return loadCareerBoardTab(table);
   if (lbTab === 'salary')   return loadSalaryBoardTab(table);
