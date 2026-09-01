@@ -1,0 +1,95 @@
+name: telegram-webhook-setup
+
+# Run once to switch the challenge bot from polling to a webhook, and never
+# again unless something breaks.
+#
+# This job exists here, rather than being a command run from a laptop, for one
+# reason: TELEGRAM_CHAL_BOT_TOKEN lives in GitHub secrets and nowhere else. This
+# is the only place that can read it, so this is the only place that can hand it
+# to the Edge Function.
+#
+# It hands it over through engine_state rather than through Supabase's secret
+# store, because setting a function secret needs a Management API token that
+# this repo does not have and that would itself be a new secret to manage.
+# engine_state is RLS-locked to service_role and the owner's own login, and the
+# service key that reaches it already lives in these same GitHub secrets and is
+# strictly more powerful than a bot token — so nothing here is reachable that
+# was not already reachable. Swap it for `supabase secrets set` any time; the
+# function prefers the environment variable if one is ever present.
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'on = webhook (instant taps) · off = back to polling · info = just report'
+        type: choice
+        options: [on, off, info]
+        default: on
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+      TELEGRAM_CHAL_BOT_TOKEN: ${{ secrets.TELEGRAM_CHAL_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      MODE: ${{ inputs.mode }}
+    steps:
+      - name: switch
+        run: |
+          set -euo pipefail
+          API="https://api.telegram.org/bot${TELEGRAM_CHAL_BOT_TOKEN}"
+          HOOK="$(echo "$SUPABASE_URL" | sed 's#/*$##')/functions/v1/challenge-tap"
+
+          state() {   # state <key> <value>  — upsert into engine_state
+            curl -sS -X POST "$SUPABASE_URL/rest/v1/engine_state" \
+              -H "apikey: $SUPABASE_SERVICE_KEY" \
+              -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
+              -H "Content-Type: application/json" \
+              -H "Prefer: resolution=merge-duplicates" \
+              -d "$(jq -nc --arg k "$1" --arg v "$2" '{key:$k, value:$v}')" > /dev/null
+          }
+
+          if [ "$MODE" = "info" ]; then
+            echo "--- getWebhookInfo ---"
+            curl -sS "$API/getWebhookInfo" | jq '.result | {url, pending_update_count, last_error_date, last_error_message, allowed_updates}'
+            exit 0
+          fi
+
+          if [ "$MODE" = "off" ]; then
+            echo "dropping the webhook — getUpdates polling becomes possible again"
+            curl -sS -X POST "$API/deleteWebhook" | jq -c .
+            state tg_webhook_secret ""
+            echo "done. re-enable the cron in challenge-taps.yml if you want polling back."
+            exit 0
+          fi
+
+          # A fresh shared secret every time this runs, so re-running it rotates
+          # rather than reuses. Telegram allows A-Z a-z 0-9 _ - only.
+          SECRET="$(head -c 32 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 40)"
+
+          echo "seeding engine_state"
+          state tg_chal_bot_token "$TELEGRAM_CHAL_BOT_TOKEN"
+          state tg_chat_id        "$TELEGRAM_CHAT_ID"
+          state tg_webhook_secret "$SECRET"
+
+          # Registering the webhook makes getUpdates start failing with 409, so
+          # this is the point of no return for the polling path. allowed_updates
+          # keeps everything except button presses out — the bot has no other job.
+          echo "registering $HOOK"
+          curl -sS -X POST "$API/setWebhook" \
+            -H 'Content-Type: application/json' \
+            -d "$(jq -nc --arg u "$HOOK" --arg s "$SECRET" \
+                  '{url:$u, secret_token:$s, allowed_updates:["callback_query"], drop_pending_updates:false}')" \
+            | jq -c .
+
+          echo "--- getWebhookInfo ---"
+          curl -sS "$API/getWebhookInfo" | jq '.result | {url, pending_update_count, last_error_date, last_error_message, allowed_updates}'
+
+          echo "--- ping ---"
+          curl -sS -X POST "$API/sendMessage" \
+            -H 'Content-Type: application/json' \
+            -d "$(jq -nc --arg c "$TELEGRAM_CHAT_ID" \
+                  '{chat_id:$c, text:"🔌 עברנו לוובהוק. לחץ על הכפתור כדי לוודא שהתגובה מיידית.",
+                    reply_markup:{inline_keyboard:[[{text:"בדיקה",callback_data:"ping"}]]}}')" \
+            | jq -c '{ok, error: .description}'

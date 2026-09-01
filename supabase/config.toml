@@ -9,3 +9,10 @@ entrypoint = "./functions/submit-result/index.ts"
 # Specifies static files to be bundled with the function. Supports glob patterns.
 # For example, if you want to serve static HTML pages in your function:
 # static_files = [ "./functions/submit-result/*.html" ]
+
+# Telegram calls this with its own secret-token header, never a Supabase JWT, so
+# JWT verification has to be off — the function checks the header itself.
+[functions.challenge-tap]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/challenge-tap/index.ts"
