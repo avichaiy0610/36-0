@@ -2171,12 +2171,17 @@ function simulateMatch(me, opp, homeOverride = null, engine = 1) {
 // whatever it returns (if anything) becomes the rating for the rest. It is
 // SYNCHRONOUS on purpose: the player's decision is taken before the season is
 // generated, and the hook only applies it, so nothing here has to await.
-function simulateRegularPhase(pool, me, engine, halfHook) {
-  if (!halfHook) return { list: pool.map(opp => simulateMatch(me, opp, null, engine)) };
+// `play` lets a caller decide how one fixture is played — the authentic formats
+// carry their own home/away per fixture, which the modern pool does not. Without
+// it the seam existed only on the modern path, and the January window silently
+// never opened in a career, which plays every season in its real format.
+function simulateRegularPhase(pool, me, engine, halfHook, play) {
+  const run = (x, meNow) => (play ? play(x, meNow) : simulateMatch(meNow, x, null, engine));
+  if (!halfHook) return { list: pool.map(x => run(x, me)) };
   const half  = Math.floor(pool.length / 2);
-  const first = pool.slice(0, half).map(opp => simulateMatch(me, opp, null, engine));
+  const first = pool.slice(0, half).map(x => run(x, me));
   const me2   = halfHook(first, me);
-  const rest  = pool.slice(half).map(opp => simulateMatch(me2 ?? me, opp, null, engine));
+  const rest  = pool.slice(half).map(x => run(x, me2 ?? me));
   return { list: [...first, ...rest], me2: me2 ?? me, firstHalf: first };
 }
 
@@ -2185,7 +2190,7 @@ function generateMatches(me, oppTeams = IL_TEAMS_SIM, spec = MODERN_FORMAT, engi
   // One form swing for the whole campaign, drawn before any match. V1 never had
   // this and is left alone; its results are frozen.
   if (engine >= 2 && typeof me === 'object' && me !== null) me = simApplySeasonForm(me);
-  if (!isModernSpec(spec)) return generateAuthenticMatches(me, oppTeams, spec, engine);
+  if (!isModernSpec(spec)) return generateAuthenticMatches(me, oppTeams, spec, engine, halfHook);
   // ── שלב הליגה: 26 משחקים (13 יריבים × בית + חוץ) ───────────────────────────
   const regPool    = shuffleArr([...oppTeams, ...oppTeams]);
   // The January window needs the season to STOP halfway, and a season that is
@@ -2243,7 +2248,7 @@ function generateMatches(me, oppTeams = IL_TEAMS_SIM, spec = MODERN_FORMAT, engi
 // One generic engine for every pre-2012 format: N-1 opponents met `rounds`
 // times, then (if the season had one) a playoff inside the group the regular
 // season put you in. 2009/10–2010/11 also halve the regular-season points.
-function generateAuthenticMatches(me, oppTeams, spec, engine = 1) {
+function generateAuthenticMatches(me, oppTeams, spec, engine = 1, halfHook = null) {
   const ovr     = typeof me === 'number' ? me : me.ovr;
   const teams   = oppTeams.slice(0, spec.teams - 1);
   const regG    = regularGames(spec);
@@ -2260,7 +2265,12 @@ function generateAuthenticMatches(me, oppTeams, spec, engine = 1) {
     const homeCount = baseHome + (extraH[i] ? 1 : 0);
     for (let r = 0; r < spec.rounds; r++) fixtures.push({ opp, home: r < homeCount });
   });
-  const regMatches = shuffleArr(fixtures).map(f => simulateMatch(me, f.opp, f.home, engine));
+  // Same seam as the modern format: half the fixtures, the January decision, then
+  // the rest against whatever squad that decision left behind.
+  const regPhase = simulateRegularPhase(shuffleArr(fixtures), me, engine, halfHook,
+                                        (f, meNow) => simulateMatch(meNow, f.opp, f.home, engine));
+  if (regPhase.me2 !== undefined) me = regPhase.me2;
+  const regMatches = regPhase.list;
   const regPts = regMatches.reduce((s, m) => s + (m.outcome === 'W' ? 3 : m.outcome === 'D' ? 1 : 0), 0);
 
   // Opponents' regular season, scaled to this format's number of games
