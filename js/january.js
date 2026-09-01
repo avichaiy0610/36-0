@@ -152,6 +152,33 @@
     return live[0];
   }
 
+  // Pick the RATING first, then a man at it — never a man at random out of the
+  // whole band.
+  //
+  // The pool is steeply bottom-heavy: of the right-backs a band of 76-92 covers,
+  // 319 sit at 76-79 and 131 above 80. Drawing a player uniformly therefore
+  // lands near the floor of the band almost every time, and "מציאה" — which is
+  // supposed to be the generous one — came out a DOWNGRADE 47% of the time for
+  // a squad whose weakest link was already an 80, and 56% at 84. The better your
+  // team, the worse your find: exactly backwards, and invisible in the first
+  // audit because that test XI had a 68 at the bottom, where nearly the whole
+  // band is above you.
+  //
+  // Levelling the ratings makes each band mean what its name implies at every
+  // squad strength, and leaves the shape of every scenario intact — a band
+  // entirely below you still cannot produce an upgrade.
+  function drawFromBand(cands) {
+    const byOvr = new Map();
+    for (const c of cands) {
+      const o = ovrOf(c.player);
+      if (!byOvr.has(o)) byOvr.set(o, []);
+      byOvr.get(o).push(c);
+    }
+    const ovrs = [...byOvr.keys()];
+    const pick = byOvr.get(ovrs[Math.floor(Math.random() * ovrs.length)]);
+    return pick[Math.floor(Math.random() * pick.length)];
+  }
+
   /* ── the plan ────────────────────────────────────────────────────────────── */
   // Everything the window will do, decided in one place and BEFORE either
   // continuation is simulated, so both branches are computed against a fixed
@@ -183,7 +210,7 @@
         inBand = pool.filter(c => { const o = ovrOf(c.player); return o >= lo - grow && o <= hi + grow; });
       }
       if (!inBand.length) inBand = pool;
-      incoming = inBand[Math.floor(Math.random() * inBand.length)];
+      incoming = drawFromBand(inBand);
       break;
     }
     if (!incoming) return null;
