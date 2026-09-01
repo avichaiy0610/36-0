@@ -1,3 +1,14 @@
+// One toast element, three callers — submit-result, the career and Europe — and
+// two of them fire without awaiting. They used to each run their own 3.5s timer
+// over the same div, so a second caller would blank a toast the first was still
+// showing and then re-run the entry animation: the "jumping" every second or so.
+//
+// So there is one queue and one drainer. Callers add to it; whoever is already
+// draining keeps draining. Nothing else touches the element.
+const _toastQueue = [];
+const _toastSeen  = new Set();      // an achievement announces itself once a session
+let   _toastBusy  = false;
+
 async function showAchievementToasts(achievementKeys) {
   if (!achievementKeys?.length) return;
   const { data: achs } = await _supabase
@@ -5,17 +16,47 @@ async function showAchievementToasts(achievementKeys) {
     .select('key, name_he, icon')
     .in('key', achievementKeys);
   for (const ach of (achs ?? [])) {
-    await showSingleToast(ach);
+    if (_toastSeen.has(ach.key)) continue;
+    _toastSeen.add(ach.key);
+    _toastQueue.push(ach);
+  }
+  if (!_toastBusy) await drainAchievementToasts();
+}
+
+async function drainAchievementToasts() {
+  _toastBusy = true;
+  const toast = document.getElementById('achievement-toast');
+  try {
+    while (_toastQueue.length) {
+      // A long run of them is worse than useless: half a minute of popups over
+      // the season you are trying to read. Name the first two and count the rest.
+      if (_toastQueue.length > 3) {
+        await paintToast(toast, _toastQueue.shift());
+        await paintToast(toast, _toastQueue.shift());
+        const rest = _toastQueue.length;
+        _toastQueue.length = 0;
+        await paintToast(toast, { icon: '🏆', name_he: `ועוד ${rest} הישגים` });
+        continue;
+      }
+      await paintToast(toast, _toastQueue.shift());
+    }
+  } finally {
+    if (toast) toast.style.display = 'none';
+    _toastBusy = false;
   }
 }
 
-function showSingleToast(ach) {
+function paintToast(toast, ach) {
   return new Promise(resolve => {
-    const toast = document.getElementById('achievement-toast');
-    document.getElementById('toast-icon').textContent = ach.icon;
-    document.getElementById('toast-name').textContent = ach.name_he;
+    if (!toast) { resolve(); return; }
+    document.getElementById('toast-icon').textContent = ach.icon || '🏆';
+    document.getElementById('toast-name').textContent = ach.name_he || '';
+    // Restart the entry animation deliberately rather than as a side effect of
+    // the display flip, so each one arrives the same way.
+    toast.style.display = 'none';
+    void toast.offsetWidth;
     toast.style.display = 'flex';
-    setTimeout(() => { toast.style.display = 'none'; resolve(); }, 3500);
+    setTimeout(resolve, 2400);
   });
 }
 

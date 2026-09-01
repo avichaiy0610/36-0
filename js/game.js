@@ -2917,6 +2917,10 @@ function animateResults(ovr) {
   function bindSeason(s, { consequences = true } = {}) {
     season = s;
     ({ matches, inTopSix, leagueTable, playerStats } = s);
+    // Re-read rather than keep the opening value: a January transfer restates it
+    // as the rating of the XI that finished the season, which is the XI on the
+    // pitch beside this number.
+    ovr = s.ovr;
     totalGames = matches.length;
     wins = draws = losses = gfTotal = gaTotal = 0;
     matches.forEach(m => {

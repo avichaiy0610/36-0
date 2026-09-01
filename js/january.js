@@ -472,6 +472,16 @@
         // card show the man who actually played the second half.
         janApply(plan);
         if (typeof saveDraftState === 'function') saveDraftState();
+        // The results pitch is built ONCE, before the season is revealed, so
+        // without this it keeps showing the man who was sold — standing on the
+        // pitch for a half he did not play. Rebuilding is cheap and it reads
+        // straight from state.picks, which the swap has already changed.
+        if (typeof buildResultsPitch === 'function') buildResultsPitch();
+        // Same reason for the number above that pitch: the OVR card's line bars
+        // are recomputed from the squad but the headline figure is carried on
+        // the season, so it would still quote the XI you no longer have. The XI
+        // you finished with is the one on screen, so that is the one it states.
+        if (typeof teamOVR === 'function') pair.gamble.ovr = teamOVR();
         onChosen(pair.gamble);
       })));
     });

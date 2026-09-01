@@ -1620,7 +1620,10 @@ body {
 
 /* ── Achievement Toast ───────────────────────────────────────────────────── */
 .achievement-toast {
-  position: fixed; bottom: 24px; right: 24px;
+  /* Bottom-LEFT, not right. The page is RTL and the results panel — the table,
+     the match list, the thing the toast is congratulating you about — lives on
+     the right, so the old corner landed straight on top of it. */
+  position: fixed; bottom: 24px; left: 24px; max-width: min(320px, calc(100vw - 48px));
   background: #1e1e3a; border: 1px solid #4CAF50; border-radius: 12px;
   padding: 14px 18px; display: flex; align-items: center; gap: 12px;
   direction: rtl; z-index: 300; box-shadow: 0 4px 20px rgba(76,175,80,0.3);
