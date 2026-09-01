@@ -1210,7 +1210,12 @@ function clearDraftState() {
 
 // Attach the simulated season to the saved draft, so a refresh replays the
 // exact same result instead of allowing a fresh simulation.
-function saveSeasonState(season) {
+// `fresh` marks the FIRST save of a new season. It matters because this is
+// called twice: once when the season is simulated, and again from inside the
+// January window when the second half is re-bound. Anything that belongs to the
+// previous season must be cleared on the first call only — clearing on the
+// second wipes work the current season has already done.
+function saveSeasonState(season, fresh) {
   try {
     const raw = localStorage.getItem(DRAFT_SAVE_KEY);
     if (!raw) return;
@@ -1232,9 +1237,19 @@ function saveSeasonState(season) {
       playerStats: season.playerStats.map(({ squad, ...rest }) => rest),
     };
     // A new season means last season's European campaign is void — it belonged
-    // to a squad and a finishing position that no longer exist.
+    // to a squad and a finishing position that no longer exist. Europe is only
+    // ever entered after the season has finished, so clearing it on every save
+    // is harmless.
     delete d.europe;
     if (typeof _euCampaign !== 'undefined') _euCampaign = null;
+    // The CUP is different: it is played DURING the season, and the January
+    // window saves the season again half way through it. Clearing it there
+    // destroyed the run in flight — the rounds after the window were skipped in
+    // silence and no champion was ever crowned. Only the first save may do it.
+    if (fresh) {
+      delete d.cup;
+      if (typeof cupClear === 'function') cupClear();
+    }
     localStorage.setItem(DRAFT_SAVE_KEY, JSON.stringify(d));
   } catch (e) {}
 }
@@ -2716,6 +2731,31 @@ function showPreseason(ovr) {
 // else still sees the button, so they know what finishing first is worth.
 // Called with the finishing rank, which is only known once the season is built —
 // until then there is nothing to show.
+/* Israel's four European places, as they really are:
+   champion → Champions League · State Cup winner → Europa League ·
+   2nd and 3rd → Conference League.
+
+   On a DOUBLE nobody loses a place; they shift up and a fourth is added — the
+   runner-up goes to the Europa League and 3rd and 4th to the Conference. And a
+   club only ever holds its highest place, which is what makes the order
+   CL > EL > ECL a rule rather than a preference.
+
+   Returns null when the season earned nothing. */
+function euAllocationFor(rank) {
+  const iWonCup = typeof cupPlayerWon === 'function' && cupPlayerWon();
+  const w = typeof cupWinner === 'function' ? cupWinner() : null;
+  // A double only matters here when somebody ELSE did it: the club above me took
+  // both places, so mine moves up.
+  const doubleAbove = !!(w && !w.us && rank > 1);
+
+  if (rank === 1) return { tier: 'ucl', label: 'ליגת האלופות' };
+  if (iWonCup)    return { tier: 'uel', label: 'הליגה האירופית' };
+  if (doubleAbove && rank === 2) return { tier: 'uel', label: 'הליגה האירופית' };
+  const last = doubleAbove ? 4 : 3;
+  if (rank >= 2 && rank <= last) return { tier: 'uecl', label: 'קונפרנס ליג' };
+  return null;
+}
+
 function wireEuropeButton(rank) {
   const btn = document.getElementById('btn-europe');
   if (!btn) return;
@@ -2723,19 +2763,28 @@ function wireEuropeButton(rank) {
     btn.style.display = 'none';
     return;
   }
-  const champ = rank === 1;
+  // The first moment both halves are known — who won the cup, and where the
+  // league finished. The double badge needs both, so the cup reports here.
+  if (typeof cupSubmit === 'function') cupSubmit(rank);
+  // The cup's own way in, beside Europe's. Skipping a round should cost the
+  // drama, not the record — the bracket is always there to open.
+  if (typeof cupMountButton === 'function') cupMountButton(btn);
+  const alloc = euAllocationFor(rank);
+  const inEurope = !!alloc;
   btn.style.display = '';
-  btn.classList.toggle('locked', !champ);
-  btn.disabled = !champ;
-  btn.textContent = champ ? '🇪🇺 המשך למוקדמות אירופה' : '🇪🇺 אירופה - רק לאלופה';
-  btn.onclick = champ ? () => euStart() : null;
+  btn.classList.toggle('locked', !inEurope);
+  btn.disabled = !inEurope;
+  btn.textContent = inEurope
+    ? `🇪🇺 המשך ל${alloc.label}`
+    : '🇪🇺 אירופה - למקומות 1-3 ולזוכת הגביע';
+  btn.onclick = inEurope ? () => euStart(alloc.tier) : null;
 
   // The admin's way in from any finishing position is a small link under the
   // row, not a third button in it: as a button it wrapped its own label down
   // seven lines and ate a third of the actions row.
   const old = document.getElementById('eu-admin-link');
   if (old) old.remove();
-  if (!champ && typeof euIsAdmin === 'function' && euIsAdmin()) {
+  if (!inEurope && typeof euIsAdmin === 'function' && euIsAdmin()) {
     const a = document.createElement('button');
     a.id = 'eu-admin-link';
     a.className = 'eu-admin-link';
@@ -2877,7 +2926,7 @@ function animateResults(ovr) {
     // restores the season you already had rather than re-rolling one, which is
     // the same rule that stops any other result being ground by reloading.
     // Refreshing therefore counts as sticking with your XI.
-    saveSeasonState(season);
+    saveSeasonState(season, true);   // the season is new here, and only here
     // stamp the engine so the submitted payload can mark which scale this
     // score is on (V2 outscores V1 at the same squad rating)
     window._resultSubmitted = false;   // a new season may be saved again
@@ -3063,32 +3112,88 @@ function animateResults(ovr) {
   if (skipBtn) skipBtn.style.display = 'block';
 
   let idx = 0, timer = null;
-  // The January seam: the reveal stops here, the window opens, and only then is
-  // it decided which half of the season the rest of these rows come from.
-  let janSeam = janPair ? janPair.played : -1;
+
+  /* ── seams ──────────────────────────────────────────────────────────────────
+     A seam is a point where the reveal stops, hands over, and picks up again.
+     There used to be exactly one — January — and it lived in a single number.
+     The State Cup adds five more, interleaved around it, so a lone number would
+     silently lose whichever seam was written second. They are a SORTED LIST now,
+     and every seam is opened through the same door.
+
+     January is a decision; a cup round is a match. What they share is the
+     mechanism, and that is all this has to model. */
+  const seams = [];
+  if (janPair) seams.push({ at: janPair.played, kind: 'jan' });
+  if (typeof cupSeamsFor === 'function') {
+    for (const s of cupSeamsFor(matches.length) || []) seams.push(s);
+  }
+  seams.sort((a, b) => a.at - b.at);
+  let seamI = 0;
+  const nextSeam = () => (seamI < seams.length ? seams[seamI] : null);
+
   let janSkip = null;
   if (janPair && typeof janMountSkip === 'function') {
     janSkip = janMountSkip(() => {                 // "דלג לינואר"
-      while (idx < janSeam) revealOne(true);
-      openJanuary();
+      const jan = seams.find(s => s.kind === 'jan');
+      if (!jan) return;
+      clearTimeout(timer);
+      // The button promises January, so it has to ARRIVE there. Cup rounds in
+      // the way are played on the road and never shown: opening one here would
+      // put a modal in front of somebody who just asked to skip ahead, and the
+      // skip would end at the cup instead of at the decision.
+      while (idx < jan.at) {
+        const s = nextSeam();
+        if (s && s.at === idx) {
+          if (s.kind === 'cup' && typeof cupSkipRound === 'function') cupSkipRound(s.round);
+          seamI++;                                 // spent, silently
+          continue;
+        }
+        revealOne(true);
+      }
+      openSeam(jan);
     });
   }
-  function openJanuary() {
+
+  // Open whatever the seam is, and give each kind the same contract: call
+  // `resume` when it is done, and the reveal continues from the next row.
+  function openSeam(s) {
     clearTimeout(timer);
-    if (janSkip) janSkip.remove();
     if (skipBtn) skipBtn.style.display = 'none';
-    janOpen(janPair, { wins: rw, draws: rd, losses: rl }, (chosen) => {
-      // Re-bind before anything else reads the season: from here the table, the
-      // finish, the stats and the career consequence all belong to this future.
-      bindSeason(chosen);
-      saveSeasonState(chosen);
-      janSeam = -1;                 // the seam is spent; the rest runs straight through
+    // Both skips have to go quiet while a seam owns the screen. The cup opens a
+    // modal over the reveal, and "דלג לינואר" sitting live behind it can be
+    // clicked through — which fast-forwards to January and leaves two dialogs
+    // stacked on top of each other.
+    if (janSkip) janSkip.style.display = 'none';
+    const resume = () => {
+      seamI++;                        // this seam is spent
       if (skipBtn) skipBtn.style.display = 'block';
+      // only worth showing again while January is still ahead of us
+      if (janSkip && seams.slice(seamI).some(x => x.kind === 'jan')) janSkip.style.display = '';
       timer = setTimeout(revealOne, 200);
-    });
+    };
+    if (s.kind === 'jan') {
+      if (janSkip) janSkip.remove();
+      janOpen(janPair, { wins: rw, draws: rd, losses: rl }, (chosen) => {
+        // Re-bind before anything else reads the season: from here the table, the
+        // finish, the stats and the career consequence all belong to this future.
+        bindSeason(chosen);
+        saveSeasonState(chosen);
+        resume();
+      });
+    } else if (s.kind === 'cup' && typeof cupOpenRound === 'function') {
+      cupOpenRound(s.round, resume);
+    } else {
+      resume();                       // an unknown seam must never wedge the reveal
+    }
   }
+
   function revealOne(sync) {
-    if (janSeam === idx) { if (!sync) openJanuary(); return; }
+    const s = nextSeam();
+    if (s && s.at === idx) { if (!sync) openSeam(s); return; }
+    // The cup final is a seam AT matches.length — after the last league row.
+    // Once it has been opened there is no row left to draw, and reading
+    // matches[idx] here would hand makeMatchRow an undefined.
+    if (idx >= matches.length) { if (!sync) endReveal(); return; }
     if (idx === splitAt) grid.appendChild(separatorRow());
     const m = matches[idx];
     grid.appendChild(makeMatchRow(m));
@@ -3096,16 +3201,19 @@ function animateResults(ovr) {
     setEl('res-wins', rw); setEl('res-draws', rd); setEl('res-losses', rl);
     idx++;
     if (sync) return;
-    if (idx === janSeam) openJanuary();
+    const nxt = nextSeam();
+    if (nxt && nxt.at === idx) openSeam(nxt);
     else if (idx < matches.length) timer = setTimeout(revealOne, 130);
     else endReveal();
   }
+
   function endReveal() {
     clearTimeout(timer);
-    // Skipping must never skip the decision — it fast-forwards TO the window.
-    if (janSeam >= 0 && idx < janSeam) {
-      while (idx < janSeam) revealOne(true);
-      openJanuary();
+    // Skipping must never skip a seam — it fast-forwards TO the next one.
+    const s = nextSeam();
+    if (s && idx <= s.at) {
+      while (idx < s.at) revealOne(true);
+      openSeam(s);
       return;
     }
     if (janSkip) janSkip.remove();
