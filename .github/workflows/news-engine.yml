@@ -19,7 +19,6 @@ concurrency:
 # the engine generates player SEO pages and commits them back to the repo
 permissions:
   contents: write
-  actions: write        # so this job can dispatch challenge-taps (see below)
 
 jobs:
   run:
@@ -29,23 +28,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      # Read the challenge approvals, by dispatching the job that does it.
-      #
-      # challenge-taps is on GitHub's built-in cron, which fires it every three
-      # to eleven HOURS instead of the ten minutes it asks for — so pressing ✅
-      # in Telegram went unanswered for most of a day, and Telegram discards an
-      # unread update after 24. This workflow is the one trigger on the repo
-      # that is actually reliable: an external scheduler hits it every 30
-      # minutes. Dispatching rather than running the code here on purpose —
-      # challenge-taps and challenge-engine share one getUpdates offset in
-      # engine_state and a shared concurrency group, and polling from a third
-      # place would race them and drop taps.
-      - name: read challenge taps
-        continue-on-error: true      # a missed tap must never fail the news run
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh workflow run challenge-taps.yml --repo ${{ github.repository }}
-
       - run: node scripts/news_engine.js
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}

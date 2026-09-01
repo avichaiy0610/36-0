@@ -374,6 +374,13 @@ async function processTaps() {
   const offset = await stateGet('chal_tg_offset');
   const u = await tg('getUpdates', { offset: offset ? +offset + 1 : undefined, timeout: 0 });
   if (!u || !u.ok) {
+    // 409 is the expected, healthy answer now: a registered webhook makes
+    // getUpdates illegal, and the webhook is what actually reads the taps.
+    // Saying so beats logging it as a failure every single day.
+    if (u && u.error_code === 409) {
+      console.log('taps: a webhook is registered — supabase/functions/challenge-tap handles taps now, nothing to poll');
+      return;
+    }
     console.log(`taps: getUpdates failed — ${u ? (u.description || JSON.stringify(u)) : 'no response'}`);
     return;
   }

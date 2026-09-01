@@ -1,16 +1,15 @@
 name: challenge-taps
 
-# Reads the ✅/🗑️ taps from Telegram and nothing else.
+# Kept for diagnostics only. The ✅/🗑️ taps are now handled by the
+# supabase/functions/challenge-tap webhook, which answers them the moment they
+# happen instead of up to eleven hours later.
 #
-# The engine itself runs once a day, and for a while that was also the only time
-# a tap was read — so pressing approve gave no answer until the next morning, and
-# a tap made shortly after a run could be dropped entirely, because Telegram
-# discards an unread update after 24 hours and the daily schedule drifts past
-# that. This job closes both holes. It never proposes anything: composing a
-# challenge stays on the daily run.
+# The schedule is gone rather than merely slowed: with a webhook registered,
+# getUpdates returns 409 on every call, so a polling run can only produce noise.
+# Run this by hand with diag to inspect the bot, or ping to send a test button.
+# To come back to polling, run telegram-webhook-setup with mode=off first and
+# then restore the cron below.
 on:
-  schedule:
-    - cron: '*/10 * * * *'
   workflow_dispatch:
     inputs:
       diag:
@@ -22,8 +21,8 @@ on:
         type: boolean
         default: false
 
-# Shares the group with challenge-engine so the two never poll getUpdates at the
-# same time — they share one offset in engine_state, and a race would skip taps.
+# Still shares the group with challenge-engine: a hand-run diagnostic and the
+# daily engine must not talk to Telegram at the same time.
 concurrency:
   group: challenge-engine
   cancel-in-progress: false
