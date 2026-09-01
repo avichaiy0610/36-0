@@ -106,11 +106,12 @@ function euSimMatch(me, opp, home) {
 /* ── the campaign ─────────────────────────────────────────────────────────── */
 // Nothing is simulated here. The campaign starts holding only the XI it will be
 // played with, frozen at the moment you walked in.
-function euBuildCampaign() {
+function euBuildCampaign(tier) {
   let me = myLineRatings();
   if (typeof euForcedLines === 'function') me = euForcedLines(me);
   return {
     v: EU_SAVE_V,
+    tier: EU_TIERS[tier] ? tier : 'ucl',   // which competition this summer is
     ovr: me.ovr,
     lines: { atk: me.atk, mid: me.mid, def: me.def, gk: me.gk },
     sandbox: typeof euSandboxActive === 'function' ? euSandboxActive() : false,
@@ -131,6 +132,35 @@ function euBuildCampaign() {
 // The XI as the engine wants it. Rebuilt from the frozen numbers rather than read
 // from state.picks, so a campaign resumed after a refresh plays with the squad it
 // started with even if the draft screen has moved on.
+// Everything the engine needs to know about the competition being played.
+function euTier(c) { return EU_TIERS[(c && c.tier) || 'ucl']; }
+
+// The qualifying rounds of this competition. The Champions League has hand
+// written opponents with their own histories; the other two draw a club from
+// their own field inside the round's band, which is all they need.
+function euQualRounds(c) {
+  const t = euTier(c);
+  return t.rounds || t.qual;
+}
+function euDrawQualClub(c, i) {
+  const t = euTier(c);
+  const r = euQualRounds(c)[i];
+  if (r.clubs) {
+    const forced = typeof euForcedClub === 'function' ? euForcedClub(i) : null;
+    return forced || r.clubs[Math.floor(Math.random() * r.clubs.length)];
+  }
+  const beaten = new Set(c.ties.map(x => x.club.name));
+  // Real qualifying clubs first — the sides that actually play these rounds. The
+  // band over the league-phase field is only a fallback, and it exists because a
+  // parachuted run can land in a round the list was never written for.
+  const named = ((EU_QUAL_CLUBS[t.id] || {})[r.id] || []).filter(x => !beaten.has(x.name));
+  if (named.length) return named[Math.floor(Math.random() * named.length)];
+  const [lo, hi] = r.band;
+  const pool = t.pots.flat().filter(x => !beaten.has(x.name) && x.ovr >= lo && x.ovr <= hi);
+  const from = pool.length ? pool : t.pots.flat().filter(x => !beaten.has(x.name));
+  return from[Math.floor(Math.random() * from.length)];
+}
+
 function euMe(c) {
   return { ovr: c.ovr, atk: c.lines.atk, mid: c.lines.mid, def: c.lines.def, gk: c.lines.gk };
 }
@@ -141,10 +171,9 @@ function euEnsureTie(c) {
   if (c.cur) return c.cur;
 
   if (c.koi < 0) {                                     // still in qualifying
-    const r = EU_ROUNDS[c.qi];
+    const r = euQualRounds(c)[c.qi];
     if (!r) return null;
-    const forced = typeof euForcedClub === 'function' ? euForcedClub(c.qi) : null;
-    const club = forced || r.clubs[Math.floor(Math.random() * r.clubs.length)];
+    const club = euDrawQualClub(c, c.qi);
     c.cur = { kind: 'q', idx: c.qi, roundId: r.id, round: r.round, roundLong: r.roundLong,
               club: { ...club }, legs: [], oneLeg: false };
   } else {
@@ -163,11 +192,14 @@ function euEnsureTie(c) {
 // cannot meet one you already beat.
 function euDrawKoOpponent(c, k) {
   const beaten = new Set(c.ties.map(t => t.club.name));
-  const pots = (c.seeded && k.seedPots) ? k.seedPots : k.pots;
-  const pool = pots.flatMap(i => EU_POTS[i]).filter(x => !beaten.has(x.name));
-  // The pots hold 35 clubs and the ladder is five rounds, so this cannot empty in
-  // practice; falling back to the whole field keeps a draw possible regardless.
-  const from = pool.length ? pool : EU_POTS.flat().filter(x => !beaten.has(x.name));
+  const all = euTier(c).pots;
+  // The ladder names pot indexes for a four-pot competition. The Conference has
+  // six, so the same index means "one of the strongest" there too — clamp rather
+  // than read past the end and hand the draw an undefined.
+  const idx = (c.seeded && k.seedPots) ? k.seedPots : k.pots;
+  const pots = idx.map(i => Math.min(i, all.length - 1));
+  const pool = pots.flatMap(i => all[i]).filter(x => !beaten.has(x.name));
+  const from = pool.length ? pool : all.flat().filter(x => !beaten.has(x.name));
   return from[Math.floor(Math.random() * from.length)];
 }
 
@@ -283,12 +315,36 @@ function euAfterTie(c) {
   if (!t) return;
 
   if (!t.won) {
-    c.result = 'out';
-    c.outAt = t.roundId;
-    c.view = 'out';
+    // ── the parachute ──────────────────────────────────────────────────────
+    // Losing ANY qualifying round drops you a competition rather than ending the
+    // summer, into the round after the one you just lost. Lose the play-off and
+    // there is no round after it, so you land in the league phase itself. The
+    // whole screen changes colour at that moment, because the palette follows
+    // the tier you are IN and not the one you started in.
+    const drop = t.kind === 'q' ? EU_PARACHUTE[c.tier || 'ucl'] : null;
+    if (drop) {
+      c.droppedFrom = c.tier || 'ucl';
+      c.droppedAt = t.roundId;
+      c.tier = drop;
+      // The round after the one just lost, in the competition below.
+      const nextId = EU_ROUND_SEQ[EU_ROUND_SEQ.indexOf(t.roundId) + 1];
+      const at = nextId ? euQualRounds(c).findIndex(r => r.id === nextId) : -1;
+      if (at >= 0) {
+        c.qi = at;                     // straight into that qualifying round
+        c.view = 'drop';
+      } else {
+        c.qi = euQualRounds(c).length;  // no rounds left — the league phase
+        euPlayLeaguePhase(c);
+        c.view = 'drop';
+      }
+    } else {
+      c.result = 'out';
+      c.outAt = t.roundId;
+      c.view = 'out';
+    }
   } else if (t.kind === 'q') {
     c.qi++;
-    if (c.qi >= EU_ROUNDS.length) { euPlayLeaguePhase(c); c.view = 'league'; }
+    if (c.qi >= euQualRounds(c).length) { euPlayLeaguePhase(c); c.view = 'league'; }
     else c.view = 'tie';
   } else if (t.roundId === 'final') {
     c.result = 'won';
@@ -326,9 +382,10 @@ function euBand(rank) { return EU_BANDS.find(b => rank <= b.max); }
 function euPlayLeaguePhase(c) {
   const me = euMe(c);
   const beaten = c.ties.map(t => t.club.name);
+  const T = euTier(c);
   const out = new Set(beaten);
   const used = new Set();                // a reserve fills exactly one seat
-  const pots = EU_POTS.map((pot, i) => {
+  const pots = T.pots.map((pot, i) => {
     const kept = pot.filter(x => !out.has(x.name));
     // refill, so the field is always 35 opponents and the table always 36 rows
     for (const club of (EU_RESERVES[i] || [])) {
@@ -347,8 +404,10 @@ function euPlayLeaguePhase(c) {
 
   const opponents = [];
   pots.forEach((pot, pi) => {
-    shuffleArr([...pot]).slice(0, 2)
-      .forEach((club, k) => opponents.push({ ...club, pot: pi + 1, home: k === 0 }));
+    // Two from each of four pots in the Champions and Europa Leagues; one from
+    // each of six in the Conference. Eight matches against six.
+    shuffleArr([...pot]).slice(0, T.perPot)
+      .forEach((club, k) => opponents.push({ ...club, pot: pi + 1, home: k % 2 === 0 }));
   });
   const matches = shuffleArr(opponents).map(o => {
     const m = simulateMatchV2(me, euTeam(o), o.home);
@@ -362,7 +421,7 @@ function euPlayLeaguePhase(c) {
   // same eight matches — order from the xG model, spacing conventionalised, and
   // a form swing per club so the table is not identical every campaign.
   const field = pots.flat().map(x => ({ ...x, ...euLines(x.ovr) }));
-  const est = simTableEstimateV2([...field, { ...me, name: 'me' }], 8);
+  const est = simTableEstimateV2([...field, { ...me, name: 'me' }], T.matches);
   const pts = matches.reduce((s, m) => s + (m.outcome === 'W' ? 3 : m.outcome === 'D' ? 1 : 0), 0);
 
   const table = field.map((x, i) => ({ name: x.name, flag: x.flag, cid: x.id, pts: est[i], us: false }));
@@ -437,6 +496,11 @@ async function euSubmit(c) {
   try {
     const r = await _supabase.rpc('submit_europe_run', {
       p: {
+        tier: c.tier || 'ucl',
+        // A parachuted run reaches a league phase having LOST its last qualifier,
+        // so this cannot be inferred from the number of ties won.
+        reached_league: !!c.league,
+        parachuted: !!c.droppedFrom,
         won_ties: c.ties.filter(t => t.kind === 'q' && t.won).length,
         rank: L ? L.rank : 0,
         points: L ? L.pts : 0,
@@ -496,10 +560,10 @@ function euText(key, def) {
 }
 
 /* ── entry ────────────────────────────────────────────────────────────────── */
-function euStart() {
+function euStart(tier) {
   if (!state.picks || !state.picks.some(Boolean)) return;
   _euCampaign = _euCampaign || euLoad();
-  if (!_euCampaign) { _euCampaign = euBuildCampaign(); euSave(_euCampaign); }
+  if (!_euCampaign) { _euCampaign = euBuildCampaign(tier); euSave(_euCampaign); }
   showScreen('europe');
   const back = document.getElementById('eu-back');
   if (back) back.onclick = () => euLeave();

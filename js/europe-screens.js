@@ -28,22 +28,48 @@ function euCycleSpeed() {
   return next;
 }
 
-/* ── crests ───────────────────────────────────────────────────────────────── */
-// A badge, falling back to the flag emoji if we do not have that club's crest.
-// Written as a sibling rather than a background-image so the fallback is one
-// onerror away and never leaves an empty box.
-function euCrest(cid, flag) {
-  const f = `<span class="eu-mini-flag">${flag || ''}</span>`;
-  // `.eu-mini-flag` is hidden until a badge next to it fails, so a club with no
-  // badge at all needs the visible variant or it shows nothing — which is
-  // exactly how Manchester City and Girona ended up with an empty gap.
-  if (!cid) return `<span class="eu-mini-flag shown">${flag || ''}</span>`;
-  return `<img class="eu-mini-crest" src="crests/eu/${cid}.png" alt="" loading="lazy" onerror="this.classList.add('missing')">` + f;
+/* ── crests ───────────────────────────────────────────────────────────────────
+   Fifty of the 138 clubs have a badge in crests/eu/. The rest used to fall back
+   to their country's flag emoji — which was fine until you looked at it on
+   Windows, where regional-indicator glyphs are not in any system font and 🇨🇾
+   renders as the literal letters "CY". A crest that reads "CY" is worse than no
+   crest at all.
+
+   So the fallback is a MONOGRAM: the club's own initials on a disc, coloured
+   from its name. It always renders, it differs club to club, and it reads as a
+   deliberate mark rather than as something that failed to load. */
+function euInitials(name) {
+  const words = String(name || '').replace(/["']/g, '').split(/[\s.\-]+/).filter(Boolean);
+  if (!words.length) return '?';
+  if (words.length === 1) return words[0].slice(0, 2);
+  return words[0][0] + words[1][0];
 }
-function euBigCrest(cid, flag) {
+// A stable hue per club, so two clubs on one screen never wear the same disc.
+function euHue(name) {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) % 360;
+  return h;
+}
+function euMonogram(name, cls) {
+  const h = euHue(String(name || ''));
+  return `<span class="eu-mono ${cls || ''}" style="--h:${h}">${euInitials(name)}</span>`;
+}
+
+// Inline, for a table row or a match line.
+function euCrest(cid, flag, name) {
+  const mono = euMonogram(name, 'eu-mono-sm');
+  if (!cid) return mono;
+  // The badge is the real thing when we have it; the monogram sits behind it and
+  // is revealed by one class the moment the image fails.
+  return `<img class="eu-mini-crest" src="crests/eu/${cid}.png" alt="" loading="lazy"
+               onerror="this.classList.add('missing')">` + mono;
+}
+// Larger, for a card header or the road.
+function euBigCrest(cid, flag, name) {
+  const mono = euMonogram(name, 'eu-mono-lg');
   return `<span class="eu-badge">${cid
-    ? `<img src="crests/eu/${cid}.png" alt="" onerror="this.classList.add('missing')"><span class="eu-badge-fb">${flag || '🏳️'}</span>`
-    : `<span class="eu-badge-fb shown">${flag || '🏳️'}</span>`}</span>`;
+    ? `<img src="crests/eu/${cid}.png" alt="" onerror="this.classList.add('missing')">` + mono
+    : mono}</span>`;
 }
 
 /* ── the backdrop ─────────────────────────────────────────────────────────────
@@ -58,69 +84,133 @@ function euBigCrest(cid, flag) {
 
    One element, appended once, toggled by a class. It is removed when Europe is
    left, so nothing leaks into the rest of the site. */
-function euBackdrop(on) {
-  let el = document.getElementById('eu-backdrop');
+function euBackdrop(tier) {
+  const el = document.getElementById('eu-backdrop');
   // .screen-page paints a solid var(--bg) over the whole viewport, so the layer
   // is invisible until the screen itself is told to go transparent. The class
   // goes on <body> because that is the only element both of them can see.
-  document.body.classList.toggle('eu-blue', !!on);
-  if (!on) { if (el) el.remove(); return; }
-  if (el) return;
-  el = document.createElement('div');
-  el.id = 'eu-backdrop';
-  el.setAttribute('aria-hidden', 'true');
-  el.innerHTML = `
+  document.body.classList.toggle('eu-blue', !!tier);
+  if (!tier) { if (el) el.remove(); return; }
+  if (el && el.dataset.tier === tier) return;
+  if (el) el.remove();
+
+  const d = document.createElement('div');
+  d.id = 'eu-backdrop';
+  d.dataset.tier = tier;
+  d.setAttribute('aria-hidden', 'true');
+  d.innerHTML = EU_ART[tier] ? EU_ART[tier]() : EU_ART.ucl();
+  document.body.appendChild(d);
+}
+
+/* ── three nights, three languages ────────────────────────────────────────────
+   Not one drawing in three colours: each competition has its own geometry,
+   because that is what actually distinguishes them to anyone who watches.
+
+     ליגת האלופות  — the curved seams of a ball, blue into magenta
+     הליגה האירופית — hard nested chevrons in orange on black
+     קונפרנס ליג    — flowing parallel ribbons in green
+
+   Evocative, never sampled: no starball, no wordmark, no official palette
+   lifted off a badge. The site's footer promises it uses no official emblems
+   and that stays true with three competitions. */
+const EU_ART = {
+  ucl: () => `
     <svg viewBox="0 0 400 800" preserveAspectRatio="xMidYMid slice">
       <defs>
         <linearGradient id="eu-wash" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0"    stop-color="#0a1a3d"/>
-          <stop offset=".45"  stop-color="#16276b"/>
-          <stop offset=".75"  stop-color="#3b1f7a"/>
-          <stop offset="1"    stop-color="#5b1d63"/>
+          <stop offset="0" stop-color="#0a1a3d"/><stop offset=".45" stop-color="#16276b"/>
+          <stop offset=".75" stop-color="#3b1f7a"/><stop offset="1" stop-color="#5b1d63"/>
         </linearGradient>
         <linearGradient id="eu-edge" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0"   stop-color="#5fd0ff"/>
-          <stop offset=".55" stop-color="#4f7dff"/>
-          <stop offset="1"   stop-color="#c05cff"/>
+          <stop offset="0" stop-color="#5fd0ff"/><stop offset=".55" stop-color="#4f7dff"/>
+          <stop offset="1" stop-color="#c05cff"/>
         </linearGradient>
         <radialGradient id="eu-floor" cx=".5" cy="1" r=".8">
-          <stop offset="0"   stop-color="#6aa8ff" stop-opacity=".55"/>
-          <stop offset="0.5" stop-color="#7d5cff" stop-opacity=".18"/>
-          <stop offset="1"   stop-color="#000"    stop-opacity="0"/>
+          <stop offset="0" stop-color="#6aa8ff" stop-opacity=".55"/>
+          <stop offset=".5" stop-color="#7d5cff" stop-opacity=".18"/>
+          <stop offset="1" stop-color="#000" stop-opacity="0"/>
         </radialGradient>
         <filter id="eu-soft" x="-40%" y="-40%" width="180%" height="180%">
-          <feGaussianBlur stdDeviation="7"/>
-        </filter>
-      </defs>
-
-      <rect width="400" height="800" fill="url(#eu-wash)"/>
-
-      <!-- The seams of a ball far larger than the frame, so it reads as a shape
-           you are standing inside rather than a logo placed on a page. Drawn
-           twice: once blurred for the bloom, once sharp on top. -->
-      <g fill="none" stroke="url(#eu-edge)" stroke-linejoin="round">
-        <defs><g id="eu-seams">
+          <feGaussianBlur stdDeviation="7"/></filter>
+        <g id="eu-seams">
           <path d="M-60 150 Q90 30 250 84 Q300 210 196 300 Q60 312 -30 236 Z"/>
           <path d="M196 300 Q330 244 470 306 Q476 452 350 500 Q232 442 196 300 Z"/>
           <path d="M-30 236 Q-90 366 -18 470 Q120 512 196 424 Q214 344 196 300 Z"/>
           <path d="M250 84 Q400 26 470 130 Q478 224 470 306"/>
           <path d="M-18 470 Q150 570 350 500"/>
-          <path d="M-60 150 Q-120 40 -40 -30"/>
           <path d="M196 424 Q250 540 350 500"/>
-        </g></defs>
+        </g>
+      </defs>
+      <rect width="400" height="800" fill="url(#eu-wash)"/>
+      <g fill="none" stroke="url(#eu-edge)" stroke-linejoin="round">
         <use href="#eu-seams" filter="url(#eu-soft)" stroke-width="5" opacity=".55"/>
         <use href="#eu-seams" stroke-width="2.1" opacity=".95"/>
       </g>
-
-      <!-- lit from the floor, which is what makes it a night match -->
       <ellipse cx="200" cy="560" rx="330" ry="170" fill="url(#eu-floor)"/>
       <path d="M-40 530 Q200 486 440 540" fill="none" stroke="url(#eu-edge)"
             stroke-width="3" opacity=".95" filter="url(#eu-soft)"/>
-      <path d="M-40 530 Q200 486 440 540" fill="none" stroke="#bcdcff"
-            stroke-width="1" opacity=".55"/>
+    </svg>`,
+
+  // Nested chevrons driving in from one corner: hard angles, no curves, and a
+  // deep black ground so the orange is the only thing with any light in it.
+  uel: () => {
+    // Concentric Vs, all pointing the same way. The apex walks left while the
+    // arms stay pinned to the same edge, which is what makes them nest instead
+    // of drifting off the corner — the first attempt moved the apex AND the
+    // arms, and the whole family slid out of frame.
+    const rows = [];
+    for (let i = 0; i < 18; i++) {
+      const ax = 395 - i * 23;                  // apex, walking left
+      const reach = (520 - ax) * 1.45;          // arms open as it goes
+      const w = (5.5 - i * 0.18).toFixed(2);
+      const op = (0.95 - i * 0.042).toFixed(2);
+      rows.push(`<path d="M520 ${(400 - reach).toFixed(0)} L${ax} 400 L520 ${(400 + reach).toFixed(0)}"
+                       stroke-width="${w}" opacity="${op}"/>`);
+    }
+    return `
+    <svg viewBox="0 0 400 800" preserveAspectRatio="xMidYMid slice">
+      <defs>
+        <linearGradient id="eu-edge" x1="1" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#ffb03a"/><stop offset=".5" stop-color="#ff6a1a"/>
+          <stop offset="1" stop-color="#c22f05"/>
+        </linearGradient>
+        <filter id="eu-soft" x="-30%" y="-30%" width="160%" height="160%">
+          <feGaussianBlur stdDeviation="9"/></filter>
+        <g id="eu-chev" fill="none" stroke="url(#eu-edge)" stroke-linecap="square">${rows.join('')}</g>
+      </defs>
+      <rect width="400" height="800" fill="#080402"/>
+      <use href="#eu-chev" filter="url(#eu-soft)" opacity=".7"/>
+      <use href="#eu-chev"/>
     </svg>`;
-  document.body.appendChild(el);
-}
+  },
+
+  // Ribbons: long parallel curves sweeping across, thin and calm. The third
+  // competition should not shout as loudly as the first two.
+  uecl: () => {
+    const rows = [];
+    for (let i = 0; i < 18; i++) {
+      const y = -120 + i * 52;
+      const op = (0.85 - i * 0.028).toFixed(2);
+      rows.push(`<path d="M${470 - i * 6} ${y} C 250 ${y + 150}, 210 ${y + 300}, ${-40 + i * 4} ${y + 470}"
+                       stroke-width="${(2.6 - i * 0.06).toFixed(2)}" opacity="${op}"/>`);
+    }
+    return `
+    <svg viewBox="0 0 400 800" preserveAspectRatio="xMidYMid slice">
+      <defs>
+        <linearGradient id="eu-edge" x1="1" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#7dffc4"/><stop offset=".5" stop-color="#1ee07f"/>
+          <stop offset="1" stop-color="#0a7d47"/>
+        </linearGradient>
+        <filter id="eu-soft" x="-30%" y="-30%" width="160%" height="160%">
+          <feGaussianBlur stdDeviation="6"/></filter>
+        <g id="eu-rib" fill="none" stroke="url(#eu-edge)" stroke-linecap="round">${rows.join('')}</g>
+      </defs>
+      <rect width="400" height="800" fill="#02110a"/>
+      <use href="#eu-rib" filter="url(#eu-soft)" opacity=".6"/>
+      <use href="#eu-rib"/>
+    </svg>`;
+  },
+};
 
 /* ── the frame ────────────────────────────────────────────────────────────── */
 // Kicker, title, stage chip, exit, progress bar — identical on every screen, so
@@ -134,20 +224,28 @@ function euStageOf(c) {
   if (c.view === 'trophy') return 'final';
   if (c.cur)               return c.cur.roundId;
   if (c.view === 'league' || c.view === 'standings') return 'league';
+  // A drop can land in a league phase OR in a qualifying round of the tier below
+  if (c.view === 'drop') return c.league ? 'league' : (euQualRounds(c)[c.qi] || {}).id || 'po';
   if (c.koi >= 0 && EU_KO[c.koi])  return EU_KO[c.koi].id;
-  if (EU_ROUNDS[c.qi])     return EU_ROUNDS[c.qi].id;
+  const q = euQualRounds(c)[c.qi];
+  if (q) return q.id;
   return 'q1';
 }
 
-// Everything from the qualifying play-off on is "the blue half".
+// The colour is a REVEAL, in all three competitions alike: the qualifying rounds
+// are played on the ordinary dark ground and the competition's own night arrives
+// at the play-off, which is the gate to the league phase. Dressing the Europa
+// League and the Conference from their first whistle was tried and rejected —
+// it spent the reveal on a first qualifying round nobody remembers.
 const EU_BLUE_FROM = ['po', 'league', 'ko-po', 'r16', 'qf', 'sf', 'final'];
+function euDressed(c) { return EU_BLUE_FROM.includes(euStageOf(c)); }
 
 // How far through the whole campaign we are. Four qualifying ties, the league
 // phase, then the knockout ladder — the denominator shrinks by one when a top-8
 // finish skips the play-off round.
 function euProgress(c) {
-  const total = EU_ROUNDS.length + 1 + EU_KO.length - (c.seeded ? 1 : 0);
-  let done = Math.min(c.qi, EU_ROUNDS.length) + (c.league ? 1 : 0)
+  const total = euQualRounds(c).length + 1 + EU_KO.length - (c.seeded ? 1 : 0);
+  let done = Math.min(c.qi, euQualRounds(c).length) + (c.league ? 1 : 0)
            + c.ties.filter(t => t.kind === 'ko').length;
   if (c.result === 'won') done = total;
   return Math.max(0.04, Math.min(1, done / total));
@@ -155,11 +253,20 @@ function euProgress(c) {
 
 function euStageLabel(c) {
   const id = euStageOf(c);
-  const q = EU_ROUNDS.find(r => r.id === id);
+  const q = euQualRounds(c).find(r => r.id === id);
   if (q) return q.round;
   const k = EU_KO.find(x => x.id === id);
   if (k) return k.round;
   return euText('eu-phase-t', 'שלב הליגה');
+}
+
+// A round always belongs to a competition, and the ladder's own names cannot say
+// which — they are shared by all three. "הגמר" alone also reads badly after
+// "נעצרת ב", so the competition is what completes the sentence:
+//   הגמר → הגמר של הליגה האירופית · שמינית הגמר → שמינית הגמר של הקונפרנס ליג
+function euRoundName(c, t) {
+  const long = t.roundLong || t.round;
+  return `${long} ${euText('eu-of', 'של')} ${euTier(c).name}`;
 }
 
 function euShell(c, body, cta) {
@@ -168,11 +275,12 @@ function euShell(c, body, cta) {
   const speed = euSpeed();
   const live = c.view === 'tie';
   return `
-    <div class="eu-seq" data-eu-stage="${id}" data-eu-blue="${EU_BLUE_FROM.includes(id) ? '1' : '0'}">
+    <div class="eu-seq" data-eu-stage="${id}" data-eu-tier="${c.tier || 'ucl'}"
+         data-eu-blue="${euDressed(c) ? '1' : '0'}">
       <div class="eu-top">
         <div class="eu-top-l">
           <div class="eu-kicker">${euText('eu-kicker', 'המסע האירופי')}</div>
-          <div class="eu-title">${euText('eu-title', 'ליגת האלופות')}</div>
+          <div class="eu-title">${euTier(c).name}</div>
         </div>
         <div class="eu-top-r">
           ${live ? `<button class="eu-chip" id="eu-speed">${speed}x</button>` : ''}
@@ -202,16 +310,16 @@ function euLiveHTML(c, t, leg) {
   return `
     <div class="eu-card eu-live">
       <div class="eu-card-head">
-        <span>${t.roundLong} · ${legLabel}</span>
+        <span>${euRoundName(c, t)} · ${legLabel}</span>
         <span class="eu-vs">${euText('eu-vs', 'מול')} ${t.club.name}</span>
       </div>
       <div class="eu-live-top">
-        <span class="eu-side">${euText('eu-you', 'ההרכב שלי')} ${euBigCrest(null, '⭐')}</span>
+        <span class="eu-side">${euText('eu-you', 'ההרכב שלי')} ${euBigCrest(null, '', euText('eu-you', 'ההרכב שלי'))}</span>
         <!-- RTL row: your side renders on the right. The scoreline is dir=ltr, so
              its first child is leftmost and must be the OPPONENT's goals, or your
              own score ends up printed beside their name. -->
         <span class="eu-live-score" dir="ltr"><b id="eu-sc-them">0</b> – <b id="eu-sc-me">0</b></span>
-        <span class="eu-side">${euBigCrest(t.club.id, t.club.flag)} ${t.club.name}</span>
+        <span class="eu-side">${euBigCrest(t.club.id, t.club.flag, t.club.name)} ${t.club.name}</span>
       </div>
       <div class="eu-clock"><span id="eu-min">0</span>' · ${venue}</div>
       <div class="eu-bar"><span id="eu-bar"></span></div>
@@ -306,8 +414,8 @@ function euAggHTML(c, t) {
   return `
     <div class="eu-card ${t.won ? 'won' : 'lost'}">
       <div class="eu-card-head">
-        <span>${t.roundLong}</span>
-        <span class="eu-vs">${euBigCrest(t.club.id, t.club.flag)} ${t.club.name} · ${t.club.ovr}</span>
+        <span>${euRoundName(c, t)}</span>
+        <span class="eu-vs">${euBigCrest(t.club.id, t.club.flag, t.club.name)} ${t.club.name} · ${t.club.ovr}</span>
       </div>
       <div class="eu-agg-big">
         <div>
@@ -337,7 +445,7 @@ function euRoadHTML(c) {
         : r.state === 'now' && t
           ? t.club.name
           : euText('eu-tbd', 'ייקבע בהמשך');
-    const crest = t ? euBigCrest(t.club.id, t.club.flag) : '';
+    const crest = t ? euBigCrest(t.club.id, t.club.flag, t.club.name) : '';
     return `
       <div class="eu-road-row ${r.state}">
         <span class="eu-road-dot">${r.state === 'won' ? '✓' : r.id === 'final' ? '🏆' : ''}</span>
@@ -382,7 +490,7 @@ function euLeagueHTML(c) {
       </div>
       <p class="eu-note">${euText('eu-phase-sub', 'שמונה משחקים מול שמונה יריבות שונות - שתיים מכל דרג, אחת בבית ואחת בחוץ.')}</p>
       ${L.matches.map((m, i) => euMatchRowHTML(m,
-        `<span class="mr-gw">מחזור ${i + 1}</span> ${euCrest(m.cid, m.flag)} ${m.opponent}
+        `<span class="mr-gw">מחזור ${i + 1}</span> ${euCrest(m.cid, m.flag, m.opponent)} ${m.opponent}
          <span class="mr-pot">דרג ${m.pot} · ${m.ovr}</span>`)).join('')}
     </div>`;
 }
@@ -397,7 +505,7 @@ function euStandingsHTML(c) {
     const cls = pos <= 8 ? 'bye' : pos <= 24 ? 'po' : 'out';
     const name = t.us
       ? `<span class="lt-name">${euText('eu-you', 'ההרכב שלי')} <span class="lt-us-badge">#${pos}</span></span>`
-      : `<span class="lt-name">${euCrest(t.cid, t.flag)} ${t.name}</span>`;
+      : `<span class="lt-name">${euCrest(t.cid, t.flag, t.name)} ${t.name}</span>`;
     return `<div class="lt-row ${cls}${t.us ? ' lt-us' : ''}">
       <span class="lt-pos">${pos}</span>${name}
       <span class="lt-pts" dir="ltr">${t.pts}</span></div>`;
@@ -422,6 +530,33 @@ function euStandingsHTML(c) {
     </div>`;
 }
 
+/* ── the drop ─────────────────────────────────────────────────────────────────
+   The one screen in the mode whose job is to reframe a defeat. It has to say
+   three things in order: you lost, you are not out, and here is where you are
+   now — and it says the last one in the new competition's colours, because by
+   the time this renders the tier has already changed. */
+function euDropHTML(c) {
+  const t = c.ties[c.ties.length - 1];
+  const from = EU_TIERS[c.droppedFrom] || EU_TIERS.ucl;
+  const to = euTier(c);
+  return `
+    <div class="eu-card eu-drop">
+      <div class="eu-card-head"><span>${from.name} · ${euText('eu-po', 'פלייאוף')}</span></div>
+      <div class="eu-drop-score">
+        ${t.club.name} <b dir="ltr">${t.agg.ga}-${t.agg.gf}</b>
+      </div>
+      <div class="eu-drop-t">${euText('eu-drop-t', 'נפלת. אבל לא הביתה.')}</div>
+      <p class="eu-note">${euText('eu-drop-a', 'הפסד במוקדמות לא מסיים את הקיץ - הוא מוריד אותך מפעל אחד למטה, אל')}
+        <b>${c.league ? euText('eu-drop-league', 'שלב הליגה של') + ' ' + to.name
+                      : to.name + ' · ' + (euQualRounds(c)[c.qi] || {}).round}</b>.</p>
+      <div class="eu-drop-arrow">
+        <span class="from">${from.short}</span>
+        <span class="ar">↓</span>
+        <span class="to">${to.short}</span>
+      </div>
+    </div>`;
+}
+
 /* ── the ends ─────────────────────────────────────────────────────────────── */
 function euOutHTML(c) {
   const t = c.ties[c.ties.length - 1];
@@ -438,7 +573,7 @@ function euOutHTML(c) {
   }
   return `
     <div class="eu-card lost">
-      <div class="eu-end-t">${euText('eu-out-title', 'נעצרת ב')}${euText('eu-round-' + t.club.id, t.roundLong)}</div>
+      <div class="eu-end-t">${euText('eu-out-title', 'נעצרת ב')}${euRoundName(c, t)}</div>
       <p class="eu-note">${t.club.name} ${euText('eu-out-body', 'עברה במצבר')}
         <bdi dir="ltr">${t.agg.ga}-${t.agg.gf}</bdi>.
         ${t.kind === 'q'
@@ -453,10 +588,10 @@ function euTrophyHTML(c) {
   return `
     <div class="eu-card eu-trophy">
       <div class="eu-trophy-cup">🏆</div>
-      <div class="eu-trophy-t">${euText('eu-trophy-t', 'אלופת אירופה')}</div>
+      <div class="eu-trophy-t">${euTier(c).trophy}</div>
       <p class="eu-note">${euText('eu-trophy-sub', 'אלופת ישראל, על גג היבשת. זה לא היה אמור לקרות.')}</p>
       <div class="eu-trophy-line">
-        ${ko.map(t => `<span>${euBigCrest(t.club.id, t.club.flag)} ${t.club.name}
+        ${ko.map(t => `<span>${euBigCrest(t.club.id, t.club.flag, t.club.name)} ${t.club.name}
           <b dir="ltr">${t.agg.gf}-${t.agg.ga}</b>${t.pens
             ? `<i>${euText('eu-on-pens', 'בפנדלים')}</i>` : ''}</span>`).join('')}
       </div>
@@ -469,7 +604,7 @@ function euTrophyHTML(c) {
 // behind: stop the clock, take the backdrop off the page, show the results.
 function euLeave() {
   euStopClock();
-  euBackdrop(false);
+  euBackdrop(null);
   showScreen('results');
 }
 
@@ -477,7 +612,7 @@ function euRender() {
   const c = _euCampaign, body = document.getElementById('eu-body');
   if (!c || !body) return;
   euStopClock();
-  euBackdrop(EU_BLUE_FROM.includes(euStageOf(c)));
+  euBackdrop(euDressed(c) ? (c.tier || 'ucl') : null);
 
   let html = '', cta = '';
   let onNext = null;
@@ -516,6 +651,14 @@ function euRender() {
       : euText('eu-next-round', 'לסיבוב הבא →');
     cta = euCta(label);
     onNext = () => { euAfterTie(c); euRender(); };
+  } else if (c.view === 'drop') {
+    html = euDropHTML(c);
+    // A play-off loss lands in a league phase; anything earlier lands in another
+    // qualifying round, and the button has to name the right one.
+    const toLeague = !!c.league;
+    cta = euCta(toLeague ? euText('eu-to-new-league', 'לשלב הליגה →')
+                         : euText('eu-to-new-round', 'לסיבוב הבא →'));
+    onNext = () => { c.view = toLeague ? 'league' : 'tie'; euSave(c); euRender(); };
   } else if (c.view === 'league') {
     html = euLeagueHTML(c);
     cta = euCta(euText('eu-see-table', 'לטבלה הסופית →'));
