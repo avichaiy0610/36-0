@@ -33,7 +33,12 @@
     if (typeof state === 'undefined' || !state) return false;
     if (state.januaryOn === false) return false;             // switched off in setup
     if (state.challenge || state.league || state.gauntlet) return false;
-    if (state.salaryCap || state.career) return false;
+    if (state.salaryCap) return false;
+    // The career opts in explicitly, per run and per season — crApplyStateFor
+    // resolves לא / כל עונה / כל 2 עונות into this flag. Anything less than an
+    // outright yes keeps a career out, so a run started before the setting
+    // existed carries on exactly as it did.
+    if (state.career && state.januaryOn !== true) return false;
     if (!Array.isArray(state.picks) || state.picks.some(p => !p)) return false;
     return true;
   }

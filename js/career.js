@@ -173,7 +173,8 @@ function crRender() {
 }
 
 /* ── new career ───────────────────────────────────────────────────────────── */
-let _crSetup = { startYear: 1999, difficulty: 'normal', formationId: '4-3-3', tactic: 'bal', classic: false };
+let _crSetup = { startYear: 1999, difficulty: 'normal', formationId: '4-3-3', tactic: 'bal', classic: false,
+                 january: 'every' };
 
 function crRenderSetup(box) {
   const years = ALL_SEASON_YEARS.map(y =>
@@ -201,6 +202,7 @@ function crRenderSetup(box) {
         <li>💀 סיום בשני המקומות האחרונים = <strong>ירידת ליגה, והקריירה נגמרת</strong>.</li>
         <li>🇪🇺 אליפות פותחת את מוקדמות אירופה — והקריירה ממשיכה בלי קשר לתוצאה שם.</li>
         <li>🔄 החלפות הקבוצה בהגרלה הן משאב של <strong>כל הקריירה</strong> — הן לא מתחדשות בין עונות.</li>
+        <li>🗓️ אפשר לפתוח <strong>חלון חורף</strong> באמצע העונה — הימור אחד, בלי חזרה. מי שנחתם נשאר לעונות הבאות.</li>
       </ul>
     </div>
 
@@ -224,9 +226,14 @@ function crRenderSetup(box) {
           <div class="lg-mini" id="cr-diff">
             <button data-v="easy">קל</button><button data-v="normal">רגיל</button><button data-v="hard">קשה</button>
           </div></div>
+        <div class="lg-config-row"><span>חלון ינואר</span>
+          <div class="lg-mini" id="cr-jan">
+            <button data-v="off">לא</button><button data-v="every">כל עונה</button><button data-v="alt">כל 2 עונות</button>
+          </div></div>
       </div>
       <div class="cr-len-note" id="cr-len-note"></div>
       <div class="cr-len-note" id="cr-reroll-note"></div>
+      <div class="cr-len-note" id="cr-jan-note"></div>
       <button class="btn-primary lg-btn" id="cr-start" style="width:100%">התחל קריירה ⚽</button>
     </div>
 
@@ -251,6 +258,28 @@ function crRenderSetup(box) {
     };
   });
   syncRerollNote();
+
+  // חלון ינואר — a career choice rather than a global one, because ten windows
+  // in one run is a very different proposition from one window in one season.
+  const janBox = document.getElementById('cr-jan');
+  const janNote = document.getElementById('cr-jan-note');
+  const syncJanNote = () => {
+    janNote.innerHTML = _crSetup.january === 'off'
+      ? '🗓️ בלי חלון חורף. אותו הרכב מתחילת כל עונה ועד סופה.'
+      : _crSetup.january === 'alt'
+        ? '🗓️ חלון חורף <strong>בעונה הראשונה ואז כל עונה שנייה</strong> — הראשונה, השלישית, החמישית. מי שנחתם נשאר איתך להמשך הקריירה.'
+        : '🗓️ חלון חורף <strong>בכל עונה</strong>. מי שנחתם נשאר איתך להמשך הקריירה ונכנס להחלטת מי נשמר.';
+  };
+  janBox.querySelectorAll('button').forEach(b => {
+    b.classList.toggle('on', b.dataset.v === _crSetup.january);
+    b.onclick = () => {
+      janBox.querySelectorAll('button').forEach(x => x.classList.remove('on'));
+      b.classList.add('on');
+      _crSetup.january = b.dataset.v;
+      syncJanNote();
+    };
+  });
+  syncJanNote();
 
   // the tactic row belongs only to shapes that leave the middle open
   const formSel = document.getElementById('cr-formation');
@@ -284,6 +313,7 @@ function crRenderSetup(box) {
     run.tactic      = (!run.classic && formationTactical(run.formationId))
       ? tacticOf(document.getElementById('cr-tactic')?.value) : 'bal';
     run.difficulty  = _crSetup.difficulty;
+    run.january     = _crSetup.january;
     run.rerolls     = CR_REROLLS[_crSetup.difficulty] ?? CR_REROLLS.normal;
     run.clubName    = (document.getElementById('cr-club').value || '').trim().slice(0, 24) || 'המועדון שלי';
     _crRun = run;
@@ -548,6 +578,11 @@ function crApplyStateFor(run) {
   document.getElementById('duel-review-chrome')?.remove();
 
   state.career      = { year, seasonIdx: run.seasonIdx };
+  // A run started before this existed has no setting, and a career in flight is
+  // not the place to spring a new mechanic — so absent means off.
+  // 'alt' opens on the first season and every other one after it.
+  const janMode = run.january || 'off';
+  state.januaryOn   = janMode === 'every' || (janMode === 'alt' && run.seasonIdx % 2 === 0);
   state.difficulty  = run.difficulty || 'normal';
   state.showRatings = true;
   state.draftMode   = 'squad-first';
