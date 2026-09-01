@@ -844,6 +844,7 @@ function startLeagueDraft(code, settings) {
   pick('diff-row', s.difficulty || 'normal');
   pick('ratings-row', s.ratings_visible === false ? 'off' : 'on');
   pick('peakmode-row', s.peak_mode ? 'on' : 'off');
+  pick('january-row', s.january_on === false ? 'off' : 'on');
   pick('draftmode-row', s.draft_mode || 'squad-first');
   pick('mode-row', 'full');          // a league is one contest — same style for all
   const oppSel = document.getElementById('opp-season-sel');
@@ -1091,11 +1092,13 @@ function beginDraft() {
   const ratingsEl   = document.querySelector('#ratings-row .opt-btn.selected');
   const draftModeEl = document.querySelector('#draftmode-row .opt-btn.selected');
   const peakModeEl  = document.querySelector('#peakmode-row .opt-btn.selected');
+  const januaryEl   = document.querySelector('#january-row .opt-btn.selected');
 
   state.difficulty  = diffEl?.dataset.val ?? 'normal';
   state.showRatings = (ratingsEl?.dataset.val ?? 'on') === 'on';
   state.draftMode   = draftModeEl?.dataset.val ?? 'squad-first';
   state.peakMode    = (peakModeEl?.dataset.val ?? 'off') === 'on';
+  state.januaryOn   = (januaryEl?.dataset.val ?? 'on') === 'on';
   // set by the salary-cap card on the setup screen; a plain draft clears it
   state.salaryCap   = !!_salaryCapPick;
   const classicPick = (document.querySelector('#mode-row .opt-btn.selected')?.dataset.val ?? 'full') === 'classic';
@@ -2809,6 +2812,7 @@ function animateResults(ovr) {
   // _restoredSeason → replay instantly (page refresh). _presetSeason → a season
   // computed elsewhere (e.g. a league reveal) that still plays the full reveal.
   let season = window._restoredSeason ?? window._presetSeason ?? null;
+  let janPair = null;                 // the two futures, while one is unchosen
   const seasonWasRestored = !!window._restoredSeason;
   window._restoredSeason = null; window._presetSeason = null;
   if (!season) {
@@ -2844,14 +2848,14 @@ function animateResults(ovr) {
         projectedPoints: projectedPts,
       };
     };
-    // The January window, when it applies, decides which of two seasons this is
-    // before any of them is played out. janRunWindow simulates both, asks, and
-    // re-enters here with the chosen one in _janPicked.
-    if (window._janPicked) {
-      season = window._janPicked;
-      window._janPicked = null;
-    } else if (typeof janRunWindow === 'function' && janRunWindow(ovr, simulate)) {
-      return;                       // the window is open; it will call us back
+    // The January window, when it applies, makes this TWO seasons rather than
+    // one. janPrepare simulates both from a single seed — so the first half is
+    // identical in each — and the reveal pauses at the seam to ask which one
+    // this is going to be. We open on `stay`, which is true of the first half
+    // either way; a gamble swaps the rest in at the moment of the decision.
+    janPair = (typeof janPrepare === 'function') ? janPrepare(simulate) : null;
+    if (janPair) {
+      season = janPair.stay;
     } else {
       // Challenge run: the season is a pure function of (challenge, lineup) — the
       // same XI always produces the same result, so retries can't grind luck.
@@ -2859,6 +2863,10 @@ function animateResults(ovr) {
         ? withSeededRandom(chalSeed(`chal|${state.challenge.period}|${state.challenge.key}|sim|` + challengeLineupKey()), simulate)
         : simulate();
     }
+    // Saved before the window is answered on purpose: a refresh mid-decision
+    // restores the season you already had rather than re-rolling one, which is
+    // the same rule that stops any other result being ground by reloading.
+    // Refreshing therefore counts as sticking with your XI.
     saveSeasonState(season);
     // stamp the engine so the submitted payload can mark which scale this
     // score is on (V2 outscores V1 at the same squad rating)
@@ -2875,9 +2883,11 @@ function animateResults(ovr) {
       chalRecordDaily(state.challenge.key);
     }
   }
-  const { matches, inTopSix, leagueTable, playerStats } = season;
+  // Not const: the January window can replace the season half way through the
+  // reveal, and everything derived from it has to move with it.
+  let { matches, inTopSix, leagueTable, playerStats } = season;
   ovr = season.ovr;
-  const totalGames = matches.length;
+  let totalGames = matches.length;
   // A restored/preset season carries its own format — never re-read state, or a
   // refresh after changing the setting would re-label an already-played season.
   // A restored/preset season carries its own format — never re-read the setting,
@@ -2889,26 +2899,40 @@ function animateResults(ovr) {
   const grid = document.getElementById('matches-grid');
   grid.innerHTML = '';
 
-  let wins = 0, draws = 0, losses = 0, gfTotal = 0, gaTotal = 0;
-  matches.forEach(m => {
-    if (m.outcome==='W') wins++;
-    else if (m.outcome==='D') draws++;
-    else losses++;
-    gfTotal += m.gf; gaTotal += m.ga;
-  });
-  const myRank = leagueTable.findIndex(t => t.us) + 1;
-  wireEuropeButton(myRank);
-  // A career season is an ordinary season plus a consequence. This runs for
-  // restored seasons too (a refresh must not lose the result), so recording it
-  // is idempotent on the career's side.
-  if (typeof crOnSeasonEnd === 'function') {
-    crOnSeasonEnd({ rank: myRank, n: leagueTable.length, ovr,
-                    wins, draws, losses, gf: gfTotal, ga: gaTotal });
+  let wins = 0, draws = 0, losses = 0, gfTotal = 0, gaTotal = 0, myRank = 0;
+  // Everything that is a fact ABOUT the season rather than a fact about the
+  // screen. Called again if the January window swaps the season out, so the
+  // table, the finish and the career consequence all belong to the half you
+  // actually played rather than the one that was on screen first.
+  function bindSeason(s, { consequences = true } = {}) {
+    season = s;
+    ({ matches, inTopSix, leagueTable, playerStats } = s);
+    totalGames = matches.length;
+    wins = draws = losses = gfTotal = gaTotal = 0;
+    matches.forEach(m => {
+      if (m.outcome==='W') wins++;
+      else if (m.outcome==='D') draws++;
+      else losses++;
+      gfTotal += m.gf; gaTotal += m.ga;
+    });
+    myRank = leagueTable.findIndex(t => t.us) + 1;
+    wireEuropeButton(myRank);
+    if (!consequences) return;
+    // A career season is an ordinary season plus a consequence. This runs for
+    // restored seasons too (a refresh must not lose the result), so recording it
+    // is idempotent on the career's side.
+    if (typeof crOnSeasonEnd === 'function') {
+      crOnSeasonEnd({ rank: myRank, n: leagueTable.length, ovr,
+                      wins, draws, losses, gf: gfTotal, ga: gaTotal });
+    }
+    if (typeof mgwOnSeasonEnd === 'function') {
+      mgwOnSeasonEnd({ rank: myRank, n: leagueTable.length, ovr,
+                       wins, draws, losses, gf: gfTotal, ga: gaTotal });
+    }
   }
-  if (typeof mgwOnSeasonEnd === 'function') {
-    mgwOnSeasonEnd({ rank: myRank, n: leagueTable.length, ovr,
-                     wins, draws, losses, gf: gfTotal, ga: gaTotal });
-  }
+  // While a January window is pending the season on screen is provisional, so
+  // the consequences wait until the door is chosen.
+  bindSeason(season, { consequences: !janPair });
 
   function makeMatchRow(m) {
     const rc = m.outcome==='W' ? 'win' : m.outcome==='D' ? 'draw' : 'loss';
@@ -3025,18 +3049,52 @@ function animateResults(ovr) {
   if (skipBtn) skipBtn.style.display = 'block';
 
   let idx = 0, timer = null;
-  function revealOne() {
+  // The January seam: the reveal stops here, the window opens, and only then is
+  // it decided which half of the season the rest of these rows come from.
+  let janSeam = janPair ? janPair.played : -1;
+  let janSkip = null;
+  if (janPair && typeof janMountSkip === 'function') {
+    janSkip = janMountSkip(() => {                 // "דלג לינואר"
+      while (idx < janSeam) revealOne(true);
+      openJanuary();
+    });
+  }
+  function openJanuary() {
+    clearTimeout(timer);
+    if (janSkip) janSkip.remove();
+    if (skipBtn) skipBtn.style.display = 'none';
+    janOpen(janPair, { wins: rw, draws: rd, losses: rl }, (chosen) => {
+      // Re-bind before anything else reads the season: from here the table, the
+      // finish, the stats and the career consequence all belong to this future.
+      bindSeason(chosen);
+      saveSeasonState(chosen);
+      janSeam = -1;                 // the seam is spent; the rest runs straight through
+      if (skipBtn) skipBtn.style.display = 'block';
+      timer = setTimeout(revealOne, 200);
+    });
+  }
+  function revealOne(sync) {
+    if (janSeam === idx) { if (!sync) openJanuary(); return; }
     if (idx === splitAt) grid.appendChild(separatorRow());
     const m = matches[idx];
     grid.appendChild(makeMatchRow(m));
     if (m.outcome === 'W') rw++; else if (m.outcome === 'D') rd++; else rl++;
     setEl('res-wins', rw); setEl('res-draws', rd); setEl('res-losses', rl);
     idx++;
-    if (idx < matches.length) timer = setTimeout(revealOne, 130);
+    if (sync) return;
+    if (idx === janSeam) openJanuary();
+    else if (idx < matches.length) timer = setTimeout(revealOne, 130);
     else endReveal();
   }
   function endReveal() {
     clearTimeout(timer);
+    // Skipping must never skip the decision — it fast-forwards TO the window.
+    if (janSeam >= 0 && idx < janSeam) {
+      while (idx < janSeam) revealOne(true);
+      openJanuary();
+      return;
+    }
+    if (janSkip) janSkip.remove();
     // append any not-yet-shown matches (skip path)
     for (; idx < matches.length; idx++) {
       if (idx === splitAt) grid.appendChild(separatorRow());
@@ -3710,6 +3768,7 @@ async function submitResult() {
       era_min:         state.eraMin,
       era_max:         state.eraMax,
       peak_mode:       state.peakMode,
+      january_on:      state.januaryOn !== false,
       ratings_visible: state.showRatings,
       ...(state.oppSeason ? { opp_season: state.oppSeason } : {}),
       league_format: (r.spec && !isModernSpec(r.spec)) ? 'authentic' : 'modern',
