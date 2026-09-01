@@ -2819,12 +2819,12 @@ function animateResults(ovr) {
       : calcPreseasonOdds(ovr, 300, currentSimEngine());
     const projected = odds.projectedFinish;
     const projectedPts = odds.expectedPoints;
-    const simulate = () => {
+    const simulate = (halfHook = null) => {
       const spec = specForState();
       // A challenge already in progress must keep the engine it started on, or
       // its scores stop being comparable — chalSimEngine gates that by key.
       const engine = currentSimEngine();
-      const g = generateMatches(myLineRatings(), oppTeamsForState(), spec, engine);
+      const g = generateMatches(myLineRatings(), oppTeamsForState(), spec, engine, halfHook);
       let w = 0, d = 0;
       g.matches.forEach(m => { if (m.outcome === 'W') w++; else if (m.outcome === 'D') d++; });
       const l = g.matches.length - w - d;
@@ -2844,11 +2844,21 @@ function animateResults(ovr) {
         projectedPoints: projectedPts,
       };
     };
-    // Challenge run: the season is a pure function of (challenge, lineup) — the
-    // same XI always produces the same result, so retries can't grind luck.
-    season = state.challenge
-      ? withSeededRandom(chalSeed(`chal|${state.challenge.period}|${state.challenge.key}|sim|` + challengeLineupKey()), simulate)
-      : simulate();
+    // The January window, when it applies, decides which of two seasons this is
+    // before any of them is played out. janRunWindow simulates both, asks, and
+    // re-enters here with the chosen one in _janPicked.
+    if (window._janPicked) {
+      season = window._janPicked;
+      window._janPicked = null;
+    } else if (typeof janRunWindow === 'function' && janRunWindow(ovr, simulate)) {
+      return;                       // the window is open; it will call us back
+    } else {
+      // Challenge run: the season is a pure function of (challenge, lineup) — the
+      // same XI always produces the same result, so retries can't grind luck.
+      season = state.challenge
+        ? withSeededRandom(chalSeed(`chal|${state.challenge.period}|${state.challenge.key}|sim|` + challengeLineupKey()), simulate)
+        : simulate();
+    }
     saveSeasonState(season);
     // stamp the engine so the submitted payload can mark which scale this
     // score is on (V2 outscores V1 at the same squad rating)
