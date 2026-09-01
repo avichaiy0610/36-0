@@ -294,6 +294,10 @@ function pcTagEffect(t, slotPos) {
   // is the story, this line is the effect.
   const pct = n => Math.round(n * 1000) / 10;
   // A tag that lifts the side, not the man, cannot be written as his percentage.
+  // The European one lifts it in ONE place only, and saying "finishes a little
+  // higher" about a man whose tag does nothing to the league would be a lie.
+  if (d.eu) return { live: true, story: false,
+    text: 'משפר את סיכויי הקבוצה במסע האירופי' };
   if (d.team) return { live: true, story: false,
     text: 'הקבוצה שלו מסיימת מעט גבוה יותר' };
   if (d.clean) return { live: true, story: false, text: `סיכוי גבוה ב-${pct(d.clean)}% לשער נקי` };

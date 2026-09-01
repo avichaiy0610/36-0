@@ -52,6 +52,11 @@ const TAG_DEFS = {
   three_decades: { icon: '🕰', name: 'שלושה עשורים' },
   nomad:         { icon: '🎒', name: 'נדד בליגה' },
   prime90:       { icon: '🌟', name: 'דירוג 90+' },
+  // Like serial_winner, this one does not touch the man — it lifts the SIDE, and
+  // only in Europe. Its data does not live in TAG_DATA either: it comes from
+  // EU_CAPS, because it is a record of matches actually played in the Champions
+  // League rather than anything the league tables can tell us.
+  europe:        { icon: '🇪🇺', name: 'ניסיון אירופאי', team: true, eu: true },
 };
 
 
@@ -63,24 +68,42 @@ function tagNorm(s) {
     .trim();
 }
 
-// [{ key, icon, name, count, evidence, def }] — everything the player earned
+// EU_CAPS is keyed by the raw name from the squad data; every lookup here goes
+// through tagNorm, so the index is built once against the same normalisation.
+let _euCapsIdx = null;
+function euCapsFor(name) {
+  if (typeof EU_CAPS === 'undefined') return null;
+  if (!_euCapsIdx) {
+    _euCapsIdx = {};
+    for (const k of Object.keys(EU_CAPS)) _euCapsIdx[tagNorm(k)] = EU_CAPS[k];
+  }
+  return _euCapsIdx[tagNorm(name)] || null;
+}
+
+// [{ key, icon, name, count, evidence, def }] — everything the player earned.
+// Two sources: TAG_DATA, built from the league tables, and EU_CAPS, which is a
+// record of European appearances the league tables know nothing about.
 function tagsOf(name) {
-  if (typeof TAG_DATA === 'undefined') return [];
-  const rows = TAG_DATA[tagNorm(name)];
-  if (!rows) return [];
-  return rows
-    .map(([key, count, evidence]) => {
+  const out = [];
+  if (typeof TAG_DATA !== 'undefined') {
+    for (const [key, count, evidence] of (TAG_DATA[tagNorm(name)] || [])) {
       const def = TAG_DEFS[key];
-      return def ? { key, count, evidence, def, icon: def.icon, name: def.name } : null;
-    })
-    .filter(Boolean)
-    .sort((a, b) => TAG_ORDER.indexOf(a.key) - TAG_ORDER.indexOf(b.key));
+      if (def) out.push({ key, count, evidence, def, icon: def.icon, name: def.name });
+    }
+  }
+  const eu = euCapsFor(name);
+  if (eu) {
+    out.push({ key: 'europe', count: 1, def: TAG_DEFS.europe,
+               icon: TAG_DEFS.europe.icon, name: TAG_DEFS.europe.name,
+               evidence: `${eu.c} ${eu.s}` });
+  }
+  return out.sort((a, b) => TAG_ORDER.indexOf(a.key) - TAG_ORDER.indexOf(b.key));
 }
 
 // the order they read best in: what he won, then what he did, then how long
 const TAG_ORDER = ['poty', 'golden_boot', 'playmaker', 'ten_goals', 'ten_assists',
-                   'gk_wall', 'wall', 'serial_winner', 'one_club', 'ironman',
-                   'three_decades', 'nomad', 'prime90'];
+                   'gk_wall', 'wall', 'serial_winner', 'europe', 'one_club',
+                   'ironman', 'three_decades', 'nomad', 'prime90'];
 
 // Does this tag change anything at all? Position no longer enters into it, so
 // this is simply "does it carry an effect" — the honours and the long-service
