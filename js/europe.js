@@ -1,140 +1,81 @@
 // The European campaign — what a title-winning season is actually worth.
 //
 // This is NOT the gauntlet. The gauntlet is a roguelike: one life, relics, coins,
-// a map. This is the season's own continuation, so it is built in the season's
-// idiom — the whole campaign is simulated up front and revealed as rows, a tie is
-// two legs and an aggregate, and the league phase ends in a table read exactly
-// like the league table on the results screen.
+// a map. This is the season's own continuation, and BOTH the draft and the career
+// arrive here through the same button on the results screen — the career runs no
+// Europe of its own, it only records that the summer happened.
 //
-// ── Ratings, which are the whole design ──────────────────────────────────────
-// A PERFECT draft — the best legal player at every slot, across every season in
-// the data — rates 91 (92 in peak mode). A normal good draft lands at 85-88.
-// The pots are set against that number, not against it being close:
+// ── What changed in v2 ───────────────────────────────────────────────────────
+// v1 simulated the whole campaign the moment you walked in and printed it as one
+// scrolling page: the result existed before your finger touched the screen. v2 is
+// a SEQUENCE. One match at a time, simulated only when you ask for it, with the
+// clock running and the goals arriving on it — the idiom the gauntlet's fight
+// screen already established. The campaign persists after every leg, so a refresh
+// puts you back exactly where you were rather than at the start or the end.
 //
-//   pot 1  96-99   pot 2  93-99   pot 3  89-90   pot 4  84-91
+// It also no longer stops at a table position. Places 1-8 go straight to the last
+// 16, 9-24 play a knockout play-off, and the ladder runs to a final.
 //
-// Eleven clubs sit at 99 — eight clear of anything Israeli football has ever
-// assembled. That gap is the design, not an accident of tuning: see
-// docs/EUROPE.md for what it costs a squad at each rating.
-//
-// The pots are the DRAW (two clubs from each), not a difficulty ladder: the
-// ratings were set club by club, so pot 2 holds three 99s and pot 4 holds a 91.
-// Nothing in the code assumes pot number tracks strength.
-
-/* ── the clubs ────────────────────────────────────────────────────────────────
-   The four qualifying opponents are not invented. docs/EUROPE_OPPONENTS.md counts
-   every tie Israeli champions played from 2000/01 to 2026/27, and these are the
-   clubs that keep turning up in each round — Salzburg most of all, three times in
-   the play-off, more than anyone. They also exist in js/gauntlet-europe.js as
-   GM_EU with the same ratings; the gauntlet keeps its own copy because it stores
-   line ratings inside a run. Change a rating in one place, change it in both. */
-
-// Three candidates per round, one drawn per campaign, so the same season is not
-// the same summer twice. Each round holds one club easier and one harder than
-// the anchor, which is what makes the draw worth caring about: a 79 in the first
-// round can end a run that a 75 would have waved through.
-//
-// `round` is the chip on the tie header, where space is short. `roundLong` is
-// the form a sentence needs: "נעצרת בסיבוב המוקדמות השלישי", not "נעצרת במוקדמות 3".
-const EU_ROUNDS = [
-  { round: 'מוקדמות 1', roundLong: 'סיבוב המוקדמות הראשון', clubs: [
-    { id: 'eu-kalju',  name: 'נומה קאליו',   country: 'אסטוניה', flag: '🇪🇪', ovr: 77,
-      desc: 'אלופת אסטוניה. הסיבוב שישראלית מגיעה אליו רק כשהמקדם נמוך - ובכל ארבע הפעמים היריבה הייתה אחרת.' },
-    { id: 'eu-flora',  name: 'פלורה טאלין',  country: 'אסטוניה', flag: '🇪🇪', ovr: 75,
-      desc: 'הפועל באר שבע עברה אותה ב-2018/19. הסיבוב הראשון שלה, וגם שלך.' },
-    { id: 'eu-kairat', name: 'קייראט אלמאטי', country: 'קזחסטן', flag: '🇰🇿', ovr: 79,
-      desc: 'אלופת קזחסטן שהדיחה את מכבי חיפה ב-2021/22. הסיבוב הראשון לא תמיד קל.' },
-  ]},
-  { round: 'מוקדמות 2', roundLong: 'סיבוב המוקדמות השני', clubs: [
-    { id: 'eu-sheriff', name: 'שריף טירספול', country: 'מולדובה', flag: '🇲🇩', ovr: 84,
-      desc: 'היריבה החוזרת ביותר של הסיבוב השני: פעמיים מול ישראליות, ושתי הפעמים הן עברו.' },
-    { id: 'eu-zilina',  name: 'ז\'ילינה',      country: 'סלובקיה', flag: '🇸🇰', ovr: 81,
-      desc: 'נפגשה פעמיים בסיבוב הזה - מכבי ת"א ב-2003/04 ועירוני קריית שמונה ב-2012/13.' },
-    { id: 'eu-copenhagen', name: 'קופנהגן',   country: 'דנמרק',  flag: '🇩🇰', ovr: 87,
-      desc: 'בית"ר ירושלים נתקלה בה ב-2007/08. גדולה מדי לסיבוב השני, וזה בדיוק העניין.' },
-  ]},
-  { round: 'מוקדמות 3', roundLong: 'סיבוב המוקדמות השלישי', clubs: [
-    { id: 'eu-zvezda',  name: 'הכוכב האדום בלגרד', country: 'סרביה',   flag: '🇷🇸', ovr: 87,
-      desc: 'מכבי חיפה הדיחה אותה ב-2022/23 ועלתה לשלב הבתים. מרקאנה הסרבית לא מוחלת פעמיים.' },
-    { id: 'eu-maribor', name: 'מריבור',            country: 'סלובניה', flag: '🇸🇮', ovr: 85,
-      desc: 'שלושה מפגשים מול ישראליות - יותר מכל מועדון חוץ מזלצבורג.' },
-    { id: 'eu-basel',   name: 'באזל',              country: 'שווייץ',  flag: '🇨🇭', ovr: 89,
-      desc: 'מכבי ת"א עברה אותה ב-2015/16 בשערי חוץ. הסיבוב השלישי במיטבו הקשה.' },
-  ]},
-  { round: 'פלייאוף', roundLong: 'שלב הפלייאוף', clubs: [
-    { id: 'eu-salzburg', name: 'רד בול זלצבורג', country: 'אוסטריה', flag: '🇦🇹', ovr: 89,
-      desc: 'הקיר של הפלייאוף: שלושה מפגשים מול ישראליות, יותר מכל מועדון אחר. מי שעובר אותה - בשלב הליגה.' },
-    { id: 'eu-bate',     name: 'באט"ה בוריסוב',  country: 'בלארוס',  flag: '🇧🇾', ovr: 86,
-      desc: 'עצרה את עירוני קריית שמונה ב-2012/13, במסע האירופי היחיד של המועדון.' },
-    { id: 'eu-celtic',   name: 'סלטיק',          country: 'סקוטלנד', flag: '🏴', ovr: 91,
-      desc: 'הפועל באר שבע נפלה מולה ב-2016/17. סלטיק פארק הוא לא מקום להתחיל בו קיץ.' },
-  ]},
-];
-
-// 35 clubs in four pots. The 36th seat in the table is yours, and it is in pot 4
-// — which is where an Israeli champion actually lands.
-const EU_POTS = [
-  [ // pot 1 — 96-99. The clubs you are not supposed to take a point off.
-    { id: 'eu-real', name: 'ריאל מדריד', flag: '🇪🇸', ovr: 99 },
-    { id: 'eu-barca', name: 'ברצלונה', flag: '🇪🇸', ovr: 99 },
-    { id: 'eu-mancity', name: "מנצ'סטר סיטי", flag: '🏴', ovr: 99 },
-    { id: 'eu-bayern', name: 'באיירן מינכן', flag: '🇩🇪', ovr: 99 },
-    { id: 'eu-liverpool', name: 'ליברפול', flag: '🏴', ovr: 99 },
-    { id: 'eu-psg', name: "פריז סן ז'רמן", flag: '🇫🇷', ovr: 99 },
-    { id: 'eu-inter', name: 'אינטר', flag: '🇮🇹', ovr: 99 },
-    { id: 'eu-dortmund', name: 'בורוסיה דורטמונד', flag: '🇩🇪', ovr: 99 },
-    { id: 'eu-leipzig', name: 'לייפציג', flag: '🇩🇪', ovr: 96 },
-  ],
-  [ // pot 2 — 93-99. Arsenal, Atlético and Juventus are rated with pot 1.
-    { id: 'eu-arsenal', name: 'ארסנל', flag: '🏴', ovr: 99 },
-    { id: 'eu-atletico', name: 'אתלטיקו מדריד', flag: '🇪🇸', ovr: 99 },
-    { id: 'eu-leverkusen', name: 'באייר לוורקוזן', flag: '🇩🇪', ovr: 94 },
-    { id: 'eu-juventus', name: 'יובנטוס', flag: '🇮🇹', ovr: 99 },
-    { id: 'eu-milan', name: 'מילאן', flag: '🇮🇹', ovr: 94 },
-    { id: 'eu-atalanta', name: 'אטלנטה', flag: '🇮🇹', ovr: 93 },
-    { id: 'eu-benfica', name: 'בנפיקה', flag: '🇵🇹', ovr: 93 },
-    { id: 'eu-porto', name: 'פורטו', flag: '🇵🇹', ovr: 93 },
-    { id: 'eu-bilbao', name: 'אתלטיק בילבאו', flag: '🇪🇸', ovr: 93 },
-  ],
-  [ // pot 3 — 89-90. Olympiacos and Young Boys are here for a reason: both
-    // knocked on Israeli doors in the real qualifying rounds.
-    { id: 'eu-sporting', name: 'ספורטינג ליסבון', flag: '🇵🇹', ovr: 90 },
-    { id: 'eu-feyenoord', name: 'פיינורד', flag: '🇳🇱', ovr: 90 },
-    { id: 'eu-psv', name: 'PSV איינדהובן', flag: '🇳🇱', ovr: 90 },
-    { id: 'eu-lille', name: 'ליל', flag: '🇫🇷', ovr: 90 },
-    { id: 'eu-celtic', name: 'סלטיק', flag: '🏴', ovr: 89 },
-    { id: 'eu-shakhtar', name: 'שחטאר דונייצק', flag: '🇺🇦', ovr: 89 },
-    { id: 'eu-zagreb', name: 'דינמו זאגרב', flag: '🇭🇷', ovr: 89 },
-    { id: 'eu-youngboys', name: 'יאנג בויז', flag: '🇨🇭', ovr: 89 },
-    { id: 'eu-olympiacos', name: 'אולימפיאקוס', flag: '🇬🇷', ovr: 89 },
-  ],
-  [ // pot 4 — 84-91. Your own pot, and the only place the table is winnable —
-    // though Aston Villa at 91 outrates everything in pot 3.
-    { id: 'eu-villa', name: 'אסטון וילה', flag: '🏴', ovr: 91 },
-    { id: 'eu-monaco', name: 'מונאקו', flag: '🇫🇷', ovr: 90 },
-    { id: 'eu-stuttgart', name: 'שטוטגרט', flag: '🇩🇪', ovr: 88 },
-    { id: 'eu-girona', name: "ג'ירונה", flag: '🇪🇸', ovr: 86 },
-    { id: 'eu-sparta', name: 'ספרטה פראג', flag: '🇨🇿', ovr: 85 },
-    { id: 'eu-brest', name: 'ברסט', flag: '🇫🇷', ovr: 85 },
-    { id: 'eu-sturm', name: 'שטורם גראץ', flag: '🇦🇹', ovr: 84 },
-    { id: 'eu-slovan', name: 'סלובאן ברטיסלבה', flag: '🇸🇰', ovr: 84 },
-  ],
-];
-
-// One stand-by per pot. The league phase is 36 clubs and stays 36: a side you
-// eliminated in qualifying is out of the competition, and somebody takes the
-// seat. Today only Celtic can trigger this — she is the one club that sits in
-// both a qualifying round and a pot — but the mechanism is general, because the
-// day another overlap is added nobody will remember to re-check the count.
-const EU_RESERVES = [
-  [{ id: 'eu-chelsea', name: "צ'לסי", flag: '🏴', ovr: 97 },       { id: 'eu-newcastle', name: 'ניוקאסל', flag: '🏴', ovr: 96 }],
-  [{ id: 'eu-napoli', name: 'נאפולי', flag: '🇮🇹', ovr: 93 },      { id: 'eu-marseille', name: 'מרסיי', flag: '🇫🇷', ovr: 93 }],
-  [{ id: 'eu-galatasaray', name: 'גלאטסראיי', flag: '🇹🇷', ovr: 89 },   { id: 'eu-ajax', name: 'אייאקס', flag: '🇳🇱', ovr: 89 }],
-  [{ id: 'eu-brugge', name: "קלאב ברוז'", flag: '🇧🇪', ovr: 85 },  { id: 'eu-rangers', name: "ריינג'רס", flag: '🏴', ovr: 85 }],
-];
+// This file must stay DOM-free. Every number in docs/EUROPE.md was measured by
+// loading it into Node against the real sim engine, and that has to keep working.
 
 const EU_KEY = 'europe';                 // the slot inside the saved draft
+const EU_SAVE_V = 2;                     // v1 campaigns are not migrated — see euLoad
 let _euCampaign = null;
+
+/* ── the European night ───────────────────────────────────────────────────────
+   In the KNOCKOUT ROUNDS ONLY, your XI is lifted by a share of the gap between
+   you and whoever is in front of you. Against a 99 that is an enormous hand;
+   against an 85 it is nothing at all.
+
+   It is deliberately NOT a flat bonus. A flat +10 was measured and rejected: it
+   is wasted on a weak opponent and too small against a 99, which turned the first
+   knockout round into a 94% formality — a corridor rather than a climb. Scaled to
+   the gap, every round lands between 50% and 60%, and the whole mechanic is one
+   sentence: under the lights you are the equal of anyone.
+
+   1.15 is the single calibration point of this file. Measured over 150,000
+   campaigns per rating against the live engine:
+
+     XI 86 → 1:4,167    XI 87 → 1:1,293    XI 88 → 1:456    XI 89 → 1:196
+
+   The brief was 0.1% at 87 and 0.2% at 88; this gives 0.08% and 0.22%. Each
+   rating point is worth ~2.75x rather than 2x, because the league-phase gate is
+   already steep before any bonus and the two compound. */
+const EU_NIGHT_K = 1.15;
+
+/* ── who has been here before ─────────────────────────────────────────────────
+   Every player who has actually appeared in the Champions League — the six
+   Israeli group-stage squads, plus the eighteen who played it abroad — raises
+   the coefficient a little. `js/eu-caps-data.js` holds the record and
+   scripts/build_europe_caps.js builds it.
+
+   0.018 per capped player: an XI with nobody who has been there plays at 1.15,
+   an XI of eleven who have plays at 1.35. Measured at OVR 88, 40,000 campaigns
+   per step:
+
+     caps 0 → 1:449    caps 4 → 1:377    caps 8 → 1:290    caps 11 → 1:282
+
+   So a fully-experienced XI is worth about 1.6x, and the curve flattens at the
+   top because the final is a coin flip either way. Worth drafting for, and never
+   enough to replace the squad's rating as the thing that decides the summer. */
+const EU_CAPS_K = 0.018;
+
+// Counted once, when the campaign is built, and frozen into it — the XI cannot
+// change afterwards and a saved campaign must not re-derive this from a draft
+// screen that has moved on.
+function euCapsInXI() {
+  if (typeof EU_CAPS === 'undefined' || !state || !Array.isArray(state.picks)) return 0;
+  return state.picks.filter(p => p && p.player && EU_CAPS[p.player.name]).length;
+}
+
+function euNightLines(me, oppOvr, caps) {
+  const k = EU_NIGHT_K + EU_CAPS_K * (caps || 0);
+  const lift = k * Math.max(0, oppOvr - me.ovr);
+  if (!lift) return me;
+  return { ovr: me.ovr + lift, atk: me.atk + lift, mid: me.mid + lift,
+           def: me.def + lift, gk: me.gk + lift, cs: me.cs };
+}
 
 /* ── ratings ──────────────────────────────────────────────────────────────── */
 // Four line ratings drawn at random that average EXACTLY the club's rating: the
@@ -151,46 +92,169 @@ function euLines(ovr) {
 
 function euTeam(club) { return { name: club.name, ovr: club.ovr, ...euLines(club.ovr) }; }
 
-/* ── the qualifying ties ──────────────────────────────────────────────────── */
-// Away first, home second, aggregate over the two. Level after 180 minutes goes
-// to extra time in the second leg — a third of a match's worth of chances — and
-// then, if it is still level, to a coin flip. No away goals: UEFA abolished them
-// in 2021 and this ladder is the modern one.
-// `want` is the sandbox forcing a result. It replays the tie until the
-// simulation produces the asked-for outcome, so the legs, the aggregate and the
-// scorers all stay internally consistent — and if the simulation simply will not
-// cooperate (forcing a 90-rated squad to lose to a 79 is a sub-1% event, and a
-// retry budget loses that coin flip often enough to matter) it MIRRORS the last
-// tie instead of quietly returning the opposite of what was asked. A sandbox
-// that silently ignores you is worse than no sandbox.
-function euPlayTie(me, club, want) {
-  if (want) {
-    for (let n = 0; n < 200; n++) {
-      const t = euPlayTie(me, club);
-      if ((want === 'W') === t.won) return t;
-    }
-    return euMirrorTie(euPlayTie(me, club));
+// A neutral venue, which simulateMatchV2 has no way to express — it hands the
+// HOME multiplier to one side or the other. The final is played on nobody's
+// ground, so both sides are computed as the away team.
+function euSimMatch(me, opp, home) {
+  if (home !== null) return simulateMatchV2(me, opp, home);
+  const a = simShrinkLines(me), b = simShrinkLines(opp);
+  const gf = simDrawGoals(simExpectedGoals(a, b, false));
+  const ga = simDrawGoals(simExpectedGoals(b, a, false), me.cs);
+  return { outcome: gf > ga ? 'W' : gf === ga ? 'D' : 'L', gf, ga, opponent: opp.name, home: null };
+}
+
+/* ── the campaign ─────────────────────────────────────────────────────────── */
+// Nothing is simulated here. The campaign starts holding only the XI it will be
+// played with, frozen at the moment you walked in.
+function euBuildCampaign() {
+  let me = myLineRatings();
+  if (typeof euForcedLines === 'function') me = euForcedLines(me);
+  return {
+    v: EU_SAVE_V,
+    ovr: me.ovr,
+    lines: { atk: me.atk, mid: me.mid, def: me.def, gk: me.gk },
+    sandbox: typeof euSandboxActive === 'function' ? euSandboxActive() : false,
+    caps: euCapsInXI(),          // players in the XI who have really played it
+    view: 'tie',        // 'tie' | 'agg' | 'league' | 'standings' | 'road' | 'out' | 'trophy'
+    qi: 0,              // next qualifying round to draw
+    koi: -1,            // index into EU_KO once the knockouts start
+    seeded: false,      // finished top 8, so the play-off round is skipped
+    cur: null,          // the tie being played
+    ties: [],           // every completed tie, qualifying and knockout alike
+    league: null,
+    result: null,       // 'out' | 'won'
+    outAt: null,
+    submitted: 0,       // how many ties had been reported the last time we sent
+  };
+}
+
+// The XI as the engine wants it. Rebuilt from the frozen numbers rather than read
+// from state.picks, so a campaign resumed after a refresh plays with the squad it
+// started with even if the draft screen has moved on.
+function euMe(c) {
+  return { ovr: c.ovr, atk: c.lines.atk, mid: c.lines.mid, def: c.lines.def, gk: c.lines.gk };
+}
+
+/* ── ties ─────────────────────────────────────────────────────────────────── */
+// Draw the tie that belongs at the current position, if it is not already drawn.
+function euEnsureTie(c) {
+  if (c.cur) return c.cur;
+
+  if (c.koi < 0) {                                     // still in qualifying
+    const r = EU_ROUNDS[c.qi];
+    if (!r) return null;
+    const forced = typeof euForcedClub === 'function' ? euForcedClub(c.qi) : null;
+    const club = forced || r.clubs[Math.floor(Math.random() * r.clubs.length)];
+    c.cur = { kind: 'q', idx: c.qi, roundId: r.id, round: r.round, roundLong: r.roundLong,
+              club: { ...club }, legs: [], oneLeg: false };
+  } else {
+    const k = EU_KO[c.koi];
+    if (!k) return null;
+    const club = euDrawKoOpponent(c, k);
+    c.cur = { kind: 'ko', idx: c.koi, roundId: k.id, round: k.round, roundLong: k.roundLong,
+              club: { ...club }, legs: [], oneLeg: !!k.oneLeg };
   }
-  const opp = euTeam(club);
-  const legs = [simulateMatchV2(me, opp, false), simulateMatchV2(me, opp, true)];
-  const tie = { id: club.id, name: club.name, flag: club.flag, country: club.country,
-                round: club.round, roundLong: club.roundLong, ovr: club.ovr, lines: { atk: opp.atk, mid: opp.mid, def: opp.def, gk: opp.gk },
-                legs, et: null, pens: null };
-  let gf = legs[0].gf + legs[1].gf, ga = legs[0].ga + legs[1].ga;
+  c.cur.lines = euLines(c.cur.club.ovr);
+  return c.cur;
+}
+
+// Who is waiting in a knockout round. Drawn from the pots the ladder names, minus
+// anyone already knocked out — you cannot meet a club twice, and you certainly
+// cannot meet one you already beat.
+function euDrawKoOpponent(c, k) {
+  const beaten = new Set(c.ties.map(t => t.club.name));
+  const pots = (c.seeded && k.seedPots) ? k.seedPots : k.pots;
+  const pool = pots.flatMap(i => EU_POTS[i]).filter(x => !beaten.has(x.name));
+  // The pots hold 35 clubs and the ladder is five rounds, so this cannot empty in
+  // practice; falling back to the whole field keeps a draw possible regardless.
+  const from = pool.length ? pool : EU_POTS.flat().filter(x => !beaten.has(x.name));
+  return from[Math.floor(Math.random() * from.length)];
+}
+
+// How many legs this tie needs. The final is one match on neutral ground.
+function euLegsNeeded(tie) { return tie.oneLeg ? 1 : 2; }
+function euTieComplete(c) { const t = c.cur; return !!t && t.legs.length >= euLegsNeeded(t); }
+
+// Play the next leg and return it. Away first, home second — the order Israeli
+// clubs actually draw. The European night applies to knockout ties only.
+function euPlayLeg(c) {
+  const t = euEnsureTie(c);
+  if (!t || euTieComplete(c)) return null;
+
+  const opp = { name: t.club.name, ovr: t.club.ovr, ...t.lines };
+  const base = euMe(c);
+  const me = t.kind === 'ko' ? euNightLines(base, t.club.ovr, c.caps) : base;
+  const home = t.oneLeg ? null : t.legs.length === 1;
+
+  const leg = euSimMatch(me, opp, home);
+  leg.leg = t.legs.length + 1;
+
+  // Scorers, so a European row reads like a league row. Same helper the season
+  // uses, so the names come from the XI that actually played.
+  try { simulatePlayerStats([leg]); } catch (e) { leg.scorers = leg.scorers || []; }
+  leg.events = euLegEvents(leg, t.club.name);
+  t.legs.push(leg);
+  euSave(c);
+  return leg;
+}
+
+// The minute-by-minute feed the live screen plays back. Your goals already carry
+// minutes and names from simulatePlayerStats; the opponent's carry only a club.
+function euLegEvents(leg, oppName) {
+  const used = new Set();
+  const minute = () => {
+    let m;
+    do { m = 1 + Math.floor(Math.random() * 90); } while (used.has(m));
+    used.add(m);
+    return m;
+  };
+  const ev = [];
+  (leg.scorers || []).forEach(s => { used.add(s.min); ev.push({ min: s.min, side: 'me', name: s.n }); });
+  for (let i = 0; i < leg.ga; i++) ev.push({ min: minute(), side: 'them', name: oppName });
+  return ev.sort((a, b) => a.min - b.min);
+}
+
+// Close the tie: aggregate, extra time in the second leg, then penalties.
+// No away goals — UEFA abolished them in 2021 and this ladder is the modern one.
+function euCloseTie(c) {
+  const t = c.cur;
+  if (!t || !euTieComplete(c)) return null;
+
+  let gf = t.legs.reduce((s, l) => s + l.gf, 0);
+  let ga = t.legs.reduce((s, l) => s + l.ga, 0);
+  t.et = null; t.pens = null;
+
   if (gf === ga) {
+    const base = euMe(c);
+    const me = t.kind === 'ko' ? euNightLines(base, t.club.ovr, c.caps) : base;
+    const opp = { name: t.club.name, ovr: t.club.ovr, ...t.lines };
     const a = simShrinkLines(me), b = simShrinkLines(opp);
-    const eg = simDrawGoals(simExpectedGoals(a, b, true) / 3);
+    const eg = simDrawGoals(simExpectedGoals(a, b, true) / 3);       // a third of a match
     const ea = simDrawGoals(simExpectedGoals(b, a, false) / 3);
-    tie.et = { gf: eg, ga: ea };
+    t.et = { gf: eg, ga: ea };
     gf += eg; ga += ea;
   }
   if (gf === ga) {
     const mine = 3 + (Math.random() < 0.5 ? 1 : 0);
-    tie.pens = { gf: mine, ga: mine === 4 ? 3 : 4 };
+    t.pens = { gf: mine, ga: mine === 4 ? 3 : 4 };
   }
-  tie.agg = { gf, ga };
-  tie.won = tie.pens ? tie.pens.gf > tie.pens.ga : gf > ga;
-  return tie;
+  t.agg = { gf, ga };
+  t.won = t.pens ? t.pens.gf > t.pens.ga : gf > ga;
+
+  // The sandbox forces a result by mirroring the tie it just watched, rather than
+  // by replaying until the dice agree: a 90-rated squad losing to a 79 is a sub-1%
+  // event and a retry budget loses that coin flip often enough to matter. The
+  // legs, the aggregate and the scorers all stay internally consistent.
+  // Keyed by round id, not by index — 'q1' and 'ko-po' are both index 0.
+  const want = typeof euForcedOutcome === 'function' ? euForcedOutcome(t.roundId) : null;
+  if (want && (want === 'W') !== t.won) euMirrorTie(t);
+
+  c.ties.push(t);
+  c.cur = null;
+  c.view = 'agg';
+  euSave(c);
+  euSubmit(c);
+  return t;
 }
 
 // Swap both sides of every leg. The scoreline stays a real one the engine could
@@ -200,28 +264,74 @@ function euMirrorTie(t) {
     const g = l.gf; l.gf = l.ga; l.ga = g;
     l.outcome = l.gf > l.ga ? 'W' : l.gf === l.ga ? 'D' : 'L';
     l.scorers = [];                       // they were the other side's goals
+    l.events = (l.events || []).map(e => ({ ...e, side: e.side === 'me' ? 'them' : 'me' }));
   });
   if (t.et) { const g = t.et.gf; t.et.gf = t.et.ga; t.et.ga = g; }
   if (t.pens) { const g = t.pens.gf; t.pens.gf = t.pens.ga; t.pens.ga = g; }
-  const gf = t.legs[0].gf + t.legs[1].gf + (t.et ? t.et.gf : 0);
-  const ga = t.legs[0].ga + t.legs[1].ga + (t.et ? t.et.ga : 0);
+  const gf = t.legs.reduce((s, l) => s + l.gf, 0) + (t.et ? t.et.gf : 0);
+  const ga = t.legs.reduce((s, l) => s + l.ga, 0) + (t.et ? t.et.ga : 0);
   t.agg = { gf, ga };
   t.won = t.pens ? t.pens.gf > t.pens.ga : gf > ga;
   return t;
 }
 
+/* ── after a tie ──────────────────────────────────────────────────────────── */
+// The one place that decides where the campaign goes next. Called when the
+// aggregate screen is dismissed.
+function euAfterTie(c) {
+  const t = c.ties[c.ties.length - 1];
+  if (!t) return;
+
+  if (!t.won) {
+    c.result = 'out';
+    c.outAt = t.roundId;
+    c.view = 'out';
+  } else if (t.kind === 'q') {
+    c.qi++;
+    if (c.qi >= EU_ROUNDS.length) { euPlayLeaguePhase(c); c.view = 'league'; }
+    else c.view = 'tie';
+  } else if (t.roundId === 'final') {
+    c.result = 'won';
+    c.view = 'trophy';
+  } else {
+    c.koi++;
+    c.view = 'tie';
+  }
+  euSave(c);
+  euSubmit(c);
+}
+
+// Leaving the standings: 25-36 is the end of the road, 1-8 skips the play-off.
+function euEnterKnockouts(c) {
+  const band = euBand(c.league.rank);
+  if (band.id === 'out') {
+    c.result = 'out';
+    c.outAt = 'league';
+    c.view = 'out';
+  } else {
+    c.seeded = band.id === 'r16';
+    c.koi = c.seeded ? 1 : 0;            // index 0 is the knockout play-off
+    c.view = 'road';
+  }
+  euSave(c);
+  euSubmit(c);
+}
+
+function euBand(rank) { return EU_BANDS.find(b => rank <= b.max); }
+
 /* ── the league phase ─────────────────────────────────────────────────────── */
 // Eight matches against eight different clubs: two out of every pot, one at home
 // and one away in each — the real format since 2024. Your own pot gives you two
 // of the eight clubs in it, because the ninth seat is you.
-function euDrawLeaguePhase(me, myOvr, beaten = []) {
+function euPlayLeaguePhase(c) {
+  const me = euMe(c);
+  const beaten = c.ties.map(t => t.club.name);
   const out = new Set(beaten);
-  const used = new Set();          // a reserve fills exactly one seat
+  const used = new Set();                // a reserve fills exactly one seat
   const pots = EU_POTS.map((pot, i) => {
-    const kept = pot.filter(c => !out.has(c.name));
+    const kept = pot.filter(x => !out.has(x.name));
     // refill, so the field is always 35 opponents and the table always 36 rows
-    const bench = EU_RESERVES[i] || [];
-    for (const club of bench) {
+    for (const club of (EU_RESERVES[i] || [])) {
       if (kept.length >= pot.length) break;
       if (!used.has(club.name)) { kept.push(club); used.add(club.name); }
     }
@@ -234,102 +344,109 @@ function euDrawLeaguePhase(me, myOvr, beaten = []) {
     }
     return kept;
   });
+
   const opponents = [];
   pots.forEach((pot, pi) => {
-    const two = shuffleArr([...pot]).slice(0, 2);
-    two.forEach((club, k) => opponents.push({ ...club, pot: pi + 1, home: k === 0 }));
+    shuffleArr([...pot]).slice(0, 2)
+      .forEach((club, k) => opponents.push({ ...club, pot: pi + 1, home: k === 0 }));
   });
   const matches = shuffleArr(opponents).map(o => {
     const m = simulateMatchV2(me, euTeam(o), o.home);
     m.pot = o.pot; m.flag = o.flag; m.ovr = o.ovr; m.cid = o.id;
     return m;
   });
+  try { simulatePlayerStats(matches); } catch (e) {}
 
   // The other 35 clubs never play a ball. Their points come from the same
   // closed-form estimator that already fills the Israeli league table, over the
   // same eight matches — order from the xG model, spacing conventionalised, and
   // a form swing per club so the table is not identical every campaign.
-  const field = pots.flat().map(c => ({ ...c, ...euLines(c.ovr) }));
+  const field = pots.flat().map(x => ({ ...x, ...euLines(x.ovr) }));
   const est = simTableEstimateV2([...field, { ...me, name: 'me' }], 8);
-  const myPts = matches.reduce((s, m) => s + (m.outcome === 'W' ? 3 : m.outcome === 'D' ? 1 : 0), 0);
+  const pts = matches.reduce((s, m) => s + (m.outcome === 'W' ? 3 : m.outcome === 'D' ? 1 : 0), 0);
 
-  const table = field.map((c, i) => ({ name: c.name, flag: c.flag, cid: c.id, pts: est[i], us: false }));
-  table.push({ name: 'הקבוצה שלי', flag: '🇮🇱', pts: myPts, us: true, ovr: myOvr });
+  const table = field.map((x, i) => ({ name: x.name, flag: x.flag, cid: x.id, pts: est[i], us: false }));
+  table.push({ name: 'הקבוצה שלי', flag: '🇮🇱', pts, us: true, ovr: c.ovr });
   // Ties always favour the player — the same rule the league table uses.
   table.sort((a, b) => b.pts - a.pts || (a.us ? -1 : b.us ? 1 : 0));
 
-  const rank = table.findIndex(t => t.us) + 1;
-  return { matches, table, rank, pts: myPts };
+  c.league = { matches, table, rank: table.findIndex(t => t.us) + 1, pts };
+
+  // The sandbox can dictate where you finished. Reaching the knockouts honestly
+  // is a ~3% run even with a perfect draft, so without this the entire second
+  // half of the mode is untestable by playing it. The row is MOVED rather than
+  // renumbered, so the table still reads top to bottom.
+  const forced = typeof euForcedRank === 'function' ? euForcedRank() : null;
+  if (forced && forced >= 1 && forced <= 36) {
+    const mine = table.splice(table.findIndex(t => t.us), 1)[0];
+    table.splice(forced - 1, 0, mine);
+    c.league.rank = forced;
+  }
+  euSave(c);
+  return c.league;
 }
 
-const EU_BANDS = [
-  { max: 8,  id: 'r16',    label: '🏆 עלית ישירות לשמינית הגמר',  note: 'שמונה הראשונות עוקפות את הפלייאוף.' },
-  { max: 24, id: 'po',     label: '✅ עלית לפלייאוף הנוקאאוט',      note: 'מקומות 9-24 משחקים סיבוב נוסף על מקום בשמינית.' },
-  { max: 36, id: 'out',    label: '❌ סיימת מחוץ לתמונה',           note: 'מקומות 25-36 נגמרו להם באירופה.' },
-];
-function euBand(rank) { return EU_BANDS.find(b => rank <= b.max); }
-
-/* ── the campaign ─────────────────────────────────────────────────────────── */
-function euBuildCampaign() {
-  let me = myLineRatings();
-  if (typeof euForcedLines === 'function') me = euForcedLines(me);
-  const c = { v: 1, ovr: me.ovr, lines: { atk: me.atk, mid: me.mid, def: me.def, gk: me.gk },
-              qual: [], eliminatedAt: null, league: null };
-  const beaten = [];
-  for (let i = 0; i < EU_ROUNDS.length; i++) {
-    const r = EU_ROUNDS[i];
-    const forced = typeof euForcedClub === 'function' ? euForcedClub(i) : null;
-    const club = { ...(forced || r.clubs[Math.floor(Math.random() * r.clubs.length)]),
-                   round: r.round, roundLong: r.roundLong };
-    const want = typeof euForcedOutcome === 'function' ? euForcedOutcome(i) : null;
-    const tie = euPlayTie(me, club, want);
-    c.qual.push(tie);
-    if (!tie.won) { c.eliminatedAt = i; break; }
-    beaten.push(tie.name);
-  }
-  // A club you knocked out in July cannot be waiting for you in September. That
-  // is why Salzburg and Crvena Zvezda were kept out of the pots by hand; doing it
-  // from the tie you actually played covers every draw, including Celtic, who
-  // sits in pot 3 as well as the play-off.
-  if (c.eliminatedAt === null) c.league = euDrawLeaguePhase(me, me.ovr, beaten);
-
-  // Scorers, so a European row reads like a league row. Same helper the season
-  // uses, so the names come from the XI that actually played.
-  const all = [];
-  c.qual.forEach(t => { all.push(...t.legs); });
-  if (c.league) all.push(...c.league.matches);
-  try { simulatePlayerStats(all); } catch (e) {}
-  return c;
+/* ── the road ─────────────────────────────────────────────────────────────── */
+// The ladder as the screen wants it: every knockout round from where you entered
+// to the final, each either won, current, or still to come.
+function euRoad(c) {
+  const done = c.ties.filter(t => t.kind === 'ko');
+  return EU_KO.filter((k, i) => !(c.seeded && i === 0)).map(k => {
+    const t = done.find(x => x.roundId === k.id);
+    const cur = c.cur && c.cur.roundId === k.id;
+    const at = EU_KO.findIndex(x => x.id === k.id);
+    return {
+      id: k.id, round: k.round, roundLong: k.roundLong,
+      state: t ? (t.won ? 'won' : 'lost') : (cur || c.koi === at ? 'now' : 'todo'),
+      tie: t || (cur ? c.cur : null),
+    };
+  });
 }
 
 /* ── achievements ─────────────────────────────────────────────────────────── */
-// Sent once, when the campaign is built. There is no run table behind this: a
-// European summer is not a leaderboard, it is something that either happened to
-// your season or did not, so only the badges are recorded.
+// Reported after every completed tie, not once at the end.
+//
+// v1 sent this a single time, when the campaign was built — which worked only
+// because the campaign was built complete. In a sequence there is no such moment,
+// and a player who closes the tab three rounds deep would never report at all.
+// The gauntlet learned this the hard way: its board read 0/8 for weeks because a
+// run only reported itself when it ENDED, and the only runs that end quickly are
+// the ones that die at the first whistle.
+//
+// Sending is cheap and the server clamps everything, so the guard is simply "has
+// anything new happened since the last send".
 async function euSubmit(c) {
-  if (c.submitted) return;
-  c.submitted = true;
-  // a sandbox 👑 שמינית הגמר is not an achievement
-  if (typeof euSandboxActive === 'function' && euSandboxActive()) return;
-  // the campaign is simulated the moment it is built, so this IS the run —
-  // recorded whether or not anyone is signed in, unlike the badges below
-  if (typeof track === 'function') {
-    track('finish', 'europe', c.league ? String(c.league.rank) : 'qual');
+  if (c.sandbox) return;                 // a sandbox 👑 שמינית הגמר is not an achievement
+  const done = c.ties.length + (c.league ? 1 : 0) + (c.result ? 1 : 0);
+  if (done <= (c.submitted || 0)) return;
+  c.submitted = done;
+
+  // the campaign IS the run, recorded whether or not anyone is signed in
+  if (typeof track === 'function' && c.result) {
+    track('finish', 'europe', c.result === 'won' ? 'trophy'
+                            : c.league ? String(c.league.rank) : 'qual');
   }
   if (typeof getCurrentUser !== 'function' || !getCurrentUser()) return;
+
   const L = c.league;
+  const ko = c.ties.filter(t => t.kind === 'ko');
   const giant = !!(L && L.matches.some(m => m.outcome === 'W' && m.ovr >= 96));
   // a tie survived without conceding over BOTH legs, extra time included
-  const clean = c.qual.some(t => t.won &&
+  const clean = c.ties.some(t => t.won &&
     t.legs.reduce((n, l) => n + l.ga, 0) + (t.et ? t.et.ga : 0) === 0);
   try {
     const r = await _supabase.rpc('submit_europe_run', {
       p: {
-        won_ties: c.qual.filter(t => t.won).length,
+        won_ties: c.ties.filter(t => t.kind === 'q' && t.won).length,
         rank: L ? L.rank : 0,
         points: L ? L.pts : 0,
         beat_giant: giant,
         clean_tie: clean,
+        // New with the knockouts. The live function ignores unknown keys, so
+        // these are inert until the migration that reads them is applied.
+        ko_won: ko.filter(t => t.won).length,
+        reached_final: ko.some(t => t.roundId === 'final'),
+        trophy: c.result === 'won',
       },
     });
     // pop the toast for whatever the run just earned, same as everywhere else
@@ -340,7 +457,8 @@ async function euSubmit(c) {
 
 /* ── persistence ──────────────────────────────────────────────────────────── */
 // The campaign lives beside the season inside the saved draft, so a refresh
-// shows the campaign you played rather than rolling a new one.
+// shows the campaign you played rather than rolling a new one. A new season
+// deletes it — see the save path in js/game.js, which also clears the cache here.
 function euSave(c) {
   try {
     const raw = localStorage.getItem(DRAFT_SAVE_KEY);
@@ -350,10 +468,12 @@ function euSave(c) {
     localStorage.setItem(DRAFT_SAVE_KEY, JSON.stringify(d));
   } catch (e) {}
 }
+// A v1 campaign is not migrated. It belongs to a season that has already been
+// played to its end, and the shapes have nothing in common.
 function euLoad() {
   try {
     const d = JSON.parse(localStorage.getItem(DRAFT_SAVE_KEY));
-    return d && d[EU_KEY] && d[EU_KEY].v === 1 ? d[EU_KEY] : null;
+    return d && d[EU_KEY] && d[EU_KEY].v === EU_SAVE_V ? d[EU_KEY] : null;
   } catch (e) { return null; }
 }
 function euClear() {
@@ -375,150 +495,13 @@ function euText(key, def) {
   return (typeof siteText === 'function' ? siteText(key, def) : def) || def;
 }
 
-// A badge, falling back to the flag emoji if we do not have that club's crest.
-// Written as a sibling rather than a background-image so the fallback is one
-// onerror away and never leaves an empty box.
-function euCrest(cid, flag) {
-  const f = `<span class="eu-mini-flag">${flag || ''}</span>`;
-  // `.eu-mini-flag` is hidden until a badge next to it fails, so a club with no
-  // badge at all needs the visible variant or it shows nothing — which is
-  // exactly how Manchester City and Girona ended up with an empty gap.
-  if (!cid) return `<span class="eu-mini-flag shown">${flag || ''}</span>`;
-  // The flag is always in the markup, hidden by CSS while the badge is intact.
-  // A broken badge only has to add a class to itself — no quoting a fallback
-  // element inside an onerror inside an attribute inside a template literal,
-  // which is exactly how the first attempt shipped a literal backslash.
-  return `<img class="eu-mini-crest" src="crests/eu/${cid}.png" alt="" loading="lazy" onerror="this.classList.add('missing')">` + f;
-}
-
-/* ── the screen ───────────────────────────────────────────────────────────── */
+/* ── entry ────────────────────────────────────────────────────────────────── */
 function euStart() {
   if (!state.picks || !state.picks.some(Boolean)) return;
   _euCampaign = _euCampaign || euLoad();
-  const fresh = !_euCampaign;
-  if (fresh) { _euCampaign = euBuildCampaign(); euSave(_euCampaign); euSubmit(_euCampaign); }
+  if (!_euCampaign) { _euCampaign = euBuildCampaign(); euSave(_euCampaign); }
   showScreen('europe');
   const back = document.getElementById('eu-back');
-  if (back) back.onclick = () => showScreen('results');
-  euRender(fresh);
-}
-
-function euMatchRowHTML(m, label) {
-  const rc = m.outcome === 'W' ? 'win' : m.outcome === 'D' ? 'draw' : 'loss';
-  const rl = m.outcome === 'W' ? 'נ' : m.outcome === 'D' ? 'ת' : 'ה';
-  const scorers = (m.scorers && m.scorers.length)
-    ? `<div class="mr-scorers">⚽ ${m.scorers.map(s => `${s.n} ${s.min}'`).join(' · ')}</div>` : '';
-  return `
-    <div class="match-row ${rc}">
-      <div class="mr-main">
-        <span class="mr-badge ${rc}">${rl}</span>
-        <span class="mr-opponent">${label} <span class="mr-venue">${m.home ? '(ב)' : '(ח)'}</span></span>
-        <span class="mr-score" dir="ltr">${m.gf}-${m.ga}</span>
-      </div>
-      ${scorers}
-    </div>`;
-}
-
-function euTieHTML(t) {
-  const extra = [];
-  if (t.et) extra.push(`הארכה <bdi dir="ltr">${t.et.gf}-${t.et.ga}</bdi>`);
-  if (t.pens) extra.push(`פנדלים <bdi dir="ltr">${t.pens.gf}-${t.pens.ga}</bdi>`);
-  return `
-    <div class="eu-tie ${t.won ? 'won' : 'lost'}">
-      <div class="eu-tie-head">
-        <img class="eu-tie-crest" src="crests/eu/${t.id}.png" alt=""
-             onerror="this.style.visibility='hidden'">
-        <span class="eu-tie-name">${t.name}
-          <span class="eu-tie-sub">${t.flag} ${t.country} · ${t.round}</span></span>
-        <span class="eu-tie-ovr">${t.ovr}</span>
-      </div>
-      <div class="eu-tie-desc">${euText('gt-' + t.id, '')}</div>
-      <div class="eu-tie-scout" dir="ltr">GK ${t.lines.gk} · DEF ${t.lines.def} · MID ${t.lines.mid} · ATK ${t.lines.atk}</div>
-      ${euMatchRowHTML(t.legs[0], t.name)}
-      ${euMatchRowHTML(t.legs[1], t.name)}
-      <div class="eu-agg">
-        <span class="eu-agg-lbl">מצטבר</span>
-        <span class="eu-agg-val" dir="ltr">${t.agg.gf}-${t.agg.ga}</span>
-        ${extra.length ? `<span class="eu-agg-extra">${extra.join(' · ')}</span>` : ''}
-        <span class="eu-agg-res">${t.won ? '✅ עולה' : '❌ נעצרת כאן'}</span>
-      </div>
-    </div>`;
-}
-
-function euTableHTML(table) {
-  return table.map((t, i) => {
-    const sep = (i === 8 || i === 24) ? '<div class="lt-bracket-sep"></div>' : '';
-    const name = t.us
-      ? `<span class="lt-name">הקבוצה שלי <span class="lt-us-badge">#${i + 1}</span></span>`
-      : `<span class="lt-name">${euCrest(t.cid, t.flag)} ${t.name}</span>`;
-    return `${sep}<div class="lt-row${t.us ? ' lt-us' : ''}">
-      <span class="lt-pos">${i + 1}</span>${name}
-      <span class="lt-pts" dir="ltr">${t.pts}</span></div>`;
-  }).join('');
-}
-
-function euRender(animate) {
-  const c = _euCampaign, body = document.getElementById('eu-body');
-  if (!c || !body) return;
-  const won = c.qual.filter(t => t.won).length;
-
-  const head = `
-    <div class="eu-head">
-      <div class="eu-kicker">${euText('eu-kicker', 'אלופת ישראל · הקיץ שאחרי')}</div>
-      <div class="eu-title">🇪🇺 ${euText('eu-title', 'מוקדמות ליגת האלופות')}</div>
-      <p class="eu-sub">${euText('eu-sub', 'ארבעה סיבובים, כל אחד בית וחוץ. ההרכב שלך משחק כמו שהוא -')}
-        <bdi dir="ltr">${c.ovr}</bdi> ${euText('eu-sub-tail', 'מול אירופה.')}</p>
-    </div>`;
-
-  const ties = c.qual.map(euTieHTML).join('');
-
-  let tail = '';
-  if (c.eliminatedAt !== null) {
-    const t = c.qual[c.eliminatedAt];
-    tail = `
-      <div class="eu-verdict out">
-        <div class="eu-verdict-t">${euText('eu-out-title', 'נעצרת ב')}${euText('eu-round-' + t.id, t.roundLong || t.round)}</div>
-        <p>${t.name} ${euText('eu-out-body', 'עברה במצבר')} <bdi dir="ltr">${t.agg.ga}-${t.agg.gf}</bdi>.
-           ${euText('eu-out-tail-a', 'עברת')} ${won} ${euText('eu-out-tail-b', 'מתוך 4 סיבובים - הקיץ נגמר.')}</p>
-      </div>`;
-  } else {
-    const L = c.league, band = euBand(L.rank);
-    tail = `
-      <div class="eu-verdict in">
-        <div class="eu-verdict-t">🏆 ${euText('eu-in-title', 'עלית לשלב הליגה של ליגת האלופות!')}</div>
-        <p>${euText('eu-in-body', 'רד בול זלצבורג נשארת מאחור. אין יותר מוקדמות.')}</p>
-      </div>
-      <div class="eu-phase">
-        <div class="eu-phase-t">${euText('eu-phase-t', 'שלב הליגה')}</div>
-        <p class="eu-phase-sub">${euText('eu-phase-sub', 'שמונה משחקים מול שמונה יריבות שונות - שתיים מכל דרג, אחת בבית ואחת בחוץ.')}</p>
-      </div>
-      ${L.matches.map(m => euMatchRowHTML(m, `${euCrest(m.cid, m.flag)} ${m.opponent} <span class="mr-pot">דרג ${m.pot} · ${m.ovr}</span>`)).join('')}
-      <div class="eu-phase">
-        <div class="eu-phase-t">${euText('eu-table-t', 'טבלת שלב הליגה')}</div>
-        <p class="eu-phase-sub">${euText('eu-table-sub', '36 קבוצות, 8 מחזורים. הקו הראשון הוא השמינית, השני הוא הפלייאוף.')}</p>
-      </div>
-      <div class="eu-table">${euTableHTML(L.table)}</div>
-      <div class="eu-verdict ${band.id === 'out' ? 'out' : 'in'}">
-        <div class="eu-verdict-t">${euText('eu-band-' + band.id, band.label)}</div>
-        <p>${euText('eu-rank-a', 'מקום')} <bdi dir="ltr">${L.rank}</bdi>
-           ${euText('eu-rank-b', 'מתוך 36 עם')} <bdi dir="ltr">${L.pts}</bdi>
-           ${euText('eu-rank-c', 'נקודות.')} ${euText('eu-band-note-' + band.id, band.note)}</p>
-      </div>`;
-  }
-
-  body.innerHTML = head + ties + tail +
-    `<button class="btn-secondary btn-full" id="eu-done">← ${euText('eu-back', 'חזרה לתוצאות העונה')}</button>` +
-    (typeof euAdminHTML === 'function' ? euAdminHTML() : '');
-  if (typeof euWireAdmin === 'function') euWireAdmin(body);
-  const done = body.querySelector('#eu-done');
-  if (done) done.onclick = () => showScreen('results');
-
-  // A fresh campaign is worth watching arrive; a revisit is not.
-  if (animate) {
-    const blocks = body.querySelectorAll('.eu-tie, .match-row, .eu-verdict, .eu-phase, .eu-table');
-    blocks.forEach((el, i) => {
-      el.style.opacity = '0';
-      setTimeout(() => { el.style.transition = 'opacity .35s'; el.style.opacity = '1'; }, 120 * i);
-    });
-  }
+  if (back) back.onclick = () => euLeave();
+  euRender();
 }

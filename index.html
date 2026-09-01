@@ -78,6 +78,7 @@
   <link rel="stylesheet" href="css/gauntlet.css" />
   <link rel="stylesheet" href="css/career.css" />
   <link rel="stylesheet" href="css/minigames.css" />
+  <link rel="stylesheet" href="css/europe.css" />
 </head>
 <body>
 
@@ -839,10 +840,10 @@
   <!-- ══ EUROPE (the season's continuation — not the gauntlet) ════════════════ -->
   <div id="screen-europe" class="screen screen-page">
     <div class="page-inner">
-      <div class="page-header">
-        <button class="back-btn" id="eu-back">→ חזרה לתוצאות</button>
-        <h2 class="page-title">🇪🇺 המסע האירופי</h2>
-      </div>
+      <!-- No page-header here on purpose. The campaign carries its own: title,
+           stage, exit and a progress bar, all in one strip that has to stay put
+           from the first qualifier to the final. A second header above it said
+           the same thing twice and cost the screen its top third. -->
       <div id="eu-body"></div>
     </div>
   </div>
@@ -1012,7 +1013,10 @@
   <script src="js/data.js"></script>
   <script src="js/sim-engine.js"></script>
   <script src="js/game.js"></script>
+  <script src="js/europe-data.js"></script>
+  <script src="js/eu-caps-data.js"></script>
   <script src="js/europe.js"></script>
+  <script src="js/europe-screens.js"></script>
   <script src="js/whatsnew.js"></script>
   <script src="js/europe-admin.js"></script>
   <script src="js/season-admin.js"></script>

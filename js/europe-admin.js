@@ -18,7 +18,7 @@ function euIsAdmin() {
 
 // Forced settings for the NEXT campaign built. Deliberately not persisted: a
 // refresh should hand you the honest game back.
-let _euForce = { pick: [null, null, null, null], result: 'auto', ovr: null };
+let _euForce = { pick: [null, null, null, null], result: 'auto', ovr: null, rank: null };
 
 function euAdminHTML() {
   if (!euIsAdmin()) return '';
@@ -39,10 +39,17 @@ function euAdminHTML() {
         <label>תוצאות</label>
         <select class="gt-admin-in" id="eu-force-res">
           <option value="auto">רגיל - לפי הסימולציה</option>
-          <option value="W">נצח הכל - ישר לשלב הליגה</option>
+          <option value="W">נצח הכל - עד הגביע</option>
+          <option value="Q">נצח את המוקדמות בלבד</option>
           <option value="L1">הפסד בסיבוב הראשון</option>
           <option value="L4">הגע לפלייאוף והפסד בו</option>
+          <option value="LF">הגע לגמר והפסד בו</option>
         </select>
+      </div>
+      <div class="gt-admin-row">
+        <label>מקום בטבלה</label>
+        <input class="gt-admin-in gt-admin-num" id="eu-force-rank" type="number" min="1" max="36"
+               placeholder="לפי המשחקים" value="${_euForce.rank ?? ''}">
       </div>
       <div class="gt-admin-row">
         <label>דירוג ההרכב</label>
@@ -69,6 +76,8 @@ function euWireAdmin(root) {
   if (res) { res.value = _euForce.result; res.onchange = () => (_euForce.result = res.value); }
   const ovr = root.querySelector('#eu-force-ovr');
   if (ovr) ovr.onchange = () => (_euForce.ovr = ovr.value === '' ? null : +ovr.value);
+  const rank = root.querySelector('#eu-force-rank');
+  if (rank) rank.onchange = () => (_euForce.rank = rank.value === '' ? null : +rank.value);
 
   const fill = root.querySelector('#eu-admin-fill');
   if (fill) fill.onclick = () => {
@@ -100,12 +109,25 @@ function euForcedClub(roundIdx) {
 }
 
 // Whether a tie's result is being dictated, and to what. 'auto' means play it.
-function euForcedOutcome(roundIdx) {
+//
+// Keyed by ROUND ID rather than by index, because the ladder now has two rounds
+// numbered zero — the first qualifier and the knockout play-off.
+const EU_QUAL_IDS = ['q1', 'q2', 'q3', 'po'];
+function euForcedOutcome(roundId) {
   if (!euIsAdmin() || _euForce.result === 'auto') return null;
+  const qual = EU_QUAL_IDS.includes(roundId);
   if (_euForce.result === 'W')  return 'W';
-  if (_euForce.result === 'L1') return roundIdx === 0 ? 'L' : 'W';
-  if (_euForce.result === 'L4') return roundIdx === 3 ? 'L' : 'W';
+  if (_euForce.result === 'Q')  return qual ? 'W' : null;    // then play the knockouts honestly
+  if (_euForce.result === 'L1') return roundId === 'q1' ? 'L' : 'W';
+  if (_euForce.result === 'L4') return roundId === 'po' ? 'L' : 'W';
+  if (_euForce.result === 'LF') return roundId === 'final' ? 'L' : 'W';
   return null;
+}
+
+// Where the league phase says you finished. Null means "wherever the eight
+// matches put you", which is what a real campaign does.
+function euForcedRank() {
+  return euIsAdmin() ? _euForce.rank : null;
 }
 
 // A forced squad rating, applied on top of the real XI's line ratings so the
@@ -118,5 +140,5 @@ function euForcedLines(me) {
 
 function euSandboxActive() {
   return euIsAdmin() && (_euForce.result !== 'auto' || _euForce.ovr != null ||
-                         _euForce.pick.some(p => p != null));
+                         _euForce.rank != null || _euForce.pick.some(p => p != null));
 }
