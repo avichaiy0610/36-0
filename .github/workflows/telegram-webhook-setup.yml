@@ -20,10 +20,12 @@ on:
   workflow_dispatch:
     inputs:
       mode:
+        # Quoted, because YAML reads a bare on/off as a boolean and GitHub then
+        # rejects "on" as not being one of the allowed values.
         description: 'on = webhook (instant taps) · off = back to polling · info = just report'
         type: choice
-        options: [on, off, info]
-        default: on
+        options: ['on', 'off', 'info']
+        default: 'on'
 
 jobs:
   setup:
