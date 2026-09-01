@@ -126,14 +126,25 @@
       blurb: 'כישרון צעיר בלי עבר בליגה. או שהוא מתפוצץ, או שהוא לא.',
       slot: weakestIdx,
       band: cur => [cur - 9, cur + 16],
+      // The name has to be true. Without this the draw was happy to hand you a
+      // keeper in his best season and call him a prospect — the whole point is
+      // a player the data itself says was not finished yet, so the season on
+      // offer must sit well below his career peak.
+      filter: c => (c.player.peak_ovr || 0) - c.player.ovr >= 5,
+      // In peak mode every player IS finished, so the premise cannot hold and
+      // the scenario steps aside rather than lying.
+      unless: () => !!state.peakMode,
     },
   ];
 
-  function drawScenario() {
-    const total = SCENARIOS.reduce((s, x) => s + x.weight, 0);
+  function drawScenario(exclude) {
+    const live = SCENARIOS.filter(s =>
+      !(s.unless && s.unless()) && !(exclude && exclude.has(s.key)));
+    if (!live.length) return null;
+    const total = live.reduce((s, x) => s + x.weight, 0);
     let r = Math.random() * total;
-    for (const s of SCENARIOS) { if ((r -= s.weight) <= 0) return s; }
-    return SCENARIOS[0];
+    for (const s of live) { if ((r -= s.weight) <= 0) return s; }
+    return live[0];
   }
 
   /* ── the plan ────────────────────────────────────────────────────────────── */
@@ -141,26 +152,37 @@
   // continuation is simulated, so both branches are computed against a fixed
   // outcome. The player still sees nothing until they have committed.
   function janPlan() {
-    const scenario = drawScenario();
-    const idx = scenario.slot();
-    if (idx == null || idx < 0 || !state.picks[idx]) return null;
+    // A scenario that cannot be honoured hands over to another one rather than
+    // being honoured loosely. That is the difference between "no youngster was
+    // available" and calling a keeper in his best season a youngster.
+    const tried = new Set();
+    let scenario, idx, incoming, cur;
+    for (let attempt = 0; attempt < SCENARIOS.length; attempt++) {
+      scenario = drawScenario(tried);
+      if (!scenario) return null;
+      tried.add(scenario.key);
 
-    const outgoing = state.picks[idx];
-    const cur = ovrOf(outgoing.player);
-    const [lo, hi] = scenario.band(cur);
+      idx = scenario.slot();
+      if (idx == null || idx < 0 || !state.picks[idx]) continue;
+      cur = ovrOf(state.picks[idx].player);
+      const [lo, hi] = scenario.band(cur);
 
-    // Candidates that both fit the slot and land in the band. The band is
-    // widened rather than abandoned if nothing fits — a window that silently
-    // does nothing is worse than one that offers a smaller swing.
-    const pool = janPool().filter(c => janFits(c, idx));
-    if (!pool.length) return null;
-    let inBand = pool.filter(c => { const o = ovrOf(c.player); return o >= lo && o <= hi; });
-    for (let grow = 3; !inBand.length && grow <= 15; grow += 3) {
-      inBand = pool.filter(c => { const o = ovrOf(c.player); return o >= lo - grow && o <= hi + grow; });
+      // Candidates that fit the slot, satisfy whatever the scenario claims about
+      // them, and land in the band. The band is widened rather than abandoned if
+      // nothing fits — a window that silently does nothing is worse than one
+      // that offers a smaller swing. The scenario's own filter is NEVER relaxed.
+      const pool = janPool().filter(c => janFits(c, idx) && (!scenario.filter || scenario.filter(c)));
+      if (!pool.length) continue;
+      let inBand = pool.filter(c => { const o = ovrOf(c.player); return o >= lo && o <= hi; });
+      for (let grow = 3; !inBand.length && grow <= 15; grow += 3) {
+        inBand = pool.filter(c => { const o = ovrOf(c.player); return o >= lo - grow && o <= hi + grow; });
+      }
+      if (!inBand.length) inBand = pool;
+      incoming = inBand[Math.floor(Math.random() * inBand.length)];
+      break;
     }
-    if (!inBand.length) inBand = pool;
-
-    const incoming = inBand[Math.floor(Math.random() * inBand.length)];
+    if (!incoming) return null;
+    const outgoing = state.picks[idx];
     return {
       key: scenario.key,
       title: scenario.title,
