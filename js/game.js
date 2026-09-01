@@ -2162,7 +2162,22 @@ function simulateMatch(me, opp, homeOverride = null, engine = 1) {
   return simulateMatchV1(typeof me === 'number' ? me : me.ovr, opp, homeOverride);
 }
 
-function generateMatches(me, oppTeams = IL_TEAMS_SIM, spec = MODERN_FORMAT, engine = 1) {
+// Plays a regular phase, optionally pausing at the halfway mark.
+//
+// halfHook(firstHalf, me) is called once, after exactly half the fixtures, and
+// whatever it returns (if anything) becomes the rating for the rest. It is
+// SYNCHRONOUS on purpose: the player's decision is taken before the season is
+// generated, and the hook only applies it, so nothing here has to await.
+function simulateRegularPhase(pool, me, engine, halfHook) {
+  if (!halfHook) return { list: pool.map(opp => simulateMatch(me, opp, null, engine)) };
+  const half  = Math.floor(pool.length / 2);
+  const first = pool.slice(0, half).map(opp => simulateMatch(me, opp, null, engine));
+  const me2   = halfHook(first, me);
+  const rest  = pool.slice(half).map(opp => simulateMatch(me2 ?? me, opp, null, engine));
+  return { list: [...first, ...rest], me2: me2 ?? me, firstHalf: first };
+}
+
+function generateMatches(me, oppTeams = IL_TEAMS_SIM, spec = MODERN_FORMAT, engine = 1, halfHook = null) {
   const ovr = typeof me === 'number' ? me : me.ovr;
   // One form swing for the whole campaign, drawn before any match. V1 never had
   // this and is left alone; its results are frozen.
@@ -2170,8 +2185,17 @@ function generateMatches(me, oppTeams = IL_TEAMS_SIM, spec = MODERN_FORMAT, engi
   if (!isModernSpec(spec)) return generateAuthenticMatches(me, oppTeams, spec, engine);
   // ── שלב הליגה: 26 משחקים (13 יריבים × בית + חוץ) ───────────────────────────
   const regPool    = shuffleArr([...oppTeams, ...oppTeams]);
-  const regMatches = regPool.map(opp => simulateMatch(me, opp, null, engine));
-  const regPts     = regMatches.reduce((s, m) => s + (m.outcome === 'W' ? 3 : m.outcome === 'D' ? 1 : 0), 0);
+  // The January window needs the season to STOP halfway, and a season that is
+  // computed in one call cannot stop. So the regular phase is played in two
+  // halves with a seam between them: `halfHook` is handed the first half and may
+  // return a NEW `me` for the second, which is how a transfer takes effect.
+  //
+  // With no hook the two slices consume the RNG in exactly the order one .map()
+  // did, so every existing league, challenge and duel result is untouched —
+  // scripts/sim/golden-v1.js is the proof, not the intention.
+  const regMatches = simulateRegularPhase(regPool, me, engine, halfHook);
+  if (regMatches.me2 !== undefined) me = regMatches.me2;
+  const regPts     = regMatches.list.reduce((s, m) => s + (m.outcome === 'W' ? 3 : m.outcome === 'D' ? 1 : 0), 0);
 
   // Estimate opponent regular-season pts to determine which playoff bracket we land in
   const avgOppOvr = Math.round(oppTeams.reduce((s, t) => s + t.ovr, 0) / oppTeams.length);
@@ -2209,7 +2233,7 @@ function generateMatches(me, oppTeams = IL_TEAMS_SIM, spec = MODERN_FORMAT, engi
   const champOpponents = inTopSix ? sortedTeams.slice(0, 5) : sortedTeams.slice(0, 6);
   const relegOpponents = inTopSix ? sortedTeams.slice(5)    : sortedTeams.slice(6);
 
-  return { matches: [...regMatches, ...playoffMatches], inTopSix, champOpponents, relegOpponents, format: 'modern' };
+  return { matches: [...regMatches.list, ...playoffMatches], inTopSix, champOpponents, relegOpponents, format: 'modern' };
 }
 
 // ─── Authentic historical formats ─────────────────────────────────────────────
