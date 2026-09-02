@@ -529,13 +529,24 @@ function playerPositions(player) {
   return [...new Set(all)];
 }
 
+// Which position a slot RECRUITS for. A tactic relabels one central slot as a
+// CAM or a CDM and moves it up or down the pitch, but leaves `pos` as CM so the
+// simulation keeps scoring the centre as the centre and the tactic's own ±3/∓1
+// is not counted twice. That is right for the rating and wrong for the DRAFT:
+// the pitch said "קשר התקפי" while COMPAT.CM quietly accepted a holding
+// midfielder. The shape is a promise, so the slot recruits for what it shows.
+function slotFitPos(slot) {
+  if (!slot) return slot;
+  return typeof slot === 'string' ? slot : (slot.role || slot.pos);
+}
+
 function playerFitsSlot(player, slotPos) {
   const compat = COMPAT[slotPos] ?? [slotPos];
   return playerPositions(player).some(p => compat.includes(p));
 }
 
 function compatibleEmptySlots(player) {
-  return emptySlotIndices().filter(i => playerFitsSlot(player, state.slots[i].pos));
+  return emptySlotIndices().filter(i => playerFitsSlot(player, slotFitPos(state.slots[i])));
 }
 
 // `ovrAt` lets a caller price the same XI on its own terms — the gauntlet passes
@@ -1573,9 +1584,9 @@ function handleMoveClick(slotIdx) {
       restoreAfterMove();
       return;
     }
-    const validTarget = playerFitsSlot(state.picks[fromIdx].player, state.slots[slotIdx].pos);
+    const validTarget = playerFitsSlot(state.picks[fromIdx].player, slotFitPos(state.slots[slotIdx]));
     const validSwap = !state.picks[slotIdx] ||
-      playerFitsSlot(state.picks[slotIdx].player, state.slots[fromIdx].pos);
+      playerFitsSlot(state.picks[slotIdx].player, slotFitPos(state.slots[fromIdx]));
     if (!validTarget || !validSwap) {
       if (state.picks[slotIdx]) { handleMoveClick(slotIdx); return; } // switch selection to the clicked player
       clearAllHighlights();
@@ -1940,7 +1951,7 @@ function handleSlotClick(slotIdx) {
   }
 
   if (state.selectedPlayer) {
-    if (playerFitsSlot(state.selectedPlayer, state.slots[slotIdx].pos)) {
+    if (playerFitsSlot(state.selectedPlayer, slotFitPos(state.slots[slotIdx]))) {
       assignPlayer(slotIdx, state.selectedPlayer);
     } else {
       setHint('⚠ שחקן זה לא יכול לשחק בעמדה זו');
@@ -1960,7 +1971,8 @@ function handleSlotClick(slotIdx) {
 
   state.selectedSlotIdx = slotIdx; clearAllHighlights();
   setTokenHighlight(slotIdx, 'selected');
-  const compat = COMPAT[state.slots[slotIdx].pos] ?? [state.slots[slotIdx].pos];
+  const fitPos = slotFitPos(state.slots[slotIdx]);
+  const compat = COMPAT[fitPos] ?? [fitPos];
   document.querySelectorAll('.player-card').forEach(card => {
     if (card.classList.contains('card-unavailable')) return;
     const fits = card.dataset.pos.split(',').some(p => compat.includes(p));

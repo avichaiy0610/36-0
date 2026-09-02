@@ -62,7 +62,7 @@
   }
 
   function janFits(cand, slotIdx) {
-    const pos = state.slots[slotIdx].pos;
+    const pos = (typeof slotFitPos === 'function') ? slotFitPos(state.slots[slotIdx]) : state.slots[slotIdx].pos;
     return (typeof playerFitsSlot === 'function') ? playerFitsSlot(cand.player, pos) : true;
   }
 

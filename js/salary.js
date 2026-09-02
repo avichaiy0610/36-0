@@ -204,7 +204,7 @@
     const signed = [];
     state.picks.forEach((pick, i) => {
       if (pick) return;
-      const fa = salFreeAgent(state.slots[i] ? state.slots[i].pos : null, taken);
+      const fa = salFreeAgent(state.slots[i] ? (typeof slotFitPos === 'function' ? slotFitPos(state.slots[i]) : state.slots[i].pos) : null, taken);
       if (!fa) return;
       state.picks[i] = fa;
       taken.add(fa.player.name);
