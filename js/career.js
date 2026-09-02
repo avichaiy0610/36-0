@@ -656,6 +656,26 @@ function crBeginDraftWithKept(picks) {
 /* ── end of season ────────────────────────────────────────────────────────── */
 // Called from animateResults for every season it renders — including the replay
 // after a refresh, which is why recording is keyed by year and runs once.
+// The 🇪🇺 on a season row used to be `europe: champion` — written when winning
+// the league was the only way in. It has not been the only way for two versions:
+// second and third qualify, fourth can, and the cup winner takes a place from
+// wherever he finished. So a season that reached Europe on merit showed nothing,
+// and the history quietly under-reported the dynasty.
+//
+// It is recorded here rather than in crOnSeasonEnd because crOnSeasonEnd cannot
+// know the answer: it runs during the reveal, and the cup final is the LAST seam
+// of the season. This is called once the allocation is genuinely settled.
+function crRecordEurope(year, alloc) {
+  if (!crHasRun()) return;
+  const run = crRun();
+  const h = run.history.find(x => x.year === year);
+  if (!h) return;
+  const val = alloc ? (alloc.tier || true) : false;
+  if (h.europe === val) return;
+  h.europe = val;
+  crSave();
+}
+
 function crOnSeasonEnd(res) {
   const btn = document.getElementById('btn-career-next');
   if (btn) btn.style.display = 'none';
@@ -673,6 +693,9 @@ function crOnSeasonEnd(res) {
       points: res.wins * 3 + res.draws,
       wins: res.wins, draws: res.draws, losses: res.losses,
       gf: res.gf, ga: res.ga, ovr: res.ovr,
+      // A provisional answer: when this runs the cup final has not been played,
+      // and the cup gives out a European place. crRecordEurope corrects it the
+      // moment the allocation is actually settled.
       champion, europe: champion,
     });
     if (champion) run.titles++;

@@ -3110,7 +3110,13 @@ function animateResults(ovr) {
     // submitted flag. This is the first moment BOTH halves are known, so the
     // allocation and the achievements are settled here instead.
     if (typeof cupFinish === 'function') cupFinish();
-    if (myRank) wireEuropeButton(myRank, leagueTable);
+    if (myRank) {
+      wireEuropeButton(myRank, leagueTable);
+      // and the career's own record of it — same answer, same moment
+      if (state.career && typeof crRecordEurope === 'function') {
+        crRecordEurope(state.career.year, euAllocationFor(myRank, leagueTable));
+      }
+    }
     setEl('res-wins', wins); setEl('res-draws', draws); setEl('res-losses', losses);
     setEl('res-points', wins*3+draws); setEl('res-gf', gfTotal); setEl('res-ga', gaTotal);
 
