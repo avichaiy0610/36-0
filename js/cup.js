@@ -246,6 +246,10 @@
     document.querySelectorAll('.cup-wrap').forEach(e => e.remove());
   }
 
+  // What the opponent is, never what he is worth. A number over the badge tells
+  // you the result before the ninety minutes do, and a cup tie whose ending you
+  // can read off the team sheet is not a cup tie. The division is context; the
+  // rating was the answer.
   const TIER_NAME = ['ליגת העל', 'ליגה לאומית', "ליגה א'"];
 
   function cupShowMatch(i, tie, resume) {
@@ -271,7 +275,7 @@
       <div class="cup-top">
         <span class="cup-side">${siteTextOr('cup-you', 'ההרכב שלי')}</span>
         <span class="cup-score" dir="ltr"><b id="cup-them">0</b> – <b id="cup-me">0</b></span>
-        <span class="cup-side">${opp.name}<i>${TIER_NAME[opp.tier]} · ${opp.ovr}</i></span>
+        <span class="cup-side">${opp.name}<i>${TIER_NAME[opp.tier]}</i></span>
       </div>
       <div class="cup-clock"><span id="cup-min">0</span>' · ${atHome ? 'בית' : 'חוץ'}</div>
       <div class="cup-bar"><span id="cup-bar"></span></div>
@@ -361,8 +365,19 @@
   // modal the player did not ask for and the skip cannot dismiss.
   function cupSkipRound(roundId) {
     const i = CUP_ROUNDS.findIndex(r => r.id === roundId);
-    if (i < 0 || !_run) return;
+    // through cupState(), not `_run`: after a refresh the module has not loaded
+    // the save yet, and reading `_run` directly made the skip a silent no-op.
+    if (i < 0 || !cupState()) return;
     cupEnsure(i);
+  }
+
+  // Play out whatever is left of the bracket, silently. A season restored by a
+  // refresh has no seams to open, so without this the cup stays half-played and
+  // everything read off it — the European seat, the badges, the champion on the
+  // bracket — belongs to a competition that never finished.
+  function cupFinish() {
+    if (!cupState()) return;
+    cupEnsure(CUP_ROUNDS.length - 1);
   }
 
   /* ── the bracket ───────────────────────────────────────────────────────────
@@ -448,6 +463,11 @@
      finished. The double needs both. */
   async function cupSubmit(rank) {
     if (!cupState() || _run.submitted) return;
+    // Not until somebody has actually lifted it. The final is the last seam of
+    // the season, so an earlier caller sees a bracket still in progress — and
+    // submitting there reported "did not win the cup" AND set the flag below,
+    // which is how a genuine double went unbadged.
+    if (!_run.champion) return;
     _run.submitted = true;
     cupSave();
     if (typeof getCurrentUser !== 'function' || !getCurrentUser()) return;
@@ -515,6 +535,7 @@
   global.cupShowBracket = cupShowBracket;
   global.cupMountButton = cupMountButton;
   global.cupSkipRound = cupSkipRound;
+  global.cupFinish    = cupFinish;
   global.cupSubmit    = cupSubmit;
   global.cupSeamsFor  = cupSeamsFor;
   global.cupOpenRound = cupOpenRound;

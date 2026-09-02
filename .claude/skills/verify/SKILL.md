@@ -71,6 +71,31 @@ Learned the hard way three times: parsing the inline script proves nothing. The
 dead "play" button, the dead preset button and the frozen gauntlet were all
 runtime failures that a syntax check passed happily. Always click the thing.
 
+## 4b. Pick a FRESH port, and prove what is on it
+
+Earlier sessions leave `python -m http.server 8901` running. A second one binds
+nothing, fails silently under `>/dev/null`, and every request then goes to the
+OLD server — rooted in whatever directory that session was in. The symptom is a
+driver that never runs and a `--dump-dom` from a page you did not build.
+
+```bash
+netstat -ano | grep ":8901"          # several LISTENING rows = stale servers
+curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:<port>/driver.js
+```
+
+Use a port nobody has used yet, and curl the driver before launching Chrome: a
+404 there means the wrong root, and one second of curl saves ten minutes of
+debugging a page that was never served.
+
+## 4c. Instrument, don't screenshot, when the question is "which came first"
+
+For a sequencing bug — seams, skips, reveal order — wrap the globals
+(`cupOpenRound`, `wireEuropeButton`, `janOpen`) so each call appends a line, and
+write the log into a `<pre>` that `--dump-dom` picks up. That gives an ordered
+transcript instead of a still frame. For a LAYOUT question, measure:
+`getBoundingClientRect().left` per span settles "is the score on the wrong side"
+in a way that squinting at an RTL screenshot never will.
+
 ## 5. Launching the browser: use Chrome with a Windows-path profile
 
 `msedge.exe --headless ... --screenshot=x.png` silently exits 0 and writes

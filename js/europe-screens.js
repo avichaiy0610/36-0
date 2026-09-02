@@ -415,7 +415,7 @@ function euAggHTML(c, t) {
     <div class="eu-card ${t.won ? 'won' : 'lost'}">
       <div class="eu-card-head">
         <span>${euRoundName(c, t)}</span>
-        <span class="eu-vs">${euBigCrest(t.club.id, t.club.flag, t.club.name)} ${t.club.name} · ${t.club.ovr}</span>
+        <span class="eu-vs">${euBigCrest(t.club.id, t.club.flag, t.club.name)} ${t.club.name}</span>
       </div>
       <div class="eu-agg-big">
         <div>
@@ -491,7 +491,7 @@ function euLeagueHTML(c) {
       <p class="eu-note">${euText('eu-phase-sub', 'שמונה משחקים מול שמונה יריבות שונות - שתיים מכל דרג, אחת בבית ואחת בחוץ.')}</p>
       ${L.matches.map((m, i) => euMatchRowHTML(m,
         `<span class="mr-gw">מחזור ${i + 1}</span> ${euCrest(m.cid, m.flag, m.opponent)} ${m.opponent}
-         <span class="mr-pot">דרג ${m.pot} · ${m.ovr}</span>`)).join('')}
+         <span class="mr-pot">דרג ${m.pot}</span>`)).join('')}
     </div>`;
 }
 

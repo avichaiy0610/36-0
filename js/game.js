@@ -105,10 +105,17 @@ const FORMATIONS = {
       { id: 'cb2', label: 'בלם',           pos: 'CB',  x: 38, y: 72 },
       { id: 'lb',  label: 'מגן שמאלי',     pos: 'LB',  x: 20, y: 70 },
       { id: 'cdm', label: 'קשר הגנתי',     pos: 'CDM', x: 50, y: 58 },
-      { id: 'rm',  label: 'קשר ימין',      pos: 'RM',  x: 80, y: 40 },
-      { id: 'cm1', label: 'קשר',           pos: 'CM',  x: 60, y: 42 },
-      { id: 'cm2', label: 'קשר',           pos: 'CM',  x: 40, y: 42 },
-      { id: 'lm',  label: 'קשר שמאל',     pos: 'LM',  x: 20, y: 40 },
+      // The four were drawn at y=40-42, which is the band this game reserves for
+      // attacking midfielders — 4-5-1 puts its CAM at 42, and an attacking tactic
+      // lands its CAM at 39. So a holding midfielder legally filling one of these
+      // CM slots stood exactly where a CAM stands, and the pitch said he was
+      // playing as a playmaker while his card said CDM. The slot was right; the
+      // drawing was lying about it. They still sit ahead of a flat 4-4-2's
+      // midfield (50) — that is what the shape is — just not in the CAM line.
+      { id: 'rm',  label: 'קשר ימין',      pos: 'RM',  x: 80, y: 45 },
+      { id: 'cm1', label: 'קשר',           pos: 'CM',  x: 60, y: 47 },
+      { id: 'cm2', label: 'קשר',           pos: 'CM',  x: 40, y: 47 },
+      { id: 'lm',  label: 'קשר שמאל',     pos: 'LM',  x: 20, y: 45 },
       { id: 'st',  label: 'חלוץ',          pos: 'ST',  x: 50, y: 15 },
     ],
   },
@@ -1800,10 +1807,15 @@ function renderSquadPlayers(squad, filterSlotIdx = null) {
   const activeNats = (typeof challengeActiveNats === 'function') ? challengeActiveNats() : [];
   const dualNats = (typeof challengeDualNatsActive === 'function') && challengeDualNatsActive();
 
-  // Check if any player in this squad can fill a remaining slot
+  // Check if any player in this squad can fill a remaining slot.
+  // Through slotFitPos, like every other eligibility test: with a tactic on, the
+  // chosen slot may SHOW "קשר התקפי" while its `pos` is still CM, and filtering
+  // on the raw pos offered holding midfielders for it — men the placement rules
+  // then refused, so the pick landed in some other slot or nowhere at all.
+  const fitOf = i => slotFitPos(state.slots[i]);
   const anyAvailable = players.some(player => {
     if (state.usedPlayerKeys.has(player.name)) return false;
-    if (filterSlotIdx !== null && !playerFitsSlot(player, state.slots[filterSlotIdx].pos)) return false;
+    if (filterSlotIdx !== null && !playerFitsSlot(player, fitOf(filterSlotIdx))) return false;
     return compatibleEmptySlots(player).length > 0;
   });
 
@@ -1824,7 +1836,7 @@ function renderSquadPlayers(squad, filterSlotIdx = null) {
   }
 
   players.forEach(player => {
-    if (filterSlotIdx !== null && !playerFitsSlot(player, state.slots[filterSlotIdx].pos)) return;
+    if (filterSlotIdx !== null && !playerFitsSlot(player, fitOf(filterSlotIdx))) return;
     const isUsed    = state.usedPlayerKeys.has(player.name);
     const hasSlot   = compatibleEmptySlots(player).length > 0;
     // Salary cap: a man you cannot pay for is not an option. Letting the pick
@@ -2786,8 +2798,13 @@ function euAllocationFor(rank, table) {
   // The Europa seat: the cup winner's, unless the cup won them nothing.
   if (cupRank && !seats.has(cupRank)) {
     seats.set(cupRank, 'uel');
-  } else if (cupRank === 1) {
-    const r = nextFree();                 // the double: everything shifts up
+  } else {
+    // Nobody in this table can use it — the champion did the double, a club from
+    // below the top flight lifted it, or the mode plays no cup at all — so it
+    // cascades to the highest finisher still without a seat. It must never
+    // simply evaporate: that quietly demoted second and third to the Conference
+    // and left fourth with nothing at all.
+    const r = nextFree();
     if (r) seats.set(r, 'uel');
   }
   // and the two Conference seats to whoever is highest without one
@@ -3085,6 +3102,15 @@ function animateResults(ovr) {
   // Fills the summary cards, stats and story — WITHOUT revealing the tier/finish
   // (those stay hidden until revealSummary(), so the reveal isn't spoiled).
   function fillResults() {
+    // The cup final is the LAST seam of the season, so everything bindSeason
+    // worked out about Europe was worked out before anyone had lifted the cup:
+    // no champion meant no cup seat to cascade, and a club that did the double
+    // handed its Europa place to nobody. Same for the badges — cup_win and
+    // cup_double were reported as "did not win it" and then locked by the
+    // submitted flag. This is the first moment BOTH halves are known, so the
+    // allocation and the achievements are settled here instead.
+    if (typeof cupFinish === 'function') cupFinish();
+    if (myRank) wireEuropeButton(myRank, leagueTable);
     setEl('res-wins', wins); setEl('res-draws', draws); setEl('res-losses', losses);
     setEl('res-points', wins*3+draws); setEl('res-gf', gfTotal); setEl('res-ga', gaTotal);
 
@@ -3184,6 +3210,13 @@ function animateResults(ovr) {
   seams.sort((a, b) => a.at - b.at);
   let seamI = 0;
   const nextSeam = () => (seamI < seams.length ? seams[seamI] : null);
+  // "דלג" means skip the REST of the season, not "skip until something stops
+  // you". January is the one thing entitled to stop it — it is a decision, not
+  // content — but once it is answered the skip is still in force, and forgetting
+  // it dropped the player back into a match-by-match reveal with three cup
+  // modals still to dismiss.
+  let skipping = false;
+  let ended = false;
 
   let janSkip = null;
   if (janPair && typeof janMountSkip === 'function') {
@@ -3220,6 +3253,8 @@ function animateResults(ovr) {
     if (janSkip) janSkip.style.display = 'none';
     const resume = () => {
       seamI++;                        // this seam is spent
+      // A skip that was already asked for carries through the seam it stopped at
+      if (skipping) { endReveal(); return; }
       if (skipBtn) skipBtn.style.display = 'block';
       // only worth showing again while January is still ahead of us
       if (janSkip && seams.slice(seamI).some(x => x.kind === 'jan')) janSkip.style.display = '';
@@ -3263,6 +3298,7 @@ function animateResults(ovr) {
 
   function endReveal() {
     clearTimeout(timer);
+    skipping = true;
     // Skipping fast-forwards to the next DECISION, not to the next event. A cup
     // round is content, not a choice, and stopping the skip five times to make
     // somebody dismiss a modal they did not ask for is the opposite of skipping
@@ -3279,6 +3315,11 @@ function animateResults(ovr) {
       openSeam(s);
       return;
     }
+    // Past here is the tail that must run exactly once: it submits the result
+    // and opens the placement popup. There are two ways in now — the button and
+    // the seam that resumes into it — so the tail is latched.
+    if (ended) return;
+    ended = true;
     if (janSkip) janSkip.remove();
     // append any not-yet-shown matches (skip path)
     for (; idx < matches.length; idx++) {
