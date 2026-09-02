@@ -115,3 +115,9 @@
 .cup-br-l { flex: 1; text-align: end; color: var(--dim); }
 .cup-br-s { font-weight: 900; flex-shrink: 0; }
 .cup-br-row i { font-style: normal; font-size: 9.5px; color: var(--dim); }
+
+/* Who went through, said outright. Without it a bold "me" row shows both clubs
+   in the same weight and a defeat reads like an advance. */
+.cup-br-go { width: 12px; flex-shrink: 0; color: #6bff6b; font-weight: 900; }
+.cup-br-row.me .cup-br-l { color: var(--dim); font-weight: 400; }
+.cup-br-row.me .cup-br-w { color: var(--text); }

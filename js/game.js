@@ -778,6 +778,10 @@ function trackDraftMode() {
 }
 
 function showScreen(id) {
+  // Europe's backdrop is a fixed layer on <body>, so it does not leave with the
+  // screen. Anything that navigates away — the nav logo above all — has to take
+  // it down, or the next screen paints over nothing and looks empty.
+  if (id !== 'europe' && typeof euBackdrop === 'function') euBackdrop(null);
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   const el = document.getElementById('screen-' + id);
   if (el) { el.classList.add('active'); el.scrollTop = 0; }

@@ -381,7 +381,12 @@
         const lose = t.winner === t.a ? t.b : t.a;
         const upset = (lose.tier || 0) < (win.tier || 0);      // beaten from below
         const how = t.pens ? ' <i>פנדלים</i>' : t.et ? ' <i>הארכה</i>' : '';
+        // The winner is on the right and the loser dimmed on the left, which
+        // reads fine until it is YOUR tie: the row is bold throughout and both
+        // sides look the same, so a defeat could be mistaken for going through.
+        // The tick says it outright.
         return `<div class="cup-br-row${us ? ' me' : ''}${upset ? ' upset' : ''}">
+          <span class="cup-br-go">${win.us ? '✓' : ''}</span>
           <span class="cup-br-w">${win.us ? 'ההרכב שלי' : win.name}</span>
           <span class="cup-br-s" dir="ltr">${Math.max(t.gf, t.ga)}-${Math.min(t.gf, t.ga)}</span>${how}
           <span class="cup-br-l">${lose.us ? 'ההרכב שלי' : lose.name}</span>
