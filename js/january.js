@@ -104,9 +104,15 @@
       title: 'מציאה',
       blurb: 'סוכן מציע שחקן שאף אחד לא שם לב אליו. אתה חותם עיוור, בלי לראות אותו משחק.',
       slot: weakestIdx,
-      // Skewed high, but the bottom of the band is below what you already have:
-      // most of the time this helps, and sometimes you paid for nothing.
-      band: cur => [cur - 4, cur + 12],
+      // Leans hard upward, and the floor sits just under what you already have:
+      // most of the time this is a real upgrade, and once in a while you signed
+      // somebody no better. A gamble, but one worth taking.
+      band: cur => [cur - 2, cur + 14],
+      // 0.8, measured: the average signing is +7.9 on the man he replaces where
+      // it used to be +4, and one in twelve is still no upgrade at all. Higher
+      // than this and the "gamble" stops being one — at 2.5 the draw literally
+      // never produced a dud over 200,000 windows.
+      skew: 0.8,
     },
     {
       key: 'offer', weight: 22,
@@ -131,6 +137,9 @@
       blurb: 'כישרון צעיר בלי עבר בליגה. או שהוא מתפוצץ, או שהוא לא.',
       slot: weakestIdx,
       band: cur => [cur - 9, cur + 16],
+      // Boom or bust by design, so only a gentle lean — but a lean, because a
+      // prospect nobody rates is still more often a step up than a step down.
+      skew: 0.6,
       // The name has to be true. Without this the draw was happy to hand you a
       // keeper in his best season and call him a prospect — the whole point is
       // a player the data itself says was not finished yet, so the season on
@@ -167,15 +176,30 @@
   // Levelling the ratings makes each band mean what its name implies at every
   // squad strength, and leaves the shape of every scenario intact — a band
   // entirely below you still cannot produce an upgrade.
-  function drawFromBand(cands) {
+  // One rating is drawn, then a player at it — so a band with forty 71s and one
+  // 84 does not become a band of 71s. `skew` is what decides WHICH rating: the
+  // ratings are sorted and weighted by their position to the power of skew, so
+  // 1 is the flat draw and anything above it leans upward.
+  //
+  // It used to be flat while the scenarios' comments promised otherwise, and a
+  // flat draw over [cur-4, cur+12] hands you something no better than you had
+  // about a quarter of the time. That is how a "מציאה" replaced a 72 with a 72.
+  function drawFromBand(cands, skew) {
     const byOvr = new Map();
     for (const c of cands) {
       const o = ovrOf(c.player);
       if (!byOvr.has(o)) byOvr.set(o, []);
       byOvr.get(o).push(c);
     }
-    const ovrs = [...byOvr.keys()];
-    const pick = byOvr.get(ovrs[Math.floor(Math.random() * ovrs.length)]);
+    const ovrs = [...byOvr.keys()].sort((a, b) => a - b);
+    // 0 is a flat draw — every rating equally likely — because that is what the
+    // scenarios meant to hurt you still want. Anything above 0 leans upward.
+    const k = skew || 0;
+    const w = ovrs.map((_, i) => Math.pow(i + 1, k));
+    const total = w.reduce((a, b) => a + b, 0);
+    let r = Math.random() * total, at = ovrs.length - 1;
+    for (let i = 0; i < w.length; i++) { r -= w[i]; if (r <= 0) { at = i; break; } }
+    const pick = byOvr.get(ovrs[at]);
     return pick[Math.floor(Math.random() * pick.length)];
   }
 
@@ -210,7 +234,7 @@
         inBand = pool.filter(c => { const o = ovrOf(c.player); return o >= lo - grow && o <= hi + grow; });
       }
       if (!inBand.length) inBand = pool;
-      incoming = drawFromBand(inBand);
+      incoming = drawFromBand(inBand, scenario.skew);
       break;
     }
     if (!incoming) return null;
