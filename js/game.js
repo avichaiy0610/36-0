@@ -3209,8 +3209,17 @@ function animateResults(ovr) {
 
   function endReveal() {
     clearTimeout(timer);
-    // Skipping must never skip a seam — it fast-forwards TO the next one.
-    const s = nextSeam();
+    // Skipping fast-forwards to the next DECISION, not to the next event. A cup
+    // round is content, not a choice, and stopping the skip five times to make
+    // somebody dismiss a modal they did not ask for is the opposite of skipping
+    // — so cup rounds are played on the way and only January stops the run.
+    let s = nextSeam();
+    while (s && s.kind === 'cup' && idx <= s.at) {
+      while (idx < s.at) revealOne(true);
+      if (typeof cupSkipRound === 'function') cupSkipRound(s.round);
+      seamI++;
+      s = nextSeam();
+    }
     if (s && idx <= s.at) {
       while (idx < s.at) revealOne(true);
       openSeam(s);

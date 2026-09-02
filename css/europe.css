@@ -72,7 +72,12 @@
 /* the content has to float above it, and .screen is where the stacking starts.
    .screen-page fills the viewport with a solid var(--bg); on the blue half it
    has to step aside or the backdrop is painted over and never seen. */
-#screen-europe { position: relative; z-index: 1; }
+/* z-index ONLY. .screen is already position:fixed with inset:0 and overflow-y:
+   auto — it IS the scroll container, and body sets overflow:hidden behind it.
+   Overriding it to position:relative lifted it out of that box and the screen
+   simply stopped scrolling. A positioned element does not need repositioning to
+   take a z-index. */
+#screen-europe { z-index: 1; }
 body.eu-blue #screen-europe { background: transparent; }
 @keyframes eu-fade { from { opacity: 0; } to { opacity: 1; } }
 
