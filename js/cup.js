@@ -380,7 +380,9 @@
         const win = t.winner;
         const lose = t.winner === t.a ? t.b : t.a;
         const upset = (lose.tier || 0) < (win.tier || 0);      // beaten from below
-        const how = t.pens ? ' <i>פנדלים</i>' : t.et ? ' <i>הארכה</i>' : '';
+        // "בפנדלים" rather than "פנדלים": with the preposition it can only be
+        // read as belonging to the club it follows.
+        const how = t.pens ? ' <i>בפנדלים</i>' : t.et ? ' <i>בהארכה</i>' : '';
         // The winner is on the right and the loser dimmed on the left, which
         // reads fine until it is YOUR tie: the row is bold throughout and both
         // sides look the same, so a defeat could be mistaken for going through.
@@ -391,12 +393,15 @@
         // the far side from the club it belongs to. Two spans, no direction
         // override, and the row reads the way it is written.
         const hi = Math.max(t.gf, t.ga), lo = Math.min(t.gf, t.ga);
+        // "פנדלים" goes beside the WINNER. Sitting after the score it landed
+        // against the losing club and read as though they had won the shootout —
+        // which is exactly how a 2-2 final looked like Maccabi Haifa's cup.
         return `<div class="cup-br-row${us ? ' me' : ''}${upset ? ' upset' : ''}">
           <span class="cup-br-go">${win.us ? '✓' : ''}</span>
-          <span class="cup-br-w">${win.us ? 'ההרכב שלי' : win.name}</span>
+          <span class="cup-br-w">${win.us ? 'ההרכב שלי' : win.name}</span>${how}
           <span class="cup-br-s">${hi}</span>
           <span class="cup-br-d">–</span>
-          <span class="cup-br-s">${lo}</span>${how}
+          <span class="cup-br-s">${lo}</span>
           <span class="cup-br-l">${lose.us ? 'ההרכב שלי' : lose.name}</span>
         </div>`;
       }).join('');

@@ -2747,46 +2747,60 @@ function showPreseason(ovr) {
 // else still sees the button, so they know what finishing first is worth.
 // Called with the finishing rank, which is only known once the season is built —
 // until then there is nothing to show.
-/* Israel's four European places, as they really are:
-   champion → Champions League · State Cup winner → Europa League ·
-   2nd and 3rd → Conference League.
+/* Israel's four European places, allocated the way they really are.
 
-   On a DOUBLE nobody loses a place; they shift up and a fourth is added — the
-   runner-up goes to the Europa League and 3rd and 4th to the Conference. And a
-   club only ever holds its highest place, which is what makes the order
-   CL > EL > ECL a rule rather than a preference.
+   The champion takes the Champions League seat. The State Cup winner takes the
+   Europa League seat — but only if the cup has actually given them something:
+   a cup winner who ALREADY qualified through the league keeps the better place
+   and the Europa seat passes down the table. The two Conference seats then go
+   to the highest clubs still without one.
 
-   Returns null when the season earned nothing. */
-function euAllocationFor(rank, champion) {
+   That cascade is the whole rule, and modelling only its most famous case — the
+   champion doing the double — was the bug. If the club that finished THIRD wins
+   the cup, third is promoted to the Europa League and the Conference seat it
+   vacates drops to fourth. Fourth is in Europe, and previously was not.
+
+   `table` is the final league table; without it only the champion's seat can be
+   known, which is the safe answer rather than a wrong one. */
+function euAllocationFor(rank, table) {
+  const LABEL = { ucl: 'ליגת האלופות', uel: 'הליגה האירופית', uecl: 'קונפרנס ליג' };
+  const rows = Array.isArray(table) ? table : null;
   const iWonCup = typeof cupPlayerWon === 'function' && cupPlayerWon();
   const w = typeof cupWinner === 'function' ? cupWinner() : null;
-  // A double is the CHAMPION winning the cup, and only that. Reading it as
-  // "somebody else won the cup" made every season a double the moment the
-  // player was not the cup winner, which promoted the runner-up into the Europa
-  // League place that actually belongs to whoever lifted the trophy.
-  //
-  // Without a champion to compare against there is no way to know, and the
-  // no-double allocation is both the common case and the safe one.
-  const champName = champion && !champion.us ? champion.name : null;
-  const doubleAbove = !!(w && !w.us && champName && w.name === champName);
 
-  if (rank === 1) return { tier: 'ucl', label: 'ליגת האלופות' };
-  if (iWonCup)    return { tier: 'uel', label: 'הליגה האירופית' };
-  if (doubleAbove && rank === 2) return { tier: 'uel', label: 'הליגה האירופית' };
-  const last = doubleAbove ? 4 : 3;
-  if (rank >= 2 && rank <= last) return { tier: 'uecl', label: 'קונפרנס ליג' };
-  return null;
+  // Where the cup winner finished. Null means either no cup was played or the
+  // winner is not in this table — both of which mean nothing cascades.
+  let cupRank = null;
+  if (iWonCup) cupRank = rank;
+  else if (w && !w.us && rows) {
+    const i = rows.findIndex(t => t && !t.us && t.name === w.name);
+    if (i >= 0) cupRank = i + 1;
+  }
+
+  const seats = new Map([[1, 'ucl']]);
+  const nextFree = () => {
+    for (let r = 2; r <= 24; r++) if (!seats.has(r)) return r;
+    return null;
+  };
+
+  // The Europa seat: the cup winner's, unless the cup won them nothing.
+  if (cupRank && !seats.has(cupRank)) {
+    seats.set(cupRank, 'uel');
+  } else if (cupRank === 1) {
+    const r = nextFree();                 // the double: everything shifts up
+    if (r) seats.set(r, 'uel');
+  }
+  // and the two Conference seats to whoever is highest without one
+  for (let n = 0; n < 2; n++) {
+    const r = nextFree();
+    if (r) seats.set(r, 'uecl');
+  }
+
+  const tier = seats.get(rank);
+  return tier ? { tier, label: LABEL[tier] } : null;
 }
 
-// Hebrew swallows the definite article after a prefix letter: ל + הליגה is
-// לליגה, never להליגה. Written as a rule rather than fixed on the one label
-// that showed it, so a fourth competition cannot reintroduce the mistake.
-function heLamed(name) {
-  const s = String(name || '');
-  return 'ל' + (s.startsWith('ה') ? s.slice(1) : s);
-}
-
-function wireEuropeButton(rank, champion) {
+function wireEuropeButton(rank, table) {
   const btn = document.getElementById('btn-europe');
   if (!btn) return;
   if (typeof euStart !== 'function' || typeof rank !== 'number') {
@@ -2799,7 +2813,7 @@ function wireEuropeButton(rank, champion) {
   // The cup's own way in, beside Europe's. Skipping a round should cost the
   // drama, not the record — the bracket is always there to open.
   if (typeof cupMountButton === 'function') cupMountButton(btn);
-  const alloc = euAllocationFor(rank, champion);
+  const alloc = euAllocationFor(rank, table);
   const inEurope = !!alloc;
   btn.style.display = '';
   btn.classList.toggle('locked', !inEurope);
@@ -3009,8 +3023,9 @@ function animateResults(ovr) {
       gfTotal += m.gf; gaTotal += m.ga;
     });
     myRank = leagueTable.findIndex(t => t.us) + 1;
-    // the top row is the champion — the only club whose cup would be a double
-    wireEuropeButton(myRank, leagueTable[0]);
+    // the whole table: the cup seat cascades by league position, not just off
+    // the champion, so the allocation needs to see who finished where
+    wireEuropeButton(myRank, leagueTable);
     if (!consequences) return;
     // A career season is an ordinary season plus a consequence. This runs for
     // restored seasons too (a refresh must not lose the result), so recording it
