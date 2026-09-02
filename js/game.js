@@ -2778,6 +2778,14 @@ function euAllocationFor(rank, champion) {
   return null;
 }
 
+// Hebrew swallows the definite article after a prefix letter: ל + הליגה is
+// לליגה, never להליגה. Written as a rule rather than fixed on the one label
+// that showed it, so a fourth competition cannot reintroduce the mistake.
+function heLamed(name) {
+  const s = String(name || '');
+  return 'ל' + (s.startsWith('ה') ? s.slice(1) : s);
+}
+
 function wireEuropeButton(rank, champion) {
   const btn = document.getElementById('btn-europe');
   if (!btn) return;
@@ -2797,7 +2805,7 @@ function wireEuropeButton(rank, champion) {
   btn.classList.toggle('locked', !inEurope);
   btn.disabled = !inEurope;
   btn.textContent = inEurope
-    ? `🇪🇺 המשך ל${alloc.label}`
+    ? `🇪🇺 המשך ${heLamed(alloc.label)}`
     : '🇪🇺 אירופה - למקומות 1-3 ולזוכת הגביע';
   btn.onclick = inEurope ? () => euStart(alloc.tier) : null;
 
