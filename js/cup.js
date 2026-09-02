@@ -385,10 +385,18 @@
         // reads fine until it is YOUR tie: the row is bold throughout and both
         // sides look the same, so a defeat could be mistaken for going through.
         // The tick says it outright.
+        // Each number sits beside the club that scored it. A single dir="ltr"
+        // "2-1" between them put the WINNER's goals next to the LOSER, because
+        // an LTR span inside an RTL row renders its first digit on the left —
+        // the far side from the club it belongs to. Two spans, no direction
+        // override, and the row reads the way it is written.
+        const hi = Math.max(t.gf, t.ga), lo = Math.min(t.gf, t.ga);
         return `<div class="cup-br-row${us ? ' me' : ''}${upset ? ' upset' : ''}">
           <span class="cup-br-go">${win.us ? '✓' : ''}</span>
           <span class="cup-br-w">${win.us ? 'ההרכב שלי' : win.name}</span>
-          <span class="cup-br-s" dir="ltr">${Math.max(t.gf, t.ga)}-${Math.min(t.gf, t.ga)}</span>${how}
+          <span class="cup-br-s">${hi}</span>
+          <span class="cup-br-d">–</span>
+          <span class="cup-br-s">${lo}</span>${how}
           <span class="cup-br-l">${lose.us ? 'ההרכב שלי' : lose.name}</span>
         </div>`;
       }).join('');
