@@ -371,7 +371,7 @@
      out rather than drawn: skipping a round should cost you the drama, not the
      information. */
   function cupShowBracket() {
-    if (!_run) return;
+    if (!cupState()) return;
     const rounds = _run.rounds.filter(r => r.played).map((r, i) => {
       const meta = CUP_ROUNDS.find(m => m.id === r.id);
       const mine = r.ties.find(t => t.a.us || t.b.us);
@@ -425,7 +425,7 @@
   function cupMountButton(after) {
     const old = document.getElementById('cup-open');
     if (old) old.remove();
-    if (!after || !_run || !_run.rounds.some(r => r.played)) return;
+    if (!after || !cupState() || !_run.rounds.some(r => r.played)) return;
     const b = document.createElement('button');
     b.id = 'cup-open';
     b.className = 'cup-open-link';
@@ -442,7 +442,7 @@
      halves of the story are known: who won the cup, and where the league
      finished. The double needs both. */
   async function cupSubmit(rank) {
-    if (!_run || _run.submitted) return;
+    if (!cupState() || _run.submitted) return;
     _run.submitted = true;
     cupSave();
     if (typeof getCurrentUser !== 'function' || !getCurrentUser()) return;
@@ -462,10 +462,21 @@
     } catch (e) {}
   }
 
-  /* ── what the rest of the game asks ───────────────────────────────────────── */
-  function cupWinner() { return _run && _run.champion; }
-  function cupPlayerWon() { return !!(_run && _run.champion && _run.champion.us); }
-  function cupRun() { return _run; }
+  /* ── what the rest of the game asks ─────────────────────────────────────────
+     Through cupState(), never through `_run` directly. `_run` is only assigned
+     while a season is being revealed, so anything asking later in the same page
+     — the European allocation, the bracket button, a refreshed results screen,
+     and every season of a career after the first — was reading null and being
+     told there had been no cup at all. That is how a cup winner who finished
+     fifth was refused Europe. The SAVE is the source of truth, exactly as it is
+     for the European campaign. */
+  function cupState() {
+    if (!_run) _run = cupLoad();
+    return _run;
+  }
+  function cupWinner() { const r = cupState(); return r && r.champion; }
+  function cupPlayerWon() { const r = cupState(); return !!(r && r.champion && r.champion.us); }
+  function cupRun() { return cupState(); }
 
   /* ── persistence ──────────────────────────────────────────────────────────── */
   function cupSave() {

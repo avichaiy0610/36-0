@@ -2757,12 +2757,18 @@ function showPreseason(ovr) {
    CL > EL > ECL a rule rather than a preference.
 
    Returns null when the season earned nothing. */
-function euAllocationFor(rank) {
+function euAllocationFor(rank, champion) {
   const iWonCup = typeof cupPlayerWon === 'function' && cupPlayerWon();
   const w = typeof cupWinner === 'function' ? cupWinner() : null;
-  // A double only matters here when somebody ELSE did it: the club above me took
-  // both places, so mine moves up.
-  const doubleAbove = !!(w && !w.us && rank > 1);
+  // A double is the CHAMPION winning the cup, and only that. Reading it as
+  // "somebody else won the cup" made every season a double the moment the
+  // player was not the cup winner, which promoted the runner-up into the Europa
+  // League place that actually belongs to whoever lifted the trophy.
+  //
+  // Without a champion to compare against there is no way to know, and the
+  // no-double allocation is both the common case and the safe one.
+  const champName = champion && !champion.us ? champion.name : null;
+  const doubleAbove = !!(w && !w.us && champName && w.name === champName);
 
   if (rank === 1) return { tier: 'ucl', label: 'ליגת האלופות' };
   if (iWonCup)    return { tier: 'uel', label: 'הליגה האירופית' };
@@ -2772,7 +2778,7 @@ function euAllocationFor(rank) {
   return null;
 }
 
-function wireEuropeButton(rank) {
+function wireEuropeButton(rank, champion) {
   const btn = document.getElementById('btn-europe');
   if (!btn) return;
   if (typeof euStart !== 'function' || typeof rank !== 'number') {
@@ -2785,7 +2791,7 @@ function wireEuropeButton(rank) {
   // The cup's own way in, beside Europe's. Skipping a round should cost the
   // drama, not the record — the bracket is always there to open.
   if (typeof cupMountButton === 'function') cupMountButton(btn);
-  const alloc = euAllocationFor(rank);
+  const alloc = euAllocationFor(rank, champion);
   const inEurope = !!alloc;
   btn.style.display = '';
   btn.classList.toggle('locked', !inEurope);
@@ -2995,7 +3001,8 @@ function animateResults(ovr) {
       gfTotal += m.gf; gaTotal += m.ga;
     });
     myRank = leagueTable.findIndex(t => t.us) + 1;
-    wireEuropeButton(myRank);
+    // the top row is the champion — the only club whose cup would be a double
+    wireEuropeButton(myRank, leagueTable[0]);
     if (!consequences) return;
     // A career season is an ordinary season plus a consequence. This runs for
     // restored seasons too (a refresh must not lose the result), so recording it
