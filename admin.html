@@ -746,19 +746,39 @@ function usStatus(msg, ok) {
 async function loadUsage() {
   const days = Number(document.getElementById('usage-days').value) || 30;
   usStatus('טוען…');
-  const [daily, stats, detail] = await Promise.all([
-    _supabase.rpc('usage_daily',  { p_days: days }),
-    _supabase.rpc('usage_stats',  { p_days: days }),
-    _supabase.rpc('usage_detail', { p_days: days }),
+  const [daily, stats, detail, signups] = await Promise.all([
+    _supabase.rpc('usage_daily',   { p_days: days }),
+    _supabase.rpc('usage_stats',   { p_days: days }),
+    _supabase.rpc('usage_detail',  { p_days: days }),
+    _supabase.rpc('usage_signups', { p_days: days }),
   ]);
   const err = daily.error || stats.error || detail.error;
   if (err) { usStatus('טעינה נכשלה: ' + err.message, false); return; }
-  usStatus('');
+  // Signups are newer than the rest of the panel. If that one RPC is missing the
+  // three that matter still render, with a line saying which part is absent —
+  // rather than the whole panel failing over an addition to it.
+  usStatus(signups.error ? 'נרשמים: ' + signups.error.message : '', signups.error ? false : undefined);
   document.getElementById('usage-out').innerHTML =
+    usSignupsHTML(signups.data ?? []) +
     usDailyHTML(daily.data ?? []) + usModesHTML(stats.data ?? []) + usDetailHTML(detail.data ?? []);
 }
 
 function usNum(n) { return n ? String(n) : '<span class="us-zero">·</span>'; }
+
+// New accounts per day, and the running total beside them. "אנשים ליום" below
+// counts who was HERE; this counts who joined, which is a different question and
+// the one that says whether the site is growing.
+function usSignupsHTML(rows) {
+  if (!rows.length) return '';
+  const sum = rows.reduce((a, r) => a + Number(r.signups || 0), 0);
+  const body = rows.map(r => `<tr>
+      <td>${htEsc(r.day)}</td><td>${usNum(r.signups)}</td><td>${usNum(r.total)}</td>
+    </tr>`).join('');
+  return `<div class="us-h3">נרשמים חדשים — ${sum} בטווח הזה</div>
+    <div class="us-wrap"><table class="us-table">
+      <thead><tr><th>תאריך</th><th>נרשמו</th><th>סה״כ משתמשים</th></tr></thead>
+      <tbody>${body}</tbody></table></div>`;
+}
 
 function usDailyHTML(rows) {
   if (!rows.length) return '<div class="chal-note">אין עדיין נתונים בטווח הזה.</div>';
@@ -768,7 +788,7 @@ function usDailyHTML(rows) {
     </tr>`).join('');
   return `<div class="us-h3">אנשים ליום (כל המודים יחד)</div>
     <div class="us-wrap"><table class="us-table">
-      <thead><tr><th>תאריך</th><th>אנשים</th><th>מתוכם מחוברים</th><th>אירועים</th></tr></thead>
+      <thead><tr><th>תאריך</th><th>נכנסו</th><th>מתוכם מחוברים</th><th>אירועים</th></tr></thead>
       <tbody>${body}</tbody></table></div>`;
 }
 

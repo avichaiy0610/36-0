@@ -87,7 +87,11 @@
   function entrySource() {
     let ref = '';
     try { ref = document.referrer || ''; } catch (e) { return null; }
-    if (!ref) return null;                       // no referrer is not a source
+    // No referrer IS a visit — a typed address, a bookmark, the installed app,
+    // or a link opened from inside WhatsApp. Returning null here meant those
+    // people produced no event at all unless they went on to open a mode, so
+    // "אנשים ליום" was really "people who started something".
+    if (!ref) return 'direct';
     let host = '', path = '';
     try {
       const u = new URL(ref);
