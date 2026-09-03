@@ -1741,6 +1741,16 @@ body {
   background: #ffd70015; border: 1px solid #ffd70040;
   border-radius: 8px; padding: 0 6px; margin-right: 6px;
 }
+/* admin-only: marks a hidden achievement once the mask is off, so an unmasked
+   list still shows which of them are the secret ones */
+.ach-secret {
+  font-size: 0.62rem; font-weight: 800; color: #b98cff;
+  background: #b98cff15; border: 1px solid #b98cff40;
+  border-radius: 8px; padding: 0 6px; margin-right: 6px; white-space: nowrap;
+}
+.ach-admin-note { grid-column: 1 / -1; color: #b98cff; }
+.ach-admin-note b { color: #fff; }
+
 .ach-rarity-row { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
 .ach-rarity-tag {
   font-size: 0.65rem; font-weight: 700; padding: 1px 6px;

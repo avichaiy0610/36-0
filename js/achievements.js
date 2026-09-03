@@ -68,6 +68,22 @@ function getRarity(pct) {
   return               { label: 'קל',    color: '#6b7280' };
 }
 
+/* ── the owner's view of the hidden ones ────────────────────────────────────
+   A hidden achievement shows ❓ / ??? until it is earned, which is the point of
+   it — but it also means the person who WROTE them cannot see, on the same
+   screen as everyone else, which of the secrets he has actually collected.
+   For this one account the mask comes off and every hidden achievement is
+   labelled as such, so the list still says which ones are the secrets.
+
+   Display only. The achievements table is fetched in full by every visitor
+   (select('*')), so their names have always been one devtools tab away — the
+   mask is a surprise, never a secret, and nothing here changes what is sent. */
+const ACH_ADMIN_EMAIL = 'avichaiy0610@outlook.com';
+function achIsAdmin() {
+  const u = typeof getCurrentUser === 'function' ? getCurrentUser() : null;
+  return !!(u && u.email === ACH_ADMIN_EMAIL);
+}
+
 async function showAchievements() {
   showScreen('achievements');
   const grid = document.getElementById('achievements-grid');
@@ -109,9 +125,22 @@ async function showAchievements() {
     grid.appendChild(note);
   }
 
+  // The owner gets a line saying how many of the secrets he actually holds —
+  // the question the unmasking is there to answer.
+  const reveal = achIsAdmin();
+  if (reveal) {
+    const hidden = (allAchs ?? []).filter(a => a.is_hidden);
+    const got    = hidden.filter(a => unlockedMap[a.key]).length;
+    const note = document.createElement('p');
+    note.className = 'page-note ach-admin-note';
+    note.innerHTML = `🕵️ תצוגת אדמין — ההישגים המוסתרים גלויים ומסומנים ` +
+                     `<b>${got} מתוך ${hidden.length}</b> מהמוסתרים הושגו`;
+    grid.appendChild(note);
+  }
+
   (allAchs ?? []).forEach(ach => {
     const isUnlocked        = !!unlockedMap[ach.key];
-    const isHiddenAndLocked = ach.is_hidden && !isUnlocked;
+    const isHiddenAndLocked = ach.is_hidden && !isUnlocked && !reveal;
 
     const s           = statsMap[ach.key];
     const totalUsers  = Number(s?.total_users ?? 0);
@@ -139,13 +168,19 @@ async function showAchievements() {
     const times = unlockedMap[ach.key]?.times ?? 1;
     const countHtml = (isUnlocked && !isCumulative && times > 1) ? `<span class="ach-count">×${times}</span>` : '';
 
+    // Unmasked, so the row has to say which ones were the secrets — otherwise
+    // the admin view is just "all the achievements" and the distinction is lost.
+    const secretHtml = (reveal && ach.is_hidden)
+      ? `<span class="ach-secret" title="הישג מוסתר — שאר המשתמשים רואים ??? עד שהוא מושג">🕵️ מוסתר</span>`
+      : '';
+
     const card = document.createElement('div');
     card.className = `ach-card ${isUnlocked ? 'ach-unlocked' : 'ach-locked'}`;
     card.innerHTML = `
       <div class="ach-icon">${isHiddenAndLocked ? '❓' : ach.icon}</div>
       <div class="ach-info">
         <div class="ach-name">${isHiddenAndLocked ? '???' : ach.name_he}
-          ${countHtml}
+          ${secretHtml}${countHtml}
         </div>
         <div class="ach-desc">${isHiddenAndLocked ? '' : ach.desc_he}</div>
         ${progressHtml}
