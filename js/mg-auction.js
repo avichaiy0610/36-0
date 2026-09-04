@@ -462,6 +462,12 @@ function mgaPlaySeason() {
   // cup run too, and "דלג" plays it out silently for anyone in a hurry), the
   // January window NO — a transfer window is the opposite of one attempt.
   state.januaryOn = false;
+  // The manager is the same decision, and the same trap: coachEligible() tests
+  // exactly the flags this mode has just cleared, so it would sail through. Off,
+  // because everyone plays this day's squads on identical terms and a drawn
+  // manager would be one player's private weather.
+  state.coachOn = false;
+  state.coach = null;
 
   window._restoredSeason = null; window._presetSeason = null;
   document.getElementById('league-review-back')?.remove();

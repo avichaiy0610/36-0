@@ -488,6 +488,7 @@ const state = {
   leagueCode: null,
   duelCode: null,
   career: null,                                                // { year, seasonIdx } while a career season is being played
+  coachOn: true, coach: null,                                  // the drawn manager for this season, and whether one is offered at all
   deck: null, mgw: null,                                       // a fixed squad deck (כדורדל) + which daily it belongs to
   challenge: null, challengeDeck: null, challengeReqs: null,   // { period, key } + missions for challenge runs
 };
@@ -827,6 +828,7 @@ function startGame() {
   state.leagueCode = null;   // a normal game from the welcome screen isn't for a league
   state.duelCode = null;
   state.career = null;       // ...nor for a career: leaving one mid-run must not record this season into it
+  state.coach = null;        // ...and it certainly isn't still run by the last one's manager
   state.deck = null; state.mgw = null;   // ...nor for the fixed daily deck
   state.challenge = null; state.challengeDeck = null; state.challengeReqs = null;
   window._leagueReviewMode = null;
@@ -1126,12 +1128,15 @@ function beginDraft() {
   const draftModeEl = document.querySelector('#draftmode-row .opt-btn.selected');
   const peakModeEl  = document.querySelector('#peakmode-row .opt-btn.selected');
   const januaryEl   = document.querySelector('#january-row .opt-btn.selected');
+  const coachEl     = document.querySelector('#coach-row .opt-btn.selected');
 
   state.difficulty  = diffEl?.dataset.val ?? 'normal';
   state.showRatings = (ratingsEl?.dataset.val ?? 'on') === 'on';
   state.draftMode   = draftModeEl?.dataset.val ?? 'squad-first';
   state.peakMode    = (peakModeEl?.dataset.val ?? 'off') === 'on';
   state.januaryOn   = (januaryEl?.dataset.val ?? 'on') === 'on';
+  state.coachOn     = (coachEl?.dataset.val ?? 'on') === 'on';
+  state.coach       = null;              // a new draft starts unmanaged
   // set by the salary-cap card on the setup screen; a plain draft clears it
   state.salaryCap   = !!_salaryCapPick;
   const classicPick = (document.querySelector('#mode-row .opt-btn.selected')?.dataset.val ?? 'full') === 'classic';
@@ -1215,6 +1220,8 @@ function saveDraftState() {
       showRatings: state.showRatings,
       draftMode: state.draftMode,
       peakMode: state.peakMode,
+      coachOn: state.coachOn !== false,
+      coach: state.coach || null,
       eraMin: state.eraMin,
       eraMax: state.eraMax,
       oppSeason: state.oppSeason,
@@ -1324,6 +1331,10 @@ function restoreDraftState() {
     challenge: d.challenge ?? null,
     difficulty: d.difficulty, showRatings: d.showRatings,
     draftMode: d.draftMode, peakMode: d.peakMode,
+    // A save from before managers existed carries neither field. It restores
+    // with no manager and is never offered one — the appointment happens once,
+    // on a freshly completed eleven, and a half-played season is not that.
+    coachOn: d.coachOn !== false, coach: d.coach ?? null,
     eraMin: d.eraMin, eraMax: d.eraMax,
     oppSeason: d.oppSeason ?? null, oppSeasonChoice: d.oppSeasonChoice ?? 'latest',
     leagueFormat: formatOf(d.leagueFormat ?? 'modern'),   // saves from before formats existed were all modern
@@ -2043,7 +2054,14 @@ function assignPlayer(slotIdx, player) {
     // only worth anything once you can see all eleven together.
     else if (typeof salActive === 'function' && salActive() && typeof salShowReview === 'function')
       setTimeout(() => salShowReview(), 500);
-    else setTimeout(() => showPreseason(teamOVR()), 500);
+    // The manager is appointed here and only here: with the eleven complete and
+    // before a ball is kicked. coachOpen falls straight through to the preseason
+    // when it is switched off or the mode is one that never gets a manager, so
+    // this stays a single path rather than a branch.
+    else setTimeout(() => {
+      const go = () => showPreseason(teamOVR());
+      if (typeof coachOpen === 'function') coachOpen(go); else go();
+    }, 500);
   } else setTimeout(startRound, 400);
 }
 
@@ -2724,6 +2742,14 @@ function showPreseason(ovr) {
   if (typeof renderChallengeReqsPreseason === 'function') renderChallengeReqsPreseason();
   showScreen('preseason');
 
+  // The manager, by name only. What he does is the season's job to show.
+  const coachEl = document.getElementById('pre-coach');
+  if (coachEl) {
+    const c = typeof coachActive === 'function' ? coachActive() : null;
+    coachEl.style.display = c ? 'block' : 'none';
+    if (c) coachEl.textContent = `המאמן: ${c.name}`;
+  }
+
   const signinPrompt = document.getElementById('pre-signin-prompt');
   if (signinPrompt) {
     signinPrompt.style.display = getCurrentUser() ? 'none' : 'flex';
@@ -3171,6 +3197,10 @@ function animateResults(ovr) {
       modeParts.push('🏛 ' + siteText('label-format-authentic', 'פורמט {games} מחזורים').replace('{games}', totalGames));
     if (state.challenge && typeof challengeLabel === 'function')
       modeParts.unshift(`${CHAL_PERIODS[state.challenge.period]?.icon ?? '🗓️'} ${challengeLabel(state.challenge.period, state.challenge.key)} #${challengeNumber(state.challenge.period, state.challenge.key)}`);
+    // The manager sits at the front of the line: whoever reads this row wants to
+    // know who ran the season before he wants to know the difficulty.
+    const resCoach = typeof coachActive === 'function' ? coachActive() : null;
+    if (resCoach) modeParts.unshift(`🧑‍💼 ${resCoach.name}`);
     const modeInfoEl = document.getElementById('res-mode-info');
     if (modeInfoEl) modeInfoEl.textContent = modeParts.join(' · ');
     setupSaveSection();
@@ -3841,6 +3871,10 @@ function generateShareText() {
   return [
     title,
     fillTemplate(st('share-line-formation', 'מערך: {formation} | דירוג: {ovr}'), vars),
+    (() => {
+      const c = typeof coachActive === 'function' ? coachActive() : null;
+      return c ? fillTemplate(st('share-line-coach', '🧑‍💼 המאמן: {coach}'), { ...vars, coach: c.name }) : null;
+    })(),
     state.oppSeason
       ? fillTemplate(st('share-line-opp', '🆚 מול ליגת {opp}'), { ...vars, opp: yearToSeason(state.oppSeason) })
       : null,
@@ -3981,6 +4015,7 @@ function restartGame() {
     oppSeason: oppSeasonChoice === 'random' ? resolveOppSeason('random') : oppSeason,
     challenge: null, challengeDeck: null, challengeReqs: null,
     career: null,          // "new game" leaves the career; the run itself stays in storage
+    coach: null,           // a new eleven is appointed its own manager, or none
     deck: null, mgw: null,
     slots:[], picks:[], currentRound:0,
     usedSquadIds:new Set(), usedPlayerKeys:new Set(), currentSquad:null,

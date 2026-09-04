@@ -1674,6 +1674,7 @@ body {
 .pre-trophy { font-size: 2.2rem; }
 .pre-title  { font-size: 1.3rem; font-weight: 800; color: #fff; margin: 4px 0; }
 .pre-sub    { font-size: 0.8rem; color: #888; line-height: 1.4; }
+.pre-coach  { font-size: 0.82rem; color: var(--accent); margin-top: 8px; font-weight: 600; }
 
 .pre-odds-card {
   background: #141425; border: 1px solid #2a2a4e; border-radius: 12px;

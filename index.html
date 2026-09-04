@@ -384,6 +384,20 @@
       </section>
 
       <section class="setup-section lg-lockable">
+        <div class="setup-label" data-txt="lbl-coach">מאמן <span class="label-new">חדש</span></div>
+        <div class="option-row" id="coach-row">
+          <button class="opt-btn selected" data-val="on">
+            <div class="opt-title" data-txt="coach-on">פעיל</div>
+            <div class="opt-sub" data-txt="coach-on-sub">אחרי הדראפט ימונה מאמן לעונה</div>
+          </button>
+          <button class="opt-btn" data-val="off">
+            <div class="opt-title" data-txt="coach-off">כבוי</div>
+            <div class="opt-sub" data-txt="coach-off-sub">בלי מאמן, כמו קודם</div>
+          </button>
+        </div>
+      </section>
+
+      <section class="setup-section lg-lockable">
         <div class="setup-label" data-txt="lbl-era">עידן</div>
         <div class="era-presets" id="era-presets">
           <button class="era-btn selected" data-era="all">כל הזמנים</button>
@@ -536,6 +550,7 @@
         <div class="pre-trophy">🏆</div>
         <div class="pre-title">הרכב מוכן!</div>
         <div class="pre-sub">הנה מה שהמומחים אומרים על ה-XI שלך. סמלץ את העונה ונסה את הבלתי אפשרי.</div>
+        <div class="pre-coach" id="pre-coach" style="display:none"></div>
       </div>
 
       <div class="pre-odds-card">
@@ -1042,6 +1057,8 @@
   <script src="js/nav-drawer.js?v=d459aa88"></script>
   <script src="js/salary.js?v=e7056dfe"></script>
   <script src="js/january.js?v=6b52bcf8"></script>
+  <script src="js/coach-data.js"></script>
+  <script src="js/coach.js"></script>
   <script src="js/install.js?v=6b792604"></script>
 </body>
 </html>

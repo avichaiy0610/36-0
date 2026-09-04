@@ -218,6 +218,104 @@
     return String(name || '').trim().split(/\s+/)[0] || '';
   }
 
+  /* ── the screens ──────────────────────────────────────────────────────────
+   * Built as an overlay in JS rather than as markup, the way the January window
+   * is, because that is the shape the owner picked when he saw the two side by
+   * side: a moment in the game rather than a settings dialog.
+   */
+  function ensureStyle() {
+    if (document.getElementById('coach-style')) return;
+    const s = document.createElement('style');
+    s.id = 'coach-style';
+    s.textContent = `
+.coach-wrap{position:fixed;inset:0;z-index:9000;display:flex;align-items:center;justify-content:center;
+  background:rgba(0,0,0,.74);backdrop-filter:blur(3px);padding:16px}
+.coach-box{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);
+  max-width:440px;width:100%;padding:22px;text-align:center;box-shadow:0 18px 60px rgba(0,0,0,.55);
+  animation:coachIn .22s ease-out}
+@keyframes coachIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.coach-box.named{border-color:var(--accent)}
+.coach-kicker{color:var(--accent);font-size:11.5px;letter-spacing:.1em;margin:0 0 7px;font-weight:600}
+.coach-h{margin:0 0 14px;font-size:23px;color:var(--text)}
+.coach-name{margin:0 0 12px;font-size:27px;color:var(--text);font-weight:700;line-height:1.2}
+.coach-sub{margin:0 0 18px;color:var(--dim);font-size:14px;line-height:1.7}
+.coach-style{margin:0 0 20px;color:var(--text);font-size:15px;line-height:1.75}
+.coach-btns{display:flex;flex-direction:column;gap:9px}
+.coach-b{padding:12px;border-radius:9px;border:1px solid var(--border);background:var(--surface);
+  color:var(--text);font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;width:100%}
+.coach-b:hover{background:var(--hover)}
+.coach-b.go{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.coach-b[disabled]{opacity:.5;cursor:default}
+.coach-spin{font-size:15px;color:var(--dim);min-height:34px;margin:0 0 14px;font-weight:600}
+@media(max-width:420px){.coach-box{padding:17px}.coach-h{font-size:20px}.coach-name{font-size:23px}}
+`;
+    document.head.appendChild(s);
+  }
+
+  function close() {
+    const w = document.querySelector('.coach-wrap');
+    if (w) w.remove();
+  }
+
+  function frame(html, named) {
+    ensureStyle();
+    close();
+    const w = document.createElement('div');
+    w.className = 'coach-wrap';
+    w.innerHTML = `<div class="coach-box${named ? ' named' : ''}" role="dialog" aria-modal="true">${html}</div>`;
+    document.body.appendChild(w);
+    return w;
+  }
+
+  // Step 2. His name, and the sentence written about him. Nothing else — no
+  // trophies, no line explaining what he changes. Whatever he does to the season
+  // is for the season to show.
+  function reveal(c, onDone) {
+    frame(`
+      <p class="coach-kicker">המאמן שלך</p>
+      <h3 class="coach-name">${c.name}</h3>
+      <p class="coach-style">${c.style || ''}</p>
+      <div class="coach-btns">
+        <button class="coach-b go" id="coach-go">להמשיך עם ${coachFirstName(c.name)} ←</button>
+      </div>`, true);
+    document.getElementById('coach-go').onclick = () => { close(); onDone(); };
+  }
+
+  // Step 1. Two doors, and the promise the whole feature is built to keep.
+  function coachOpen(onDone) {
+    if (!coachEligible() || typeof COACHES === 'undefined' || !COACHES.length) { onDone(); return; }
+    frame(`
+      <p class="coach-kicker">אופציונלי</p>
+      <h3 class="coach-h">למנות מאמן?</h3>
+      <p class="coach-sub">מאמן משנה את האופי של העונה שלך, לא את הסיכוי שלך ל-36-0.</p>
+      <div class="coach-btns">
+        <button class="coach-b go" id="coach-draw">🎲 להגריל מאמן</button>
+        <button class="coach-b" id="coach-none">בלי מאמן</button>
+      </div>`);
+    document.getElementById('coach-none').onclick = () => {
+      coachClear();
+      if (typeof track === 'function') track('open', 'coach-none');
+      close(); onDone();
+    };
+    document.getElementById('coach-draw').onclick = () => {
+      const c = coachDraw();
+      if (!c) { close(); onDone(); return; }
+      coachAppoint(c, false);
+      if (typeof track === 'function') track('open', 'coach');
+      if (typeof saveDraftState === 'function') saveDraftState();
+      // A beat on the way, so the name lands as a draw and not as a form field.
+      frame(`<p class="coach-kicker">מחפשים מאמן</p>
+             <h3 class="coach-h">מדברים עם כמה שמות…</h3>
+             <p class="coach-spin" id="coach-spin">—</p>`);
+      const el = document.getElementById('coach-spin');
+      let n = 0;
+      const t = setInterval(() => {
+        el.textContent = COACHES[Math.floor(Math.random() * COACHES.length)].name;
+        if (++n >= 9) { clearInterval(t); reveal(c, onDone); }
+      }, 90);
+    };
+  }
+
   global.COACH_ARCH     = COACH_ARCH;
   global.COACH_TIER     = COACH_TIER;
   global.coachActive    = coachActive;
@@ -232,4 +330,5 @@
   global.coachAppoint   = coachAppoint;
   global.coachClear     = coachClear;
   global.coachFirstName = coachFirstName;
+  global.coachOpen      = coachOpen;
 })(typeof window !== 'undefined' ? window : globalThis);
