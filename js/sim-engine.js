@@ -88,13 +88,14 @@ function simFormSwing() {
 // Apply a season's form to the player's line ratings. Returns a copy — the caller
 // keeps its own object, which the results card still renders unmodified.
 //
-// `sdMult` is the manager's grip on the year and defaults to none. A drilled side
-// lands on its projection and a volatile one does not, which costs nothing in
-// expectation — the swing is symmetric, so widening or narrowing it moves no
-// average anywhere. It is the one lever here that is neutral by construction
-// rather than by measurement.
-function simApplySeasonForm(me, sdMult) {
-  const f = SIM2_SEASON_FORM_SD * (sdMult || 1) * simFormSwing();
+// This was briefly a manager's lever — a drilled side landing on its projection,
+// a volatile one not — and it was measured and dropped. At the width the engine
+// actually uses, halving or doubling the SD moved a season's spread by 1.15x
+// where the design wanted 2x: nobody would have felt it. And it was not free
+// either, since narrowing a symmetric swing on a concave payoff raises the mean.
+// See scripts/sim/coach-balance.js.
+function simApplySeasonForm(me) {
+  const f = SIM2_SEASON_FORM_SD * simFormSwing();
   return { ovr: me.ovr, atk: me.atk + f, mid: me.mid + f, def: me.def + f, gk: me.gk + f,
            cs: me.cs };            // a clean-sheet bonus is not form, it travels
 }

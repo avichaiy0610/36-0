@@ -34,7 +34,7 @@
 
   /* ── the six archetypes ───────────────────────────────────────────────────
    * Numbers are DELTAS from 1.0, so the tier multiplies the signature and not
-   * the value: at 1.5x a tempo of -0.12 becomes 0.82, where multiplying 0.88
+   * the value: at 1.5x a tempo of -0.10 becomes 0.85, where multiplying 0.90
    * directly would have given a legend a stronger LEAGUE rather than a stronger
    * style.
    *
@@ -42,19 +42,46 @@
    * moved attack against defence would simply cancel the tactic the player
    * chose, and taking back a decision the game just offered is worse than
    * offering nothing.
-   *   tempo — scales both sides' xG. 1-0s and 2-1s, or 4-3s. Same points.
+   *   tempo — scales both sides' xG. 1-0s and 2-1s, or 4-3s.
    *   cs    — the chance of conceding nothing, on the tags' own lever.
-   *   form  — the season's form SD. Symmetric, so it moves no average at all.
    *   venue — a home fortress, mirrored away, so eighteen and eighteen cancel.
    *   spear — who the goals go to. Never how many.
+   *   comp  — the price, in rating points on the four lines. See below.
+   *
+   * WHY THERE IS A PRICE COLUMN AT ALL. The first cut of this table assumed a
+   * lever that treats both sides alike costs nothing. scripts/sim/coach-balance.js
+   * says otherwise, and it is not close: cutting the tempo for BOTH sides was
+   * worth +3.3 points a season to an OVR 78 squad, because fewer goals is
+   * shelter for whoever is worse — the better side needs the game to be long
+   * enough to assert itself. Raising it pays the favourite for the same reason.
+   * A clean-sheet multiplier is not a trade in any direction: it only ever
+   * subtracts from the goals against. Football's payoff is not linear in goals,
+   * so symmetry in the GOALS is not symmetry in the POINTS, and no amount of
+   * even-handed design gets around that.
+   *
+   * So every archetype carries a measured price instead of an assumed one. The
+   * numbers below were not chosen; they were solved for, by running the real
+   * engine at three squad ratings and taking out exactly what each style put in.
+   * Re-run the harness after any engine change — a drifting compensation is a
+   * silently unfair manager.
+   *
+   * One lever needed no price and never will: `spear` moves goals BETWEEN the
+   * player's own men and cannot touch a scoreline.
+   *
+   * Two levers were dropped rather than priced. The season's form SD, because at
+   * the width the engine actually uses it moved the volatility of a campaign by
+   * 1.15x where the design asked for 2x — invisible, and quietly profitable,
+   * since a narrower swing on a concave payoff RAISES the mean. And a second
+   * clean-sheet user, because two archetypes leaning on the same lever read as
+   * one archetype with two names.
    */
   const COACH_ARCH = {
-    grit:    { tempo: -0.12, cs:   +0.15 },
-    press:   { tempo: +0.12, form: +0.50 },
-    attack:  { tempo: +0.10, spear:+0.35 },
-    control: { tempo: -0.10, form: -0.40 },
-    order:   { form:  -0.55, cs:   +0.08 },
-    spirit:  { venue: +0.10 },
+    grit:    { tempo: -0.07, cs: +0.19,     comp: -0.52 },
+    press:   { tempo: +0.07,                comp: -0.09 },
+    attack:  { tempo: +0.04, spear: +0.35,  comp: -0.08 },
+    control: { tempo: -0.04, spear: -0.25,  comp: +0.07 },
+    order:   { cs:    +0.10,                comp: -0.29 },
+    spirit:  { venue: +0.08,                comp: +0.05 },
   };
 
   // Amplitude is how hard he stamps it; edge is what the trophies are worth.
@@ -112,16 +139,21 @@
     return m;
   }
 
-  function coachFormMult()  { const c = coachActive(); return c ? mult(COACH_ARCH[c.arch].form) : 1; }
-  function coachCleanMult() { const c = coachActive(); return c ? mult(COACH_ARCH[c.arch].cs)   : 1; }
+  function coachCleanMult() { const c = coachActive(); return c ? mult(COACH_ARCH[c.arch].cs) : 1; }
 
+  // What the manager is worth on the four lines: his trophies, plus the price of
+  // his own style. The two are added because they ride the same lever, but they
+  // are different claims — the first is the advantage the owner asked for, the
+  // second is what keeps the style itself from being one. Both settle in.
   function coachEdge() {
     const c = coachActive();
     if (!c) return 0;
     const t = COACH_TIER[c.tier] || COACH_TIER.journeyman;
     // The edge settles in like everything else: a manager appointed yesterday
     // has not yet made anyone braver.
-    return t.edge * (c.settling ? COACH_SETTLE : 1);
+    const trophies = t.edge * (c.settling ? COACH_SETTLE : 1);
+    const price    = (COACH_ARCH[c.arch].comp || 0) * coachAmp();
+    return trophies + price;
   }
 
   function coachGoalMult(slotPos) {
@@ -191,7 +223,6 @@
   global.coachActive    = coachActive;
   global.coachAmp       = coachAmp;
   global.coachSimMods   = coachSimMods;
-  global.coachFormMult  = coachFormMult;
   global.coachCleanMult = coachCleanMult;
   global.coachEdge      = coachEdge;
   global.coachGoalMult  = coachGoalMult;
