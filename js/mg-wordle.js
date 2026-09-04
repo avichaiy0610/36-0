@@ -89,6 +89,17 @@ function mgwPlay() {
   window._restoredSeason = null; window._presetSeason = null;
   document.getElementById('league-review-back')?.remove();
   document.getElementById('duel-review-chrome')?.remove();
+  // Two flags that decide what the SEASON contains, set here rather than
+  // inherited. Both modes clear challenge/league/gauntlet, which is exactly what
+  // cupEligible() and janEligible() test — so the cup was already running here
+  // by accident, and whether a January window opened depended on the mode played
+  // BEFORE this one. That is the "a field nobody sets is a field that carries
+  // over" trap beginDraftWithState warns about, and it made a daily
+  // non-deterministic. Now it is a decision: the cup YES (a one-shot XI gets a
+  // cup run too, and "דלג" plays it out silently for anyone in a hurry), the
+  // January window NO — a transfer window is the opposite of one attempt.
+  state.januaryOn = false;
+
 
   state.mgw  = { key };
   state.deck = mgwDeck(key);

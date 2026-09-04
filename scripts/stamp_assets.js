@@ -33,7 +33,12 @@ function stampFor(rel) {
   if (hashes.has(rel)) return hashes.get(rel);
   const file = path.join(BASE, rel);
   if (!fs.existsSync(file)) return null;          // a dead reference — leave it alone and shout
-  const h = crypto.createHash('sha1').update(fs.readFileSync(file)).digest('hex').slice(0, 8);
+  // Hash the content with line endings normalised. Git checks these files out
+  // as CRLF on Windows and LF on the Linux box that builds the deploy, so
+  // hashing raw bytes made the stamp depend on which machine last ran this —
+  // every clone reported every asset stale and rewrote all 64 of them.
+  const raw = fs.readFileSync(file).toString('utf8').split(String.fromCharCode(13)).join('');
+  const h = crypto.createHash('sha1').update(raw, 'utf8').digest('hex').slice(0, 8);
   hashes.set(rel, h);
   return h;
 }

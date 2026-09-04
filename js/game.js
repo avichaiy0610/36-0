@@ -3059,6 +3059,13 @@ function animateResults(ovr) {
       crOnSeasonEnd({ rank: myRank, n: leagueTable.length, ovr,
                       wins, draws, losses, gf: gfTotal, ga: gaTotal });
     }
+    // and the ordinary drafts, which until now kept no history at all: one
+    // entry per finished season, with the eleven that played it. daRecord is
+    // idempotent and skips career seasons, which have their own archive.
+    if (typeof daRecord === 'function') {
+      daRecord({ rank: myRank, n: leagueTable.length, ovr, points: wins * 3 + draws,
+                 wins, draws, losses, gf: gfTotal, ga: gaTotal });
+    }
     if (typeof mgwOnSeasonEnd === 'function') {
       mgwOnSeasonEnd({ rank: myRank, n: leagueTable.length, ovr,
                        wins, draws, losses, gf: gfTotal, ga: gaTotal });
@@ -3115,6 +3122,13 @@ function animateResults(ovr) {
       // and the career's own record of it — same answer, same moment
       if (state.career && typeof crRecordEurope === 'function') {
         crRecordEurope(state.career.year, euAllocationFor(myRank, leagueTable));
+        // The cup too: it is decided by now and by nothing later, so this is
+        // where a dynasty learns whether it won one.
+        if (typeof crRecordCup === 'function' && typeof cupState === 'function' && cupState()) {
+          crRecordCup(state.career.year,
+                      typeof cupPlayerWon === 'function' && cupPlayerWon(),
+                      (cupRun() || {}).out || null);
+        }
       }
     }
     setEl('res-wins', wins); setEl('res-draws', draws); setEl('res-losses', losses);
@@ -3273,6 +3287,25 @@ function animateResults(ovr) {
         // finish, the stats and the career consequence all belong to this future.
         bindSeason(chosen);
         saveSeasonState(chosen);
+        // The window is the most interesting thing that happens to a squad all
+        // season, and until now it left no trace: the archive kept the FINAL XI
+        // and the swap that produced it was invisible. Both futures were already
+        // simulated from one seed, so the record can also say what the road not
+        // taken was worth — which is the whole point of having been asked.
+        if (typeof crRecordJanuary === 'function' && state.career) {
+          const pts = sn => sn.matches.reduce((a, m) =>
+            a + (m.outcome === 'W' ? 3 : m.outcome === 'D' ? 1 : 0), 0);
+          const took = chosen === janPair.gamble ? 'gamble' : 'stay';
+          crRecordJanuary(state.career.year, {
+            took,
+            outName: janPair.plan.outName, outOvr: janPair.plan.outOvr,
+            inName: janPair.plan.inName,   inOvr: janPair.plan.inOvr,
+            inClub: janPair.plan.inClub,   inSeason: janPair.plan.inSeason,
+            slot: janPair.plan.slotLabel,  title: janPair.plan.title,
+            teamBefore: janPair.plan.teamBefore, teamAfter: janPair.plan.teamAfter,
+            ptsStay: pts(janPair.stay), ptsGamble: pts(janPair.gamble),
+          });
+        }
         resume();
       });
     } else if (s.kind === 'cup' && typeof cupOpenRound === 'function') {

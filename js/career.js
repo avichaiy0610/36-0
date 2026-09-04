@@ -84,6 +84,80 @@ function crClear() {
 }
 function crHasRun() { const r = crRun(); return !!r.startYear; }
 
+/* ── the archive ──────────────────────────────────────────────────────────────
+   A dynasty used to end and disappear: crClear() wiped the run and all that
+   survived was a two-number "best" (seasons, titles). Ten seasons of history,
+   the honours, and every XI went with it. They are kept now, so past careers can
+   be read back and so the trophies can be counted ACROSS careers rather than
+   only inside the current one.
+
+   Archived at the moment a run ENDS rather than when the next one starts —
+   waiting for the next one means a player who never starts another loses the
+   only copy. `archived` on the run itself makes it once-only. */
+const CR_ARCHIVE_KEY = '36-0-career-archive';
+const CR_ARCHIVE_MAX = 25;          // bounds localStorage; a run is ~6-10KB with its XIs
+
+function crArchive() {
+  try {
+    const a = JSON.parse(localStorage.getItem(CR_ARCHIVE_KEY));
+    return Array.isArray(a) ? a : [];
+  } catch (e) { return []; }
+}
+
+function crArchiveSave(list) {
+  try { localStorage.setItem(CR_ARCHIVE_KEY, JSON.stringify(list)); }
+  catch (e) {
+    // Out of quota: drop the oldest run's squads first — the honours and the
+    // table are what a past career is FOR; the eleven names are the luxury.
+    try {
+      const trimmed = list.map((r, i) => i < list.length - 5
+        ? { ...r, history: (r.history || []).map(({ xi, ...rest }) => rest) } : r);
+      localStorage.setItem(CR_ARCHIVE_KEY, JSON.stringify(trimmed));
+    } catch (e2) { /* nothing more to give */ }
+  }
+}
+
+// `reason` lets a run be filed BEFORE it is over — which is the whole point:
+// "נטוש את הקריירה" used to delete six seasons, their trophies and
+// every XI, and the only way to keep a dynasty was to play it to the end. A run
+// you walked away from is still a run you played.
+function crArchiveRun(run, reason) {
+  if (!run || run.archived || !run.history || !run.history.length) return;
+  if (!reason && !run.over) return;
+  run.archived = true;
+  crSave();
+  const list = crArchive();
+  const id = run.startYear + '-' + Date.now().toString(36);
+  run.archiveId = id;
+  crSave();
+  list.push({
+    id,
+    startYear: run.startYear, clubName: run.clubName,
+    formationId: run.formationId, tactic: run.tactic, classic: !!run.classic,
+    difficulty: run.difficulty,
+    startedAt: run.startedAt || null, endedAt: new Date().toISOString(),
+    overReason: reason || run.overReason, titles: run.titles || 0,
+    history: run.history,
+  });
+  // oldest first, so "קריירה 1" is the first one you ever played and the
+  // number never changes under you when a new one is filed
+  crArchiveSave(list.slice(-CR_ARCHIVE_MAX));
+}
+
+// Every trophy this device has ever won in career mode — the current run plus
+// everything archived. The per-career numbers stay per-career; this is the sum.
+function crLifetimeHonours() {
+  const runs = crArchive().slice();
+  if (crHasRun() && !crRun().archived) runs.push(crRun());
+  const tot = { league: 0, cup: 0, ucl: 0, uel: 0, uecl: 0, doubles: 0, careers: runs.length, seasons: 0 };
+  runs.forEach(r => {
+    const n = crHonours(r);
+    Object.keys(tot).forEach(k => { if (n[k] != null) tot[k] += n[k]; });
+    tot.seasons += (r.history || []).length;
+  });
+  return tot;
+}
+
 function crBest() {
   try { return JSON.parse(localStorage.getItem(CR_BEST_KEY)) || { seasons: 0, titles: 0 }; }
   catch (e) { return { seasons: 0, titles: 0 }; }
@@ -157,6 +231,9 @@ function crRender() {
   if (!box) return;
   const run = crRun();
   const fresh = !crHasRun();
+  // Archived first, drawn second. The other order rendered the end-of-dynasty
+  // screen against an archive that did not yet hold the dynasty it was about.
+  if (!fresh && run.over) crArchiveRun(run);
   if (fresh)                       crRenderSetup(box);
   else if (run.over)               crRenderOver(box, run);
   else if (run.phase === 'played') crRenderTransfer(box, run);
@@ -238,8 +315,11 @@ function crRenderSetup(box) {
     </div>
 
     ${best.seasons ? `<div class="cr-best">🏅 השיא שלך: ${best.seasons} עונות · ${best.titles} אליפויות</div>` : ''}
+    ${crSetupHonoursHTML()}
+    ${crPastHTML({ always: true })}
     <div id="cr-board"></div>`;
 
+  crWirePast();
   const diffBox = document.getElementById('cr-diff');
   const rerollNote = document.getElementById('cr-reroll-note');
   const syncRerollNote = () => {
@@ -335,10 +415,15 @@ function crRenderDashboard(box, run) {
       ${pending ? `<div class="cr-next-kept">✅ ${pending.filter(Boolean).length} שחקנים כבר בסגל — נותרו ${pending.filter(p => !p).length} בחירות</div>` : ''}
       <button class="btn-primary btn-full" id="cr-play">⚽ ${pending ? 'המשך את הדראפט' : 'דראפט עונת ' + crEsc(yearToSeason(year))}</button>
     </div>
+    ${crHonoursHTML(run)}
+    ${crTimelineHTML(run)}
     ${crHistoryHTML(run)}
+    ${crPastHTML()}
     <button class="lg-leave" id="cr-abandon">נטוש את הקריירה</button>`;
   document.getElementById('cr-play').onclick = () => crStartDraft();
   document.getElementById('cr-abandon').onclick = crAbandon;
+  crWireHistory();
+  crWirePast();
 }
 
 function crHeaderHTML(run) {
@@ -542,20 +627,117 @@ function crWireShare() {
 function crHistoryHTML(run) {
   if (!run.history.length) return '';
   const rows = run.history.map(h => {
-    const medal = h.rank === 1 ? '🏆' : h.rank <= 3 ? '🥉' : '';
+    // The medal used to double as the title marker; the plate says it better,
+    // so 🥉 is left to mean only "podium, no title".
+    const medal = h.rank === 1 ? '' : h.rank <= 3 ? '🥉' : '';
+    // Qualifying is not winning. The flag stays for a season that reached
+    // Europe; the trophy beside it is for one that came back with it.
+    const eu = h.europe && !h.euTrophy ? ' 🇪🇺' : '';
+    const cupOut = crCupRoundHe(h.cupWon ? null : h.cupOut);
+    const hasXI = Array.isArray(h.xi) && h.xi.some(Boolean);
     return `
-      <div class="lb-row cr-row">
+      <div class="lb-row cr-row${hasXI ? ' cr-row-xi' : ''}"${hasXI ? ` data-year="${h.year}" role="button" tabindex="0"` : ''}>
         <span class="lb-rank ${h.rank === 1 ? 'lb-rank-top' : ''}">${h.rank}</span>
-        <span class="lb-name">${crEsc(yearToSeason(h.year))} ${medal}${h.europe ? ' 🇪🇺' : ''}</span>
+        <span class="lb-name">${crEsc(yearToSeason(h.year))} ${medal}${eu}${crSeasonTrophies(h)}${h.jan && h.jan.took === 'gamble' ? '<span class="cr-row-jan" title="נעשתה העברת חורף">❄</span>' : ''}</span>
         <span class="lb-stat">${h.points} נק׳</span>
-        <span class="lb-sub" dir="rtl">${h.wins}נ ${h.draws}ת ${h.losses}ה · דירוג ${h.ovr}</span>
+        <span class="lb-sub" dir="rtl">${h.wins}נ ${h.draws}ת ${h.losses}ה · דירוג ${h.ovr}${cupOut}</span>
+        ${hasXI ? '<span class="cr-row-open">👕 ההרכב</span>' : ''}
       </div>`;
   }).join('');
-  return `<div class="section-label">היסטוריית המועדון</div><div class="lb-table cr-table">${rows}</div>`;
+  const anyXI = run.history.some(h => Array.isArray(h.xi) && h.xi.some(Boolean));
+  return `<div class="section-label">היסטוריית המועדון</div>` +
+    (anyXI ? `<div class="cr-hint">לחיצה על עונה פותחת את ההרכב ששיחק אותה</div>` : '') +
+    `<div class="lb-table cr-table">${rows}</div>`;
+}
+
+// Clicking a season opens the eleven that played it. Wired after every render
+// that can contain history rows, which is why it lives on its own.
+function crWireHistory() {
+  document.querySelectorAll('.cr-row-xi').forEach(row => {
+    const open = () => crShowSeasonXI(+row.dataset.year);
+    row.onclick = open;
+    row.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } };
+  });
+}
+
+function crShowSeasonXI(year) {
+  // A past career's rows are on screen while its modal is open, so the year is
+  // looked up there first — otherwise clicking 2003/04 inside an old dynasty
+  // would open the CURRENT run's 2003/04, which is a different eleven entirely.
+  const run = _crViewRun || crRun();
+  const h = (run.history || []).find(x => x.year === year);
+  if (!h || !Array.isArray(h.xi)) return;
+  // Rebuilt against today's data, so a rating corrected since that season shows
+  // corrected here. A man who has since left the data drops out rather than
+  // taking the whole archive down with him.
+  const slots = formationSlots(run.formationId, tacticOf(run.tactic));
+  const bySquad = new Map(SQUADS.map(s => [s.id, s]));
+  const rows = h.xi.map((p, i) => {
+    if (!p) return null;
+    const sq = bySquad.get(p.squadId);
+    const pl = sq && sq.players.find(x => crNormName(x.name) === crNormName(p.name));
+    if (!sq || !pl) return null;
+    const team = typeof getTeam === 'function' ? getTeam(sq.teamId) : null;
+    const pos = slots[i] ? (slots[i].role || slots[i].pos) : '';
+    return { pl, sq, team, pos };
+  }).filter(Boolean);
+  if (!rows.length) return;
+
+  const ovr = Math.round(rows.reduce((s, r) => s + (r.pl.ovr || 0), 0) / rows.length);
+  const clubCount = new Set(rows.map(r => r.sq.teamId)).size;
+  // Which clubs this eleven was actually built from, biggest share first — the
+  // question "how many" only ever half-answered.
+  const byClub = {};
+  rows.forEach(r => {
+    const nm = r.team ? r.team.name : '—';
+    byClub[nm] = (byClub[nm] || 0) + 1;
+  });
+  const clubLine = Object.keys(byClub).sort((a, b) => byClub[b] - byClub[a])
+    .map(nm => `<span class="cr-xi-clubchip">${crEsc(nm)} <b>${byClub[nm]}</b></span>`).join('');
+
+  const inName = h.jan && h.jan.took === 'gamble' ? crNormName(h.jan.inName) : null;
+  const list = rows.map(r => `
+    <div class="cr-xi-row${inName && crNormName(r.pl.name) === inName ? ' cr-xi-new' : ''}">
+      <span class="cr-xi-pos">${crEsc(r.pos)}</span>
+      <span class="cr-xi-name">${crEsc(r.pl.name)}${
+        inName && crNormName(r.pl.name) === inName ? ' <i class="cr-xi-tag">חורף</i>' : ''}</span>
+      <span class="cr-xi-club">${crEsc(r.team ? r.team.name : '')} · ${crEsc(r.sq.season)}</span>
+      <span class="cr-xi-ovr">${r.pl.ovr}</span>
+    </div>`).join('');
+
+  let w = document.getElementById('cr-xi-modal');
+  if (!w) {
+    w = document.createElement('div');
+    w.id = 'cr-xi-modal';
+    w.className = 'cr-xi-wrap cr-xi-top';
+    document.body.appendChild(w);
+  }
+  w.innerHTML = `
+    <div class="cr-xi-box" role="dialog" aria-modal="true">
+      <div class="cr-xi-head">
+        <span>${crEsc(yearToSeason(year))} · ${crEsc(run.clubName)}</span>
+        <span class="cr-xi-meta">מקום ${h.rank} · ${h.points} נק׳ · דירוג ${ovr} · ${clubCount} מועדונים</span>
+      </div>
+      <div class="cr-xi-tro">${crSeasonTrophies(h) || '<span class="cr-xi-none">בלי תארים העונה</span>'}</div>
+      ${crJanuaryHTML(h)}
+      <div class="cr-xi-clubs"><i>ההרכב הורכב מ:</i>${clubLine}</div>
+      <div class="cr-xi-list">${list}</div>
+      <button class="btn-secondary btn-full" id="cr-xi-close">סגור</button>
+    </div>`;
+  w.style.display = 'flex';
+  const close = () => { w.style.display = 'none'; };
+  document.getElementById('cr-xi-close').onclick = close;
+  w.onclick = e => { if (e.target === w) close(); };
 }
 
 function crAbandon() {
-  if (!confirm('לנטוש את הקריירה? כל העונות שנצברו יימחקו.')) return;
+  const run = crRun();
+  const played = (run.history || []).length;
+  const msg = played
+    ? `לנטוש את הקריירה? ${played} העונות ששיחקת יישמרו בקריירות הקודמות על כל התארים וההרכבים, ותוכל לפתוח אותם מתי שתרצה.`
+    : 'לנטוש את הקריירה? עוד לא שיחקת בה עונה, אז אין מה לשמור.';
+  if (!confirm(msg)) return;
+  crArchiveRun(run, 'abandoned');
   crClear();
   if (typeof clearDraftState === 'function') clearDraftState();
   state.career = null;
@@ -665,15 +847,315 @@ function crBeginDraftWithKept(picks) {
 // It is recorded here rather than in crOnSeasonEnd because crOnSeasonEnd cannot
 // know the answer: it runs during the reveal, and the cup final is the LAST seam
 // of the season. This is called once the allocation is genuinely settled.
+function crSeasonRow(year) {
+  if (!crHasRun()) return null;
+  return crRun().history.find(x => x.year === year) || null;
+}
+
 function crRecordEurope(year, alloc) {
-  if (!crHasRun()) return;
-  const run = crRun();
-  const h = run.history.find(x => x.year === year);
+  const h = crSeasonRow(year);
   if (!h) return;
   const val = alloc ? (alloc.tier || true) : false;
   if (h.europe === val) return;
   h.europe = val;
   crSave();
+}
+
+// The cup, from the same moment and for the same reason: the final is the last
+// seam of the season, so nothing before fillResults can be asked who won it.
+function crRecordCup(year, won, outRound) {
+  const h = crSeasonRow(year);
+  if (!h) return;
+  if (h.cupWon === !!won && h.cupOut === (outRound || null)) return;
+  h.cupWon = !!won;
+  h.cupOut = won ? null : (outRound || null);
+  crSave();
+}
+
+// The European trophy is later still — that campaign is played AFTER the season
+// screen has been left, so it is written when the campaign itself resolves.
+// `tier` is which competition it was; only a win is worth a shelf.
+function crRecordEuTrophy(year, tier, won) {
+  const h = crSeasonRow(year);
+  if (!h) return;
+  const val = won ? (tier || 'ucl') : null;
+  if ((h.euTrophy || null) === val) return;
+  h.euTrophy = val;
+  crSave();
+}
+
+// The winter window, kept per season. Written from the seam in game.js, where
+// both futures are still in hand — so the row can say not only what you did but
+// what the other door was worth.
+function crRecordJanuary(year, jan) {
+  const h = crSeasonRow(year);
+  if (!h || !jan) return;
+  h.jan = jan;
+  crSave();
+}
+
+/* ── the cabinet ──────────────────────────────────────────────────────────── */
+// Five competitions hand out silverware now, and until this the history could
+// only say where you FINISHED. A dynasty that won three State Cups and a
+// Conference League showed a league position and a flag.
+const CR_HONOUR_ORDER = ['league', 'cup', 'ucl', 'uel', 'uecl'];
+
+function crHonours(run) {
+  const h = (run || crRun()).history || [];
+  return {
+    league: h.filter(x => x.champion).length,
+    cup:    h.filter(x => x.cupWon).length,
+    ucl:    h.filter(x => x.euTrophy === 'ucl').length,
+    uel:    h.filter(x => x.euTrophy === 'uel').length,
+    uecl:   h.filter(x => x.euTrophy === 'uecl').length,
+    doubles: h.filter(x => x.champion && x.cupWon).length,
+  };
+}
+
+// Empty shelves are drawn too, muted. A cabinet that only shows what you won
+// says nothing about what is still missing, and the missing shelf is the point.
+// `n` can be a counted set rather than a run, which is how the setup screen
+// shows a lifetime total before any single career is on screen.
+function crHonoursHTML(run, opts) {
+  if (typeof trophySVG !== 'function') return '';
+  const o = opts || {};
+  const n = o.counts || crHonours(run);
+  const total = CR_HONOUR_ORDER.reduce((s, k) => s + n[k], 0);
+  // Each trophy stands ON something and is mirrored in it — the reflection is a
+  // second copy, flipped and faded, and it is what turns five floating icons
+  // into a cabinet. A shelf you have not filled keeps its silhouette so the gap
+  // is legible as a gap.
+  const cells = CR_HONOUR_ORDER.map(k => {
+    const won = n[k];
+    const art = trophySVG(k, { size: 44, muted: !won });
+    return `
+    <div class="cr-hon${won ? '' : ' cr-hon-empty'}">
+      <div class="cr-hon-stand">
+        <div class="cr-hon-art">${art}</div>
+        <div class="cr-hon-mirror" aria-hidden="true">${art}</div>
+      </div>
+      ${won ? `<span class="cr-hon-n">×${won}</span>` : '<span class="cr-hon-n">—</span>'}
+      <span class="cr-hon-l">${crEsc(trophyName(k, true))}</span>
+    </div>`;
+  }).join('');
+  const sub = o.sub !== undefined ? o.sub : (total
+    ? `${total} ${total === 1 ? 'תואר' : 'תארים'}` + (n.doubles ? ` · ${n.doubles === 1 ? 'דאבל' : n.doubles + ' דאבלים'} 👑` : '')
+    : 'עוד לא הורמת כלום. השנה, אולי.');
+  return `
+    <div class="section-label">${crEsc(o.title || 'ארון התארים')}</div>
+    <div class="cr-cabinet">
+      <div class="cr-hon-row">${cells}</div>
+      <div class="cr-hon-sub">${sub}</div>
+    </div>`;
+}
+
+// The cabinet BEFORE a career exists: five shelves, filled from every career
+// this device has finished, empty on a first visit. Shown here on purpose —
+// the mode's whole point is what ends up on these shelves, and a player who has
+// never finished a run had no way of knowing they were there at all.
+function crSetupHonoursHTML() {
+  if (typeof trophySVG !== 'function') return '';
+  const t = crLifetimeHonours();
+  const total = CR_HONOUR_ORDER.reduce((s, k) => s + t[k], 0);
+  const sub = t.careers
+    ? `<b>${total}</b> ${total === 1 ? 'תואר' : 'תארים'} ב-${t.careers} ${t.careers === 1 ? 'קריירה' : 'קריירות'} · ${t.seasons} עונות`
+      + (t.doubles ? ` · ${t.doubles} דאבל` : '')
+    : 'חמישה מפעלים, חמישה מדפים ריקים. עשר עונות במועדון אחד כדי למלא אותם.';
+  return crHonoursHTML(null, { counts: t, sub, title: 'ארון התארים — כל הקריירות' });
+}
+
+// What the winter window did to this squad — the swap itself, what it cost or
+// bought in rating, and what the door you did not open would have finished on.
+// A season that skipped the window says so, rather than silently showing nothing.
+function crJanuaryHTML(h) {
+  // A window only exists here when it MOVED somebody. A season where the offer
+  // was turned down is a season where nothing happened, and saying so at length
+  // pushed the eleven — the thing actually being looked at — down the screen.
+  const j = h.jan;
+  if (!j || j.took !== 'gamble') return '';
+  const dOvr = (j.teamAfter != null && j.teamBefore != null) ? j.teamAfter - j.teamBefore : null;
+  const diff = (j.ptsGamble != null && j.ptsStay != null) ? j.ptsGamble - j.ptsStay : null;
+  const verdict = diff == null ? ''
+    : diff > 0 ? `העסקה הכניסה ${diff} נק׳`
+    : diff < 0 ? `העסקה עלתה ${Math.abs(diff)} נק׳`
+    : 'העסקה לא שינתה את התוצאה';
+  return `
+    <div class="cr-jan cr-jan-took">
+      <div class="cr-jan-h">❄ העברת חורף${j.title ? ' · ' + crEsc(j.title) : ''}</div>
+      <div class="cr-jan-swap">
+        <span class="cr-jan-out">${crEsc(j.outName)} <b>${j.outOvr}</b></span>
+        <span class="cr-jan-arrow">←</span>
+        <span class="cr-jan-in">${crEsc(j.inName)} <b>${j.inOvr}</b></span>
+      </div>
+      <div class="cr-jan-sub">${crEsc(j.inClub || '')}${j.inSeason ? ' · ' + crEsc(j.inSeason) : ''}${
+        j.slot ? ' · ' + crEsc(j.slot) : ''}${
+        dOvr != null ? ` · דירוג הקבוצה <b>${dOvr > 0 ? '+' : ''}${dOvr}</b>` : ''}</div>
+      ${verdict ? `<div class="cr-jan-verdict ${diff > 0 ? 'good' : diff < 0 ? 'bad' : ''}">${verdict}</div>` : ''}
+    </div>`;
+}
+
+// The dynasty as a shape rather than a table. One column per season, tall for a
+// title and short for a scrape, with what it won standing on top of it. Ten rows
+// of numbers do not show you that the fourth season was the turn; this does.
+//
+// It also answers "which clubs was I actually building from" — every season's XI
+// is drawn from a different set of real squads, and the count under each column
+// says how many that season leaned on.
+function crTimelineHTML(run) {
+  const h = (run || crRun()).history || [];
+  if (h.length < 2) return '';
+  const n = Math.max(...h.map(x => x.n || 14));
+  const bySquad = new Map(SQUADS.map(sq => [sq.id, sq]));
+  const cols = h.map(x => {
+    // rank 1 is the tallest bar, last place the shortest
+    const frac = Math.max(0.14, 1 - ((x.rank - 1) / Math.max(1, n - 1)));
+    const hgt = Math.round(18 + frac * 46);
+    const tone = x.rank === 1 ? 'linear-gradient(180deg,#FFE27A,#C98A22)'
+              : x.rank <= 3 ? 'linear-gradient(180deg,#9fb4c9,#5d6b7d)'
+              : x.rank > (x.n || n) - CR_RELEGATE ? 'linear-gradient(180deg,#a34a4a,#6d2f2f)'
+              : 'linear-gradient(180deg,#3c4459,#2b3242)';
+    const tro = [];
+    if (x.champion) tro.push(trophySVG('league', { size: 13 }));
+    if (x.cupWon)   tro.push(trophySVG('cup', { size: 13 }));
+    if (x.euTrophy) tro.push(trophySVG(x.euTrophy, { size: 13 }));
+    let clubs = '';
+    if (Array.isArray(x.xi)) {
+      const set = new Set(x.xi.filter(Boolean).map(p => (bySquad.get(p.squadId) || {}).teamId).filter(Boolean));
+      if (set.size) clubs = set.size + ' מוע׳';
+    }
+    return `
+      <div class="cr-tl-col" title="${crEsc(yearToSeason(x.year))} — מקום ${x.rank} · ${x.points} נק׳">
+        <div class="cr-tl-tro">${tro.join('')}</div>
+        <div class="cr-tl-bar" style="height:${hgt}px;background:${tone}">
+          <span class="cr-tl-rank">${x.rank}</span>
+        </div>
+        <div class="cr-tl-yr">${crEsc(String(x.year).slice(-2))}׳</div>
+        <div class="cr-tl-clubs">${clubs}</div>
+      </div>`;
+  }).join('');
+  return `
+    <div class="section-label">השושלת לאורך זמן</div>
+    <div class="cr-tl">${cols}</div>
+    <div class="cr-tl-legend">גובה העמודה = מיקום הסיום · המספר מתחת = העונה · מוע׳ = מכמה מועדונים הורכב ההרכב</div>`;
+}
+
+// "יצא ברבע הגמר" — where a cup run ended, when it did not end with the cup.
+function crCupRoundHe(roundId) {
+  if (!roundId || typeof CUP_ROUNDS === 'undefined') return '';
+  const r = CUP_ROUNDS.find(x => x.id === roundId);
+  return r ? ` · <span class="cr-row-cup">🏆 ${crEsc(r.round)}</span>` : '';
+}
+
+/* ── past careers ─────────────────────────────────────────────────────────── */
+// The shelf of finished dynasties. Shown where a career is decided — on the
+// fresh-start screen and at the end of a run — and never mid-run, where it
+// would only be a distraction from the one being played.
+const CR_END_HE = {
+  finished:  { icon: '🏁', he: 'הושלמה' },
+  relegated: { icon: '💀', he: 'ירידת ליגה' },
+  abandoned: { icon: '🚪', he: 'ננטשה' },
+};
+
+function crPastHTML(opts) {
+  const o = opts || {};
+  const list = crArchive().filter(r => r.id !== o.exclude);
+  if (!list.length) {
+    return o.always
+      ? `<div class="section-label">קריירות קודמות</div>
+         <div class="cr-past-empty">כל קריירה שתסתיים — או שתנטוש — תישמר כאן על כל התארים,
+         העונות וההרכבים שלה, ואפשר לפתוח אותה מתי שרוצים.</div>`
+      : '';
+  }
+  const tot = crLifetimeHonours();
+  const totalTro = ['league', 'cup', 'ucl', 'uel', 'uecl'].reduce((s, k) => s + tot[k], 0);
+  // newest at the top, but numbered by when it was STARTED — so "קריירה 1" is
+  // the first dynasty you ever ran and its number never moves
+  const rows = list.map((r, idx) => ({ r, no: idx + 1 })).reverse().map(({ r, no }) => {
+    const n = crHonours(r);
+    const icons = ['league', 'cup', 'ucl', 'uel', 'uecl']
+      .filter(k => n[k])
+      .map(k => `${trophySVG(k, { size: 16 })}${n[k] > 1 ? `<i>×${n[k]}</i>` : ''}`).join('');
+    const last = r.history[r.history.length - 1];
+    const end = CR_END_HE[r.overReason] || CR_END_HE.abandoned;
+    const pts = (r.history || []).reduce((a, h) => a + (h.points || 0), 0);
+    const when = r.endedAt
+      ? new Date(r.endedAt).toLocaleDateString('he-IL', { day: 'numeric', month: 'numeric', year: '2-digit' })
+      : '';
+    return `
+      <div class="lb-row cr-row cr-past-row" data-id="${crEsc(r.id)}" role="button" tabindex="0">
+        <span class="cr-past-no">${no}</span>
+        <span class="lb-name">
+          <b>קריירה ${no}</b> · ${crEsc(r.clubName)}
+          <span class="cr-past-tro">${icons || '<i class="cr-past-none">בלי תארים</i>'}</span>
+        </span>
+        <span class="lb-stat">${pts} נק׳</span>
+        <span class="lb-sub" dir="rtl">${crEsc(yearToSeason(r.startYear))}–${crEsc(yearToSeason(last.year))} ·
+          ${r.history.length} עונות · ${end.icon} ${end.he}${when ? ' · ' + crEsc(when) : ''}</span>
+      </div>`;
+  }).join('');
+  return `
+    <div class="section-label">קריירות קודמות</div>
+    <div class="cr-past-sum">
+      ${tot.careers} ${tot.careers === 1 ? 'קריירה' : 'קריירות'} · ${tot.seasons} עונות ·
+      <b>${totalTro} ${totalTro === 1 ? 'תואר' : 'תארים'}</b>${tot.doubles ? ` · ${tot.doubles} דאבל` : ''}
+    </div>
+    <div class="cr-hint">לחיצה על קריירה פותחת את הארון, העונות וכל ההרכבים שלה</div>
+    <div class="lb-table cr-table cr-past">${rows}</div>`;
+}
+
+function crWirePast() {
+  document.querySelectorAll('.cr-past-row').forEach(row => {
+    const open = () => crShowPastRun(row.dataset.id);
+    row.onclick = open;
+    row.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } };
+  });
+}
+
+// One finished dynasty, opened in full: its cabinet, and every season it played.
+function crShowPastRun(id) {
+  const r = crArchive().find(x => x.id === id);
+  if (!r) return;
+  const last = r.history[r.history.length - 1];
+  let w = document.getElementById('cr-past-modal');
+  if (!w) {
+    w = document.createElement('div');
+    w.id = 'cr-past-modal';
+    w.className = 'cr-xi-wrap';
+    document.body.appendChild(w);
+  }
+  w.innerHTML = `
+    <div class="cr-xi-box cr-past-box" role="dialog" aria-modal="true">
+      <div class="cr-xi-head">
+        <span>${crEsc(r.clubName)} · ${crEsc(yearToSeason(r.startYear))}–${crEsc(yearToSeason(last.year))}</span>
+        <span class="cr-xi-meta">${r.history.length} עונות · ${(CR_END_HE[r.overReason] || CR_END_HE.abandoned).icon} ${(CR_END_HE[r.overReason] || CR_END_HE.abandoned).he}</span>
+      </div>
+      ${crHonoursHTML(r)}
+      ${crTimelineHTML(r)}
+      ${crHistoryHTML(r)}
+      <button class="btn-secondary btn-full" id="cr-past-close">סגור</button>
+    </div>`;
+  w.style.display = 'flex';
+  // The season rows inside a past run open their XI the same way the live ones
+  // do — crShowSeasonXI reads the ARCHIVED run when the live one has no such year.
+  _crViewRun = r;
+  crWireHistory();
+  const close = () => { w.style.display = 'none'; _crViewRun = null; };
+  document.getElementById('cr-past-close').onclick = close;
+  w.onclick = e => { if (e.target === w) close(); };
+}
+
+// Which run the history rows currently on screen belong to. Null means the live
+// one; a past career sets it while its modal is open.
+let _crViewRun = null;
+
+// The small icons that ride on a season row
+function crSeasonTrophies(h) {
+  if (typeof trophySVG !== 'function') return '';
+  const out = [];
+  if (h.champion) out.push(trophySVG('league', { size: 17 }));
+  if (h.cupWon)   out.push(trophySVG('cup',    { size: 17 }));
+  if (h.euTrophy) out.push(trophySVG(h.euTrophy, { size: 17 }));
+  return out.length ? `<span class="cr-row-tro">${out.join('')}</span>` : '';
 }
 
 function crOnSeasonEnd(res) {
@@ -697,6 +1179,11 @@ function crOnSeasonEnd(res) {
       // and the cup gives out a European place. crRecordEurope corrects it the
       // moment the allocation is actually settled.
       champion, europe: champion,
+      // The XI that actually played this season, kept so a finished dynasty can
+      // be read back season by season. Stored the way every other squad here is
+      // — squad id + name, never a copy of the ratings — so a corrected rating
+      // shows up in the archive too instead of freezing a stale number.
+      xi: crPacksPicks(state.picks),
     });
     if (champion) run.titles++;
     // Who has been here before, and for how long. Counted before the XI is
@@ -914,11 +1401,16 @@ function crRenderOver(box, run) {
         <div><span>${run.history.reduce((s, h) => s + h.points, 0)}</span>נקודות</div>
       </div>
     </div>
+    ${crHonoursHTML(run)}
+    ${crTimelineHTML(run)}
     ${crHistoryHTML(run)}
+    ${crPastHTML({ always: true, exclude: run.archiveId })}
     ${crShareButtonHTML('btn-primary btn-full')}
     <div id="cr-board"></div>
     <button class="btn-secondary btn-full" id="cr-new" style="margin-top:8px">👑 קריירה חדשה</button>`;
 
+  crWireHistory();
+  crWirePast();
   document.getElementById('cr-new').onclick = () => {
     crClear();
     if (typeof clearDraftState === 'function') clearDraftState();

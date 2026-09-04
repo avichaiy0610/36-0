@@ -24,11 +24,18 @@ async function showProfile() {
   }
 
   body.innerHTML = '<div class="page-loading">טוען...</div>';
-  let s;
+  let s, held = {};   // key -> times won
   try {
-    const { data, error } = await _supabase.rpc('player_stats');
-    if (error) throw error;
-    s = data || {};
+    // The trophies ride along with the stats — two independent reads, one wait,
+    // and the honours row is drawn from what the account actually holds.
+    const user = getCurrentUser();
+    const [statsRes, achRes] = await Promise.all([
+      _supabase.rpc('player_stats'),
+      _supabase.from('user_achievements').select('achievement_key, times_earned').eq('user_id', user.id),
+    ]);
+    if (statsRes.error) throw statsRes.error;
+    s = statsRes.data || {};
+    (achRes.data || []).forEach(r => { held[r.achievement_key] = Math.max(1, +r.times_earned || 1); });
   } catch (e) {
     body.innerHTML = '<p class="page-note">לא הצלחנו לטעון את הסטטיסטיקות. נסה שוב עוד רגע.</p>';
     return;
@@ -37,7 +44,69 @@ async function showProfile() {
     body.innerHTML = '<p class="page-note">עוד לא סיימת עונה. שחק אחת, והמספרים יתחילו להצטבר כאן.</p>';
     return;
   }
-  renderProfile(body, s);
+  renderProfile(body, s, held);
+}
+
+/* ── the honours row ────────────────────────────────────────────────────────
+   What this account has EVER lifted, across every mode, and how many times.
+   The league title is counted by player_stats off the results table; the four
+   cups are counted by times_earned on their own badge, which the cup and
+   European submits increment once per run (20260904000001_count_trophies.sql).
+
+   A shelf shows ✓ rather than a number when the badge exists but has never been
+   incremented — every row predating that migration sits at times_earned = 1, and
+   printing "×1" for a player who has four State Cups would be a worse lie than
+   saying nothing. So: a real count when there is one, a tick when there is only
+   the fact. */
+const PF_TROPHY_KEYS = {
+  league: null,          // counted, not badged
+  cup:  'cup_win',
+  ucl:  'eu_bigears',
+  uel:  'eu_uel',
+  uecl: 'eu_uecl',
+};
+
+function honoursHTML(s, held) {
+  if (typeof trophySVG !== 'function') return '';
+  const has = k => !!held[k];
+  const times = k => held[k] || 0;
+  const titles = Number(s.titles || 0);
+  const cells = ['league', 'cup', 'ucl', 'uel', 'uecl'].map(kind => {
+    const key = PF_TROPHY_KEYS[kind];
+    const won = kind === 'league' ? titles > 0 : has(key);
+    const n = kind === 'league' ? titles : times(key);
+    const val = !won ? '—' : (n > 1 ? '×' + n : (kind === 'league' ? '×1' : '✓'));
+    // the trophy, and its reflection in the shelf — same as the career cabinet
+    const art = trophySVG(kind, { size: 44, muted: !won });
+    return `
+      <div class="pf-hon${won ? '' : ' pf-hon-empty'}">
+        <div class="pf-hon-stand">
+          <div class="pf-hon-art">${art}</div>
+          <div class="pf-hon-mirror" aria-hidden="true">${art}</div>
+        </div>
+        <span class="pf-hon-n">${profEsc(val)}</span>
+        <span class="pf-hon-l">${profEsc(trophyName(kind, true))}</span>
+      </div>`;
+  }).join('');
+
+  const extras = [];
+  if (has('cup_double')) extras.push('👑 דאבל');
+  if (has('eu_treble'))  extras.push('🌍 שלושת המפעלים');
+  if (has('cr_dynasty')) extras.push('🏰 שושלת');
+  const kinds = ['cup', 'ucl', 'uel', 'uecl'].filter(k => has(PF_TROPHY_KEYS[k])).length + (titles ? 1 : 0);
+  const total = titles + ['cup', 'ucl', 'uel', 'uecl'].reduce((a, k) => a + times(PF_TROPHY_KEYS[k]), 0);
+
+  return `
+    <div class="pf-card">
+      <div class="pf-card-title">🏛 ארון התארים</div>
+      <div class="pf-hon-case"><div class="pf-hon-row">${cells}</div></div>
+      <div class="pf-sub pf-hon-sub">${
+        kinds ? `${total} ${total === 1 ? 'תואר' : 'תארים'} · ${kinds} מתוך 5 המפעלים`
+                + (extras.length ? ' · ' + extras.map(profEsc).join(' · ') : '')
+              : 'המדפים ריקים. יש חמישה למלא.'
+      }</div>
+      <p class="pf-note pf-hon-note">✓ = הורם, בלי מונה. גביעים שנזכו לפני שהספירה נכנסה מופיעים ככה.</p>
+    </div>`;
 }
 
 // The season worth bragging about, with the XI that did it one tap away.
@@ -61,7 +130,7 @@ function bestCardHTML(s) {
     </div>`;
 }
 
-function renderProfile(body, s) {
+function renderProfile(body, s, held) {
   const teamName = id => (typeof TEAMS === 'object' && TEAMS[id] ? TEAMS[id].name : id);
   const games = (s.wins || 0) + (s.draws || 0) + (s.losses || 0);
   const winPct = games ? Math.round((s.wins / games) * 100) : 0;
@@ -82,7 +151,11 @@ function renderProfile(body, s) {
       ${tile(s.achievements || 0, 'הישגים')}
     </div>
 
+    ${honoursHTML(s, held || {})}
+
     ${bestCardHTML(s)}
+
+    ${typeof daListHTML === 'function' ? daListHTML() : ''}
 
     <div class="pf-card">
       <div class="pf-card-title">📊 המאזן שלך</div>
@@ -114,6 +187,8 @@ function renderProfile(body, s) {
       ? `<p class="pf-note">שיחקת ${profEsc(s.seasons_played)} עונות, מתוכן ${profEsc(s.seasons_saved)} נשמרו ללוח השיאים. עונות שלא שמרת נספרות כאן אבל אין להן פירוט.</p>`
       : ''}
   `;
+
+  if (typeof daWire === 'function') daWire();
 
   const btn = document.getElementById('pf-view-squad');
   if (btn && s.best) {

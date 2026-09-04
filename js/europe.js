@@ -485,6 +485,13 @@ async function euSubmit(c) {
     track('finish', 'europe', c.result === 'won' ? 'trophy'
                             : c.league ? String(c.league.rank) : 'qual');
   }
+  // A career's honours cabinet is filled here and nowhere else: this campaign
+  // is played AFTER the season screen has been left, so nothing earlier can
+  // know whether the dynasty came home with the cup or just with the trip.
+  if (c.result && typeof crRecordEuTrophy === 'function' &&
+      typeof state !== 'undefined' && state && state.career) {
+    crRecordEuTrophy(state.career.year, c.tier || 'ucl', c.result === 'won');
+  }
   if (typeof getCurrentUser !== 'function' || !getCurrentUser()) return;
 
   const L = c.league;

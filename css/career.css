@@ -176,3 +176,203 @@
 .cr-sp-mute input { accent-color: var(--accent); cursor: pointer; }
 .cr-chem { display: block; font-size: 11px; font-weight: 700; color: #22d3ee; margin-top: 4px; }
 .cr-p-chem { border-color: #22d3ee55; }
+
+/* ── ארון התארים ─────────────────────────────────────────────────────────────
+   Five floating icons in a row read as a stat strip, not as a cabinet. What
+   makes it a cabinet is that each trophy STANDS on something and is mirrored in
+   it — so there is a lit shelf, a ledge under it, and a flipped fading copy of
+   every trophy below the line. Shelves you have not filled keep their silhouette
+   rather than emptying, because the gap is half of what a cabinet says. */
+.cr-cabinet {
+  background:
+    radial-gradient(120% 80% at 50% 0%, #ffd7001a 0%, transparent 62%),
+    linear-gradient(180deg, #161c28 0%, #10141d 100%);
+  border: 1px solid #2f374a; border-radius: 14px;
+  padding: 14px 6px 10px; margin-bottom: 14px;
+  box-shadow: inset 0 1px 0 #ffffff10, 0 6px 18px #0006;
+}
+.cr-hon-row { display: flex; justify-content: space-around; align-items: flex-end; gap: 2px; }
+.cr-hon { display: flex; flex-direction: column; align-items: center; flex: 1; min-width: 0; }
+
+/* the trophy, and its reflection in the shelf */
+.cr-hon-stand { position: relative; display: flex; flex-direction: column; align-items: center; }
+.cr-hon-art { line-height: 0; filter: drop-shadow(0 2px 3px #0009); }
+.cr-hon-mirror {
+  line-height: 0; margin-top: 1px; opacity: .2;
+  transform: scaleY(-1);
+  -webkit-mask-image: linear-gradient(to top, transparent 0%, #000 78%);
+  mask-image: linear-gradient(to top, transparent 0%, #000 78%);
+  height: 15px; overflow: hidden; pointer-events: none;
+}
+.cr-hon-empty .cr-hon-art { filter: none; opacity: .5; }
+.cr-hon-empty .cr-hon-mirror { opacity: .08; }
+
+/* the ledge each row of trophies stands on */
+.cr-hon-row::after { content: none; }
+.cr-cabinet .cr-hon-row {
+  border-bottom: 1px solid #ffffff14;
+  box-shadow: 0 1px 0 #0008;
+  padding-bottom: 2px;
+}
+
+.cr-hon-n {
+  font-size: .8rem; font-weight: 900; color: #0f1218;
+  background: linear-gradient(180deg, #FFE27A, #E8A33D);
+  border-radius: 9px; padding: 0 7px; margin-top: 7px;
+  box-shadow: 0 1px 2px #0007;
+}
+.cr-hon-empty .cr-hon-n {
+  color: var(--dim); background: none; box-shadow: none; font-weight: 700;
+}
+.cr-hon-l {
+  font-size: .62rem; color: var(--dim); text-align: center; margin-top: 3px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;
+}
+.cr-hon-sub {
+  text-align: center; font-size: .78rem; color: var(--dim);
+  margin-top: 10px; padding-top: 9px; border-top: 1px solid #2b3242;
+}
+.cr-hon-sub b { color: var(--accent); }
+
+/* the one line that says the rows do something */
+.cr-hint {
+  font-size: .7rem; color: var(--dim); text-align: center;
+  margin: -4px 0 7px; opacity: .85;
+}
+
+/* trophies riding on a season row, and where a cup run ended */
+.cr-row-tro { display: inline-flex; align-items: center; gap: 1px; vertical-align: -4px; margin-inline-start: 3px; }
+.cr-row-cup { color: var(--dim); }
+.cr-row-xi { cursor: pointer; }
+.cr-row-xi:hover { background: #1b2233; }
+.cr-row-open {
+  display: inline-block; font-size: .64rem; font-weight: 800;
+  color: var(--accent); background: #ffd70014; border: 1px solid #ffd70038;
+  border-radius: 7px; padding: 1px 7px; margin-top: 4px; white-space: nowrap;
+}
+.cr-row-xi:hover .cr-row-open { background: #ffd7002a; }
+
+/* the XI that played a given season */
+.cr-xi-wrap {
+  position: fixed; inset: 0; background: #000a; z-index: 120;
+  display: none; align-items: center; justify-content: center; padding: 16px;
+}
+.cr-xi-box {
+  background: var(--surface); border: 1px solid #2b3242; border-radius: 14px;
+  padding: 14px; width: 100%; max-width: 380px; max-height: 82vh; overflow-y: auto;
+}
+.cr-xi-head { display: flex; flex-direction: column; gap: 2px; margin-bottom: 6px; }
+.cr-xi-head > span:first-child { font-weight: 900; color: #fff; font-size: 1rem; }
+.cr-xi-meta { font-size: 0.75rem; color: var(--dim); }
+.cr-xi-tro { display: flex; gap: 4px; align-items: center; margin-bottom: 8px; min-height: 22px; }
+.cr-xi-none { font-size: 0.72rem; color: var(--dim); }
+.cr-xi-list { display: flex; flex-direction: column; gap: 3px; margin-bottom: 12px; }
+.cr-xi-row {
+  display: grid; grid-template-columns: 40px 1fr auto 30px; gap: 6px;
+  align-items: center; padding: 5px 7px; border-radius: 7px; background: var(--surface2);
+  font-size: 0.8rem;
+}
+.cr-xi-pos { font-size: 0.62rem; font-weight: 800; color: var(--dim); }
+.cr-xi-name { color: #fff; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cr-xi-club { font-size: 0.66rem; color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cr-xi-ovr { font-weight: 900; color: var(--accent); text-align: center; }
+
+/* ── קריירות קודמות ──────────────────────────────────────────────────────── */
+.cr-past-sum {
+  text-align: center; font-size: 0.78rem; color: var(--dim);
+  margin: -4px 0 8px;
+}
+.cr-past-sum b { color: var(--accent); }
+.cr-past-row { cursor: pointer; }
+.cr-past-row:hover { background: #1b2233; }
+.cr-past-tro { display: inline-flex; align-items: center; gap: 1px; vertical-align: -3px; margin-inline-start: 4px; }
+.cr-past-tro i { font-style: normal; font-size: 0.62rem; font-weight: 800; color: var(--accent); margin-inline-end: 3px; }
+.cr-past-none { font-style: normal; font-size: 0.66rem; color: var(--dim); }
+.cr-past-box { max-width: 420px; }
+.cr-past-box .cr-cabinet { margin-bottom: 10px; }
+.cr-past-box .section-label { margin-top: 10px; }
+/* an XI opened from inside a past career has to sit on top of it */
+.cr-xi-top { z-index: 130; }
+
+/* a section that says it exists before it has anything in it — the alternative
+   is a feature nobody finds until they have already used it */
+.cr-past-empty {
+  font-size: .76rem; color: var(--dim); line-height: 1.65;
+  background: var(--surface2); border: 1px dashed #333c50;
+  border-radius: 10px; padding: 11px 13px; margin-bottom: 14px;
+}
+
+/* ── the dynasty over time ───────────────────────────────────────────────────
+   A table of seasons tells you what happened one row at a time; it does not
+   show the ARC. One column per season, its height the finishing position, with
+   the silverware marked above it — so a decade reads in one glance. */
+.cr-tl {
+  display: flex; align-items: flex-end; gap: 3px;
+  background: var(--surface2); border: 1px solid #2b3242; border-radius: 12px;
+  padding: 10px 8px 8px; margin-bottom: 14px;
+}
+.cr-tl-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 0; }
+.cr-tl-tro { height: 15px; display: flex; align-items: flex-end; gap: 1px; }
+.cr-tl-bar {
+  width: 100%; max-width: 26px; border-radius: 4px 4px 2px 2px;
+  background: linear-gradient(180deg, #3c4459, #2b3242);
+  position: relative;
+}
+.cr-tl-rank {
+  font-size: .62rem; font-weight: 900; color: #fff;
+  position: absolute; top: 2px; left: 0; right: 0; text-align: center;
+}
+.cr-tl-yr { font-size: .55rem; color: var(--dim); white-space: nowrap; }
+.cr-tl-clubs { font-size: .55rem; color: var(--dim); opacity: .8; }
+.cr-tl-legend {
+  font-size: .68rem; color: var(--dim); text-align: center;
+  margin: -8px 0 12px;
+}
+
+/* ── the winter window, per season ───────────────────────────────────────────
+   The most interesting thing that happens to a squad all year used to leave no
+   trace: the archive kept the XI that finished and the swap that produced it
+   was invisible. Both futures are simulated from one seed, so this can also say
+   what the door you did not open would have finished on. */
+.cr-jan {
+  background: #12161f; border: 1px solid #2b3242; border-inline-start: 3px solid #4a5570;
+  border-radius: 9px; padding: 9px 11px; margin-bottom: 9px;
+}
+.cr-jan-took { border-inline-start-color: #7aa2ff; background: #131a26; }
+.cr-jan-h { font-size: .72rem; font-weight: 800; color: #9fb4d9; margin-bottom: 5px; }
+.cr-jan-swap { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; font-size: .82rem; }
+.cr-jan-out { color: var(--dim); text-decoration: line-through; }
+.cr-jan-out b, .cr-jan-in b { font-weight: 900; }
+.cr-jan-in { color: #fff; font-weight: 700; }
+.cr-jan-in b { color: var(--accent); }
+.cr-jan-arrow { color: #7aa2ff; font-weight: 900; }
+.cr-jan-sub { font-size: .68rem; color: var(--dim); margin-top: 4px; line-height: 1.5; }
+.cr-jan-sub b { color: #fff; }
+.cr-jan-verdict { font-size: .7rem; font-weight: 800; margin-top: 6px; color: var(--dim); }
+.cr-jan-verdict.good { color: #6bd47f; }
+.cr-jan-verdict.bad  { color: #e07a7a; }
+.cr-row-jan { margin-inline-start: 4px; opacity: .8; }
+
+/* which clubs the eleven was built from, not just how many */
+.cr-xi-clubs { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin-bottom: 9px; }
+.cr-xi-clubs i { font-style: normal; font-size: .66rem; color: var(--dim); margin-inline-end: 2px; }
+.cr-xi-clubchip {
+  font-size: .64rem; color: var(--dim); background: var(--surface2);
+  border: 1px solid #2b3242; border-radius: 7px; padding: 1px 6px;
+}
+.cr-xi-clubchip b { color: #fff; font-weight: 800; }
+
+/* the man the window brought in */
+.cr-xi-new { background: #16233a; border: 1px solid #2f4468; }
+.cr-xi-tag {
+  font-style: normal; font-size: .58rem; font-weight: 800; color: #0f1218;
+  background: #7aa2ff; border-radius: 5px; padding: 0 4px; margin-inline-start: 4px;
+}
+
+/* a numbered dynasty, so a list of them reads as a shelf of runs */
+.cr-past-no {
+  width: 22px; flex-shrink: 0; text-align: center;
+  font-size: .74rem; font-weight: 900; color: var(--accent);
+  background: #ffd7001a; border: 1px solid #ffd70033; border-radius: 6px;
+}
+.cr-past-row .lb-name b { color: #fff; font-weight: 900; }

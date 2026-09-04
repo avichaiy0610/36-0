@@ -2852,3 +2852,76 @@ body {
 .sal-review-none { font-size: 12.5px; color: var(--dim); margin: 12px 0; text-align: center; }
 .sal-review-list { display: flex; flex-direction: column; gap: 5px; max-height: 260px; overflow-y: auto; margin-bottom: 12px; }
 #sal-review .sal-rel { width: 100%; }
+
+/* ── lifetime honours on the profile ────────────────────────────────────────
+   The same cabinet as the career screen (css/career.css), because it is the
+   same object and it looked cheap having the polish in only one of the two
+   places a trophy is shown. Every trophy stands on a lit shelf and is mirrored
+   in it; a competition never won keeps its silhouette rather than emptying. */
+.pf-hon-case {
+  background:
+    radial-gradient(120% 80% at 50% 0%, #ffd7001a 0%, transparent 62%),
+    linear-gradient(180deg, #161c28 0%, #10141d 100%);
+  border: 1px solid #2f374a; border-radius: 12px;
+  padding: 13px 6px 9px; margin: 6px 0 2px;
+  box-shadow: inset 0 1px 0 #ffffff10;
+}
+.pf-hon-row {
+  display: flex; justify-content: space-around; align-items: flex-end; gap: 2px;
+  border-bottom: 1px solid #ffffff14; box-shadow: 0 1px 0 #0008; padding-bottom: 2px;
+}
+.pf-hon { display: flex; flex-direction: column; align-items: center; flex: 1; min-width: 0; }
+.pf-hon-stand { position: relative; display: flex; flex-direction: column; align-items: center; }
+.pf-hon-art { line-height: 0; filter: drop-shadow(0 2px 3px #0009); }
+.pf-hon-mirror {
+  line-height: 0; margin-top: 1px; opacity: .2; transform: scaleY(-1);
+  -webkit-mask-image: linear-gradient(to top, transparent 0%, #000 78%);
+  mask-image: linear-gradient(to top, transparent 0%, #000 78%);
+  height: 15px; overflow: hidden; pointer-events: none;
+}
+.pf-hon-empty .pf-hon-art { filter: none; opacity: .5; }
+.pf-hon-empty .pf-hon-mirror { opacity: .08; }
+.pf-hon-n {
+  font-size: .8rem; font-weight: 900; color: #0f1218;
+  background: linear-gradient(180deg, #FFE27A, #E8A33D);
+  border-radius: 9px; padding: 0 7px; margin-top: 7px; box-shadow: 0 1px 2px #0007;
+}
+.pf-hon-empty .pf-hon-n { color: #5a6472; background: none; box-shadow: none; font-weight: 700; }
+.pf-hon-l {
+  font-size: .62rem; color: #8b949e; text-align: center; margin-top: 3px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;
+}
+.pf-hon-sub { text-align: center; margin-top: 10px; }
+.pf-hon-sub b { color: #FFD700; }
+.pf-hon-note { font-size: .66rem; opacity: .75; margin-top: 4px; text-align: center; }
+
+/* a photographed trophy on an unfilled shelf: same promise as the muted drawing */
+img.trophy.trophy-muted { filter: grayscale(1) brightness(.55) contrast(.9); }
+img.trophy { display: block; }
+
+/* ── the draft archive on the profile (js/draft-archive.js) ──────────────── */
+.da-count {
+  font-size: .7rem; font-weight: 800; color: #0f1218;
+  background: linear-gradient(180deg, #FFE27A, #E8A33D);
+  border-radius: 8px; padding: 0 6px; margin-inline-start: 6px;
+}
+.da-hint { font-size: .7rem; color: #8b949e; margin: -2px 0 8px; opacity: .85; }
+.da-list { display: flex; flex-direction: column; gap: 4px; }
+.da-row {
+  display: grid; grid-template-columns: auto 1fr auto auto; gap: 8px; align-items: center;
+  background: #161b22; border: 1px solid #262d3a; border-radius: 9px;
+  padding: 7px 9px; cursor: pointer;
+}
+.da-row:hover { background: #1b2233; border-color: #3a4459; }
+.da-mode { font-size: .66rem; color: #8b949e; white-space: nowrap; }
+.da-main { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.da-main b { font-size: .84rem; color: #FFD700; font-weight: 900; }
+.da-main i { font-style: normal; font-size: .66rem; color: #8b949e; }
+.da-main svg, .da-main img { vertical-align: -3px; }
+.da-when { font-size: .64rem; color: #6b7684; white-space: nowrap; }
+.da-open { font-size: .8rem; opacity: .75; }
+.da-more { font-size: .66rem; color: #6b7684; text-align: center; margin-top: 7px; }
+.da-empty {
+  font-size: .76rem; color: #8b949e; line-height: 1.65;
+  background: #161b22; border: 1px dashed #333c50; border-radius: 10px; padding: 11px 13px;
+}

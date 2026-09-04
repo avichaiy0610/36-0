@@ -32,3 +32,14 @@ build_seo_pages.js
 runs.json
 allruns.json
 taps_runs.txt
+
+# The trophy pipeline is committed despite the blanket *.py above. Without it
+# js/trophy-art.js cannot be rebuilt from anywhere but one laptop — which is
+# exactly how build_seo_pages.js ended up carrying two bugs nobody could see.
+!scripts/build_trophies.py
+
+# The source PHOTOGRAPHS stay out: this repo is public and they are somebody
+# else's product shots. What ships is the derived, cut-down art in
+# js/trophy-art.js. The README explains what to drop here to rebuild.
+_trophy_refs/*
+!_trophy_refs/README.txt
