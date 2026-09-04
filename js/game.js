@@ -352,8 +352,12 @@ const GOAL_W = {
 const GOAL_QUALITY_K = 0.045;
 // Tags tilt who scores, never whether you win: the scoreline is settled by the
 // line ratings before these are consulted.
+// The manager joins the same product: he never changes how many goals the side
+// scores, only which shirt they end up next to. A front-foot manager puts them
+// through the spearhead, and the rest spread them around.
 const goalWeight   = p => (GOAL_W[p.slotPos]   ?? 0) * Math.exp(GOAL_QUALITY_K * (p.ovr - 80))
-  * (!classicMode() && typeof tagGoalMult   === 'function' ? tagGoalMult(p.name, p.slotPos)   : 1);
+  * (!classicMode() && typeof tagGoalMult   === 'function' ? tagGoalMult(p.name, p.slotPos)   : 1)
+  * (typeof coachGoalMult === 'function' ? coachGoalMult(p.slotPos) : 1);
 const assistWeight = p => (ASSIST_W[p.slotPos] ?? 0) * Math.exp(GOAL_QUALITY_K * (p.ovr - 80))
   * (!classicMode() && typeof tagAssistMult === 'function' ? tagAssistMult(p.name, p.slotPos) : 1);
 const ASSIST_W = {
@@ -711,13 +715,20 @@ function myLineRatings(ovrAt) {
   const line = (positions) => calcGroupOVR(positions, ovrAt) ?? ovr;
   const t = TACTICS[tacticOf(typeof state !== 'undefined' ? state.tactic : 'bal')] || TACTICS.bal;
   const win = tagWinnerBoost();
+  // The manager. His EDGE is what his trophies are worth and rides on the same
+  // four lines as a dressing room of winners, in the same order of magnitude; his
+  // clean-sheet multiplier rides on the tag's own lever. Both are zero-effect
+  // with nobody appointed, and both travel from here into the cup, Europe and
+  // the gauntlet without any of them knowing a manager exists.
+  const cEdge = typeof coachEdge === 'function' ? coachEdge() : 0;
+  const cClean = typeof coachCleanMult === 'function' ? coachCleanMult() : 1;
   return {
     ovr,
-    atk: line(SIM2_LINES.atk.pos) + t.atk + tagAtkBoost() + win,
-    mid: line(SIM2_LINES.mid.pos) + win,
-    def: line(SIM2_LINES.def.pos) + t.def + win,
-    gk:  line(SIM2_LINES.gk.pos) + win,
-    cs:  tagCleanBoost(),
+    atk: line(SIM2_LINES.atk.pos) + t.atk + tagAtkBoost() + win + cEdge,
+    mid: line(SIM2_LINES.mid.pos) + win + cEdge,
+    def: line(SIM2_LINES.def.pos) + t.def + win + cEdge,
+    gk:  line(SIM2_LINES.gk.pos) + win + cEdge,
+    cs:  tagCleanBoost() * cClean,
   };
 }
 
@@ -2203,7 +2214,10 @@ function simulateMatchV1(myOvr, opp, homeOverride = null) {
 // byte-identically — see the compatibility table in the design spec.
 function simulateMatch(me, opp, homeOverride = null, engine = 1) {
   if (engine >= 2 && typeof me === 'object' && me !== null) {
-    return simulateMatchV2(me, opp, homeOverride);
+    // The manager, if there is one. `coachSimMods` returns null with no manager
+    // appointed, and simulateMatchV2 then runs exactly as it did before it existed.
+    return simulateMatchV2(me, opp, homeOverride,
+      typeof coachSimMods === 'function' ? coachSimMods() : null);
   }
   return simulateMatchV1(typeof me === 'number' ? me : me.ovr, opp, homeOverride);
 }
@@ -2232,7 +2246,9 @@ function generateMatches(me, oppTeams = IL_TEAMS_SIM, spec = MODERN_FORMAT, engi
   const ovr = typeof me === 'number' ? me : me.ovr;
   // One form swing for the whole campaign, drawn before any match. V1 never had
   // this and is left alone; its results are frozen.
-  if (engine >= 2 && typeof me === 'object' && me !== null) me = simApplySeasonForm(me);
+  if (engine >= 2 && typeof me === 'object' && me !== null) {
+    me = simApplySeasonForm(me, typeof coachFormMult === 'function' ? coachFormMult() : 1);
+  }
   if (!isModernSpec(spec)) return generateAuthenticMatches(me, oppTeams, spec, engine, halfHook);
   // ── שלב הליגה: 26 משחקים (13 יריבים × בית + חוץ) ───────────────────────────
   const regPool    = shuffleArr([...oppTeams, ...oppTeams]);

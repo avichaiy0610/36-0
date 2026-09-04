@@ -87,8 +87,14 @@ function simFormSwing() {
 
 // Apply a season's form to the player's line ratings. Returns a copy — the caller
 // keeps its own object, which the results card still renders unmodified.
-function simApplySeasonForm(me) {
-  const f = SIM2_SEASON_FORM_SD * simFormSwing();
+//
+// `sdMult` is the manager's grip on the year and defaults to none. A drilled side
+// lands on its projection and a volatile one does not, which costs nothing in
+// expectation — the swing is symmetric, so widening or narrowing it moves no
+// average anywhere. It is the one lever here that is neutral by construction
+// rather than by measurement.
+function simApplySeasonForm(me, sdMult) {
+  const f = SIM2_SEASON_FORM_SD * (sdMult || 1) * simFormSwing();
   return { ovr: me.ovr, atk: me.atk + f, mid: me.mid + f, def: me.def + f, gk: me.gk + f,
            cs: me.cs };            // a clean-sheet bonus is not form, it travels
 }
@@ -128,12 +134,20 @@ function simDefGk(t) {
 }
 
 // Expected goals for `me` against `opp`. Both are shrunk line-rating objects.
-function simExpectedGoals(me, opp, home) {
+//
+// `mult` scales this side's xG and is OPTIONAL: with nothing passed this is the
+// identical calculation it has always been, which is what lets the cup, Europe,
+// the gauntlet and the golden-file harnesses keep calling it unchanged. It is a
+// plain number rather than an options object on purpose — the caller decides
+// what it MEANS (a manager's tempo, his home fortress), and this function only
+// ever multiplies.
+function simExpectedGoals(me, opp, home, mult) {
   const xg = SIM2.BASE
     * Math.exp(SIM2.KA * (me.atk - 80))
     * Math.exp(SIM2.KD * (80 - simDefGk(opp)))
     * Math.exp(SIM2.T  * (me.mid - opp.mid))
-    * (home ? SIM2.HOME : 1);
+    * (home ? SIM2.HOME : 1)
+    * (mult || 1);
   return Math.min(SIM2.MU_MAX, xg);
 }
 
@@ -157,11 +171,24 @@ function simDrawGoals(xg, csMult) {
 }
 
 // me / opp: { ovr, atk, mid, def, gk }. Returns the same shape as V1.
-function simulateMatchV2(me, opp, homeOverride = null) {
+//
+// `mods` is the manager, and it is OPTIONAL — without it this is byte-for-byte
+// the match it has always been. Two knobs, both deliberately even-handed:
+//   · `tempo` scales BOTH sides. A manager who plays 1-0s and one who plays 4-3s
+//     take the same points from the same eleven; only the season's noise level
+//     changes.
+//   · `venue` is a fortress. It is applied to the player at home and taken off
+//     him away, and mirrored onto the opponent, so over eighteen and eighteen it
+//     cancels out and only the shape of the season moves.
+function simulateMatchV2(me, opp, homeOverride = null, mods = null) {
   const home = homeOverride !== null ? homeOverride : Math.random() > 0.5;
   const a = simShrinkLines(me), b = simShrinkLines(opp);
-  const gf = simDrawGoals(simExpectedGoals(a, b, home));
-  const ga = simDrawGoals(simExpectedGoals(b, a, !home), me.cs);
+  const tempo = mods && mods.tempo ? mods.tempo : 1;
+  const v     = mods && mods.venue ? mods.venue : 1;
+  const mine  = tempo * (home ? v : 1 / v);
+  const yours = tempo * (home ? 1 / v : v);
+  const gf = simDrawGoals(simExpectedGoals(a, b, home, mine));
+  const ga = simDrawGoals(simExpectedGoals(b, a, !home, yours), me.cs);
   const outcome = gf > ga ? 'W' : gf === ga ? 'D' : 'L';
   return { outcome, gf, ga, opponent: opp.name, home };
 }
