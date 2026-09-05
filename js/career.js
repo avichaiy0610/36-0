@@ -62,6 +62,7 @@ function crBlank() {
     pending: null,             // the kept players waiting for the next draft
     history: [], titles: 0,
     stay: {}, longestStay: 0,   // how long each man has been here, and the record
+    coach: null, coachSince: 0, // the manager of the DYNASTY, and the season he arrived
     awarded: [],                // achievement keys already toasted for this run
     over: false, overReason: null,
   };
@@ -415,6 +416,7 @@ function crRenderDashboard(box, run) {
       ${pending ? `<div class="cr-next-kept">✅ ${pending.filter(Boolean).length} שחקנים כבר בסגל — נותרו ${pending.filter(p => !p).length} בחירות</div>` : ''}
       <button class="btn-primary btn-full" id="cr-play">⚽ ${pending ? 'המשך את הדראפט' : 'דראפט עונת ' + crEsc(yearToSeason(year))}</button>
     </div>
+    ${crCoachHTML(run)}
     ${crHonoursHTML(run)}
     ${crTimelineHTML(run)}
     ${crHistoryHTML(run)}
@@ -422,6 +424,8 @@ function crRenderDashboard(box, run) {
     <button class="lg-leave" id="cr-abandon">נטוש את הקריירה</button>`;
   document.getElementById('cr-play').onclick = () => crStartDraft();
   document.getElementById('cr-abandon').onclick = crAbandon;
+  const sack = document.getElementById('cr-sack');
+  if (sack) sack.onclick = crSackCoach;
   crWireHistory();
   crWirePast();
 }
@@ -624,6 +628,23 @@ function crWireShare() {
   if (btn) btn.onclick = () => crShare(btn);
 }
 
+// His name and the sentence written about him — the same two things the
+// appointment card shows, and for the same reason.
+function crCoachHTML(run) {
+  if (run.over) return '';
+  const c = run.coach;
+  const settling = c && run.seasonIdx === (run.coachSince || 0);
+  return `
+    <div class="lg-card cr-coach-card">
+      <div class="cr-next-label">המאמן</div>
+      ${c ? `<div class="cr-coach-name">${crEsc(c.name)}</div>
+             <div class="cr-coach-style">${crEsc(c.style || '')}</div>
+             ${settling ? '<div class="cr-coach-settle">עונה ראשונה שלו במועדון</div>' : ''}`
+          : '<div class="cr-coach-style">אין מאמן במועדון.</div>'}
+      <button class="lg-leave cr-sack" id="cr-sack">${c ? 'לפטר ולהביא מאמן חדש' : 'למנות מאמן'}</button>
+    </div>`;
+}
+
 function crHistoryHTML(run) {
   if (!run.history.length) return '';
   const rows = run.history.map(h => {
@@ -777,6 +798,47 @@ function crApplyStateFor(run) {
   state.formationId = FORMATIONS[run.formationId] ? run.formationId : '4-3-3';
   state.tactic      = tacticOf(run.tactic);
   state.classic     = run.classic === true;
+
+  // The manager belongs to the DYNASTY, not to the season: he is appointed once
+  // and stays until he is sacked. So the appointment screen is offered on the
+  // opening season and never again — a run that declined one can still hire from
+  // the dashboard, which is also where a sacking happens.
+  state.coachOn = run.seasonIdx === 0 && !run.coach;
+  state.coach   = run.coach
+    ? { ...run.coach, settling: run.seasonIdx === (run.coachSince || 0) }
+    : null;
+}
+
+/* ── the manager of a dynasty ─────────────────────────────────────────────── */
+// Called by coach.js the moment one is appointed inside a career season, so the
+// choice survives the season it was made in.
+function crOnCoachAppointed(rec) {
+  if (!state.career || !crHasRun()) return;
+  const run = crRun();
+  run.coach = rec ? { name: rec.name, style: rec.style, arch: rec.arch, tier: rec.tier } : null;
+  run.coachSince = run.seasonIdx;
+  crSave();
+  // His first season runs at half signature either way — a squad takes a year to
+  // learn a method, and that is what makes sacking cost something without a quota.
+  if (state.coach) state.coach.settling = true;
+}
+
+// Sacking is free and the replacement is DRAWN, never chosen. Free, because the
+// acclimatisation is the price: sack every year and no manager ever reaches full
+// strength. Drawn, because picking from a list would let a dynasty shop for the
+// style that suits its squad, and that is the one thing that turns a fair trade
+// into an advantage.
+function crSackCoach() {
+  const run = crRun();
+  if (run.over) return;
+  const had = run.coach;
+  const next = typeof coachDraw === 'function' ? coachDraw() : null;
+  if (!next) return;
+  run.coach = { name: next.name, style: next.style || '', arch: next.arch, tier: next.tier };
+  run.coachSince = run.seasonIdx;
+  crSave();
+  if (typeof coachShow === 'function') coachShow(run.coach, had ? 'המאמן החדש' : 'המאמן שלך', crRender);
+  else crRender();
 }
 
 function crStartDraft() {
@@ -1179,6 +1241,7 @@ function crOnSeasonEnd(res) {
       // and the cup gives out a European place. crRecordEurope corrects it the
       // moment the allocation is actually settled.
       champion, europe: champion,
+      coach: (state.coach && state.coach.name) || null,
       // The XI that actually played this season, kept so a finished dynasty can
       // be read back season by season. Stored the way every other squad here is
       // — squad id + name, never a copy of the ratings — so a corrected rating
@@ -1401,6 +1464,7 @@ function crRenderOver(box, run) {
         <div><span>${run.history.reduce((s, h) => s + h.points, 0)}</span>נקודות</div>
       </div>
     </div>
+    ${crCoachHTML(run)}
     ${crHonoursHTML(run)}
     ${crTimelineHTML(run)}
     ${crHistoryHTML(run)}

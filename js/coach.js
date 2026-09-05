@@ -270,15 +270,15 @@
   // Step 2. His name, and the sentence written about him. Nothing else — no
   // trophies, no line explaining what he changes. Whatever he does to the season
   // is for the season to show.
-  function reveal(c, onDone) {
+  function coachShow(c, kicker, onDone) {
     frame(`
-      <p class="coach-kicker">המאמן שלך</p>
+      <p class="coach-kicker">${kicker || 'המאמן שלך'}</p>
       <h3 class="coach-name">${c.name}</h3>
       <p class="coach-style">${c.style || ''}</p>
       <div class="coach-btns">
         <button class="coach-b go" id="coach-go">להמשיך עם ${coachFirstName(c.name)} ←</button>
       </div>`, true);
-    document.getElementById('coach-go').onclick = () => { close(); onDone(); };
+    document.getElementById('coach-go').onclick = () => { close(); if (onDone) onDone(); };
   }
 
   // Step 1. Two doors, and the promise the whole feature is built to keep.
@@ -294,6 +294,7 @@
       </div>`);
     document.getElementById('coach-none').onclick = () => {
       coachClear();
+      if (typeof crOnCoachAppointed === 'function') crOnCoachAppointed(null);
       if (typeof track === 'function') track('open', 'coach-none');
       close(); onDone();
     };
@@ -301,6 +302,9 @@
       const c = coachDraw();
       if (!c) { close(); onDone(); return; }
       coachAppoint(c, false);
+      // A career keeps its manager between seasons, so the appointment belongs to
+      // the RUN and not to this draft. crOnCoachAppointed is a no-op everywhere else.
+      if (typeof crOnCoachAppointed === 'function') crOnCoachAppointed(state.coach);
       if (typeof track === 'function') track('open', 'coach');
       if (typeof saveDraftState === 'function') saveDraftState();
       // A beat on the way, so the name lands as a draw and not as a form field.
@@ -311,7 +315,7 @@
       let n = 0;
       const t = setInterval(() => {
         el.textContent = COACHES[Math.floor(Math.random() * COACHES.length)].name;
-        if (++n >= 9) { clearInterval(t); reveal(c, onDone); }
+        if (++n >= 9) { clearInterval(t); coachShow(state.coach || c, 'המאמן שלך', onDone); }
       }, 90);
     };
   }
@@ -331,4 +335,5 @@
   global.coachClear     = coachClear;
   global.coachFirstName = coachFirstName;
   global.coachOpen      = coachOpen;
+  global.coachShow      = coachShow;
 })(typeof window !== 'undefined' ? window : globalThis);
