@@ -185,14 +185,44 @@
   }
 
   /* ── the draw ─────────────────────────────────────────────────────────────── */
-  // Uniform, with no weighting anywhere. The target was a legend about one time
-  // in twenty, and with only two of the 34 having won three titles the data
-  // already delivers 5.9% on its own — a weights table would have been code
-  // enforcing what was going to happen regardless. If the roster grows and the
-  // tier balance moves, THIS is the line to revisit.
-  function coachDraw() {
-    if (typeof COACHES === 'undefined' || !COACHES.length) return null;
-    return COACHES[Math.floor(Math.random() * COACHES.length)];
+  // Whether a man was actually standing on a touchline that season. `from`/`to`
+  // come from the Hebrew Wikipedia infobox and are absent for anyone the article
+  // does not date — and absent means eligible, never a guessed range.
+  // A season year of 2003 is the 2003/04 campaign, so it runs into 2004.
+  function coachActiveIn(c, year) {
+    if (!year || !c.from) return true;
+    return c.from <= year + 1 && c.to >= year;
+  }
+
+  // The pool a draw comes from. With a year, only the managers who were working
+  // then — a 1999/00 career should not be handed רן קוז'וך, who first took a
+  // senior job in 2018. Ten to thirty-one men qualify in any season the game
+  // covers, so this narrows the draw without ever emptying it; the guard is
+  // there for a future roster, not for today's.
+  function coachPool(year) {
+    if (typeof COACHES === 'undefined' || !COACHES.length) return [];
+    const pool = COACHES.filter(c => coachActiveIn(c, year));
+    return pool.length ? pool : COACHES;
+  }
+
+  // Uniform within the pool, with no weighting anywhere. The target was a legend
+  // about one time in twenty, and with only two of the 34 having won three titles
+  // the data already delivers 5.9% on its own — a weights table would have been
+  // code enforcing what was going to happen regardless. If the roster grows and
+  // the tier balance moves, THIS is the line to revisit.
+  function coachDraw(year) {
+    const pool = coachPool(year);
+    if (!pool.length) return null;
+    return pool[Math.floor(Math.random() * pool.length)];
+  }
+
+  // The season a draw should be dated to, or null when there is no single one.
+  // A draft locked to one year — every career season, and a narrowed era slider —
+  // has an answer; an all-time eleven spanning 1999 to 2026 does not, and asking
+  // "which era is this squad" would be inventing one.
+  function coachDraftYear() {
+    if (typeof state === 'undefined' || !state) return null;
+    return (state.eraMin && state.eraMin === state.eraMax) ? state.eraMin : null;
   }
 
   // What gets stored on the state: the four fields the game needs and not one
@@ -299,7 +329,7 @@
       close(); onDone();
     };
     document.getElementById('coach-draw').onclick = () => {
-      const c = coachDraw();
+      const c = coachDraw(coachDraftYear());
       if (!c) { close(); onDone(); return; }
       coachAppoint(c, false);
       // A career keeps its manager between seasons, so the appointment belongs to
@@ -312,9 +342,10 @@
              <h3 class="coach-h">מדברים עם כמה שמות…</h3>
              <p class="coach-spin" id="coach-spin">—</p>`);
       const el = document.getElementById('coach-spin');
+      const spin = coachPool(coachDraftYear());
       let n = 0;
       const t = setInterval(() => {
-        el.textContent = COACHES[Math.floor(Math.random() * COACHES.length)].name;
+        el.textContent = spin[Math.floor(Math.random() * spin.length)].name;
         if (++n >= 9) { clearInterval(t); coachShow(state.coach || c, 'המאמן שלך', onDone); }
       }, 90);
     };
@@ -330,6 +361,9 @@
   global.coachGoalMult  = coachGoalMult;
   global.coachEligible  = coachEligible;
   global.coachDraw      = coachDraw;
+  global.coachPool      = coachPool;
+  global.coachDraftYear = coachDraftYear;
+  global.coachActiveIn  = coachActiveIn;
   global.coachRecord    = coachRecord;
   global.coachAppoint   = coachAppoint;
   global.coachClear     = coachClear;
