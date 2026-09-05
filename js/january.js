@@ -103,7 +103,7 @@
       key: 'find', weight: 38,
       title: 'מציאה',
       blurb: 'סוכן מציע שחקן שאף אחד לא שם לב אליו. אתה חותם עיוור, בלי לראות אותו משחק.',
-      tell: 'שחקן שאף אחד לא חיפש, לחוליה החלשה בהרכב. לרוב זה שדרוג.',
+      tell: 'החלש בהרכב יוצא, וסוכן מביא מישהו שאף אחד לא חיפש. לרוב שדרוג.',
       slot: weakestIdx,
       // Leans hard upward, and the floor sits just under what you already have:
       // most of the time this is a real upgrade, and once in a while you signed
@@ -119,7 +119,7 @@
       key: 'offer', weight: 22,
       title: 'הצעה מחו״ל',
       blurb: 'מועדון זר קונה את הכוכב שלך והוא רוצה ללכת. הכסף קונה מחליף — לא באותה רמה.',
-      tell: 'קונים לך את הכוכב והוא רוצה ללכת. המחליף לא יהיה ברמה שלו.',
+      tell: 'הכוכב שלך יוצא — קונים אותו והוא רוצה ללכת. המחליף לא ברמה שלו.',
       slot: strongestIdx,
       band: cur => [cur - 10, cur - 1],
     },
@@ -127,7 +127,7 @@
       key: 'forced', weight: 15,
       title: 'מכירה כפויה',
       blurb: 'ההנהלה מוכרת מעל הראש שלך. שחקן אחד יוצא, מחליף אחד נכנס עיוור, ואין לך מה להגיד על זה.',
-      tell: 'ההנהלה מחליטה, לא אתה. הטלת מטבע.',
+      tell: 'ההנהלה מוכרת מי שבא לה — כל אחד בהרכב, גם הכוכב. המחליף: הטלת מטבע.',
       slot: () => {
         const live = state.picks.map((p, i) => (p ? i : -1)).filter(i => i >= 0);
         return live[Math.floor(Math.random() * live.length)];
@@ -138,7 +138,7 @@
       key: 'punt', weight: 25,
       title: 'הימור על נער',
       blurb: 'כישרון צעיר בלי עבר בליגה. או שהוא מתפוצץ, או שהוא לא.',
-      tell: 'כישרון לפני הפריצה. או שהוא מתפוצץ, או שלא.',
+      tell: 'גם כאן החלש בהרכב יוצא, אבל נכנס כישרון לפני הפריצה. או שהוא מתפוצץ, או שלא.',
       slot: weakestIdx,
       band: cur => [cur - 9, cur + 16],
       // Boom or bust by design, so only a gentle lean — but a lean, because a
@@ -167,6 +167,15 @@
   // and the bands stay the engine's business: quoting 15% or ±8 here would turn
   // a decision into arithmetic, and the sentence is the part that is actually
   // true at every squad strength.
+  //
+  // Every `tell` names WHO LEAVES first and the replacement second, because that
+  // is the axis the scenarios actually differ on and the first draft missed it.
+  // "מכירה כפויה" said only "ההנהלה מחליטה, לא אתה" — true, and true of all four,
+  // since you sign blind in every one of them. What makes it the dangerous one is
+  // `slot`: `weakestIdx` for מציאה and for the punt, `strongestIdx` for the bid,
+  // and a draw over every live slot here. A find can never cost you your best
+  // player; a forced sale can, and that is the sentence a player needs before he
+  // decides.
   //
   // Built from SCENARIOS rather than written out beside them, so a band and the
   // sentence describing it cannot drift apart, and so `unless` is honoured — in
