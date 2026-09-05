@@ -206,6 +206,24 @@ for (const ovr of OVRS) {
   console.log(`OVR ${ovr}: ${sgn(full.pts - plain.pts)} pts · ${sgn(full.title - plain.title)}pp of title chance`);
 }
 
+/* ── the gate needs enough seasons to mean anything ───────────────────────────
+ * A season's points have an SD near 7, so at 1,200 seasons a cell's mean carries
+ * an SE of ~0.2 and a DIFFERENCE of two of them ~0.29 — and the statistic being
+ * graded is the worst of thirty-six such differences, which overshoots by a
+ * couple of SE as a matter of course. A short run therefore goes red on numbers
+ * a long one passes comfortably (1.64 at 1,200 against 1.33 at 5,000), and a
+ * gate that cries wolf is a gate somebody eventually edits down. So a short run
+ * prints the table and declines to grade it.
+ */
+const MIN_N = 3000;
+if (N < MIN_N) {
+  console.log(`
+-- not graded --
+${N.toLocaleString()} seasons per cell is too few to judge a `
+    + `1.5-point threshold: the noise alone is worth about half of it. Re-run with ${MIN_N} or more.`);
+  process.exit(0);
+}
+
 console.log('\n── acceptance ──');
 const at = (arch, ovr, tier) => cell[`${arch}|${ovr}|${tier}`];
 const goals = r => r.gf + r.ga;
