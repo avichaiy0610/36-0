@@ -2634,7 +2634,7 @@ function buildLeagueTable(table, spec = MODERN_FORMAT) {
     const row = document.createElement('div');
     row.className = 'lt-row' + (t.us ? ' lt-us' : '');
     const nameHTML = t.us
-      ? `<span class="lt-name">הקבוצה שלי <span class="lt-us-badge">#${idx+1}</span></span>`
+      ? `<span class="lt-name">${myTeamName('הקבוצה שלי')} <span class="lt-us-badge">#${idx+1}</span></span>`
       : `<span class="lt-name">${t.name}</span>`;
     row.innerHTML = `
       <span class="lt-pos">${idx+1}</span>

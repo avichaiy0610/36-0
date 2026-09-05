@@ -319,7 +319,7 @@ function euLiveHTML(c, t, leg) {
         <span class="eu-vs">${euText('eu-vs', 'מול')} ${t.club.name}</span>
       </div>
       <div class="eu-live-top">
-        <span class="eu-side">${euText('eu-you', 'ההרכב שלי')} ${euBigCrest(null, '', euText('eu-you', 'ההרכב שלי'))}</span>
+        <span class="eu-side">${myTeamName(euText('eu-you', 'ההרכב שלי'))} ${euBigCrest(null, '', myTeamName(euText('eu-you', 'ההרכב שלי')))}</span>
         <!-- RTL row: your side renders on the right. The scoreline is dir=ltr, so
              its first child is leftmost and must be the OPPONENT's goals, or your
              own score ends up printed beside their name. -->
@@ -509,7 +509,7 @@ function euStandingsHTML(c) {
     const pos = offset + i + 1;
     const cls = pos <= 8 ? 'bye' : pos <= 24 ? 'po' : 'out';
     const name = t.us
-      ? `<span class="lt-name">${euText('eu-you', 'ההרכב שלי')} <span class="lt-us-badge">#${pos}</span></span>`
+      ? `<span class="lt-name">${myTeamName(euText('eu-you', 'ההרכב שלי'))} <span class="lt-us-badge">#${pos}</span></span>`
       : `<span class="lt-name">${euCrest(t.cid, t.flag, t.name)} ${t.name}</span>`;
     return `<div class="lt-row ${cls}${t.us ? ' lt-us' : ''}">
       <span class="lt-pos">${pos}</span>${name}

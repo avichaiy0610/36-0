@@ -273,7 +273,7 @@
     frame(`
       <div class="cup-kicker">🏆 ${meta.roundLong}</div>
       <div class="cup-top">
-        <span class="cup-side">${siteTextOr('cup-you', 'ההרכב שלי')}</span>
+        <span class="cup-side">${myTeamName(siteTextOr('cup-you', 'ההרכב שלי'))}</span>
         <span class="cup-score" dir="ltr"><b id="cup-them">0</b> – <b id="cup-me">0</b></span>
         <span class="cup-side">${opp.name}<i>${TIER_NAME[opp.tier]}</i></span>
       </div>
@@ -413,11 +413,11 @@
         // which is exactly how a 2-2 final looked like Maccabi Haifa's cup.
         return `<div class="cup-br-row${us ? ' me' : ''}${upset ? ' upset' : ''}">
           <span class="cup-br-go">${win.us ? '✓' : ''}</span>
-          <span class="cup-br-w">${win.us ? 'ההרכב שלי' : win.name}</span>${how}
+          <span class="cup-br-w">${win.us ? myTeamName('ההרכב שלי') : win.name}</span>${how}
           <span class="cup-br-s">${hi}</span>
           <span class="cup-br-d">–</span>
           <span class="cup-br-s">${lo}</span>
-          <span class="cup-br-l">${lose.us ? 'ההרכב שלי' : lose.name}</span>
+          <span class="cup-br-l">${lose.us ? myTeamName('ההרכב שלי') : lose.name}</span>
         </div>`;
       }).join('');
       // Past the last 16 the whole round fits; before that only yours is worth
