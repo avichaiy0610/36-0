@@ -3213,6 +3213,14 @@ function animateResults(ovr) {
     const hi = calcHighlights(matches);
     setEl('hl-streak', hi.maxStreak);
     setEl('hl-cs', hi.cs);
+    // The manager sits with the season's own numbers, not only in the header
+    // line above the tier — that is where a reader looks for what shaped the year.
+    const hlCoach = typeof coachActive === 'function' ? coachActive() : null;
+    const hlCoachBox = document.getElementById('hl-coach-box');
+    if (hlCoachBox) {
+      hlCoachBox.style.display = hlCoach ? '' : 'none';
+      if (hlCoach) setEl('hl-coach', hlCoach.name);
+    }
     const bigwinEl = document.getElementById('hl-bigwin');
     if (bigwinEl) {
       bigwinEl.innerHTML = hi.bigWin

@@ -630,13 +630,13 @@ function crWireShare() {
 
 // His name and the sentence written about him — the same two things the
 // appointment card shows, and for the same reason.
-function crCoachHTML(run) {
+function crCoachHTML(run, forYear) {
   if (run.over) return '';
   const c = run.coach;
-  const settling = c && run.seasonIdx === (run.coachSince || 0);
+  const settling = c && crNextIdx(run) === (run.coachSince || 0);
   return `
-    <div class="lg-card cr-coach-card">
-      <div class="cr-next-label">המאמן</div>
+    <div class="lg-card cr-coach-card" id="cr-coach-card">
+      <div class="cr-next-label">המאמן${forYear ? ' לעונת ' + crEsc(yearToSeason(forYear)) : ''}</div>
       ${c ? `<div class="cr-coach-name">${crEsc(c.name)}</div>
              <div class="cr-coach-style">${crEsc(c.style || '')}</div>
              ${settling ? '<div class="cr-coach-settle">עונה ראשונה שלו במועדון</div>' : ''}`
@@ -828,17 +828,39 @@ function crOnCoachAppointed(rec) {
 // strength. Drawn, because picking from a list would let a dynasty shop for the
 // style that suits its squad, and that is the one thing that turns a fair trade
 // into an advantage.
+// Which season an appointment made RIGHT NOW belongs to. On the dashboard that
+// is the season about to be drafted; on the transfer screen seasonIdx has not
+// been incremented yet, so it is the one after. Getting this wrong would date a
+// new manager to a season already played and quietly skip his settling year.
+function crNextIdx(run) {
+  return run.phase === 'played' ? run.seasonIdx + 1 : run.seasonIdx;
+}
+
 function crSackCoach() {
   const run = crRun();
   if (run.over) return;
   const had = run.coach;
-  const next = typeof coachDraw === 'function' ? coachDraw() : null;
+  const idx = crNextIdx(run);
+  // Drawn from the managers who were actually working that season — a 2004/05
+  // dynasty does not get handed a man whose first senior job was in 2018.
+  const next = typeof coachDraw === 'function' ? coachDraw(run.startYear + idx) : null;
   if (!next) return;
   run.coach = { name: next.name, style: next.style || '', arch: next.arch, tier: next.tier };
-  run.coachSince = run.seasonIdx;
+  run.coachSince = idx;
   crSave();
-  if (typeof coachShow === 'function') coachShow(run.coach, had ? 'המאמן החדש' : 'המאמן שלך', crRender);
-  else crRender();
+  // Only the card is redrawn. A full crRender() would be fine on the dashboard
+  // and destructive on the transfer screen, which is holding a keep-selection
+  // the player has already made.
+  crRefreshCoachCard(run);
+  if (typeof coachShow === 'function') coachShow(run.coach, had ? 'המאמן החדש' : 'המאמן שלך', null);
+}
+
+function crRefreshCoachCard(run) {
+  const el = document.getElementById('cr-coach-card');
+  if (!el) { crRender(); return; }
+  el.outerHTML = crCoachHTML(run);
+  const b = document.getElementById('cr-sack');
+  if (b) b.onclick = crSackCoach;
 }
 
 function crStartDraft() {
@@ -1394,6 +1416,7 @@ function crRenderTransfer(box, run) {
       עונת ${crEsc(yearToSeason(crYear(run)))} הסתיימה במקום <strong>${last?.rank ?? '?'}</strong>
       מתוך ${last?.n ?? '?'} · ${last?.points ?? 0} נק׳${last?.champion ? ' · 🏆 אלופה!' : ''}
     </div>
+    ${crCoachHTML(run, nextYear)}
     <div class="cr-intro-title cr-tw-title">🔁 חלון ההעברות — ${crEsc(yearToSeason(nextYear))}</div>
     <p class="page-note cr-tw-note">
       כך נראים השחקנים שלך בעונה הבאה, לפי מה שקרה להם באמת.
@@ -1402,6 +1425,9 @@ function crRenderTransfer(box, run) {
     <div class="cr-keep-count" id="cr-keep-count"></div>
     <div class="cr-players">${cards}</div>
     <button class="btn-primary btn-full" id="cr-confirm" disabled>המשך לדראפט</button>`;
+
+  const sackBtn = document.getElementById('cr-sack');
+  if (sackBtn) sackBtn.onclick = crSackCoach;
 
   const boxes = [...box.querySelectorAll('.cr-keep-box')];
   const counter = document.getElementById('cr-keep-count');
