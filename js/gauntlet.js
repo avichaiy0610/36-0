@@ -69,6 +69,7 @@ function gtBlank(carry) {
   const c = carry || {};
   return { v: 2, rid: gtRid(), at: 0, started: false, locked: null, formationId: null, picks: null,
            log: [], over: false, banner: c.banner || 0, managerId: c.managerId || null,
+           coach: null,          // drawn once the run rule is settled; never carried into the next run
            modId: c.modId || null,
            coins: gtStartCoinsFor(c.managerId), relics: [], boosts: {}, peaks: [],
            effects: {}, hotFoot: null };

@@ -172,7 +172,11 @@ function gtLineMods(me, opp, ctx) {
   const out = { ...me };
   const all = n => { out.atk += n; out.mid += n; out.def += n; out.gk += n; out.ovr += n; };
 
-  // the run rule first: it is the frame the relics then bend
+  // The manager of the run, before anything else: he is the flattest effect on
+  // the board — every line, every fight, no condition attached.
+  if (typeof gtCoachBonus === 'function') { const cb = gtCoachBonus(); if (cb) all(cb); }
+
+  // the run rule next: it is the frame the relics then bend
   const fx = typeof gtModFx === 'function' ? gtModFx() : {};
   ['atk', 'mid', 'def', 'gk'].forEach(k => { if (fx[k]) out[k] += fx[k]; });
   if (fx.allLines) all(fx.allLines);
@@ -484,7 +488,8 @@ function gtRelicBarHTML() {
   return `
     <div class="gt-bar-top">
       <div class="gt-coins">🪙 <b>${run.coins || 0}</b>${banner}${
-        typeof gtModBadgeHTML === 'function' ? gtModBadgeHTML() : ''}</div>
+        typeof gtModBadgeHTML === 'function' ? gtModBadgeHTML() : ''}${
+        typeof gtCoachBadgeHTML === 'function' ? gtCoachBadgeHTML() : ''}</div>
       ${lines ? `<button class="gt-squad-ovr" id="gt-squad-toggle" title="לראות את ההרכב">⚽ ההרכב שלך <b>${lines.ovr}</b> <span class="gt-peek-caret">▾</span></button>` : ''}
       <div class="gt-slots">${slots.join('')}${sigSlot}</div>
     </div>

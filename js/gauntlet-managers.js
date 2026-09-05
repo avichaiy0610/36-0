@@ -90,3 +90,60 @@ function gtWireManagerPicker(root, done) {
     };
   });
 }
+
+/* ── the manager of a RUN ─────────────────────────────────────────────────────
+ *
+ * Separate from GT_MANAGERS above, which is a front-office deal and still empty.
+ * This is the real thing: one of the 34 managers in js/coach-data.js, drawn
+ * before the first fight and holding for the whole run.
+ *
+ * In the league a manager is a fair trade and moves no odds. Here he does not
+ * even pretend to: his trophies are worth a flat rating bonus on every line, and
+ * a legend is simply better than a journeyman. That is the owner's call, made
+ * with the numbers in front of him, and the numbers are large — measured on the
+ * real engine, one fight against an equal side:
+ *
+ *     bonus   per fight   eight in a row
+ *      +0       54.1%          0.7%
+ *      +1       59.8%          1.6%
+ *      +3       70.4%          6.0%
+ *      +5       79.0%         15.1%
+ *
+ * So the draw is worth more than any relic in the game, and a run's ceiling is
+ * set before the first whistle. Deliberate: the gauntlet is a roguelike, the run
+ * rules already swing it, and nobody has ever finished one.
+ *
+ * No era filter. The stations are club-seasons from across the whole history of
+ * the league, so a run has no single year to be true to.
+ */
+const GT_COACH_OVR = { legend: 5, winner: 3, cup: 1, journeyman: 0 };
+
+function gtCoach() { return gtRun().coach || null; }
+
+// Every line, every fight, for the whole run.
+function gtCoachBonus() {
+  const c = gtCoach();
+  return c ? (GT_COACH_OVR[c.tier] || 0) : 0;
+}
+
+// Drawn once, when the run rule has been settled and the road is about to open.
+// Returns the record so the caller can announce it; null when there is nothing
+// to draw or a manager is already in place.
+function gtDrawCoach() {
+  const run = gtRun();
+  if (run.coach || typeof coachDraw !== 'function') return null;
+  const c = coachDraw();                      // no year: the map spans every era
+  if (!c) return null;
+  run.coach = { name: c.name, style: c.style || '', arch: c.arch, tier: c.tier };
+  gtSave();
+  return run.coach;
+}
+
+// In the bar, beside the coins and the run rule.
+function gtCoachBadgeHTML() {
+  const c = gtCoach();
+  if (!c) return '';
+  const b = gtCoachBonus();
+  return `<span class="gt-coach-tag" title="${c.style ? c.style.replace(/"/g, '') : ''}">🧑‍💼 ${c.name}${
+    b ? ` <small dir="ltr">+${b}</small>` : ''}</span>`;
+}
