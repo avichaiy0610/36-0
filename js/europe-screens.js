@@ -223,7 +223,9 @@ function euStageOf(c) {
   if (c.view === 'out')    return c.outAt || 'q1';
   if (c.view === 'trophy') return 'final';
   if (c.cur)               return c.cur.roundId;
-  if (c.view === 'league' || c.view === 'standings') return 'league';
+  // A holder's seat IS the league phase, so it is dressed like one from the
+  // first screen — there is no qualifying road for the colour to arrive at.
+  if (c.view === 'league' || c.view === 'standings' || c.view === 'bye') return 'league';
   // A drop can land in a league phase OR in a qualifying round of the tier below
   if (c.view === 'drop') return c.league ? 'league' : (euQualRounds(c)[c.qi] || {}).id || 'po';
   if (c.koi >= 0 && EU_KO[c.koi])  return EU_KO[c.koi].id;
@@ -243,9 +245,12 @@ function euDressed(c) { return EU_BLUE_FROM.includes(euStageOf(c)); }
 // How far through the whole campaign we are. Four qualifying ties, the league
 // phase, then the knockout ladder — the denominator shrinks by one when a top-8
 // finish skips the play-off round.
+// A holder crosses no qualifying rounds, so they are not part of his road at
+// all: counting them would open the bar half full and then never move it.
 function euProgress(c) {
-  const total = euQualRounds(c).length + 1 + EU_KO.length - (c.seeded ? 1 : 0);
-  let done = Math.min(c.qi, euQualRounds(c).length) + (c.league ? 1 : 0)
+  const q = c.holder ? 0 : euQualRounds(c).length;
+  const total = q + 1 + EU_KO.length - (c.seeded ? 1 : 0);
+  let done = Math.min(c.qi, q) + (c.league ? 1 : 0)
            + c.ties.filter(t => t.kind === 'ko').length;
   if (c.result === 'won') done = total;
   return Math.max(0.04, Math.min(1, done / total));
@@ -557,6 +562,33 @@ function euDropHTML(c) {
     </div>`;
 }
 
+/* ── the holder's seat ────────────────────────────────────────────────────────
+   The parachute in reverse, and deliberately built from the same parts: a line
+   that says what happened, and an arrow between two competitions. There it
+   points down after a defeat this summer; here it points up, and it was earned
+   a year ago. The card exists because the seat is otherwise invisible — without
+   it a campaign would simply open on a league table nobody remembers being
+   drawn into. */
+function euByeHTML(c) {
+  const from = EU_TIERS[c.holder] || EU_TIERS.uecl;
+  const to = euTier(c);
+  return `
+    <div class="eu-card eu-drop eu-bye">
+      <div class="eu-card-head"><span>${euText('eu-bye-head', 'מחזיקת הגביע')}</span></div>
+      <div class="eu-bye-cup">🏆</div>
+      <div class="eu-drop-t">${euText('eu-bye-t', 'המקום הזה כבר שלך.')}</div>
+      <p class="eu-note"><b>${from.trophy}</b> ${euText('eu-bye-a', 'מהעונה שעברה נכנסת ישר')}
+        <b>${euText('eu-bye-to', 'לשלב הליגה של')} ${to.name}</b>
+        ${euText('eu-bye-b', '- בלי מוקדמות, בלי פלייאוף, ובלי קשר לאיפה סיימת בליגה. הזכייה הזאת קנתה לך את הקיץ.')}</p>
+      ${from.id === to.id ? '' : `
+      <div class="eu-drop-arrow">
+        <span class="from">${from.short}</span>
+        <span class="ar">↑</span>
+        <span class="to">${to.short}</span>
+      </div>`}
+    </div>`;
+}
+
 /* ── the ends ─────────────────────────────────────────────────────────────── */
 function euOutHTML(c) {
   const t = c.ties[c.ties.length - 1];
@@ -651,6 +683,10 @@ function euRender() {
       : euText('eu-next-round', 'לסיבוב הבא →');
     cta = euCta(label);
     onNext = () => { euAfterTie(c); euRender(); };
+  } else if (c.view === 'bye') {
+    html = euByeHTML(c);
+    cta = euCta(euText('eu-to-league', 'לשלב הליגה →'));
+    onNext = () => { c.view = 'league'; euSave(c); euRender(); };
   } else if (c.view === 'drop') {
     html = euDropHTML(c);
     // A play-off loss lands in a league phase; anything earlier lands in another

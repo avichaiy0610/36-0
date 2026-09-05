@@ -106,10 +106,13 @@ function euSimMatch(me, opp, home) {
 /* ── the campaign ─────────────────────────────────────────────────────────── */
 // Nothing is simulated here. The campaign starts holding only the XI it will be
 // played with, frozen at the moment you walked in.
-function euBuildCampaign(tier) {
+// `opts.holder` is the trophy that bought the seat, and it changes where the
+// campaign opens: a holder has no qualifying to play, so the field is drawn
+// here and the first screen is the seat itself rather than a tie.
+function euBuildCampaign(tier, opts) {
   let me = myLineRatings();
   if (typeof euForcedLines === 'function') me = euForcedLines(me);
-  return {
+  const c = {
     v: EU_SAVE_V,
     tier: EU_TIERS[tier] ? tier : 'ucl',   // which competition this summer is
     ovr: me.ovr,
@@ -127,6 +130,15 @@ function euBuildCampaign(tier) {
     outAt: null,
     submitted: 0,       // how many ties had been reported the last time we sent
   };
+
+  const holder = opts && opts.holder;
+  if (holder) {
+    c.holder = holder;                  // which trophy it was — the card names it
+    c.qi = euQualRounds(c).length;       // past the last qualifying round there is none
+    euPlayLeaguePhase(c);
+    c.view = 'bye';
+  }
+  return c;
 }
 
 // The XI as the engine wants it. Rebuilt from the frozen numbers rather than read
@@ -567,10 +579,10 @@ function euText(key, def) {
 }
 
 /* ── entry ────────────────────────────────────────────────────────────────── */
-function euStart(tier) {
+function euStart(tier, opts) {
   if (!state.picks || !state.picks.some(Boolean)) return;
   _euCampaign = _euCampaign || euLoad();
-  if (!_euCampaign) { _euCampaign = euBuildCampaign(tier); euSave(_euCampaign); }
+  if (!_euCampaign) { _euCampaign = euBuildCampaign(tier, opts); euSave(_euCampaign); }
   showScreen('europe');
   const back = document.getElementById('eu-back');
   if (back) back.onclick = () => euLeave();

@@ -2814,14 +2814,60 @@ function showPreseason(ovr) {
 
    `table` is the final league table; without it only the champion's seat can be
    known, which is the safe answer rather than a wrong one. */
+
+/* The holder's seat.
+
+   A European trophy is not only a shelf. It is next season's entry: the
+   Conference winner is in the Europa League's league phase, and the Europa
+   League and Champions League winners are in the Champions League's. No
+   qualifying to survive, and — this is the whole promise — no matter what the
+   league table or the cup did. It is the one seat in Europe that the domestic
+   season cannot give, take away, or change.
+
+   So it is not weighed against the seat the table handed you: it REPLACES it.
+   A champion who holds the Conference plays the Europa League's league phase,
+   because a guaranteed seat at the table is what the trophy was worth and
+   nothing at home can be allowed to trade it for a qualifying round.
+
+   Only a career has a "last season" to read, which is why this is the only mode
+   it applies to. The trophy is written when the campaign resolves, and that
+   campaign is played AFTER the season screen it belongs to has been left — so
+   by the time the next season reaches this line it is already on the row. */
+const EU_HOLDER_SEAT = { uecl: 'uel', uel: 'ucl', ucl: 'ucl' };
+
+function euHolderBerth() {
+  if (typeof state === 'undefined' || !state || !state.career) return null;
+  if (typeof crHasRun !== 'function' || !crHasRun() || typeof crRun !== 'function') return null;
+  // The most recent season BEFORE this one. Read by year rather than by
+  // position in the history, because the current season's row has already been
+  // pushed by the time the results screen asks the question.
+  const prev = ((crRun() || {}).history || [])
+    .filter(h => h && h.year < state.career.year)
+    .reduce((a, h) => (!a || h.year > a.year ? h : a), null);
+  const won = prev && prev.euTrophy;
+  const tier = won && EU_HOLDER_SEAT[won];
+  return tier ? { tier, from: won } : null;
+}
+
 function euAllocationFor(rank, table) {
   const LABEL = { ucl: 'ליגת האלופות', uel: 'הליגה האירופית', uecl: 'קונפרנס ליג' };
+
+  // Asked and answered before the table is read at all, because a holder's seat
+  // does not depend on a single thing in it.
+  const held = euHolderBerth();
+  if (held) return { tier: held.tier, label: LABEL[held.tier], direct: true, holder: held.from };
+
   const rows = Array.isArray(table) ? table : null;
   const iWonCup = typeof cupPlayerWon === 'function' && cupPlayerWon();
   const w = typeof cupWinner === 'function' ? cupWinner() : null;
 
-  // Where the cup winner finished. Null means either no cup was played or the
-  // winner is not in this table — both of which mean nothing cascades.
+  // Two different questions, and collapsing them into one null was the bug:
+  // "was a cup played at all" and "did its winner finish inside this table".
+  //
+  // The cup's top flight is thirteen clubs whatever the season's league size,
+  // so a twelve-club season has two top-flight cup entrants who are not in your
+  // table, on top of the eighteen from below it. Any of them can lift it.
+  const haveCup = !!(iWonCup || w);
   let cupRank = null;
   if (iWonCup) cupRank = rank;
   else if (w && !w.us && rows) {
@@ -2835,15 +2881,23 @@ function euAllocationFor(rank, table) {
     return null;
   };
 
-  // The Europa seat: the cup winner's, unless the cup won them nothing.
-  if (cupRank && !seats.has(cupRank)) {
+  // The Europa seat is the cup winner's, and it goes with them. It cascades in
+  // exactly two cases: the winner already holds a better seat — the champion
+  // did the double, so the cup won them nothing — or no cup was played at all
+  // and there is nobody to hold it. Then it must not simply evaporate: that
+  // quietly demoted second and third to the Conference and left fourth with
+  // nothing.
+  //
+  // What it must NOT do is cascade because the winner is not in your table. A
+  // club from below the top flight, or one of the two the cup draws that your
+  // season does not, is a real club that really won the cup: the seat is theirs
+  // and it leaves with them. Second stays in the Conference, which is what the
+  // mode promises second — and cascading there handed a Europa place to a club
+  // that had not earned one.
+  const doubleUp = !!cupRank && seats.has(cupRank);
+  if (cupRank && !doubleUp) {
     seats.set(cupRank, 'uel');
-  } else {
-    // Nobody in this table can use it — the champion did the double, a club from
-    // below the top flight lifted it, or the mode plays no cup at all — so it
-    // cascades to the highest finisher still without a seat. It must never
-    // simply evaporate: that quietly demoted second and third to the Conference
-    // and left fourth with nothing at all.
+  } else if (doubleUp || !haveCup) {
     const r = nextFree();
     if (r) seats.set(r, 'uel');
   }
@@ -2883,10 +2937,15 @@ function wireEuropeButton(rank, table) {
   btn.style.display = '';
   btn.classList.toggle('locked', !inEurope);
   btn.disabled = !inEurope;
-  btn.textContent = inEurope
-    ? `🇪🇺 המשך ${heLamed(alloc.label)}`
-    : '🇪🇺 אירופה - למקומות 1-3 ולזוכת הגביע';
-  btn.onclick = inEurope ? () => euStart(alloc.tier) : null;
+  // A holder's seat is a different promise from a league seat and has to say so
+  // on the button: not "carry on to the Europa League" but "straight into its
+  // league phase", which is the whole of what the trophy bought.
+  btn.textContent = !inEurope ? '🇪🇺 אירופה - למקומות 1-3 ולזוכת הגביע'
+    : alloc.direct ? `🇪🇺 ישר לשלב הליגה של ${alloc.label}`
+    : `🇪🇺 המשך ${heLamed(alloc.label)}`;
+  btn.onclick = inEurope
+    ? () => euStart(alloc.tier, alloc.direct ? { holder: alloc.holder } : null)
+    : null;
 
   // The admin's way in from any finishing position is a small link under the
   // row, not a third button in it: as a button it wrapped its own label down

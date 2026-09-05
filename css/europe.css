@@ -342,6 +342,19 @@ body.eu-blue #screen-europe { background: transparent; }
 .eu-drop-arrow .to   { color: var(--eu-glow2); font-size: 13px; }
 @keyframes eu-drop-b { 0%,100% { transform: translateY(0); } 50% { transform: translateY(4px); } }
 
+/* ── the holder's seat ────────────────────────────────────────────────────────
+   The same card, read the other way: the competition you came FROM is the one
+   lit, because that is the one you won, and the arrow floats up instead of
+   down. */
+.eu-bye-cup {
+  font-size: 40px; line-height: 1; margin-bottom: 8px;
+  filter: drop-shadow(0 0 18px color-mix(in srgb, var(--eu-glow2) 65%, transparent));
+}
+.eu-bye .eu-drop-arrow .from { color: var(--eu-glow2); opacity: 1; font-size: 13px; }
+.eu-bye .eu-drop-arrow .to   { color: var(--eu-ink); }
+.eu-bye .eu-drop-arrow .ar   { animation-name: eu-bye-b; }
+@keyframes eu-bye-b { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+
 /* ── the monogram ─────────────────────────────────────────────────────────────
    The fallback for the 88 clubs with no badge file. A flag emoji was the old
    fallback and it is unusable on Windows, which ships no regional-indicator
