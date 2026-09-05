@@ -103,6 +103,7 @@
       key: 'find', weight: 38,
       title: 'מציאה',
       blurb: 'סוכן מציע שחקן שאף אחד לא שם לב אליו. אתה חותם עיוור, בלי לראות אותו משחק.',
+      tell: 'שחקן שאף אחד לא חיפש, לחוליה החלשה בהרכב. לרוב זה שדרוג.',
       slot: weakestIdx,
       // Leans hard upward, and the floor sits just under what you already have:
       // most of the time this is a real upgrade, and once in a while you signed
@@ -118,6 +119,7 @@
       key: 'offer', weight: 22,
       title: 'הצעה מחו״ל',
       blurb: 'מועדון זר קונה את הכוכב שלך והוא רוצה ללכת. הכסף קונה מחליף — לא באותה רמה.',
+      tell: 'קונים לך את הכוכב והוא רוצה ללכת. המחליף לא יהיה ברמה שלו.',
       slot: strongestIdx,
       band: cur => [cur - 10, cur - 1],
     },
@@ -125,6 +127,7 @@
       key: 'forced', weight: 15,
       title: 'מכירה כפויה',
       blurb: 'ההנהלה מוכרת מעל הראש שלך. שחקן אחד יוצא, מחליף אחד נכנס עיוור, ואין לך מה להגיד על זה.',
+      tell: 'ההנהלה מחליטה, לא אתה. הטלת מטבע.',
       slot: () => {
         const live = state.picks.map((p, i) => (p ? i : -1)).filter(i => i >= 0);
         return live[Math.floor(Math.random() * live.length)];
@@ -135,6 +138,7 @@
       key: 'punt', weight: 25,
       title: 'הימור על נער',
       blurb: 'כישרון צעיר בלי עבר בליגה. או שהוא מתפוצץ, או שהוא לא.',
+      tell: 'כישרון לפני הפריצה. או שהוא מתפוצץ, או שלא.',
       slot: weakestIdx,
       band: cur => [cur - 9, cur + 16],
       // Boom or bust by design, so only a gentle lean — but a lean, because a
@@ -150,6 +154,30 @@
       unless: () => !!state.peakMode,
     },
   ];
+
+  /* ── the paytable ────────────────────────────────────────────────────────── */
+  // The four are named BEFORE the decision; the one that was drawn is not. That
+  // is the difference between a gamble and a guess — at a roulette table you
+  // know what each bet pays and you still do not know the number. Until now a
+  // player walked into the market blind even to the SHAPE of it, which is why
+  // "מכירה כפויה" handing back a better man read as a bug rather than as the
+  // coin landing the other way.
+  //
+  // `tell` says what a scenario does in one sentence and no numbers. The weights
+  // and the bands stay the engine's business: quoting 15% or ±8 here would turn
+  // a decision into arithmetic, and the sentence is the part that is actually
+  // true at every squad strength.
+  //
+  // Built from SCENARIOS rather than written out beside them, so a band and the
+  // sentence describing it cannot drift apart, and so `unless` is honoured — in
+  // peak mode every player is already at his best, "הימור על נער" cannot fire,
+  // and the list shows three rather than promising a fourth.
+  function janWhatHtml() {
+    const live = SCENARIOS.filter(s => !(s.unless && s.unless()) && s.tell);
+    if (!live.length) return '';
+    const rows = live.map(s => `<dt>${s.title}</dt><dd>${s.tell}</dd>`).join('');
+    return `<details class="jan-what"><summary>מה יכול לצאת לך בשוק?</summary><dl>${rows}</dl></details>`;
+  }
 
   function drawScenario(exclude) {
     const live = SCENARIOS.filter(s =>
@@ -316,11 +344,15 @@
     const s = document.createElement('style');
     s.id = 'jan-style';
     s.textContent = `
-.jan-wrap{position:fixed;inset:0;z-index:9000;display:flex;align-items:center;justify-content:center;
+.jan-wrap{position:fixed;inset:0;z-index:9000;display:flex;justify-content:center;overflow-y:auto;
   background:rgba(0,0,0,.74);backdrop-filter:blur(3px);padding:16px}
+/* margin:auto centres it AND lets it overflow both ways — align-items:center on
+   a scroll container cuts the top off with no way to scroll back, which is what
+   an open "מה יכול לצאת לך בשוק?" does to the half-way screen on a 600px-tall
+   phone: the record and the points slide above the viewport for good. */
 .jan-box{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);
-  max-width:440px;width:100%;padding:22px;text-align:center;box-shadow:0 18px 60px rgba(0,0,0,.55);
-  animation:janIn .22s ease-out}
+  max-width:440px;width:100%;margin:auto;padding:22px;text-align:center;
+  box-shadow:0 18px 60px rgba(0,0,0,.55);animation:janIn .22s ease-out}
 @keyframes janIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 .jan-box.deadline{border-color:var(--accent)}
 .jan-kicker{color:var(--accent);font-size:11.5px;letter-spacing:.1em;margin:0 0 7px;font-weight:600}
@@ -330,6 +362,17 @@
 .jan-stat{flex:1;background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:9px 4px}
 .jan-stat i{display:block;font-style:normal;font-size:10.5px;letter-spacing:.07em;color:var(--dim);margin-bottom:3px}
 .jan-stat b{display:block;font-size:19px;color:var(--text);font-weight:700}
+.jan-what{margin:0 0 15px;text-align:right;border:1px solid var(--border);border-radius:9px;
+  background:var(--surface);overflow:hidden}
+.jan-what>summary{list-style:none;cursor:pointer;padding:10px 13px;font-size:13px;font-weight:600;
+  color:var(--accent);display:flex;align-items:center}
+.jan-what>summary::-webkit-details-marker{display:none}
+.jan-what>summary::after{content:'▾';font-size:11px;margin-inline-start:auto;
+  transition:transform .18s ease}
+.jan-what[open]>summary::after{transform:rotate(180deg)}
+.jan-what dl{margin:0;padding:2px 13px 12px}
+.jan-what dt{font-size:13px;font-weight:700;color:var(--text);margin-top:9px}
+.jan-what dd{margin:2px 0 0;font-size:12.5px;color:var(--dim);line-height:1.55}
 .jan-btns{display:flex;flex-direction:column;gap:9px}
 .jan-b{padding:12px;border-radius:9px;border:1px solid var(--border);background:var(--surface);
   color:var(--text);font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;width:100%}
@@ -421,6 +464,7 @@
       <p class="jan-sub">${played} מחזורים, ${gf} שערים ו-${ga} ספיגות.
         בקצב הזה אתה בדרך ל-${pace} נקודות.<br>
         להישאר עם ההרכב, או להמר על מהלך אחד. אין חזרה.</p>
+      ${janWhatHtml()}
       <div class="jan-btns">
         <button class="jan-b go" id="jan-go">לצאת לשוק</button>
         <button class="jan-b" id="jan-stay">להישאר עם ההרכב</button>
