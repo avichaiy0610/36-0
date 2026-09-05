@@ -41,8 +41,7 @@ const col = name => head.indexOf(name);
 
 const need = ['name', 'league_titles_since_1999_00', 'title_seasons',
               'state_cups_since_1999_00', 'cup_seasons', 'main_clubs',
-              'playing_style', 'note', 'wikipedia', 'archetype',
-              'active_from', 'active_to'];
+              'playing_style', 'note', 'wikipedia', 'archetype', 'il_seasons'];
 for (const n of need) if (col(n) < 0) throw new Error(`coaches.csv is missing the "${n}" column`);
 
 // The archetype is what the SIMULATION reads. The style sentence next to it is
@@ -77,12 +76,15 @@ const list = rows.slice(1).map(r => {
     arch:   g('archetype'),
     tier:   tierOf(titles, cups),
   };
-  // The years he actually stood on a touchline, from the Hebrew Wikipedia
-  // infobox. Present only where the article states them: a manager with no span
-  // is eligible in every season rather than in a guessed one, which is the same
-  // rule `style` follows — absent, never invented.
-  const from = +g('active_from') || 0, to = +g('active_to') || 0;
-  if (from && to) { o.from = from; o.to = to; }
+  // The seasons he was actually managing an ISRAELI CLUB, one by one — not a
+  // span. A span would have marked Avram Grant as working every year from 1986
+  // to 2025, Ghana included. Built from |שנים כמאמן= paired against
+  // |קבוצות כמאמן= on his Hebrew Wikipedia page, with national teams, youth
+  // sides and assistant roles dropped. Empty means unknown, and unknown means
+  // eligible in every season rather than in a guessed one — the same rule
+  // `style` follows.
+  const yrs = g('il_seasons').split(';').map(x => +x).filter(Boolean);
+  if (yrs.length) o.yrs = yrs;
   const style = g('playing_style');
   if (style) o.style = style;          // absent, not empty, when we do not know
   return o;
@@ -130,7 +132,8 @@ console.log(`wrote ${path.relative(path.join(__dirname, '..'), OUT)} — ${list.
             `${list.filter(c => c.titles > 0).length} with a league title, ${withStyle} with a playing style`);
 console.log('tiers      ' + ['legend', 'winner', 'cup', 'journeyman'].map(t => `${t} ${tally(['tier', t])}`).join(' · '));
 console.log('archetypes ' + ARCHETYPES.map(a => `${a} ${tally(['arch', a])}`).join(' · '));
-console.log(`spans      ${list.filter(c => c.from).length}/${list.length} with coaching years`);
+console.log(`seasons    ${list.filter(c => c.yrs).length}/${list.length} with Israeli-club seasons · ` +
+            `median ${(() => { const n = list.filter(c => c.yrs).map(c => c.yrs.length).sort((a, b) => a - b); return n[n.length >> 1]; })()} seasons each`);
 if (process.argv.includes('--print')) {
   for (const c of list) {
     console.log(`${c.titles}🏆 ${c.cups}🏅  ${c.name}  [${c.clubs.join(', ')}]${c.style ? '  · ' + c.style : ''}`);

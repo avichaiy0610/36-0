@@ -185,20 +185,22 @@
   }
 
   /* ── the draw ─────────────────────────────────────────────────────────────── */
-  // Whether a man was actually standing on a touchline that season. `from`/`to`
-  // come from the Hebrew Wikipedia infobox and are absent for anyone the article
-  // does not date — and absent means eligible, never a guessed range.
-  // A season year of 2003 is the 2003/04 campaign, so it runs into 2004.
+  // Was he managing an Israeli club THAT season. `yrs` is a list of seasons, not
+  // a span, and the difference is the whole point: Avram Grant's first and last
+  // touchline years are 1986 and 2025, and a span between them would have
+  // offered him to a 2017/18 side he could not have taken, because he was
+  // managing Ghana. Absent means unknown, and unknown means eligible — never a
+  // guessed range.
   function coachActiveIn(c, year) {
-    if (!year || !c.from) return true;
-    return c.from <= year + 1 && c.to >= year;
+    if (!year || !c.yrs) return true;
+    return c.yrs.includes(year);
   }
 
-  // The pool a draw comes from. With a year, only the managers who were working
-  // then — a 1999/00 career should not be handed רן קוז'וך, who first took a
-  // senior job in 2018. Ten to thirty-one men qualify in any season the game
-  // covers, so this narrows the draw without ever emptying it; the guard is
-  // there for a future roster, not for today's.
+  // The pool a draw comes from. With a year, only the managers who were in a job
+  // in Israel that season — a 1999/00 career should not be handed רן קוז'וך, who
+  // first took one in 2022. Between 6 and 18 men qualify in any season the game
+  // covers, thinnest at the very start where the roster itself is thinnest; the
+  // empty guard is there for a future roster, not for today's.
   function coachPool(year) {
     if (typeof COACHES === 'undefined' || !COACHES.length) return [];
     const pool = COACHES.filter(c => coachActiveIn(c, year));
