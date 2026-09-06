@@ -1,20 +1,19 @@
 // ─── בונה כדורגלן — המסך ───────────────────────────────────────────────────────
 //
-// Pick a role, then six rounds. Each round draws a club-season, you take one
-// player out of it, and you decide WHICH of his attributes to keep. Every slot
-// opens once, so the interesting move is rarely the biggest number on screen —
-// it is whether to spend a slot now or gamble that a better one is coming while
-// the slots that remain get harder to fill.
+// Pick a role, then six spins. The roulette runs through the hundred best
+// players this project has and stops on one of them; you take ONE of his six
+// attributes, and that slot closes for good.
 //
-// The numbers all come from js/attrs.js, and so do the sentences under them:
-// every value a player is asked to choose between can be defended with the row
-// of a real table. Except מהירות, which says so itself.
+// The first version of this screen showed the whole squad — twenty-six rows and
+// a hundred and eighty numbers at once — and it was wrong for the obvious
+// reason: a wall of a table is not a draw. One name at a time, arriving, is.
 
 const PB_KEY = '36-0-pb';
 const PB_ROUNDS = 6;
-const PB_MIN_SQUAD = 11;        // a squad too thin to choose from is not a round
+const PB_POOL = 100;            // "the hundred best we have"
 
 let pb = null;                  // the live build, or null
+let _pbSpin = null;             // the running spin's timer, so it can be cancelled
 
 function pbEsc(s) {
   return String(s ?? '').replace(/[&<>"']/g, c => (
@@ -34,21 +33,41 @@ function pbShelfLine() {
   return s.best ? `הקריירה הטובה שלך: ${s.best} נקודות מורשת` : '';
 }
 
-/* ── the draw ─────────────────────────────────────────────────────────────── */
-// Independent of the draft's own deck. A thin squad is skipped rather than shown
-// with four names in it.
-function pbDrawSquad() {
-  const pool = SQUADS.filter(sq =>
-    sq.players.length >= PB_MIN_SQUAD && !pb.used.has(sq.id));
-  if (!pool.length) return SQUADS[Math.floor(Math.random() * SQUADS.length)];
-  const sq = pool[Math.floor(Math.random() * pool.length)];
-  pb.used.add(sq.id);
-  return sq;
+/* ── the hundred ──────────────────────────────────────────────────────────── */
+// One entry per PLAYER, at the season he was best — not the hundred best
+// player-seasons, which would be six men's careers over and over. Built once.
+let _pbPool = null;
+function pbPool() {
+  if (_pbPool) return _pbPool;
+  const best = new Map();
+  SQUADS.forEach(sq => {
+    sq.players.forEach((p, i) => {
+      const k = typeof mgNorm === 'function' ? mgNorm(p.name) : p.name;
+      const cur = best.get(k);
+      if (!cur || p.ovr > cur.ovr) {
+        best.set(k, {
+          name: p.name, ovr: p.ovr, pos: p.position,
+          squadId: sq.id, idx: i, season: sq.season, teamId: sq.teamId,
+        });
+      }
+    });
+  });
+  return (_pbPool = [...best.values()]
+    .filter(e => attrsOf(e.squadId, e.idx))       // no row, no place in the pool
+    .sort((a, b) => b.ovr - a.ovr)
+    .slice(0, PB_POOL));
+}
+
+function pbDrawPlayer() {
+  const pool = pbPool().filter(e => !pb.used.has(e.squadId + '|' + e.idx));
+  const from = pool.length ? pool : pbPool();
+  return from[Math.floor(Math.random() * from.length)];
 }
 
 /* ── open ─────────────────────────────────────────────────────────────────── */
 function pbOpen() {
   if (typeof track === 'function') track('open', 'minigame', 'builder');
+  if (_pbSpin) { clearTimeout(_pbSpin); _pbSpin = null; }
   pb = null;
   pbRenderRoles();
 }
@@ -58,16 +77,16 @@ function pbRenderRoles() {
   if (!box) return;
   const roles = ['fw', 'w', 'cm', 'df', 'gk'];
   const blurb = {
-    fw: 'הגמר הוא כמעט חצי מהערך שלו. תבנה מבקיע.',
-    w:  'גמר, יצירה ומהירות בחלקים שווים. הכי מאוזן מלפנים.',
-    cm: 'היצירה מובילה, והיציבות שווה יותר מאשר בכל עמדה אחרת.',
-    df: 'ההגנה היא כמעט חצי. מספר אחד גדול, וכל השאר תמיכה.',
-    gk: 'שוער מחליף את גמר. הקריירה שלו נמדדת בשערים נקיים.',
+    fw: 'בעיטה היא שליש מהערך שלו, ואחריה מהירות. תבנה מבקיע.',
+    w:  'מהירות וכדרור לפני הכול. הכי מהיר, הכי חמקמק.',
+    cm: 'מסירה מובילה, וכדרור אחריה. מי שמריץ את המשחק.',
+    df: 'הגנה כמעט חצי, ופיזיות אחריה. קיר.',
+    gk: 'הגנה ופיזיות כמעט לבד. בעיטה וכדרור לא רלוונטיים לו.',
   };
   box.innerHTML = `
     ${mgBackBar('בונה כדורגלן')}
-    <p class="page-note">שישה סיבובים. בכל אחד נוחתים על מועדון ועונה, בוחרים שחקן,
-       ולוקחים ממנו <b>תכונה אחת</b>. בסוף — חמש־עשרה עונות.</p>
+    <p class="page-note">שישה סיבובים. בכל אחד הרולטה עוצרת על אחד ממאה השחקנים
+       הטובים בליגה, ואתה לוקח ממנו <b>נתון אחד</b>. בסוף — חמש־עשרה עונות.</p>
     <p class="pb-role-q">מה אתה בונה?</p>
     <div class="pb-roles">
       ${roles.map(r => `
@@ -85,12 +104,13 @@ function pbRenderRoles() {
 function pbStart(role) {
   pb = {
     role,
-    slots: {},                       // key → { value, from }
-    open: attrSlots(role),
+    slots: {},                       // key → { value, from, why, season }
+    open: attrSlots(),
     round: 0,
     used: new Set(),
     rerolled: false,
-    squad: null,
+    player: null,
+    spinning: false,
   };
   pbNextRound();
 }
@@ -98,75 +118,114 @@ function pbStart(role) {
 function pbNextRound() {
   pb.round++;
   pb.rerolled = false;
-  pb.squad = pbDrawSquad();
+  pbSpin();
+}
+
+/* ── the spin ─────────────────────────────────────────────────────────────── */
+// Names go past fast and then slower, and the one that is showing when it stops
+// is the one you get. The landing is decided UP FRONT rather than by wherever
+// the animation happens to end — an animation that decides the outcome is an
+// animation that can be interrupted into deciding a different one.
+function pbSpin() {
+  const landed = pbDrawPlayer();
+  pb.player = null;
+  pb.spinning = true;
   pbRenderRound();
+
+  const pool = pbPool();
+  const face = document.getElementById('pb-face');
+  if (!face) { pbLand(landed); return; }
+
+  // ~24 frames, each a little slower than the last: 28ms out to 190ms.
+  let i = 0;
+  const FRAMES = 24;
+  const step = () => {
+    if (!pb || !pb.spinning) return;
+    if (i >= FRAMES) { pbLand(landed); return; }
+    const p = pool[Math.floor(Math.random() * pool.length)];
+    face.innerHTML = pbFaceHTML(p, true);
+    const t = i / FRAMES;
+    i++;
+    _pbSpin = setTimeout(step, 28 + Math.round(162 * t * t));
+  };
+  step();
+}
+
+function pbLand(p) {
+  _pbSpin = null;
+  if (!pb) return;
+  pb.spinning = false;
+  pb.player = p;
+  pb.used.add(p.squadId + '|' + p.idx);
+  pbRenderRound();
+}
+
+function pbFaceHTML(p, blurred) {
+  const club = (TEAMS[p.teamId] || {}).name || p.teamId;
+  return `
+    <div class="pb-face-name${blurred ? ' pb-blur' : ''}">${pbEsc(p.name)}</div>
+    <div class="pb-face-club${blurred ? ' pb-blur' : ''}">${pbEsc(club)} · ${pbEsc(p.season)}</div>
+    <div class="pb-face-ovr${blurred ? ' pb-blur' : ''}">${p.ovr}</div>`;
 }
 
 /* ── a round ──────────────────────────────────────────────────────────────── */
 function pbRenderRound() {
   const box = document.getElementById('mg-content');
   if (!box) return;
-  const sq = pb.squad;
-  const club = (TEAMS[sq.teamId] || {}).name || sq.teamId;
-
-  const rows = sq.players.map((p, i) => {
-    const a = attrsOf(sq.id, i);
-    if (!a) return '';
-    const cells = pb.open.map(k => {
-      const v = a[k];
-      if (typeof v !== 'number') return `<td class="pb-na">—</td>`;
-      return `<td><button class="pb-take" data-i="${i}" data-k="${k}">${v}</button></td>`;
-    }).join('');
-    return `<tr>
-      <th class="pb-who"><span class="pb-name">${pbEsc(p.name)}</span>
-        <span class="pb-meta">${pbEsc(p.position)} · ${p.ovr}</span></th>
-      ${cells}</tr>`;
-  }).join('');
+  const p = pb.player;
 
   box.innerHTML = `
     ${mgBackBar('בונה כדורגלן')}
     <div class="pb-head">
       <span class="pb-round">סיבוב ${pb.round} מתוך ${PB_ROUNDS}</span>
-      <span class="pb-club">${pbEsc(club)} ${pbEsc(sq.season)}</span>
-      ${pb.rerolled ? '' : '<button class="pb-reroll" id="pb-reroll">🎲 הגרלה מחדש</button>'}
+      <span class="pb-role-tag">${pbEsc(ATTR_ROLE[pb.role].name)}</span>
     </div>
     ${pbSlotsHTML()}
-    <div class="pb-tablewrap">
-      <table class="pb-table">
-        <thead><tr><th></th>${pb.open.map(k =>
-          `<th>${pbEsc(ATTR_NAME[k])}${ATTR_EST[k] ? '<sup>*</sup>' : ''}</th>`).join('')}</tr></thead>
-        <tbody>${rows}</tbody>
-      </table>
+    <div class="pb-reel${pb.spinning ? ' spinning' : ''}">
+      <div class="pb-reel-face" id="pb-face">
+        ${p ? pbFaceHTML(p, false) : '<div class="pb-face-name pb-blur">···</div>'}
+      </div>
     </div>
-    <p class="pb-foot" id="pb-why">בחר מספר — הוא ייכנס למשבצת שלו, והמשבצת תיסגר.</p>
-    ${pb.open.some(k => ATTR_EST[k])
-      ? '<p class="pb-est-note">* מהירות היא הערכה — לליגה אין נתוני מהירות, והיא נגזרת מהעמדה ומהדירוג בלבד.</p>'
-      : ''}`;
+    <div class="pb-picks" id="pb-picks">${p ? pbPicksHTML(p) : ''}</div>
+    <p class="pb-foot" id="pb-why">${pb.spinning ? 'הרולטה מסתובבת…' : 'קח נתון אחד ממנו.'}</p>
+    <div class="pb-actions">
+      ${!pb.spinning && !pb.rerolled
+        ? '<button class="pb-reroll" id="pb-reroll">🎲 סובב שוב</button>' : ''}
+    </div>`;
   mgWireBack();
 
   const reroll = document.getElementById('pb-reroll');
-  if (reroll) reroll.onclick = () => { pb.squad = pbDrawSquad(); pb.rerolled = true; pbRenderRound(); };
+  if (reroll) reroll.onclick = () => { pb.rerolled = true; pbSpin(); };
 
   box.querySelectorAll('.pb-take').forEach(btn => {
-    const i = +btn.dataset.i, k = btn.dataset.k;
-    // The evidence follows the cursor rather than sitting in a tooltip nobody
-    // opens: the whole point of this build is that the numbers are defensible,
-    // and a defence nobody reads is not one.
+    const k = btn.dataset.k;
     const show = () => {
-      const why = attrWhy(sq.id, i, k, sq.season, sq.teamId);
+      const why = attrWhy(p.squadId, p.idx, k, p.season, p.teamId);
       const el = document.getElementById('pb-why');
-      const p = sq.players[i];
-      if (el && why) el.textContent = `${p ? p.name + ' · ' : ''}${ATTR_NAME[k]} — ${why}`;
+      if (el) el.textContent = why ? `${ATTR_NAME[k]} — ${why}` : `${ATTR_NAME[k]} ${attrsOf(p.squadId, p.idx)[k]}`;
     };
     btn.addEventListener('mouseenter', show);
     btn.addEventListener('focus', show);
-    btn.onclick = () => pbTake(i, k);
+    btn.onclick = () => pbTake(k);
   });
+}
+
+function pbPicksHTML(p) {
+  const a = attrsOf(p.squadId, p.idx);
+  if (!a) return '';
+  return ATTR_KEYS.map(k => {
+    const taken = !pb.open.includes(k);
+    return `<button class="pb-take${taken ? ' taken' : ''}" data-k="${k}" ${taken ? 'disabled' : ''}>
+      <span class="pb-take-name">${pbEsc(ATTR_NAME[k])}</span>
+      <span class="pb-take-val">${a[k]}</span>
+      ${taken ? '<span class="pb-take-x">נלקח</span>' : ''}
+    </button>`;
+  }).join('');
 }
 
 function pbSlotsHTML() {
   return `<div class="pb-slots">
-    ${attrSlots(pb.role).map(k => {
+    ${ATTR_KEYS.map(k => {
       const s = pb.slots[k];
       return `<div class="pb-slot${s ? ' filled' : ''}">
         <span class="pb-slot-name">${pbEsc(ATTR_NAME[k])}</span>
@@ -177,15 +236,16 @@ function pbSlotsHTML() {
   </div>`;
 }
 
-function pbTake(i, key) {
-  const sq = pb.squad;
-  const a = attrsOf(sq.id, i);
+function pbTake(key) {
+  const p = pb.player;
+  if (!p || pb.spinning || !pb.open.includes(key)) return;
+  const a = attrsOf(p.squadId, p.idx);
   if (!a || typeof a[key] !== 'number') return;
   pb.slots[key] = {
     value: a[key],
-    from: sq.players[i].name,
-    why: attrWhy(sq.id, i, key, sq.season, sq.teamId),
-    season: sq.season,
+    from: p.name,
+    why: attrWhy(p.squadId, p.idx, key, p.season, p.teamId),
+    season: p.season,
   };
   pb.open = pb.open.filter(k => k !== key);
   if (pb.round >= PB_ROUNDS || !pb.open.length) pbFinish();
@@ -195,14 +255,9 @@ function pbTake(i, key) {
 /* ── the career ───────────────────────────────────────────────────────────── */
 function pbFinish() {
   const attrs = {};
-  Object.keys(pb.slots).forEach(k => { attrs[k] = pb.slots[k].value; });
-  // A keeper's build has no גמר, and an outfield one has no שוער. The career
-  // reads both, so fill the missing one from the role's own floor rather than
-  // leaving it undefined and letting a NaN reach the board.
-  if (pb.role === 'gk' && typeof attrs.fin !== 'number') attrs.fin = 40;
-  if (pb.role !== 'gk' && typeof attrs.gk !== 'number') attrs.gk = 40;
+  ATTR_KEYS.forEach(k => { attrs[k] = pb.slots[k] ? pb.slots[k].value : 45; });
 
-  const seed = (Date.now() ^ (attrs.fin * 7919 + attrs.def * 104729)) >>> 0;
+  const seed = (Date.now() ^ (attrs.sho * 7919 + attrs.def * 104729)) >>> 0;
   const run = pbSimCareer({ role: pb.role, attrs }, seed);
   run.slots = pb.slots;
 
@@ -285,7 +340,7 @@ function pbRenderCareer(run) {
     </div>
     <div class="pb-built">
       <p class="pb-built-h">איך הוא נבנה</p>
-      ${attrSlots(run.role).map(k => {
+      ${ATTR_KEYS.map(k => {
         const s = run.slots[k];
         if (!s) return '';
         return `<div class="pb-built-row">

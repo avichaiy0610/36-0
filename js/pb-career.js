@@ -31,7 +31,7 @@ const PB_AGE_CURVE = [
 // The reason a defender's goals are not zero is that they are not zero in the
 // tables either.
 const PB_OUTPUT = {
-  fw: { goals: 9,   assists: 3 },
+  fw: { goals: 8.2, assists: 3 },
   w:  { goals: 5.5, assists: 6 },
   cm: { goals: 3,   assists: 6.5 },
   df: { goals: 1.2, assists: 2 },
@@ -129,8 +129,11 @@ function pbSimCareer(build, seed) {
   // Stability does two things and only two, and both are why anyone would ever
   // spend a slot on it: it flattens the age curve, and it keeps him on the
   // pitch. It never makes him better.
-  // The first tuning pass made this symmetric — stability flattened the whole
-  // curve — and the harness said plainly that nobody should ever buy it: a
+  // PHYSICAL is what a career is made of length-wise, so it is what carries the
+  // old "stability" role: it flattens the decline and keeps him on the pitch. It
+  // never makes him better in a given season.
+  //
+  // The first tuning pass made this symmetric — it flattened the whole curve — and the harness said plainly that nobody should ever buy it: a
   // fragile build with four more rating points beat a stable one at the median
   // AND matched it at the tenth percentile. Lowering someone's ceiling without
   // raising their floor is not a trade, it is a tax.
@@ -138,9 +141,9 @@ function pbSimCareer(build, seed) {
   // So it acts on the DECLINE, where a career is actually decided. A stable
   // player is still himself at 32; a fragile one falls off a cliff at 29 and the
   // last four seasons of the fifteen are worth almost nothing.
-  const staF = Math.max(0, Math.min(1, (a.sta - 40) / 54));
-  const lostP = 0.18 * (1 - staF);               // 18% down to 0
-  const formSd = 5.5 * (1 - 0.6 * staF);
+  const staF = Math.max(0, Math.min(1, (a.phy - 50) / 43));
+  const lostP = 0.12 * (1 - staF);               // 12% down to 0
+  const formSd = 5.5 * (1 - 0.45 * staF);
 
   const out = PB_OUTPUT[role] || PB_OUTPUT.cm;
   let club = pbClubOfTier(rng, 3);                // everyone starts mid-table
@@ -151,7 +154,7 @@ function pbSimCareer(build, seed) {
 
   for (let i = 0; i < PB_SEASONS; i++) {
     const age = PB_FIRST_AGE + i;
-    const decay = i >= 9 ? 1.55 - 1.10 * staF : 1.00 - 0.35 * staF;
+    const decay = i >= 9 ? 1.35 - 0.70 * staF : 1.00 - 0.25 * staF;
     const curve = 1 - (1 - PB_AGE_CURVE[i]) * decay;
     const form = (rng() + rng() + rng() - 1.5) * formSd;   // roughly normal
     const ovr = Math.max(40, Math.min(99, Math.round(peak * curve + form)));
@@ -161,8 +164,11 @@ function pbSimCareer(build, seed) {
 
     const clubMult = PB_CLUB_OUTPUT[club.tier];
     const sharp = Math.pow(ovr / 80, PB_SHARP);
-    const finF = role === 'gk' ? 0 : a.fin / 85;
-    const creF = a.cre / 85;
+    // A dribbler makes chances that a static player does not, so כדרור counts
+    // toward both lines rather than being a number with nowhere to go.
+    const driF = 0.85 + 0.30 * (a.dri / 85);
+    const finF = role === 'gk' ? 0 : (a.sho / 85) * driF;
+    const creF = (a.pas / 85) * driF;
 
     const goals   = pbBinom(rng, apps, Math.min(0.95, out.goals   * sharp * clubMult * finF / PB_APPS));
     const assists = pbBinom(rng, apps, Math.min(0.95, out.assists * sharp * clubMult * creF / PB_APPS));
@@ -170,13 +176,13 @@ function pbSimCareer(build, seed) {
     // Clean sheets — a keeper's only production line, and the one stat where the
     // club he is behind matters as much as he does.
     const cs = role === 'gk'
-      ? pbBinom(rng, apps, Math.min(0.75, PB_CS_BASE * Math.pow((a.gk || a.def) / 85, 1.4) / (clubMult > 1 ? 1 : 1.25) * clubMult))
+      ? pbBinom(rng, apps, Math.min(0.75, PB_CS_BASE * Math.pow(a.def / 85, 1.4) / (clubMult > 1 ? 1 : 1.25) * clubMult))
       : 0;
 
-    // The honours. The title is the club's, not his — decisiveness nudges it,
-    // it does not decide it, for the same reason the serial_winner tag nudges a
+    // The honours. The title is the club's, not his — a good player nudges it,
+    // he does not decide it, for the same reason the serial_winner tag nudges a
     // side rather than lifting a man.
-    const titleP = PB_CLUB_TITLE[club.tier] * (0.75 + 0.5 * (a.cls / 99));
+    const titleP = PB_CLUB_TITLE[club.tier] * (0.75 + 0.5 * (ovr / 99));
     const champion = !lost && rng() < titleP;
 
     // Top of the scorers' table. The bar moves year to year the way it really

@@ -11,15 +11,20 @@ const G = new Function(
 const N = 4000;
 // Six archetypes a real player could actually assemble out of six spins.
 const BUILDS = {
-  'חלוץ מושלם':      { role: 'fw', attrs: { fin: 95, cre: 88, def: 70, pac: 88, sta: 92, cls: 82 } },
-  'חלוץ מאוזן':      { role: 'fw', attrs: { fin: 84, cre: 72, def: 55, pac: 74, sta: 76, cls: 66 } },
-  'חלוץ חד-ממדי':    { role: 'fw', attrs: { fin: 95, cre: 45, def: 35, pac: 50, sta: 45, cls: 40 } },
-  'חלוץ שביר':       { role: 'fw', attrs: { fin: 92, cre: 80, def: 60, pac: 85, sta: 44, cls: 70 } },
-  'חלוץ עם יציבות':  { role: 'fw', attrs: { fin: 80, cre: 70, def: 60, pac: 70, sta: 94, cls: 66 } },
-  'חלוץ גרוע':       { role: 'fw', attrs: { fin: 55, cre: 50, def: 45, pac: 55, sta: 55, cls: 45 } },
-  'קשר מאוזן':       { role: 'cm', attrs: { fin: 70, cre: 88, def: 74, pac: 66, sta: 84, cls: 72 } },
-  'מגן מאוזן':       { role: 'df', attrs: { fin: 50, cre: 60, def: 90, pac: 72, sta: 86, cls: 70 } },
-  'שוער מאוזן':      { role: 'gk', attrs: { fin: 40, cre: 50, def: 78, pac: 55, sta: 86, cls: 70, gk: 92 } },
+  'חלוץ מושלם':      { role: 'fw', attrs: { pac: 90, sho: 95, pas: 84, dri: 90, def: 60, phy: 90 } },
+  'חלוץ מאוזן':      { role: 'fw', attrs: { pac: 74, sho: 84, pas: 68, dri: 74, def: 50, phy: 76 } },
+  'חלוץ חד-ממדי':    { role: 'fw', attrs: { pac: 48, sho: 95, pas: 44, dri: 46, def: 35, phy: 60 } },
+  'חלוץ שביר':       { role: 'fw', attrs: { pac: 88, sho: 92, pas: 78, dri: 88, def: 55, phy: 56 } },
+  'חלוץ עמיד':       { role: 'fw', attrs: { pac: 70, sho: 80, pas: 66, dri: 70, def: 55, phy: 93 } },
+  'חלוץ גרוע':       { role: 'fw', attrs: { pac: 55, sho: 55, pas: 52, dri: 55, def: 45, phy: 62 } },
+  'כנף מאוזן':       { role: 'w',  attrs: { pac: 90, sho: 74, pas: 76, dri: 88, def: 46, phy: 66 } },
+  'קשר מאוזן':       { role: 'cm', attrs: { pac: 66, sho: 70, pas: 90, dri: 80, def: 66, phy: 78 } },
+  'מגן מאוזן':       { role: 'df', attrs: { pac: 74, sho: 48, pas: 62, dri: 56, def: 92, phy: 86 } },
+  'שוער מאוזן':      { role: 'gk', attrs: { pac: 50, sho: 30, pas: 52, dri: 34, def: 88, phy: 84 } },
+  // The control pair: SAME role, SAME rating, physical traded against shooting.
+  // Anything else is comparing two different players and learning nothing.
+  'בקרה · שביר':     { role: 'fw', attrs: { pac: 78, sho: 90, pas: 72, dri: 78, def: 52, phy: 55 } },
+  'בקרה · עמיד':     { role: 'fw', attrs: { pac: 78, sho: 78, pas: 72, dri: 78, def: 52, phy: 92 } },
 };
 
 const pct = (a, p) => a[Math.min(a.length - 1, Math.floor(a.length * p))];

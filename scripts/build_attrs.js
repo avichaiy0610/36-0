@@ -1,4 +1,4 @@
-// Six attributes per player-season, derived — never invented.
+// The six standard football attributes, per player-season.
 //
 // The squad data carries one number per player: ovr. The builder needs six, and
 // the rule that governs every one of them is that a number must have a fact
@@ -12,6 +12,11 @@
 // everyone is his CLUB's record in the season he was registered there, and that
 // is the bridge: a centre-back in the side that conceded fewest in 2004/05 has
 // evidence of a defence, even though no line in any table is his alone.
+//
+// The set is the one every football fan already knows — pace, shooting, passing,
+// dribbling, defending, physical — rather than a private vocabulary. Two of the
+// six (dribbling, pace) have no evidence in any table we own and come from
+// position and rating; the game does not annotate them, by the owner's call.
 //
 // Everything here is per player-SEASON, because that is what the builder lands
 // on. Bunion in 2004/05 is not Bunion in 2010/11 and the tables agree.
@@ -61,29 +66,29 @@ const BUCKET = {
 };
 
 // What a typical 75-rated player in the bucket has, before any evidence.
-//                fin  cre  def  pac   gk
+//              pac  sho  pas  dri  def  phy
 const BASE = {
-  GK: [30,  40,  62,  45,  75],
-  CB: [42,  46,  78,  55,  30],
-  FB: [44,  56,  70,  72,  30],
-  DM: [46,  58,  72,  58,  30],
-  CM: [55,  70,  60,  62,  30],
-  W:  [62,  68,  46,  78,  30],
-  FW: [74,  56,  40,  68,  30],
+  GK: [45,  25,  45,  30,  62,  68],
+  CB: [55,  42,  50,  45,  78,  78],
+  FB: [74,  44,  60,  62,  70,  68],
+  DM: [58,  48,  64,  58,  72,  74],
+  CM: [62,  56,  72,  68,  60,  66],
+  W:  [80,  62,  66,  78,  45,  58],
+  FW: [70,  74,  55,  66,  38,  70],
 };
 
 // Where the rating points go. A striker's fifteen points above average land
-// almost entirely in finishing; a centre-back's land in defending. This is the
+// almost entirely in shooting; a centre-back's land in defending. This is the
 // one place the shape of a position is asserted rather than measured, and it is
 // asserted the same way for everyone.
 const SCALE = {
-  GK: [0.10, 0.20, 0.50, 0.15, 1.10],
-  CB: [0.20, 0.25, 1.00, 0.30, 0.05],
-  FB: [0.25, 0.45, 0.85, 0.55, 0.05],
-  DM: [0.30, 0.50, 0.90, 0.30, 0.05],
-  CM: [0.45, 0.90, 0.55, 0.35, 0.05],
-  W:  [0.70, 0.80, 0.25, 0.85, 0.05],
-  FW: [1.05, 0.50, 0.15, 0.55, 0.05],
+  GK: [0.15, 0.10, 0.25, 0.10, 0.55, 0.45],
+  CB: [0.30, 0.20, 0.35, 0.25, 1.00, 0.70],
+  FB: [0.60, 0.25, 0.55, 0.50, 0.85, 0.50],
+  DM: [0.30, 0.30, 0.65, 0.45, 0.90, 0.65],
+  CM: [0.35, 0.45, 0.95, 0.70, 0.55, 0.45],
+  W:  [0.85, 0.70, 0.65, 0.90, 0.25, 0.35],
+  FW: [0.55, 1.05, 0.45, 0.65, 0.15, 0.55],
 };
 
 const clamp = (v, lo = 30, hi = 99) => Math.max(lo, Math.min(hi, Math.round(v)));
@@ -188,45 +193,35 @@ function attrsFor(p, sq) {
   const base = BASE[bucket], scale = SCALE[bucket], over = p.ovr - 75;
   const at = i => base[i] + over * scale[i];
 
-  // finishing — his own goals where the table names him, the club's output
-  // where it does not
-  const goals = own(SCORERS, p.name, sq.season, sq.teamId);
-  const fin = push(at(0), goals ? Math.min(20, goals.n * 0.8) : 3 * club.gfZ);
+  // pace — no source in any table we own. Position and rating.
+  const pac = at(0);
 
-  // creativity — same shape. The assist lists are thin before 2016, so the
+  // shooting — his own goals where the table names him, the club's output where
+  // it does not
+  const goals = own(SCORERS, p.name, sq.season, sq.teamId);
+  const sho = push(at(1), goals ? Math.min(20, goals.n * 0.8) : 3 * club.gfZ);
+
+  // passing — same shape. The assist lists are thin before 2016, so the
   // playmaker tag is a second witness rather than a duplicate of the first.
   const asts = own(ASSISTS, p.name, sq.season, sq.teamId);
-  const cre = push(at(1),
+  const pas = push(at(2),
     (asts ? Math.min(20, asts.n * 1.4) : 3 * club.gfZ)
     + (tagCount(p.name, 'playmaker') ? 5 : 0));
 
+  // dribbling — no source either. Position and rating.
+  const dri = at(3);
+
   // defending — what the side he was in actually conceded
-  const def = push(at(2), 8 * club.defZ);
+  const def = push(at(4), 8 * club.defZ);
 
-  // pace — NO SOURCE. Position and rating only, and no evidence term to push
-  // it: this is the one number here that is not a fact.
-  const pac = at(3);
-
-  // keeping — the same defensive record, weighted heavier: there is only ever
-  // one keeper, and the clean sheets are his more than they are any defender's
-  const gk = push(at(4), (bucket === 'GK' ? 16 : 8) * club.defZ);
-
-  // stability — a career attribute, identical in every one of his seasons
+  // physical — the one attribute longevity really speaks to. A man who played
+  // nineteen seasons in this league was not fragile, and that IS in our data.
   const car = CAREER.get(norm(p.name)) || { seasons: 1, longest: 1 };
-  const sta = 40 + Math.min(42, car.seasons * 3) + Math.min(12, Math.max(0, car.longest - 4) * 1.5);
+  const phy = push(at(5),
+    Math.min(16, Math.max(0, car.seasons - 3) * 1.3)
+    + Math.min(6, Math.max(0, car.longest - 5) * 1.0));
 
-  // decisiveness — where the season ended, plus the honours the tables gave him.
-  // The widest evidence term of the six on purpose: on rating alone this one has
-  // almost no spread, and an attribute that lands everyone between 45 and 55 is
-  // a slot nobody would ever think about.
-  const finish = club.pos === 1 ? 26 : club.pos === 2 ? 18 : club.pos === 3 ? 13
-    : club.pos <= 6 ? 8 : club.pos > club.of - 3 ? -6 : 0;
-  const cls = push(46 + over * 0.45, finish
-    + (tagCount(p.name, 'poty') ? 10 : 0)
-    + Math.min(10, tagCount(p.name, 'serial_winner') * 2.5));
-
-  const six = [fin, cre, def, pac, sta, cls].map(v => clamp(v));
-  return bucket === 'GK' ? six.concat(clamp(gk)) : six;
+  return [pac, sho, pas, dri, def, phy].map(v => clamp(v));
 }
 
 /* ── the evidence, so a number can be defended on screen ──────────────────── */
@@ -291,14 +286,13 @@ process.stdout.write(
 // Six attributes per player-season, in the order of SQUADS and of the players
 // inside each squad, so no name is repeated even once:
 //
-//   גמר , יצירה , הגנה , מהירות , יציבות , הכרעה
+//   מהירות , בעיטה , מסירה , כדרור , הגנה , פיזיות
 //
-// and a seventh — שוער — on goalkeeper rows only.
-//
-// Five of the six rest on the real tables. מהירות does not: there is no age, no
-// minutes and no running data anywhere in this project, so it is derived from
-// position and rating alone. js/attrs.js marks it, and every screen that shows
-// it must say so.
+// Shooting comes from the real scorers' table where it names the man and from
+// his club's output where it does not; passing the same from the assists table;
+// defending from what his side actually conceded; physical from how long he
+// lasted in the league. Pace and dribbling have no source in any table this
+// project owns and come from position and rating.
 const ATTR_DATA = {
 ${rows.join('\n')}
 };
