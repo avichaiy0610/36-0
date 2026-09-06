@@ -123,7 +123,7 @@ AS $$
     ORDER BY r.user_id, r.legacy DESC, r.created_at ASC
   )
   SELECT ROW_NUMBER() OVER (ORDER BY b.legacy DESC, b.created_at ASC),
-         COALESCE(pr.display_name, 'אנונימי'),
+         COALESCE(pr.username, 'אנונימי'),
          b.role, b.peak, b.legacy, b.goals, b.assists, b.clean, b.titles, b.created_at
   FROM best b
   LEFT JOIN profiles pr ON pr.id = b.user_id
