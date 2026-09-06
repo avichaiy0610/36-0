@@ -796,6 +796,31 @@ function trackDraftMode() {
        : state.duelCode ? 'duel' : 'draft';
 }
 
+// What was actually switched on for this season.
+//
+// Added 2026-09-06 after an analytics pass came back with nothing to say about
+// five features shipped inside two weeks. The settings blob carried era,
+// difficulty, peak mode and january, and not one word about chemistry, star
+// tags, tactics, classic mode or the manager — so "does anyone use any of it"
+// was not a hard question, it was an unanswerable one.
+//
+// `off` and `none` are deliberately different values. January's adoption read
+// as 95% until you notice it is on by default, at which point the real finding
+// is "only 5% turn it off" — a much weaker claim. Anything measured here has to
+// be able to tell a choice apart from a default.
+function styleProfile() {
+  try {
+    return {
+      style:  state.classic ? 'classic' : 'full',
+      tactic: state.tactic || 'bal',
+      coach:  state.coachOn === false ? 'off'
+            : state.coach ? (state.coach.arch || 'unknown') : 'none',
+    };
+  } catch (e) {
+    return { style: '?', tactic: '?', coach: '?' };   // telemetry never throws
+  }
+}
+
 function showScreen(id) {
   // Europe's backdrop is a fixed layer on <body>, so it does not leave with the
   // screen. Anything that navigates away — the nav logo above all — has to take
@@ -3103,7 +3128,13 @@ function animateResults(ovr) {
     if (typeof getCurrentUser === 'function' && getCurrentUser()) {
       _supabase.rpc('increment_games_played').then(() => {}, () => {});
     }
-    if (typeof track === 'function') track('finish', trackDraftMode());
+    if (typeof track === 'function') {
+      // game_results only keeps SAVED seasons and only for signed-in players,
+      // which is a minority and a biased one. The same three values ride the
+      // usage row so the answer covers everybody who finished a season.
+      const sp = styleProfile();
+      track('finish', trackDraftMode(), sp.style + '|' + sp.tactic + '|' + sp.coach);
+    }
     // the daily streak — the reason to come back tomorrow. An archive run counts
     // for the day it belongs to, which is the whole point of making one up.
     if (state.challenge && state.challenge.period === 'daily' && typeof chalRecordDaily === 'function') {
@@ -4151,6 +4182,7 @@ async function submitResult() {
       peak_mode:       state.peakMode,
       january_on:      state.januaryOn !== false,
       ratings_visible: state.showRatings,
+      ...styleProfile(),
       ...(state.oppSeason ? { opp_season: state.oppSeason } : {}),
       league_format: (r.spec && !isModernSpec(r.spec)) ? 'authentic' : 'modern',
       ...(state.challenge ? { challenge: state.challenge.period + '|' + state.challenge.key } : {}),
