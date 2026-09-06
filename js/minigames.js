@@ -176,6 +176,10 @@ function mgHome() {
       sub: 'בלי הגרלה — תקציב. תבנה סגל במכרז מול שלושה יריבים, ואז תשחק איתו עונה.',
       best: typeof mgAuctionShelfLine === 'function' ? mgAuctionShelfLine() : '',
       go: () => mgAuctionOpen() },
+    { id: 'builder', icon: '🧬', title: 'בונה כדורגלן',
+      sub: 'לא הרכב — שחקן אחד. שישה סיבובים, תכונה אחת מכל אחד, ואז חמש־עשרה עונות.',
+      best: typeof pbShelfLine === 'function' ? pbShelfLine() : '',
+      go: () => pbOpen() },
   ];
   box.innerHTML = `
     <p class="page-note mg-shelf-note">משחקים קצרים לצד המשחק הגדול — כל אחד נגמר בכמה דקות.</p>

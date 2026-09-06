@@ -218,6 +218,11 @@ function pbSimCareer(build, seed) {
       club = pbClubOfTier(rng, club.tier - 1);     // a move up
     } else if ((lost || ovr < 72) && club.tier < 4 && rng() < 0.35) {
       club = pbClubOfTier(rng, club.tier + 1);     // and a move back down
+    } else if (rng() < 0.16) {
+      // A sideways move. Without it a career that never climbs never moves at
+      // all: the first run printed thirteen identical rows of עירוני טבריה,
+      // which is not a modest career, it is a table with nothing to read.
+      club = pbClubOfTier(rng, club.tier || 2);
     }
   }
 
