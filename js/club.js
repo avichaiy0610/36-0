@@ -324,14 +324,24 @@ function clubShirtSVG(club, px, number) {
      spans almost all of it and "11" all but touches the seams, which is most of
      why it read as wrong. 30 leaves a margin on both sides at every number.
 
-     BASELINE. y sets the BASELINE, and digits have no descender, so the optical
-     centre of the figure sits half a cap-height above it — about 0.72em, so ~11
-     at this size. The shirt's visual body (shoulder line to hem, y 22..96)
-     centres on 59, which puts the baseline at 70. 71 measured best by eye.
+     BASELINE. Reported wrong three times, and the first three answers were all
+     reasoned rather than measured — which is why they were all wrong. Measured
+     properly: render the shirt, rasterise it, take the silhouette's pixel
+     bounding box and the number's ink bounding box, and compare their centres.
+     The silhouette runs y 2.5..96.5, so its middle is 49.5, and the ink centre
+     matches it at a baseline of 60.5. The previous value of 71 sat the figure
+     at 59 — nine and a half units low, a tenth of the whole shirt, which is
+     exactly as far off as it looked.
+
+     Note what the earlier reasoning got wrong: it kept centring on the TORSO
+     (y 37..96, middle 66.5) because that is where a number is printed on a real
+     shirt. But this drawing is a flat icon of a shirt, and what the eye centres
+     is the shape it can see, sleeves included.
+
      dominant-baseline would state this directly and is deliberately not used:
      html2canvas re-renders the SVG and does not honour it, so the saved PNG
      would place the number somewhere other than the screen does. */
-  const num = (number === 0 || number) ? `<text x="50" y="71" text-anchor="middle"
+  const num = (number === 0 || number) ? `<text x="50" y="60.5" text-anchor="middle"
       font-family="Arial Black, Arial, sans-serif" font-size="30" font-weight="900"
       fill="${ink}" stroke="${edge}" stroke-width="4" stroke-linejoin="round"
       style="paint-order:stroke fill">${number}</text>` : '';
