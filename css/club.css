@@ -89,6 +89,12 @@
 .cl-actions .btn-primary { flex: 1; }
 .cl-dice { white-space: nowrap; }
 
+/* the one-line explanation under the era toggle in the ⚙️ panel */
+.tp-note {
+  font-size: 0.68rem; color: var(--dim); line-height: 1.5;
+  margin: -6px 0 12px;
+}
+
 /* ── the club, where a career starts from it ──────────────────────────────── */
 .cr-club-from {
   display: flex; align-items: center; gap: 8px;

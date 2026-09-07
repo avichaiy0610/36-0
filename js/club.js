@@ -317,16 +317,22 @@ function clubShirtSVG(club, px, number) {
   }
 
   const ink = clInk(c1), edge = clInkOpposite(c1);
-  // The torso runs y 37..96, so its middle is 66.5 and a number printed on a
-  // shirt sits a touch below that. text-anchor centres it horizontally on the
-  // torso's own centre line (x=50); vertically the BASELINE is what y sets, so
-  // it carries half a cap-height (~0.72em of 34px ≈ 12) below the optical
-  // centre. dominant-baseline would say this more directly and is deliberately
-  // avoided — html2canvas re-renders the SVG and does not honour it reliably,
-  // which would put the number in a different place in the saved PNG than on
-  // screen. An explicit baseline renders identically in both.
-  const num = (number === 0 || number) ? `<text x="50" y="82" text-anchor="middle"
-      font-family="Arial Black, Arial, sans-serif" font-size="34" font-weight="900"
+  /* Both of these were measured against the rendered shape, not estimated —
+     twice, because estimating them is what put the number low and cramped.
+
+     SIZE. The torso is only 44 units wide (x 28..72). At 34 a two-digit number
+     spans almost all of it and "11" all but touches the seams, which is most of
+     why it read as wrong. 30 leaves a margin on both sides at every number.
+
+     BASELINE. y sets the BASELINE, and digits have no descender, so the optical
+     centre of the figure sits half a cap-height above it — about 0.72em, so ~11
+     at this size. The shirt's visual body (shoulder line to hem, y 22..96)
+     centres on 59, which puts the baseline at 70. 71 measured best by eye.
+     dominant-baseline would state this directly and is deliberately not used:
+     html2canvas re-renders the SVG and does not honour it, so the saved PNG
+     would place the number somewhere other than the screen does. */
+  const num = (number === 0 || number) ? `<text x="50" y="71" text-anchor="middle"
+      font-family="Arial Black, Arial, sans-serif" font-size="30" font-weight="900"
       fill="${ink}" stroke="${edge}" stroke-width="4" stroke-linejoin="round"
       style="paint-order:stroke fill">${number}</text>` : '';
 
@@ -632,14 +638,39 @@ function eraSkinFor(year) {
    lay down the club's FLAT colour and put the correct ink on it, which is the
    only way to get a period that predates gradients: 1999 did not look like a
    gradient, and no amount of texture over one was ever going to read as 1999. */
+/* The switch. Some people want the card to look the same every round, and that
+   is a completely reasonable thing to want — the era look is decoration, and
+   decoration you cannot turn off is an imposition. It lives in the ⚙️ panel
+   beside the other display settings, in the same localStorage record.
+
+   Default ON: the feature is meant to be seen, and a returning player who has
+   never opened the settings has no stored value. */
+function erasEnabled() {
+  try {
+    const s = JSON.parse(localStorage.getItem('36-0-theme') || '{}');
+    return s.eras !== false;
+  } catch (e) { return true; }
+}
+
+// The last call is remembered so the toggle can replay it. Without this,
+// switching the setting on mid-draft would leave the card bare until the next
+// roulette — the state is in game.js and this module cannot ask for it.
+let _eraLast = null;
+
+function eraRefresh() {
+  if (!_eraLast) return;
+  applyEraSkin(_eraLast.el, _eraLast.season, _eraLast.primary, _eraLast.ink);
+}
+
 function applyEraSkin(el, season, primary, ink) {
   if (!el) return;
+  _eraLast = { el, season, primary, ink };
   el.classList.remove(...ERA_ALL);
   el.removeAttribute('data-era');
   el.style.removeProperty('--era-club');
   el.style.removeProperty('--era-ink');
   mirrorEraOnPanel(el, null);
-  if (!season) return;
+  if (!season || !erasEnabled()) return;   // switched off = the card it always was
   const year = parseInt(String(season).split('/')[0], 10);
   const skin = eraSkinFor(year);
   if (!skin) return;
