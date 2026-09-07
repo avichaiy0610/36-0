@@ -603,22 +603,53 @@ const ERA_SKINS = [
 ];
 const ERA_ALL = ERA_SKINS.map(e => e.cls);
 
+// The side panel holds the card AND the player list. Clearing first and on every
+// call is the point: a panel still wearing the previous round's decade is this
+// project's most repeated bug, and here it would be completely silent.
+function mirrorEraOnPanel(cardEl, cls) {
+  const panel = cardEl && cardEl.closest ? cardEl.closest('.side-panel') : null;
+  if (!panel) return;
+  panel.classList.remove(...ERA_ALL);
+  if (cls) panel.classList.add(cls);
+}
+
 function eraSkinFor(year) {
   const y = Number(year);
   if (!Number.isFinite(y)) return null;
   return ERA_SKINS.find(e => y >= e.from && y <= e.to) || null;
 }
 
-// season is the raw "2001/02" string the squad carries.
-function applyEraSkin(el, season) {
+/* season is the raw "2001/02" string the squad carries. `primary` and `ink` are
+   the drawn club's own colour and the readable text colour game.js already
+   computed for it (textColorFor) — they are handed down as CSS custom
+   properties, and that is what makes these skins possible at all.
+
+   Why it has to work this way. Everything on that header is styled INLINE, so
+   CSS can only ever paint OVER it, never with it: a skin could darken the
+   gradient but could not know whether the text sitting on top was white or
+   near-black, and guessing wrong is what produced an invisible season on every
+   yellow club. Publishing --era-club and --era-ink inverts that. A skin can now
+   lay down the club's FLAT colour and put the correct ink on it, which is the
+   only way to get a period that predates gradients: 1999 did not look like a
+   gradient, and no amount of texture over one was ever going to read as 1999. */
+function applyEraSkin(el, season, primary, ink) {
   if (!el) return;
   el.classList.remove(...ERA_ALL);
   el.removeAttribute('data-era');
+  el.style.removeProperty('--era-club');
+  el.style.removeProperty('--era-ink');
+  mirrorEraOnPanel(el, null);
   if (!season) return;
   const year = parseInt(String(season).split('/')[0], 10);
   const skin = eraSkinFor(year);
   if (!skin) return;
   el.classList.add(skin.cls);
+  if (primary) el.style.setProperty('--era-club', primary);
+  if (ink)     el.style.setProperty('--era-ink', ink);
+  // The panel gets the class too. A decade that stops at the edge of a 300x90
+  // card is a detail nobody reads as a period — the player list underneath is
+  // most of what is on screen while you draft, so it takes the era as well.
+  mirrorEraOnPanel(el, skin.cls);
   // The tag is drawn by CSS from this attribute. Without it the skin is a set of
   // subtle CSS differences that a player has no reason to notice, let alone read
   // as a feature — naming the span is what turns a texture into "this is 2001".

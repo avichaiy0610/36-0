@@ -1833,8 +1833,12 @@ function showSquadCardData(squad) {
   document.getElementById('squad-card-header').style.background =
     `linear-gradient(135deg, ${team.primaryColor} 0%, #1a1a2e 100%)`;
   // מראה של תקופה — the card takes on the look of the year it just landed on.
+  // The club's colour and the ink computed for it go with it: everything on this
+  // header is set inline, so a skin can only paint over it unless those two are
+  // handed across, and a skin that cannot paint FLAT club colour cannot look
+  // like a year that predates gradients.
   if (typeof applyEraSkin === 'function')
-    applyEraSkin(document.getElementById('squad-card'), squad.season);
+    applyEraSkin(document.getElementById('squad-card'), squad.season, team.primaryColor, tx);
 }
 
 // ─── Draft: Player rendering ───────────────────────────────────────────────────
