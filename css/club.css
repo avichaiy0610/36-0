@@ -262,26 +262,42 @@
   content: ''; position: absolute; inset: 0; z-index: 0; pointer-events: none;
 }
 
-/* ── the card ──────────────────────────────────────────────────────────────── */
-
-.squad-card.era-toto {
-  background: #fff;
-  border: 1px solid #cfc7bb;
-  border-radius: 3px;
-  box-shadow: 0 2px 10px rgba(0,0,0,.45);
-}
-
-/* The league bar. attr() only reads the element its own pseudo belongs to, so
-   this hangs off the CARD, where applyEraSkin writes data-era — the name comes
-   from ERA_SKINS and nothing here hardcodes "ליגת טוטו".
-   `content` lives in this base rule on purpose: a ::before without it does not
-   render at all, and leaving it to the skin below is how the bar went missing
-   the first time this was built. */
+/* The era tag's BASE rule, and it lives up here with the other shared plumbing
+   on purpose: it has been deleted twice by rewrites of the skin below it, and
+   both times the symptom was the league bar silently not rendering — a ::before
+   without `content` produces no box at all. attr() reads only the element its
+   own pseudo belongs to, which is why this hangs off the CARD, where
+   applyEraSkin writes data-era. */
 .squad-card[data-era]::before {
   content: attr(data-era);
   position: absolute; z-index: 3; top: 0; left: 0;
   line-height: 1.4; pointer-events: none;
 }
+
+/* ── the card ──────────────────────────────────────────────────────────────
+   The first build of this skin made the whole column WHITE, because the
+   reference table is white. That was taking the reference's COLOUR instead of
+   its IDENTITY, and the verdict was right: a white slab inside a #0d1117 app is
+   painful to look at, whatever period it is quoting. The table is white because
+   it is paper; this app is dark, and a skin has to live in the app.
+
+   So what carries over is everything about the period EXCEPT the paper: the
+   league's orange, the square geometry, the plain grotesque, the bar across the
+   top with the league's name of the day. The ground stays the app's own.
+
+   Note what this also buys: with no opaque plate there is nothing to force, so
+   `.card-team` and `.card-season` keep the ink game.js computed for the club,
+   and the club's gradient is left alone entirely. Fewer overrides, fewer ways
+   to be wrong. */
+
+.squad-card.era-toto {
+  background: var(--surface);
+  border: 1px solid rgba(240,130,30,.38);
+  border-radius: 3px;
+  box-shadow: none;
+}
+
+/* The league bar — the period's strongest signal, and it reads on dark. */
 .squad-card.era-toto::before {
   left: 0; right: 0; top: 0;
   direction: rtl; text-align: right;
@@ -290,58 +306,37 @@
   letter-spacing: -.2px; color: #fff;
   background: linear-gradient(180deg, #f79a1e 0%, #ef7c12 45%, #e2600c 100%);
 }
-
-/* room for the bar, and the club's gradient covered with the printed white */
-.squad-card.era-toto .squad-card-header { padding-top: 32px; padding-bottom: 10px; }
-.squad-card.era-toto .squad-card-header::after { background: #fff; }
+.squad-card.era-toto .squad-card-header { padding-top: 32px; }
 
 .squad-card.era-toto .card-text {
-  border-right: 4px solid var(--era-club, #e2600c);
+  border-right: 3px solid var(--era-club, #e2600c);
   padding-right: 8px;
 }
 .squad-card.era-toto .card-team {
-  color: #111 !important;
   font-family: Arial, Heebo, sans-serif; font-weight: 700; letter-spacing: -.2px;
-  text-shadow: none;
 }
 .squad-card.era-toto .card-season {
-  color: #8a3b06 !important;
-  font-family: Arial, Heebo, sans-serif; font-weight: 700; font-size: 11px;
-  letter-spacing: .4px; opacity: 1;
+  font-family: Arial, Heebo, sans-serif; font-weight: 700; letter-spacing: .4px;
 }
-.squad-card.era-toto .reroll-row {
-  background: #fdf0e2; border-top: 1px solid #e6c8a8;
-}
+.squad-card.era-toto .reroll-row { border-top: 1px solid rgba(240,130,30,.28); }
 .squad-card.era-toto .btn-reroll-small {
-  background: #fff; border-color: #e0c3a4; color: #8a3b06; border-radius: 2px;
+  border-radius: 2px; border-color: rgba(240,130,30,.32);
 }
 .squad-card.era-toto .reroll-badge { background: #e2600c; color: #fff; }
 
-/* ── the list under it ─────────────────────────────────────────────────────── */
-/* The panel takes the era too. A printed card sitting on top of a dark list
-   would read as the light-frame-on-dark mistake that was rejected twice — the
-   period look only holds together if the whole column is the same object. */
-
-.side-panel.era-toto { background: #efece6; }
-.side-panel.era-toto .pick-hint { color: #6b625a; }
+/* ── the list under it ─────────────────────────────────────────────────────
+   The panel takes the era too, but as the same one accent and the same square
+   geometry — not as a change of ground. */
 
 .side-panel.era-toto .player-card {
-  background: #fff; border: 1px solid #ddd7cd; border-radius: 2px;
+  border-radius: 2px; border-color: rgba(240,130,30,.18);
 }
-.side-panel.era-toto .player-card:nth-child(even) { background: #f7f5f1; }
-.side-panel.era-toto .player-card:hover { background: #fdf0e2; border-color: #e0c3a4; }
-.side-panel.era-toto .pc-name { color: #111; font-weight: 700; }
 .side-panel.era-toto .pc-ovr {
-  color: #d8321b; font-family: Arial, Heebo, sans-serif; font-weight: 900;
+  color: #f0821e; font-family: Arial, Heebo, sans-serif; font-weight: 900;
 }
 .side-panel.era-toto .pc-pos-badge {
-  background: #fdf0e2; border-color: #e0c3a4; color: #8a3b06; border-radius: 2px;
+  border-radius: 2px; border-color: rgba(240,130,30,.30); color: #e8a35a;
 }
-.side-panel.era-toto .btn-draft-restart { color: #8a3b06; }
-.side-panel.era-toto .btn-move-player {
-  background: #fff; border-color: #e0c3a4; color: #8a3b06;
-}
-
 
 /* ── narrow phones ────────────────────────────────────────────────────────── */
 /* At a 375px viewport the box is 94vw = 352 and its content 332, so the man has
