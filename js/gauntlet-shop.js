@@ -1,8 +1,7 @@
 // The travelling shop, which opens every three fights.
 //
 // Coins come out of victories and never survive a run, so the only question the
-// shop asks is when to burn what you have. Note there are no coaches in 36-0 —
-// nothing here buys a bench.
+// shop asks is when to burn what you have.
 
 const GT_SHOP = [
   { id: 'training',     icon: '🏋️', name: 'מחנה אימונים', price: 40,
@@ -13,6 +12,12 @@ const GT_SHOP = [
     desc: 'הסוכן מאתר את העמדה החלשה בהרכב ומגריל לה שלוש חלופות טובות יותר. אחת נכנסת.' },
   { id: 'relic-wheel',  icon: '🔮',  name: 'גלגל קמעות', price: 65,
     desc: 'סיבוב אחד על גלגל שכל הקלפים בו קמעות - קמע מובטח.' },
+  // Sits with the other spins rather than at the end of the shelf: it is a wheel,
+  // and it is the only one whose price is read off the run instead of off here.
+  // Above the relics on purpose, since what it rolls for is worth more than any
+  // of them — see gauntlet-managers.js.
+  { id: 'coach-wheel',  icon: '🔄',  name: 'קרוסלת מאמנים', price: GT_COACH_SWAP_PRICE,
+    desc: 'מגריל מאמן חדש במקום זה שעל הקווים. ההגרלה עיוורת וסופית - היא יכולה גם להוריד לך את הבונוס.' },
   { id: 'insurance',    icon: '🛡',  name: 'פוליסת ביטוח', price: 125, once: true,
     desc: 'פעם אחת: הפסד לא מסיים את המסע. המשחק פשוט משוחק מחדש מההתחלה.' },
   { id: 'second-stop',  icon: '🎰',  name: 'עצירה שנייה', price: 35, once: true,
@@ -27,14 +32,34 @@ const GT_SHOP = [
 // on it. Capped, so hoarding never beats buying.
 function gtInterest(coins) { return Math.min(10, Math.floor(coins / 5)); }
 
-function gtPrice(item) { return Math.round(item.price * gtShopDiscount()); }
-function gtOwned(item) { return !!(gtRun().effects || {})[_gtEffKey(item.id)]; }
+// The manager carousel prices off the RUN, not off the shelf: the first swap of
+// a run is free wherever it is taken, and if the player waved it away on the
+// reveal card it is still sitting here at zero.
+function gtPrice(item) {
+  if (item.id === 'coach-wheel') return Math.round(gtCoachSwapPrice() * gtShopDiscount());
+  return Math.round(item.price * gtShopDiscount());
+}
+function gtPriceLabel(item) {
+  if (gtOwned(item)) return '✅ נרכש';
+  const p = gtPrice(item);
+  return p ? '🪙 ' + p : '🎁 חינם';
+}
+function gtOwned(item) { return !!(item.once && (gtRun().effects || {})[_gtEffKey(item.id)]); }
 function _gtEffKey(id) {
   return { insurance: 'insurance', 'second-stop': 'secondStop',
            'home-deed': 'homeDeed', 'scout-report': 'scoutReport' }[id] || id;
 }
 
 function gtIsShopRow(at) { const r = GM_RUN[at]; return !!r && r.kind === 'shop'; }
+
+// What the shelf carries this run. The insurance is off when the run rule bans
+// it; the carousel is off when there is no manager to swap out — a roster that
+// failed to load, or a future run that was never given one.
+function gtOnShelf(item) {
+  if (item.id === 'insurance')   return !gtModFlag('noInsurance');
+  if (item.id === 'coach-wheel') return !!gtCoach();
+  return true;
+}
 
 function gtShopHTML() {
   const run = gtRun();
@@ -47,17 +72,16 @@ function gtShopHTML() {
       </div>
       <p class="gt-shop-note">🪙 <b>ריבית:</b> בכל ניצחון אתה מקבל מטבע נוסף על כל 5 מטבעות ששמורים אצלך, עד 10 נוספים. כלומר גם לא לבזבז זה משתלם.</p>
       <div class="gt-shop-grid" id="gt-shop-grid">
-        ${GT_SHOP.filter(it => !(it.id === 'insurance' && gtModFlag('noInsurance'))).map(it => {
-          const price = gtPrice(it);
-          const owned = it.once && gtOwned(it);
-          const poor = (run.coins || 0) < price;
+        ${GT_SHOP.filter(gtOnShelf).map(it => {
+          const owned = gtOwned(it);
+          const poor = !owned && (run.coins || 0) < gtPrice(it);
           return `
-          <button class="gt-item ${owned ? 'owned' : ''} ${poor && !owned ? 'poor' : ''}"
+          <button class="gt-item ${owned ? 'owned' : ''} ${poor ? 'poor' : ''}"
                   data-item="${it.id}" ${owned ? 'disabled' : ''}>
             <span class="gt-item-ico">${it.icon}</span>
             <span class="gt-item-name">${it.name}${it.once ? '<span class="gt-once">חד-פעמי</span>' : ''}</span>
             <span class="gt-item-desc">${gtNums(it.desc)}</span>
-            <span class="gt-item-price">${owned ? '✅ נרכש' : '🪙 ' + price}</span>
+            <span class="gt-item-price">${gtPriceLabel(it)}</span>
           </button>`;
         }).join('')}
       </div>
@@ -79,7 +103,7 @@ function gtWireShop(root) {
     btn.onclick = () => {
       const item = GT_SHOP.find(i => i.id === btn.dataset.item);
       const run = gtRun();
-      if (!item || (item.once && gtOwned(item))) return;
+      if (!item || gtOwned(item)) return;
       const price = gtPrice(item);
       if ((run.coins || 0) < price) {
         work.innerHTML = `<p class="gt-shop-poor">אין מספיק מטבעות ל${item.name} - חסרים ${price - (run.coins || 0)}.</p>`;
@@ -108,12 +132,12 @@ function gtShopRepaint() {
   document.querySelectorAll('.gt-item[data-item]').forEach(btn => {
     const item = GT_SHOP.find(i => i.id === btn.dataset.item);
     if (!item) return;
-    const owned = item.once && gtOwned(item);
-    btn.classList.toggle('owned', !!owned);
+    const owned = gtOwned(item);
+    btn.classList.toggle('owned', owned);
     btn.classList.toggle('poor', !owned && (run.coins || 0) < gtPrice(item));
-    btn.disabled = !!owned;
+    btn.disabled = owned;
     const price = btn.querySelector('.gt-item-price');
-    if (price) price.innerHTML = owned ? '✅ נרכש' : '🪙 ' + gtPrice(item);
+    if (price) price.innerHTML = gtPriceLabel(item);
   });
 }
 
@@ -134,6 +158,25 @@ function gtBuy(item, price, work) {
   }
   if (item.id === 'agent-wheel') {
     gtAgentWheel(price, work);
+    return;
+  }
+  if (item.id === 'coach-wheel') {
+    const prev = gtCoach();
+    // Drawn before a coin moves and before a pixel of animation, so a refresh
+    // mid-reveal cannot undo it. gtRedrawCoach also spends the free swap, which
+    // is why the charge comes after: from here on the shelf reads 60.
+    const next = gtRedrawCoach();
+    if (!next) {
+      work.innerHTML = `<p class="gt-shop-poor">אין מאמן אחר להגריל.</p>`;
+      return;
+    }
+    gtCharge(price);
+    gtCoachSpin('מחליפים מאמן', () => gtCoachReveal(next, 'המאמן החדש', () => {
+      gtCoachBadgeRepaint();
+      work.innerHTML = `<p class="gt-sign-done">✅ ${prev ? prev.name + ' יצא, ' : ''}${
+        next.name} על הקווים - <b dir="ltr">+${gtCoachBonus()}</b> לכל הקווים.</p>`;
+      refresh();
+    }, false));
     return;
   }
   // the flag purchases: nothing to choose, they just start applying

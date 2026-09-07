@@ -142,6 +142,12 @@
                 margin-inline-start: 8px; white-space: nowrap; }
 .gt-coach-tag small { font-weight: 900; opacity: .85; }
 
+/* On the gauntlet's own reveal card (js/gauntlet-managers.js), inside the shell
+   coach.js styles. What he is worth, and the warning that the swap is one-way. */
+.gt-coach-worth { margin: -6px 0 14px; font-size: 14px; color: var(--dim); }
+.gt-coach-worth b { font-size: 20px; font-weight: 900; color: var(--accent); }
+.gt-coach-warn { margin: 2px 0 0; font-size: 11.5px; color: var(--dim); line-height: 1.5; }
+
 .gt-victory { background: var(--surface); border: 1px solid var(--accent); border-radius: 12px;
               padding: 16px; margin-bottom: 12px; text-align: center; }
 .gt-vic-kicker { font-size: 11px; font-weight: 800; letter-spacing: .6px; color: var(--dim); }

@@ -613,11 +613,13 @@ function showGauntlet() {
     if (reset) reset.style.display = 'none';   // nothing has happened yet to reset
     gtWireModPicker(map, () => {
       // The rule is chosen, the road is about to open: hire before kick-off, and
-      // say who it is. Same card the league uses, so the man reads the same way
-      // in both places.
+      // say who it is. Same box the league uses, but the gauntlet's own card —
+      // it prints what he is worth, and offers the one free swap of the run.
+      // Skipping the offer here does not burn it; it waits on the shop shelf.
       const hired = typeof gtDrawCoach === 'function' ? gtDrawCoach() : null;
-      if (hired && typeof coachShow === 'function') coachShow(hired, 'המאמן למסע', showGauntlet);
-      else showGauntlet();
+      if (hired && typeof gtCoachReveal === 'function') {
+        gtCoachReveal(hired, 'המאמן למסע', showGauntlet, !gtCoachSwapUsed());
+      } else showGauntlet();
     });
     gmAttachSandbox(map);
     return;

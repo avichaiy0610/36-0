@@ -147,3 +147,97 @@ function gtCoachBadgeHTML() {
   return `<span class="gt-coach-tag" title="${c.style ? c.style.replace(/"/g, '') : ''}">🧑‍💼 ${c.name}${
     b ? ` <small dir="ltr">+${b}</small>` : ''}</span>`;
 }
+
+// The badge sits in the relic bar, which the shop must not re-render — that
+// would wipe the panel telling the player what he just bought. Same trick the
+// wallet uses: patch it where it stands.
+function gtCoachBadgeRepaint() {
+  document.querySelectorAll('.gt-coach-tag').forEach(el => { el.outerHTML = gtCoachBadgeHTML(); });
+}
+
+/* ── one swap free, the rest bought ───────────────────────────────────────────
+ *
+ * The draw is uniform over the 34 in coach-data.js — 2 legends, 15 winners, 3
+ * cup men, 14 journeymen — so a blind re-draw is worth +1.71 on the lines. That
+ * one number is what makes the offer a decision instead of a gift: off a
+ * journeyman it is free money, off a winner it is a bad bet, and off a legend it
+ * is vandalism. Which is why the card PRINTS the bonus. The league card does not,
+ * and must not — there the manager is a fair trade and the number would only
+ * invite a re-spin that isn't on offer. Here he is the largest edge in the mode.
+ *
+ * A swap is blind and it is final, both ways: what comes out is what you have.
+ * Letting the player see the new man and keep the old one would price a +5 at
+ * whatever the roll cost and make the draw itself meaningless.
+ *
+ * The first swap of a run is free, and it is the SAME swap wherever it is taken
+ * — on the reveal card before the first fight, or later off the shop shelf at a
+ * price of zero. That is deliberate: an offer that lives only on one screen is
+ * an offer a refresh can eat. Every one after it costs GT_COACH_SWAP_PRICE, as
+ * often as the wallet allows.
+ */
+const GT_COACH_SWAP_PRICE = 60;
+
+function gtCoachSwapUsed()  { return !!gtRun().coachSwap; }
+function gtCoachSwapPrice() { return gtCoachSwapUsed() ? GT_COACH_SWAP_PRICE : 0; }
+
+// The man on the touchline is out of the pool: a swap that can hand you back the
+// same name is not a swap. Returns null when there is nobody else to draw, which
+// with 34 in the data is a guard for a future roster and not for today's.
+function gtRedrawCoach() {
+  const run = gtRun();
+  if (typeof coachPool !== 'function') return null;
+  const cur = run.coach ? run.coach.name : null;
+  const pool = coachPool().filter(c => c.name !== cur);   // no year: every era
+  if (!pool.length) return null;
+  const c = pool[Math.floor(Math.random() * pool.length)];
+  run.coach = { name: c.name, style: c.style || '', arch: c.arch, tier: c.tier };
+  run.coachSwap = true;
+  gtSave();
+  return run.coach;
+}
+
+/* ── the reveal ───────────────────────────────────────────────────────────── */
+// A beat before the name, so it lands as a draw and not as a form field. The
+// league's own card does this; the gauntlet needs its own copy because it also
+// runs on a swap, where the kicker is different.
+function gtCoachSpin(kicker, done) {
+  if (typeof coachFrame !== 'function') { done(); return; }
+  coachFrame(`<p class="coach-kicker">${kicker}</p>
+              <h3 class="coach-h">מדברים עם כמה שמות…</h3>
+              <p class="coach-spin" id="gt-coach-spin">—</p>`);
+  const el = document.getElementById('gt-coach-spin');
+  const pool = typeof coachPool === 'function' ? coachPool() : [];
+  let n = 0;
+  const t = setInterval(() => {
+    if (pool.length && el) el.textContent = pool[Math.floor(Math.random() * pool.length)].name;
+    if (++n >= 9) { clearInterval(t); done(); }
+  }, 90);
+}
+
+function gtCoachReveal(c, kicker, onDone, canSwap) {
+  if (!c || typeof coachFrame !== 'function') { if (onDone) onDone(); return; }
+  const b = GT_COACH_OVR[c.tier] || 0;
+  coachFrame(`
+    <p class="coach-kicker">${kicker}</p>
+    <h3 class="coach-name">${c.name}</h3>
+    <p class="gt-coach-worth"><b dir="ltr">+${b}</b> לכל הקווים, לכל המסע</p>
+    <p class="coach-style">${c.style || ''}</p>
+    <div class="coach-btns">
+      <button class="coach-b go" id="gt-coach-go">להמשיך עם ${
+        typeof coachFirstName === 'function' ? coachFirstName(c.name) : c.name} ←</button>
+      ${canSwap ? `<button class="coach-b" id="gt-coach-swap">🔄 להחליף מאמן - חינם, פעם אחת</button>
+                   <p class="gt-coach-warn">ההחלפה עיוורת וסופית: מי שיוצא, יוצא.</p>` : ''}
+    </div>`, true);
+
+  const go = document.getElementById('gt-coach-go');
+  if (go) go.onclick = () => { coachClose(); if (onDone) onDone(); };
+
+  const sw = document.getElementById('gt-coach-swap');
+  if (sw) sw.onclick = () => {
+    // Drawn and saved BEFORE the animation, not after: a refresh in the middle
+    // of nine ticks of theatre must not hand back the man who already left.
+    const next = gtRedrawCoach();
+    if (!next) { sw.disabled = true; return; }
+    gtCoachSpin('מחליפים מאמן', () => gtCoachReveal(next, 'המאמן החדש', onDone, false));
+  };
+}
