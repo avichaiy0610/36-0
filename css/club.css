@@ -1,0 +1,268 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   המועדון שלך — the club identity, its two artefacts, and the era skins.
+
+   Three sections:
+     1. the editor + its entry on the setup screen        (js/club.js)
+     2. the team photo and the back page                  (js/club-media.js)
+     3. מראה של תקופה — four skins for the squad card      (js/club.js)
+
+   Everything here is cosmetic. Nothing in this file may change a layout that
+   the draft or the results screen depend on.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── 1. the entry on the setup screen ─────────────────────────────────────── */
+
+.setup-club-card #scc-art {
+  display: flex; align-items: center; justify-content: center;
+  width: 40px; min-width: 40px;
+}
+.setup-club-card .scc-empty { font-size: 1.6rem; opacity: 0.75; }
+.setup-club-card #scc-art svg { display: block; }
+
+/* ── the editor ───────────────────────────────────────────────────────────── */
+
+.cl-box { width: 380px; max-width: 94vw; max-height: 92vh; overflow-y: auto; }
+
+.cl-preview {
+  display: flex; align-items: center; gap: 14px;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 10px; padding: 12px 14px; margin-bottom: 14px;
+}
+.cl-pv-art { display: flex; align-items: center; gap: 10px; }
+.cl-pv-art svg { display: block; }
+.cl-pv-text { min-width: 0; }
+.cl-pv-name {
+  font-size: 1.05rem; font-weight: 800; color: var(--text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.cl-pv-city { font-size: 0.8rem; color: var(--dim); margin-top: 2px; }
+
+.cl-tabs { display: flex; gap: 4px; margin-bottom: 12px; }
+.cl-tab {
+  flex: 1; padding: 7px; background: transparent; border: 1px solid var(--border);
+  color: var(--dim); border-radius: 6px; cursor: pointer; font-size: 0.85rem;
+}
+.cl-tab.sel { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 700; }
+
+.cl-pane { min-height: 190px; }
+.cl-lbl { font-size: 0.75rem; color: var(--dim); margin: 10px 0 5px; }
+
+.cl-row { display: flex; flex-wrap: wrap; gap: 5px; }
+.cl-chip {
+  padding: 5px 10px; background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 999px; color: var(--text); font-size: 0.8rem; cursor: pointer;
+}
+.cl-chip.sel { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 700; }
+
+.cl-swatches { display: flex; flex-wrap: wrap; gap: 6px; }
+.cl-sw {
+  width: 26px; height: 26px; border-radius: 6px; cursor: pointer;
+  border: 2px solid rgba(255,255,255,0.18);
+}
+/* The selected swatch cannot be shown by changing its own colour, so it is shown
+   by a ring OUTSIDE it — box-shadow, not border, or every swatch would jump 4px
+   when picked and the whole row would reflow. */
+.cl-sw.sel { border-color: var(--text); box-shadow: 0 0 0 2px var(--accent); }
+
+/* the badge shelf — 31 PNGs from /crests/ */
+.cl-crests {
+  display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px;
+  max-height: 178px; overflow-y: auto; padding: 2px;
+}
+.cl-crest {
+  aspect-ratio: 1; padding: 4px; cursor: pointer;
+  background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+}
+.cl-crest img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.cl-crest.sel { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+
+.cl-mini {
+  margin-top: 12px; width: 100%; padding: 7px; background: transparent;
+  border: 1px dashed var(--border); border-radius: 8px; color: var(--dim);
+  font-size: 0.8rem; cursor: pointer;
+}
+.cl-note { font-size: 0.75rem; color: var(--dim); margin-top: 10px; line-height: 1.5; }
+.cl-bad { border-color: #e74c3c !important; }
+
+.cl-actions { display: flex; gap: 8px; margin-top: 16px; }
+.cl-actions .btn-primary { flex: 1; }
+.cl-dice { white-space: nowrap; }
+
+/* ── the club on the share card ───────────────────────────────────────────── */
+/* The share card is a fixed dark graphic in both themes (style.css says so), so
+   these two colours are literal on purpose and must not become var(--text). */
+.sc-club {
+  display: flex; align-items: center; justify-content: center; gap: 7px;
+  margin-top: 8px;
+}
+.sc-club svg, .sc-club img { display: block; }
+.sc-club-name { font-size: 0.95rem; font-weight: 800; color: #fff; }
+
+/* ── 2. the two artefacts ─────────────────────────────────────────────────── */
+
+/* The widths here are a CHAIN, and it has to be walked whole or the photo gets
+   clipped: a back row of six 56px men plus gaps is 346, the pitch adds 8 of
+   padding and the card adds 20, so .cm-photo needs 374 — which means the box's
+   content area needs 380, which means the box needs 400 with 10px sides. At a
+   430px viewport 94vw is 404 and it fits. Below 420 the media query at the
+   bottom of this file shrinks the man instead, because nothing above can give. */
+.cm-box {
+  background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+  padding: 42px 10px 10px; width: 420px; max-width: 94vw;
+  max-height: 92vh; display: flex; flex-direction: column; gap: 12px; position: relative;
+}
+.cm-x { top: 10px; left: 10px; }
+/* auto, not hidden: if a future formation or a longer name breaks the sums
+   above, the photo scrolls instead of silently losing its left-hand man. */
+.cm-scroll { overflow: auto; flex: 1; min-height: 0; }
+
+/* the team photo */
+.cm-photo {
+  background: linear-gradient(180deg, #16321a 0%, #0f2413 100%);
+  border-radius: 12px; padding: 14px 10px 10px; color: #fff;
+  font-family: inherit; width: 100%; max-width: 380px; margin: 0 auto;
+}
+.cm-ph-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.cm-ph-crest svg { display: block; }
+.cm-ph-name { font-size: 1.15rem; font-weight: 900; line-height: 1.2; }
+.cm-ph-city { font-size: 0.75rem; opacity: 0.75; margin-top: 2px; }
+
+/* The two rows are the whole point of a team photo, so they are laid out as
+   rows and NOT as a wrapping grid: a grid would reflow six-and-five into
+   four-and-four-and-three on a narrow phone and stop reading as a team photo. */
+.cm-ph-pitch {
+  background: repeating-linear-gradient(90deg, rgba(255,255,255,0.035) 0 26px, transparent 26px 52px);
+  border-radius: 8px; padding: 10px 4px;
+}
+.cm-row { display: flex; justify-content: center; gap: 2px; }
+.cm-row-front { margin-top: -6px; }
+/* 56 x six-across plus gaps is what fits inside a 380px card. A wider man wraps
+   the back row onto a second line and the photo stops being a photo. */
+.cm-man { width: 56px; text-align: center; }
+/* The shirt is drawn at a fixed px size by clubShirtSVG(), but the man it sits
+   in shrinks on a narrow phone. Letting CSS drive the width keeps the two in
+   step — the viewBox scales, so the number stays centred and legible. */
+.cm-man svg { display: block; margin: 0 auto; width: 100%; height: auto; }
+.cm-man-name {
+  font-size: 0.6rem; margin-top: 1px; line-height: 1.15;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.cm-ph-foot {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-top: 10px; font-size: 0.75rem;
+}
+.cm-ph-sub { font-weight: 700; }
+.cm-ph-brand { opacity: 0.6; }
+
+/* the back page */
+.cm-back {
+  background: #f4f1ea; color: #14181f; border-radius: 6px;
+  padding: 14px; width: 100%; max-width: 380px; margin: 0 auto;
+  border: 1px solid #cfc7b8;
+}
+.cm-bp-masthead {
+  display: flex; align-items: center; gap: 8px;
+  border-bottom: 3px solid #14181f; padding-bottom: 6px;
+}
+.cm-bp-paper { font-size: 1.3rem; font-weight: 900; letter-spacing: -1px; }
+.cm-bp-strap { font-size: 0.7rem; color: #5a5348; flex: 1; }
+.cm-bp-crest svg { display: block; }
+
+.cm-bp-kicker {
+  font-size: 0.72rem; font-weight: 700; letter-spacing: 0.5px;
+  color: #a32020; margin-top: 10px; text-transform: none;
+}
+.cm-bp-head {
+  font-size: 2.3rem; font-weight: 900; line-height: 1; letter-spacing: -1.5px;
+  margin: 2px 0 10px;
+}
+.cm-tone-gold .cm-bp-head { color: #8a6d00; }
+.cm-tone-good .cm-bp-head { color: #14181f; }
+.cm-tone-bad  .cm-bp-head { color: #6a1414; }
+.cm-tone-mid  .cm-bp-head { color: #14181f; }
+
+.cm-bp-body { display: flex; gap: 10px; }
+.cm-bp-lead { flex: 1; min-width: 0; }
+.cm-bp-photo {
+  background: #e4dfd3; border: 1px solid #cfc7b8; border-radius: 4px;
+  padding: 10px; display: flex; justify-content: center;
+}
+.cm-bp-caption { font-size: 0.65rem; color: #5a5348; margin-top: 4px; line-height: 1.4; }
+.cm-bp-side { width: 132px; min-width: 132px; }
+
+.cm-bp-strip {
+  display: flex; gap: 3px; border-top: 1px solid #14181f; border-bottom: 1px solid #14181f;
+  padding: 5px 0;
+}
+.cm-bp-strip div { flex: 1; text-align: center; line-height: 1.1; }
+.cm-bp-strip b { display: block; font-size: 1rem; font-weight: 900; }
+.cm-bp-strip span { font-size: 0.55rem; color: #5a5348; }
+.cm-bp-line { font-size: 0.8rem; font-weight: 700; text-align: center; margin: 5px 0; }
+
+.cm-bp-box { border-top: 1px solid #cfc7b8; padding: 5px 0; }
+.cm-bp-box-t { font-size: 0.6rem; color: #a32020; font-weight: 700; }
+.cm-bp-box-v { font-size: 0.78rem; }
+.cm-bp-box-v b { font-weight: 900; }
+
+.cm-bp-table { margin-top: 10px; border-top: 3px solid #14181f; padding-top: 6px; }
+.cm-bp-table-t { font-size: 0.62rem; color: #a32020; font-weight: 700; margin-bottom: 3px; }
+.cm-bp-tr { display: flex; gap: 6px; font-size: 0.75rem; padding: 2px 0; }
+.cm-bp-tr.us { font-weight: 900; background: #e9e2cf; }
+.cm-bp-pos { width: 16px; color: #5a5348; }
+.cm-bp-team { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cm-bp-pts { font-weight: 700; }
+.cm-bp-foot { font-size: 0.6rem; color: #5a5348; text-align: left; margin-top: 8px; }
+
+/* ── 3. מראה של תקופה ─────────────────────────────────────────────────────────
+   Four skins for #squad-card. Each one may set a border, a radius, a shadow and
+   a type treatment — and NONE of them sets a background colour, because the
+   header gradient is built from the drawn club's own primary colour and a skin
+   that painted over it would erase the one thing on the card that is real. */
+
+#squad-card { transition: border-color 0.25s ease, box-shadow 0.25s ease; }
+
+/* 1999–2004 — flat, hard-edged, and a scanline over the header. */
+#squad-card.era-a { border-radius: 3px; box-shadow: 0 2px 0 rgba(0,0,0,0.5); }
+#squad-card.era-a .squad-card-header {
+  border-radius: 3px 3px 0 0;
+  background-image: repeating-linear-gradient(0deg, rgba(0,0,0,0.16) 0 1px, transparent 1px 3px) !important;
+  background-blend-mode: overlay;
+}
+#squad-card.era-a .card-team { letter-spacing: 0.5px; font-weight: 800; }
+
+/* 2005–2011 — the gloss years: a hard highlight across the top half. */
+#squad-card.era-b { border-radius: 10px; box-shadow: 0 3px 10px rgba(0,0,0,0.45); }
+#squad-card.era-b .squad-card-header {
+  border-radius: 10px 10px 0 0;
+  background-image: linear-gradient(180deg, rgba(255,255,255,0.28) 0%, rgba(255,255,255,0.05) 48%, rgba(0,0,0,0.12) 52%, transparent 100%) !important;
+}
+#squad-card.era-b .card-team { text-shadow: 0 1px 0 rgba(0,0,0,0.5); }
+
+/* 2012–2018 — flat design: no shadow, no gloss, one flat rule under the header. */
+#squad-card.era-c { border-radius: 2px; box-shadow: none; }
+#squad-card.era-c .squad-card-header {
+  border-radius: 0;
+  background-image: none !important;
+  border-bottom: 3px solid rgba(255,255,255,0.85);
+}
+#squad-card.era-c .card-team { font-weight: 400; letter-spacing: 0.3px; }
+
+/* 2019+ — today: soft radius, a lifted card, a thin light edge. */
+#squad-card.era-d { border-radius: 14px; box-shadow: 0 6px 18px rgba(0,0,0,0.5); }
+#squad-card.era-d .squad-card-header {
+  border-radius: 14px 14px 0 0;
+  background-image: linear-gradient(160deg, rgba(255,255,255,0.10), transparent 60%) !important;
+  border-bottom: 1px solid rgba(255,255,255,0.14);
+}
+#squad-card.era-d .card-team { font-weight: 900; letter-spacing: -0.4px; }
+
+/* ── narrow phones ────────────────────────────────────────────────────────── */
+/* At a 375px viewport the box is 94vw = 352 and its content 332, so the man has
+   to come down to 48: six of them plus gaps is 298, +8 pitch, +20 card = 326. */
+@media (max-width: 420px) {
+  .cm-man { width: 48px; }
+  .cm-bp-head { font-size: 1.9rem; }
+  .cm-bp-side { width: 112px; min-width: 112px; }
+  .cl-crests { grid-template-columns: repeat(5, 1fr); }
+}

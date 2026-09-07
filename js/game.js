@@ -1773,6 +1773,10 @@ function startRound() {
     document.getElementById('card-team-name').textContent = 'בחר עמדה...';
     document.getElementById('card-season').textContent = '';
     document.getElementById('squad-card-header').style.background = '#1a1a2e';
+    // No squad is drawn yet in pos-first, so the previous round's era skin has
+    // nothing to describe — clear it rather than let it sit on a blank card.
+    if (typeof applyEraSkin === 'function')
+      applyEraSkin(document.getElementById('squad-card'), null);
     emptySlotIndices().forEach(i => setTokenHighlight(i, 'compat'));
     setHint('בחר עמדה במגרש');
   } else {
@@ -1828,6 +1832,9 @@ function showSquadCardData(squad) {
   seasonEl.style.color = tx === '#111' ? '#000000b0' : '#ffffffaa';
   document.getElementById('squad-card-header').style.background =
     `linear-gradient(135deg, ${team.primaryColor} 0%, #1a1a2e 100%)`;
+  // מראה של תקופה — the card takes on the look of the year it just landed on.
+  if (typeof applyEraSkin === 'function')
+    applyEraSkin(document.getElementById('squad-card'), squad.season);
 }
 
 // ─── Draft: Player rendering ───────────────────────────────────────────────────
@@ -3318,10 +3325,17 @@ function animateResults(ovr) {
         : '—';
     }
     buildLeagueTable(leagueTable, seasonSpec);
-    renderSeasonStory({ wins, draws, losses, gfTotal, gaTotal, ovr, myRank,
-                        n: leagueTable.length, spec: seasonSpec,
-                        projectedFinish: season.projectedFinish,
-                        projectedPoints: season.projectedPoints, ps: playerStats, tier });
+    const story = { wins, draws, losses, gfTotal, gaTotal, ovr, myRank,
+                    n: leagueTable.length, spec: seasonSpec,
+                    projectedFinish: season.projectedFinish,
+                    projectedPoints: season.projectedPoints, ps: playerStats, tier };
+    renderSeasonStory(story);
+    // The team photo and the back page (js/club-media.js) need the finishing
+    // POSITION and the table, and window._lastResult carries neither — it is the
+    // submission payload and other code reads it, so it is left alone and the
+    // fuller picture gets its own global next to the story that already had it.
+    window._lastSeason = { ...story, leagueTable };
+    if (typeof cmSyncResultButtons === 'function') cmSyncResultButtons();
     return tier;
   }
 
@@ -3880,6 +3894,28 @@ function populateShareCard() {
 
   const formation = FORMATIONS[state.formationId]?.label ?? '';
   const pts = r.wins * 3 + r.draws;
+
+  // המועדון שלך — the crest and the name ride on the card when the player has
+  // made a club. The 36–0 logo stays: the card is still a 36-0 result, this only
+  // says whose. Hidden entirely when there is no club, so nothing moves for a
+  // player who never opened the editor.
+  const scClub = document.getElementById('sc-club');
+  if (scClub) {
+    // myTeamName returns '' when there is neither a career nor a club, and it
+    // HTML-escapes what it does return. A career that named its club but never
+    // built a crest gets the NAME only — a default green shield it never chose
+    // would be a crest the player is being told is his.
+    const name = (typeof myTeamName === 'function') ? myTeamName('') : '';
+    const club = (typeof clubGet === 'function') ? clubGet() : null;
+    if (name) {
+      const crest = (club && typeof clubCrestSVG === 'function') ? clubCrestSVG(club, 30) : '';
+      scClub.innerHTML = `${crest}<span class="sc-club-name">${name}</span>`;
+      scClub.style.display = '';
+    } else {
+      scClub.innerHTML = '';
+      scClub.style.display = 'none';
+    }
+  }
 
   document.getElementById('sc-p-formation').textContent = formation;
   document.getElementById('sc-p-ovr').textContent = `OVR ${r.ovr}`;
