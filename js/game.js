@@ -2713,9 +2713,17 @@ function buildLeagueTable(table, spec = MODERN_FORMAT, me = null) {
      which is one year for the whole season — so this is the more honest place
      for a period look, and the one the reference material is actually about. */
   const box = container.closest('.league-details');
+  const side = document.querySelector('#screen-results .results-side');
   const lgYear = (state.oppSeason ?? (typeof LATEST_SEASON_YEAR !== 'undefined' ? LATEST_SEASON_YEAR : null));
   const skin = (typeof eraSkinFor === 'function' && typeof erasEnabled === 'function' && erasEnabled())
     ? eraSkinFor(lgYear) : null;
+  // The whole results column takes the era, not only the table. A period that
+  // stops at one component reads as a component someone forgot to finish — the
+  // same thing that was wrong when the skin stopped at the draw card.
+  if (side && typeof ERA_ALL !== 'undefined') {
+    side.classList.remove(...ERA_ALL);
+    if (skin) side.classList.add(skin.cls);
+  }
   if (box) {
     if (typeof ERA_ALL !== 'undefined') box.classList.remove(...ERA_ALL);
     box.removeAttribute('data-era');

@@ -335,6 +335,64 @@
    rather than split, and the position sitting with the name. Palette stays the
    app's, per the rule above. */
 
+/* ── the whole results column ──────────────────────────────────────────────
+   Every boxed thing on the screen squares off and re-tints its edge to the
+   era's one accent, and every accented FIGURE takes that accent. What is
+   deliberately left alone is anything whose colour carries meaning: the green
+   of a win, the red of a loss, the win/draw/loss borders on the match rows.
+   Those are information, not decoration, and repainting them would cost the
+   reader something to gain a mood. */
+
+.results-side.era-toto .tier-box,
+.results-side.era-toto .ovr-card,
+.results-side.era-toto .rec-box,
+.results-side.era-toto .proj-tile,
+.results-side.era-toto .narrative-box,
+.results-side.era-toto .award-card,
+.results-side.era-toto .highlight-box,
+.results-side.era-toto .stats-table,
+.results-side.era-toto .match-row {
+  border-radius: 2px;
+}
+.results-side.era-toto .tier-box,
+.results-side.era-toto .ovr-card,
+.results-side.era-toto .proj-tile,
+.results-side.era-toto .narrative-box,
+.results-side.era-toto .award-card,
+.results-side.era-toto .highlight-box,
+.results-side.era-toto .stats-table {
+  border-color: rgba(240,130,30,.22);
+}
+
+/* the section headings — the loudest, cheapest signal that the era is on */
+.results-side.era-toto .section-label {
+  color: #f0821e; font-family: Arial, Heebo, sans-serif;
+  border-bottom: 1px solid rgba(240,130,30,.28); padding-bottom: 4px;
+}
+
+/* accented figures follow the era instead of the site gold */
+.results-side.era-toto .hl-val,
+.results-side.era-toto .proj-val,
+.results-side.era-toto .ovr-total-val,
+.results-side.era-toto .award-winner,
+.results-side.era-toto .narrative-title {
+  color: #f0821e;
+}
+.results-side.era-toto .hl-val,
+.results-side.era-toto .ovr-total-val,
+.results-side.era-toto .proj-val {
+  font-family: Arial, Heebo, sans-serif;
+}
+.results-side.era-toto .award-title,
+.results-side.era-toto .st-num-head,
+.results-side.era-toto .st-name-head { color: #e8a35a; }
+.results-side.era-toto .stats-row { border-color: rgba(240,130,30,.14); }
+
+/* the tier headline gets the league bar treatment, like the table's */
+.results-side.era-toto .tier-box {
+  border-top: 3px solid #e2600c;
+}
+
 .league-details.era-toto { border: 1px solid rgba(240,130,30,.30); border-radius: 3px; }
 .league-details.era-toto .league-summary {
   background: linear-gradient(180deg, #f79a1e 0%, #ef7c12 45%, #e2600c 100%);
