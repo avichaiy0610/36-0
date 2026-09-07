@@ -104,8 +104,23 @@
   const SPEAR_POS = ['ST', 'CF'];
 
   /* ── who is in charge ─────────────────────────────────────────────────────── */
+  // Everything the manager does flows through here — coachSimMods, the goal
+  // weights, the clean-sheet lever, the card. So this is the right place to
+  // refuse, and not only the draw.
+  //
+  // It used to trust `state.coach` on its own, which made every entry point
+  // responsible for clearing a field it did not own. startChallenge() never did,
+  // and a manager restored from a saved draft on page load therefore walked
+  // straight into the daily challenge: measured in production on 2026-09-07,
+  // three challenge seasons ran with a live manager and coachSimMods returning
+  // tempo 1.105 — a 10% lever on a board whose whole promise is identical terms.
+  //
+  // The same shape has now bitten this codebase three times (the Wordle's State
+  // Cup, the Wordle's January window, this). A field nobody sets is a field that
+  // carries over, so the fix belongs where the field is READ.
   function coachActive() {
     if (typeof state === 'undefined' || !state) return null;
+    if (coachBarredMode()) return null;
     const c = state.coach;
     return (c && c.arch && COACH_ARCH[c.arch]) ? c : null;
   }
@@ -174,12 +189,28 @@
   // themselves and would sail straight through such a test — the trap that once
   // gave the daily Wordle a State Cup — so each of them sets state.coachOn
   // explicitly instead, the way each already sets state.januaryOn.
+  // The modes where a manager is not merely undrawn but WRONG — every one of
+  // them puts all players on identical terms and a manager would break the
+  // comparison their boards depend on. Split out of coachEligible so that the
+  // draw and the point of USE can share one list and never drift apart.
+  //
+  // Deliberately NOT here: `coachOn` and classic mode. Both belong to the draw
+  // only. `coachOn` in particular is a trap — the career sets it to FALSE once a
+  // manager has been appointed (`run.seasonIdx === 0 && !run.coach`), because
+  // there it means "offer the appointment screen", not "managers are enabled".
+  // Testing it at the point of use would silently switch off every career
+  // manager from the second season onward.
+  function coachBarredMode() {
+    if (typeof state === 'undefined' || !state) return true;
+    return !!(state.challenge || state.leagueCode || state.duelCode ||
+              state.gauntlet || state.salaryCap);
+  }
+
   function coachEligible() {
     if (typeof state === 'undefined' || !state) return false;
     if (state.coachOn === false) return false;
     if (typeof classicMode === 'function' && classicMode()) return false;
-    if (state.challenge || state.leagueCode || state.duelCode || state.gauntlet) return false;
-    if (state.salaryCap) return false;
+    if (coachBarredMode()) return false;
     if (!Array.isArray(state.picks) || state.picks.some(p => !p)) return false;
     return true;
   }
@@ -372,4 +403,11 @@
   global.coachFirstName = coachFirstName;
   global.coachOpen      = coachOpen;
   global.coachShow      = coachShow;
+  // The shell, so the gauntlet can draw its own card in the same skin. It needs
+  // one the league must never have: the manager's rating bonus printed on it,
+  // and a button to trade the man in. Here he moves no odds and the number would
+  // be noise; there he moves all of them and hiding it would be hiding the
+  // decision. Same box, different card — not a flag on this one.
+  global.coachFrame     = frame;
+  global.coachClose     = close;
 })(typeof window !== 'undefined' ? window : globalThis);

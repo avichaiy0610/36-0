@@ -793,6 +793,12 @@ async function startChallenge(period, keyOverride) {
   // leave any league/duel/review context, exactly like startGame() does
   state.leagueCode = null;
   state.duelCode = null;
+  // ...and the manager, which startGame() and the setup screen both clear and
+  // this path did not. A saved draft restores one on page load, so a player who
+  // opened the site and went straight to the daily carried yesterday's manager
+  // into it. coachActive() now refuses him anyway; this keeps the state honest
+  // rather than relying on the guard alone.
+  state.coach = null;
   window._leagueReviewMode = null;
   window._duelReviewMode = null;
   document.getElementById('league-review-back')?.remove();
