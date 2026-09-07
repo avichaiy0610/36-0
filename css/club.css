@@ -89,6 +89,15 @@
 .cl-actions .btn-primary { flex: 1; }
 .cl-dice { white-space: nowrap; }
 
+/* ── the club, where a career starts from it ──────────────────────────────── */
+.cr-club-from {
+  display: flex; align-items: center; gap: 8px;
+  margin: -4px 0 10px; padding: 7px 9px;
+  background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
+  font-size: 0.74rem; color: var(--dim); line-height: 1.45;
+}
+.cr-club-from svg, .cr-club-from img { display: block; flex-shrink: 0; }
+
 /* ── the club on the share card ───────────────────────────────────────────── */
 /* The share card is a fixed dark graphic in both themes (style.css says so), so
    these two colours are literal on purpose and must not become var(--text). */
@@ -215,47 +224,164 @@
 .cm-bp-foot { font-size: 0.6rem; color: #5a5348; text-align: left; margin-top: 8px; }
 
 /* ── 3. מראה של תקופה ─────────────────────────────────────────────────────────
-   Four skins for #squad-card. Each one may set a border, a radius, a shadow and
-   a type treatment — and NONE of them sets a background colour, because the
-   header gradient is built from the drawn club's own primary colour and a skin
-   that painted over it would erase the one thing on the card that is real. */
 
-#squad-card { transition: border-color 0.25s ease, box-shadow 0.25s ease; }
+   THE RULE, learned by breaking it: never touch the header's `background`.
+   game.js sets it INLINE, per drawn club, to a gradient off that club's real
+   primary colour — so a rule like `background-image: ... !important` does not
+   layer a texture over the gradient, it REPLACES it. The first version of these
+   skins did exactly that in all four, which erased the club colour everywhere
+   and left 1999/00 as faint scanlines on near-black with unreadable text.
 
-/* 1999–2004 — flat, hard-edged, and a scanline over the header. */
-#squad-card.era-a { border-radius: 3px; box-shadow: 0 2px 0 rgba(0,0,0,0.5); }
-#squad-card.era-a .squad-card-header {
-  border-radius: 3px 3px 0 0;
-  background-image: repeating-linear-gradient(0deg, rgba(0,0,0,0.16) 0 1px, transparent 1px 3px) !important;
-  background-blend-mode: overlay;
+   So every texture here goes on a ::after overlay and every skin expresses its
+   decade through geometry and type instead: radius, border, shadow, weight,
+   tracking, and how the season is set. The club's colour is never negotiable —
+   it is the one thing on the card that is real. */
+
+.squad-card-header { position: relative; overflow: hidden; }
+.squad-card-header > * { position: relative; z-index: 1; }
+.squad-card {
+  transition: border-radius .2s ease, box-shadow .2s ease, border-color .2s ease;
+  overflow: hidden; position: relative;
 }
-#squad-card.era-a .card-team { letter-spacing: 0.5px; font-weight: 800; }
-
-/* 2005–2011 — the gloss years: a hard highlight across the top half. */
-#squad-card.era-b { border-radius: 10px; box-shadow: 0 3px 10px rgba(0,0,0,0.45); }
-#squad-card.era-b .squad-card-header {
-  border-radius: 10px 10px 0 0;
-  background-image: linear-gradient(180deg, rgba(255,255,255,0.28) 0%, rgba(255,255,255,0.05) 48%, rgba(0,0,0,0.12) 52%, transparent 100%) !important;
+/* The overlay itself: each skin fills in `background`, nothing else. */
+.squad-card[class*="era-"] .squad-card-header::after {
+  content: ''; position: absolute; inset: 0; z-index: 0; pointer-events: none;
 }
-#squad-card.era-b .card-team { text-shadow: 0 1px 0 rgba(0,0,0,0.5); }
 
-/* 2012–2018 — flat design: no shadow, no gloss, one flat rule under the header. */
-#squad-card.era-c { border-radius: 2px; box-shadow: none; }
-#squad-card.era-c .squad-card-header {
+/* The era tag. applyEraSkin() writes the span into data-era on the CARD, and the
+   tag hangs off the card rather than off the header — attr() only reads the
+   element its own pseudo belongs to, so a ::before on .squad-card-header would
+   have rendered empty. It exists because the first version of these skins was a
+   set of subtle CSS differences nobody had any reason to notice; naming the
+   decade is what turns a texture into a feature the player can see. */
+.squad-card[data-era]::before {
+  content: attr(data-era);
+  position: absolute; z-index: 2; top: 0; left: 0;
+  padding: 2px 7px 3px; font-size: 9px; font-weight: 700;
+  letter-spacing: .5px; line-height: 1.4; direction: ltr;
+  color: rgba(255,255,255,0.92); background: rgba(0,0,0,0.42);
+}
+
+/* The season is the only element on the card that literally IS the year, so it
+   carries the most obvious per-decade treatment. */
+.squad-card[class*="era-"] .card-season {
+  display: inline-block; padding: 1px 6px; margin-top: 3px;
+}
+.squad-card[class*="era-"] .card-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 38px; height: 38px;
+}
+
+/* ── 1999–2004 · the CRT years ──────────────────────────────────────────────
+   Square, heavy, and printed rather than rendered: a hard black keyline, a flat
+   drop, scanlines at 8% (low enough to read through), and a season set like a
+   scoreboard readout. */
+.squad-card.era-a {
   border-radius: 0;
-  background-image: none !important;
-  border-bottom: 3px solid rgba(255,255,255,0.85);
+  box-shadow: 0 4px 0 #000;
+  border: 3px solid #0b0b0f;
 }
-#squad-card.era-c .card-team { font-weight: 400; letter-spacing: 0.3px; }
+.squad-card.era-a::before {
+  font-family: "Courier New", monospace; background: #0b0b0f; letter-spacing: 1px;
+}
+.squad-card.era-a .squad-card-header::after {
+  background:
+    repeating-linear-gradient(0deg, rgba(0,0,0,0.20) 0 1px, transparent 1px 3px),
+    radial-gradient(120% 90% at 50% 40%, transparent 45%, rgba(0,0,0,0.42) 100%);
+}
+.squad-card.era-a .card-team {
+  font-weight: 900; letter-spacing: 0.8px;
+  text-shadow: 2px 2px 0 rgba(0,0,0,0.75);
+}
+.squad-card.era-a .card-season {
+  font-family: "Courier New", monospace; font-weight: 700; letter-spacing: 1.5px;
+  background: #0b0b0f; border: 1px solid rgba(255,255,255,0.45); border-radius: 0;
+  color: #e8e39a;                       /* the amber of a scoreboard readout */
+}
+.squad-card.era-a .card-badge {
+  background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.25); border-radius: 0;
+}
+.squad-card.era-a .reroll-row { border-top: 2px solid #0b0b0f; }
 
-/* 2019+ — today: soft radius, a lifted card, a thin light edge. */
-#squad-card.era-d { border-radius: 14px; box-shadow: 0 6px 18px rgba(0,0,0,0.5); }
-#squad-card.era-d .squad-card-header {
-  border-radius: 14px 14px 0 0;
-  background-image: linear-gradient(160deg, rgba(255,255,255,0.10), transparent 60%) !important;
-  border-bottom: 1px solid rgba(255,255,255,0.14);
+/* ── 2005–2011 · the gloss years ────────────────────────────────────────────
+   Web 2.0: a fat radius, a hard specular sweep across the top half that stops
+   dead at the midpoint, a bevelled inner edge and an embossed name. */
+.squad-card.era-b {
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.22);
+  box-shadow: 0 6px 16px rgba(0,0,0,0.55), inset 0 2px 0 rgba(255,255,255,0.5);
 }
-#squad-card.era-d .card-team { font-weight: 900; letter-spacing: -0.4px; }
+.squad-card.era-b::before { border-radius: 0 0 10px 0; background: rgba(0,0,0,0.35); }
+/* The hard stop at 50% is the whole look: a specular sweep that ENDS, rather
+   than a gradient that fades. That discontinuity is what read as "glossy". */
+.squad-card.era-b .squad-card-header::after {
+  background: linear-gradient(180deg,
+    rgba(255,255,255,0.42) 0%, rgba(255,255,255,0.14) 49.9%,
+    rgba(0,0,0,0.22) 50%, rgba(0,0,0,0.02) 100%);
+}
+.squad-card.era-b .card-team {
+  font-weight: 800;
+  text-shadow: 0 1px 1px rgba(0,0,0,0.6), 0 -1px 0 rgba(255,255,255,0.28);
+}
+.squad-card.era-b .card-season {
+  border-radius: 999px; background: rgba(255,255,255,0.28);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.6), 0 1px 2px rgba(0,0,0,0.35);
+  font-weight: 700;
+}
+.squad-card.era-b .card-badge {
+  border-radius: 50%; background: rgba(255,255,255,0.22);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.55), 0 1px 3px rgba(0,0,0,0.4);
+}
+
+/* ── 2012–2018 · flat design ────────────────────────────────────────────────
+   The decade that removed every effect: no radius, no shadow, no gloss. What
+   is left is one confident block of colour, a thick rule under it, and light
+   wide-tracked type. */
+.squad-card.era-c {
+  border-radius: 0; box-shadow: none; border: 0;
+}
+.squad-card.era-c::before {
+  background: rgba(255,255,255,0.92); color: #14181f; font-weight: 800; letter-spacing: 1.2px;
+}
+/* Flat design's one move was flattening the gradient itself, and the gradient is
+   inline and untouchable — so it is flattened from ON TOP, with an opaque wash
+   of the darker end. The result is a single block of colour, which is the look. */
+.squad-card.era-c .squad-card-header::after {
+  background: linear-gradient(135deg, rgba(26,26,46,0) 0%, rgba(26,26,46,0.55) 100%);
+}
+.squad-card.era-c .squad-card-header {
+  border-bottom: 5px solid rgba(255,255,255,0.92);
+}
+.squad-card.era-c .card-team {
+  font-weight: 400; letter-spacing: 2.2px; text-shadow: none; font-size: 14px;
+}
+.squad-card.era-c .card-season {
+  background: none; border: 0; padding: 1px 0;
+  letter-spacing: 3px; font-weight: 300; opacity: .9;
+}
+.squad-card.era-c .card-badge { border-radius: 0; background: none; }
+
+/* ── 2019+ · today ──────────────────────────────────────────────────────────
+   Soft, lifted, tight: a big radius, a wide diffuse shadow, a hairline of light
+   along the top, a faint diagonal sheen and negative tracking on a heavy name. */
+.squad-card.era-d {
+  border-radius: 18px;
+  box-shadow: 0 10px 28px rgba(0,0,0,0.6);
+  border: 1px solid rgba(255,255,255,0.12);
+}
+.squad-card.era-d::before {
+  border-radius: 0 0 12px 0; background: rgba(0,0,0,0.30);
+  backdrop-filter: blur(2px); font-weight: 600;
+}
+.squad-card.era-d .squad-card-header::after {
+  background: linear-gradient(150deg, rgba(255,255,255,0.16), transparent 52%);
+}
+.squad-card.era-d .card-team { font-weight: 900; letter-spacing: -0.6px; font-size: 16px; }
+.squad-card.era-d .card-season {
+  border-radius: 8px; background: rgba(255,255,255,0.16);
+  font-weight: 600; letter-spacing: .2px;
+}
+.squad-card.era-d .card-badge { border-radius: 12px; background: rgba(255,255,255,0.10); }
 
 /* ── narrow phones ────────────────────────────────────────────────────────── */
 /* At a 375px viewport the box is 94vw = 352 and its content 332, so the man has

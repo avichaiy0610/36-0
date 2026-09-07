@@ -32,10 +32,36 @@ const CLUB_COLORS = [
   '#111418', '#f5f5f5', '#8b5e34', '#d8c9a3',
 ];
 
+/* Every city and town of any size in Israel, not only the eighteen that have
+   ever had a Ligat ha'Al club. The point of the field is the thrill of putting
+   your club somewhere real — and a list that offers Tel Aviv, Haifa and
+   Jerusalem is just the league again. Somebody from Yeruham should be able to
+   pick Yeruham. The field stays free text (a <datalist>, not a <select>), so
+   this is a set of suggestions and never a restriction. */
 const CLUB_CITIES = [
-  'תל אביב', 'חיפה', 'ירושלים', 'באר שבע', 'נתניה', 'פתח תקווה',
-  'אשדוד', 'רמת גן', 'כפר סבא', 'רעננה', 'חולון', 'עכו',
-  'טבריה', 'אשקלון', 'הרצליה', 'סכנין', 'לוד', 'רחובות',
+  // the big ones
+  'תל אביב', 'ירושלים', 'חיפה', 'ראשון לציון', 'פתח תקווה', 'אשדוד',
+  'נתניה', 'באר שבע', 'בני ברק', 'חולון', 'רמת גן', 'אשקלון', 'רחובות',
+  'בת ים', 'בית שמש', 'כפר סבא', 'הרצליה', 'חדרה', 'מודיעין', 'נצרת',
+  'לוד', 'רמלה', 'רעננה', 'גבעתיים', 'הוד השרון', 'קריית אתא', 'נהריה',
+  'קריית גת', 'אום אל-פחם', 'אילת', 'ראש העין', 'עפולה', 'נס ציונה',
+  'עכו', 'אלעד', 'רהט', 'טבריה', 'כרמיאל', 'יבנה', 'טייבה', 'שפרעם',
+  // the north
+  'קריית מוצקין', 'קריית ים', 'קריית ביאליק', 'נשר', 'טירת כרמל',
+  'צפת', 'טמרה', 'סכנין', 'נוף הגליל', 'קריית שמונה', 'מעלות-תרשיחא',
+  'יקנעם', 'מגדל העמק', 'בית שאן', 'קצרין', 'שלומי', 'מטולה', 'ראש פינה',
+  'זכרון יעקב', 'פרדס חנה-כרכור', 'אור עקיבא', 'בנימינה', 'עראבה',
+  'כפר יאסיף', 'מג׳ד אל-כרום', 'דיר אל-אסד', 'ג׳דיידה-מכר', 'בועיינה-נוג׳ידאת',
+  // the centre
+  'אור יהודה', 'יהוד', 'קריית אונו', 'גני תקווה', 'רמת השרון', 'שוהם',
+  'אזור', 'סביון', 'כפר יונה', 'טירה', 'קלנסווה', 'ג׳לג׳וליה',
+  'כפר קאסם', 'כפר ברא', 'מזכרת בתיה', 'גדרה', 'קריית עקרון',
+  'באר יעקב', 'אריאל', 'מודיעין עילית', 'ביתר עילית',
+  'מעלה אדומים', 'גבעת זאב', 'אפרת',
+  // the south
+  'קריית מלאכי', 'גן יבנה', 'ערד', 'דימונה', 'ירוחם', 'מצפה רמון',
+  'אופקים', 'נתיבות', 'שדרות', 'שגב-שלום', 'תל שבע', 'כסייפה', 'ערערה בנגב',
+  'להבים', 'עומר', 'מיתר',
 ];
 
 const CLUB_NAME_A = ['הפועל', 'מכבי', 'בני', 'עירוני', 'איתן', 'שמשון', 'הכוח', 'מועדון'];
@@ -291,7 +317,15 @@ function clubShirtSVG(club, px, number) {
   }
 
   const ink = clInk(c1), edge = clInkOpposite(c1);
-  const num = (number === 0 || number) ? `<text x="50" y="72" text-anchor="middle"
+  // The torso runs y 37..96, so its middle is 66.5 and a number printed on a
+  // shirt sits a touch below that. text-anchor centres it horizontally on the
+  // torso's own centre line (x=50); vertically the BASELINE is what y sets, so
+  // it carries half a cap-height (~0.72em of 34px ≈ 12) below the optical
+  // centre. dominant-baseline would say this more directly and is deliberately
+  // avoided — html2canvas re-renders the SVG and does not honour it reliably,
+  // which would put the number in a different place in the saved PNG than on
+  // screen. An explicit baseline renders identically in both.
+  const num = (number === 0 || number) ? `<text x="50" y="82" text-anchor="middle"
       font-family="Arial Black, Arial, sans-serif" font-size="34" font-weight="900"
       fill="${ink}" stroke="${edge}" stroke-width="4" stroke-linejoin="round"
       style="paint-order:stroke fill">${number}</text>` : '';
@@ -559,10 +593,13 @@ document.addEventListener('DOMContentLoaded', () => {
    is a field that carries over" bug this project has now hit three times, and
    here it would be silent: the card would simply keep looking like 2003. */
 const ERA_SKINS = [
-  { cls: 'era-a', from: 0,    to: 2004, label: 'ראשית שנות ה-2000' },
-  { cls: 'era-b', from: 2005, to: 2011, label: 'סוף העשור הראשון' },
-  { cls: 'era-c', from: 2012, to: 2018, label: 'העשור השני' },
-  { cls: 'era-d', from: 2019, to: 9999, label: 'ימינו' },
+  { cls: 'era-a', from: 0,    to: 2004, label: '1999–2004' },
+  { cls: 'era-b', from: 2005, to: 2011, label: '2005–2011' },
+  { cls: 'era-c', from: 2012, to: 2018, label: '2012–2018' },
+  // '2019–היום' would be right, and renders as 'היום–2019': the tag is set LTR so
+  // the years read in order, and a Hebrew word inside an LTR run gets reordered
+  // to the front. A pure-digit label sidesteps bidi entirely.
+  { cls: 'era-d', from: 2019, to: 9999, label: '2019+' },
 ];
 const ERA_ALL = ERA_SKINS.map(e => e.cls);
 
@@ -576,8 +613,14 @@ function eraSkinFor(year) {
 function applyEraSkin(el, season) {
   if (!el) return;
   el.classList.remove(...ERA_ALL);
+  el.removeAttribute('data-era');
   if (!season) return;
   const year = parseInt(String(season).split('/')[0], 10);
   const skin = eraSkinFor(year);
-  if (skin) el.classList.add(skin.cls);
+  if (!skin) return;
+  el.classList.add(skin.cls);
+  // The tag is drawn by CSS from this attribute. Without it the skin is a set of
+  // subtle CSS differences that a player has no reason to notice, let alone read
+  // as a feature — naming the span is what turns a texture into "this is 2001".
+  el.setAttribute('data-era', skin.label);
 }
