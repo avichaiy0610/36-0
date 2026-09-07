@@ -324,6 +324,50 @@
 }
 .squad-card.era-toto .reroll-badge { background: #e2600c; color: #fff; }
 
+/* ── after the whistle: the league table ───────────────────────────────────
+   The card follows the DRAWN squad and changes every round; the table follows
+   the league you actually played, which is one year for the whole season. So
+   this is the more honest home for a period look, and the one the reference is
+   actually about — it IS a league table.
+
+   Structure taken from it: the league bar on top, the column set
+   מש׳ · נצ׳ · ת׳ · הפ׳ · שערים · נק׳ reading right to left, goals as one cell
+   rather than split, and the position sitting with the name. Palette stays the
+   app's, per the rule above. */
+
+.league-details.era-toto { border: 1px solid rgba(240,130,30,.30); border-radius: 3px; }
+.league-details.era-toto .league-summary {
+  background: linear-gradient(180deg, #f79a1e 0%, #ef7c12 45%, #e2600c 100%);
+  color: #fff; font-family: Arial, Heebo, sans-serif; font-weight: 900;
+  border-radius: 0;
+}
+/* the era's league name, printed on the bar next to the summary's own label */
+.league-details.era-toto .league-summary::after {
+  content: attr(data-era); float: left;
+  font-size: 10px; font-weight: 700; opacity: .92; letter-spacing: .3px;
+}
+.league-details.era-toto .lt-head {
+  background: rgba(240,130,30,.10); color: #e8a35a;
+  border-top: 0; border-bottom: 1px solid rgba(240,130,30,.28);
+  font-family: Arial, Heebo, sans-serif; letter-spacing: 0;
+}
+.league-details.era-toto .lt-row { border-top-color: rgba(240,130,30,.12); }
+.league-details.era-toto .lt-row.lt-us {
+  background: rgba(240,130,30,.13);
+  border-color: rgba(240,130,30,.35) !important;
+}
+.league-details.era-toto .lt-pts { color: #f0821e; font-family: Arial, Heebo, sans-serif; }
+.league-details.era-toto .lt-bracket-sep { border-top: 2px solid #d8321b; }
+
+/* The five numeric columns. Fixed widths, not flex — a table whose columns do
+   not line up between rows is not a table, and the name is the only thing
+   allowed to take the slack. */
+.lt-stat  { width: 20px; text-align: center; flex-shrink: 0; }
+.lt-goals { width: 44px; text-align: center; flex-shrink: 0; font-size: 10px; color: var(--dim); }
+.league-details.era-toto .lt-head { font-size: 9px; }
+.league-details.era-toto .lt-row  { gap: 5px; padding-inline: 8px; }
+.league-details.era-toto .lt-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 /* ── the list under it ─────────────────────────────────────────────────────
    The panel takes the era too, but as the same one accent and the same square
    geometry — not as a change of ground. */
