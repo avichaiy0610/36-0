@@ -608,14 +608,18 @@ document.addEventListener('DOMContentLoaded', () => {
    A skin left over from the previous round is exactly the "a field nobody sets
    is a field that carries over" bug this project has now hit three times, and
    here it would be silent: the card would simply keep looking like 2003. */
+/* ONE era for now, and deliberately one.
+   Four bands shipped before this and all four were invented from general design
+   history — arbitrary years, arbitrary looks, and the verdict on every round of
+   them was some version of "ugly". This band is different: it is drawn from an
+   actual period league table the user supplied, so every choice in .era-toto has
+   a source. Its span is his, from looking at the table: roughly 2006–2013.
+
+   Everything else falls through to no skin at all, which is the point — the card
+   is either the ליגת טוטו one or the ordinary one, so there is exactly one thing
+   to judge. The previous four are not deleted, they are in tag `era-v1`. */
 const ERA_SKINS = [
-  { cls: 'era-a', from: 0,    to: 2004, label: '1999–2004' },
-  { cls: 'era-b', from: 2005, to: 2011, label: '2005–2011' },
-  { cls: 'era-c', from: 2012, to: 2018, label: '2012–2018' },
-  // '2019–היום' would be right, and renders as 'היום–2019': the tag is set LTR so
-  // the years read in order, and a Hebrew word inside an LTR run gets reordered
-  // to the front. A pure-digit label sidesteps bidi entirely.
-  { cls: 'era-d', from: 2019, to: 9999, label: '2019+' },
+  { cls: 'era-toto', from: 2006, to: 2013, label: 'ליגת טוטו' },
 ];
 const ERA_ALL = ERA_SKINS.map(e => e.cls);
 

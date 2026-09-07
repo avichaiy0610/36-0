@@ -227,177 +227,121 @@
 .cm-bp-pos { width: 16px; color: #5a5348; }
 .cm-bp-team { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cm-bp-pts { font-weight: 700; }
-.cm-bp-foot { font-size: 0.6rem; color: #5a5348; text-align: left; margin-top: 8px; }/* ── 3. מראה של תקופה ─────────────────────────────────────────────────────────
+.cm-bp-foot { font-size: 0.6rem; color: #5a5348; text-align: left; margin-top: 8px; }
 
-   THREE RULES, all three learned by breaking them on live screens.
+/* ── 3. מראה של תקופה — ליגת טוטו, 2006–2013 ─────────────────────────────────
 
-   1. NEVER touch the header's `background` from CSS. game.js sets it INLINE,
-      per drawn club, so `background-image: … !important` does not layer over
-      the gradient — it REPLACES it, and the club's colour is gone.
+   Every value in this block was read off a real league table from the period
+   that the user supplied, not invented. That is the whole difference between
+   this and the four skins it replaces (kept in tag `era-v1`), which were argued
+   from general design history and were rejected four times running.
 
-   2. NEVER assume the ink. game.js sets `.card-team` / `.card-season` colours
-      inline from textColorFor(primary): white on a dark club, `#111` on a light
-      one. A dark plate under near-black text made the season vanish on every
-      yellow club. So a skin either leaves the ink alone under a TRANSLUCENT
-      plate, or — now that applyEraSkin publishes `--era-club` and `--era-ink` —
-      lays down the club's FLAT colour and puts the matching ink on it. Those
-      two properties are what let a skin look like a year that predates
-      gradients at all.
+   What the reference actually shows, and what is therefore reproduced here:
+     · an orange→red bar carrying the league's name of the day
+     · a WHITE body with black text — it is a printed table, not a dark UI
+     · numerals in a plain grotesque, tabular, with the club name bold
+     · goals written as one cell, "85-25", never split into columns
+     · red rules at the bracket cuts, not green/red position bands
+   The card cannot show columns, so what carries across to it is the bar, the
+   white printed body, the type, and the orange.
 
-   3. STAY IN THE DARK PALETTE. Two attempts hung light frames on these cards —
-      a cream sticker edge, thick white rules — and both were called ugly, quite
-      rightly: a bright frame inside a #0d1117 app reads as a rendering fault,
-      not as a period. Each era gets ONE accent instead, used thinly and used
-      everywhere: the card's keyline, the era tag, the OVR figures and the row
-      edges in the list. That consistency is what makes it a theme rather than a
-      decorated box.
-
-   Scope: applyEraSkin puts the class on the card AND mirrors it onto
-   .side-panel, because the player list is most of what is on screen during a
-   draft and a decade that stops at the card is a decade nobody notices.
-
-   And every TEAMS[].badge is TWO emoji ("⚫🟡"), so nothing here may give
-   .card-badge a fixed box — it squashes both glyphs. */
+   THE THREE STANDING RULES still apply and are what make this safe:
+     1. never touch the header's inline `background` — paint on ::after;
+     2. never assume the ink — here the ::after is opaque WHITE, so the ink is
+        forced black to match it, plate and ink as a pair;
+     3. the club's own colour is not lost: it becomes the flash down the side of
+        the name, drawn from --era-club. */
 
 .squad-card-header { position: relative; overflow: hidden; }
 .squad-card-header > * { position: relative; z-index: 1; }
 .squad-card {
-  transition: border-radius .2s ease, box-shadow .2s ease, border-color .2s ease;
+  transition: background .2s ease, border-color .2s ease;
   overflow: hidden; position: relative;
 }
 .squad-card[class*="era-"] .squad-card-header::after {
   content: ''; position: absolute; inset: 0; z-index: 0; pointer-events: none;
 }
 
-/* The era tag. attr() only reads the element its own pseudo belongs to, so this
-   hangs off the CARD, where applyEraSkin writes data-era — a ::before on the
-   header would have rendered empty. */
+/* ── the card ──────────────────────────────────────────────────────────────── */
+
+.squad-card.era-toto {
+  background: #fff;
+  border: 1px solid #cfc7bb;
+  border-radius: 3px;
+  box-shadow: 0 2px 10px rgba(0,0,0,.45);
+}
+
+/* The league bar. attr() only reads the element its own pseudo belongs to, so
+   this hangs off the CARD, where applyEraSkin writes data-era — the name comes
+   from ERA_SKINS and nothing here hardcodes "ליגת טוטו".
+   `content` lives in this base rule on purpose: a ::before without it does not
+   render at all, and leaving it to the skin below is how the bar went missing
+   the first time this was built. */
 .squad-card[data-era]::before {
   content: attr(data-era);
   position: absolute; z-index: 3; top: 0; left: 0;
-  padding: 2px 7px 3px; font-size: 9px; font-weight: 700;
-  letter-spacing: .5px; line-height: 1.4; direction: ltr;
-  background: rgba(0,0,0,0.62); color: var(--era-accent, #fff);
+  line-height: 1.4; pointer-events: none;
 }
-.squad-card[class*="era-"] .card-season { display: inline-block; margin-top: 3px; }
+.squad-card.era-toto::before {
+  left: 0; right: 0; top: 0;
+  direction: rtl; text-align: right;
+  padding: 4px 10px 5px;
+  font-family: Arial, Heebo, sans-serif; font-size: 12px; font-weight: 900;
+  letter-spacing: -.2px; color: #fff;
+  background: linear-gradient(180deg, #f79a1e 0%, #ef7c12 45%, #e2600c 100%);
+}
 
-/* Shared panel wiring. Each era only sets --era-accent and the few shape
-   properties below; everything that USES the accent is written once here. */
-.side-panel[class*="era-"] .pc-ovr { color: var(--era-accent); }
-.side-panel[class*="era-"] .player-card { transition: none; }
+/* room for the bar, and the club's gradient covered with the printed white */
+.squad-card.era-toto .squad-card-header { padding-top: 32px; padding-bottom: 10px; }
+.squad-card.era-toto .squad-card-header::after { background: #fff; }
 
-/* ── 1999–2004 · phosphor ───────────────────────────────────────────────────
-   Hard square edges, a thin amber keyline, flat club colour under a halftone
-   screen, and figures set in the monospace of a scoreboard readout. Flat is the
-   whole point: nothing in 1999 had a gradient, which is why covering one with a
-   texture never read as 1999. */
-.squad-card.era-a, .side-panel.era-a { --era-accent: #e0a83c; }
-.squad-card.era-a {
-  border-radius: 0;
-  border: 1px solid rgba(224,168,60,0.55);
-  box-shadow: none;
+.squad-card.era-toto .card-text {
+  border-right: 4px solid var(--era-club, #e2600c);
+  padding-right: 8px;
 }
-.squad-card.era-a::before { font-family: "Courier New", monospace; letter-spacing: 1px; }
-.squad-card.era-a .squad-card-header::after {
-  background:
-    radial-gradient(circle at 50% 50%, rgba(0,0,0,0.16) 0.9px, transparent 1.2px) 0 0/4px 4px,
-    var(--era-club, #1a1a2e);
+.squad-card.era-toto .card-team {
+  color: #111 !important;
+  font-family: Arial, Heebo, sans-serif; font-weight: 700; letter-spacing: -.2px;
+  text-shadow: none;
 }
-.squad-card.era-a .card-team {
-  color: var(--era-ink, #fff) !important;
-  font-weight: 900; letter-spacing: 0.3px; text-shadow: none;
+.squad-card.era-toto .card-season {
+  color: #8a3b06 !important;
+  font-family: Arial, Heebo, sans-serif; font-weight: 700; font-size: 11px;
+  letter-spacing: .4px; opacity: 1;
 }
-.squad-card.era-a .card-season {
-  color: var(--era-ink, #fff) !important; opacity: 0.75;
-  font-family: "Courier New", monospace; font-weight: 700; letter-spacing: 1.6px;
+.squad-card.era-toto .reroll-row {
+  background: #fdf0e2; border-top: 1px solid #e6c8a8;
 }
-.side-panel.era-a .player-card {
-  border-radius: 0;
-  border-color: rgba(224,168,60,0.22);
+.squad-card.era-toto .btn-reroll-small {
+  background: #fff; border-color: #e0c3a4; color: #8a3b06; border-radius: 2px;
 }
-.side-panel.era-a .pc-ovr { font-family: "Courier New", monospace; }
-.side-panel.era-a .pc-pos-badge { border-radius: 0; }
+.squad-card.era-toto .reroll-badge { background: #e2600c; color: #fff; }
 
-/* ── 2005–2011 · gloss ──────────────────────────────────────────────────────
-   Web 2.0, and the one era whose look really was the gradient — so this is the
-   skin that keeps the club's own and adds the specular sweep that STOPS dead at
-   50% rather than fading. That discontinuity is the whole thing. Both plates
-   are translucent, so the inline ink is left exactly as game.js computed it. */
-.squad-card.era-b, .side-panel.era-b { --era-accent: #6aa9e0; }
-.squad-card.era-b {
-  border-radius: 12px;
-  border: 1px solid rgba(255,255,255,0.16);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.32);
-}
-.squad-card.era-b::before { border-radius: 0 0 10px 0; }
-.squad-card.era-b .squad-card-header::after {
-  background: linear-gradient(180deg,
-    rgba(255,255,255,0.30) 0%, rgba(255,255,255,0.10) 49.9%,
-    rgba(0,0,0,0.14) 50%, rgba(0,0,0,0.02) 100%);
-}
-.squad-card.era-b .card-team { font-weight: 800; }
-.squad-card.era-b .card-season {
-  padding: 1px 9px; border-radius: 999px;
-  background: rgba(255,255,255,0.26);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.5);
-  font-weight: 700;
-}
-.side-panel.era-b .player-card {
-  border-radius: 10px;
-  background-image: linear-gradient(180deg, rgba(255,255,255,0.055), transparent 60%);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.10);
-}
-.side-panel.era-b .pc-pos-badge { border-radius: 999px; }
+/* ── the list under it ─────────────────────────────────────────────────────── */
+/* The panel takes the era too. A printed card sitting on top of a dark list
+   would read as the light-frame-on-dark mistake that was rejected twice — the
+   period look only holds together if the whole column is the same object. */
 
-/* ── 2012–2018 · flat ───────────────────────────────────────────────────────
-   The decade that deleted every effect. Flat club colour, no texture, no
-   shadow, no radius, no gloss; what carries it is a single accent edge on each
-   row and wide, light, unshadowed type. */
-.squad-card.era-c, .side-panel.era-c { --era-accent: #2fbf9e; }
-.squad-card.era-c {
-  border-radius: 0; box-shadow: none;
-  border: 1px solid rgba(47,191,158,0.35);
-}
-.squad-card.era-c .squad-card-header::after { background: var(--era-club, #1a1a2e); }
-.squad-card.era-c .card-team {
-  color: var(--era-ink, #fff) !important;
-  font-weight: 400; letter-spacing: 2.2px; text-shadow: none; font-size: 14px;
-}
-.squad-card.era-c .card-season {
-  color: var(--era-ink, #fff) !important; opacity: 0.8;
-  letter-spacing: 3px; font-weight: 300;
-}
-.side-panel.era-c .player-card {
-  border-radius: 0; border: 0;
-  border-right: 3px solid rgba(47,191,158,0.55);
-}
-.side-panel.era-c .pc-pos-badge { border-radius: 0; letter-spacing: .5px; }
+.side-panel.era-toto { background: #efece6; }
+.side-panel.era-toto .pick-hint { color: #6b625a; }
 
-/* ── 2019+ · today ──────────────────────────────────────────────────────────
-   Soft, lifted, tight. Keeps the club's gradient and adds only a shallow
-   diagonal sheen — too slight to move the header's luminance, so the ink is
-   left alone here too. */
-.squad-card.era-d, .side-panel.era-d { --era-accent: #9b8bf5; }
-.squad-card.era-d {
-  border-radius: 16px;
-  border: 1px solid rgba(255,255,255,0.10);
-  box-shadow: 0 8px 22px rgba(0,0,0,0.55);
+.side-panel.era-toto .player-card {
+  background: #fff; border: 1px solid #ddd7cd; border-radius: 2px;
 }
-.squad-card.era-d::before { border-radius: 0 0 12px 0; }
-.squad-card.era-d .squad-card-header::after {
-  background: linear-gradient(150deg, rgba(255,255,255,0.15), transparent 52%);
+.side-panel.era-toto .player-card:nth-child(even) { background: #f7f5f1; }
+.side-panel.era-toto .player-card:hover { background: #fdf0e2; border-color: #e0c3a4; }
+.side-panel.era-toto .pc-name { color: #111; font-weight: 700; }
+.side-panel.era-toto .pc-ovr {
+  color: #d8321b; font-family: Arial, Heebo, sans-serif; font-weight: 900;
 }
-.squad-card.era-d .card-team { font-weight: 900; letter-spacing: -0.5px; font-size: 16px; }
-.squad-card.era-d .card-season {
-  padding: 1px 8px; border-radius: 8px;
-  background: rgba(255,255,255,0.16); font-weight: 600;
+.side-panel.era-toto .pc-pos-badge {
+  background: #fdf0e2; border-color: #e0c3a4; color: #8a3b06; border-radius: 2px;
 }
-.side-panel.era-d .player-card {
-  border-radius: 14px;
-  border-color: rgba(255,255,255,0.09);
-  box-shadow: 0 2px 8px rgba(0,0,0,0.28);
+.side-panel.era-toto .btn-draft-restart { color: #8a3b06; }
+.side-panel.era-toto .btn-move-player {
+  background: #fff; border-color: #e0c3a4; color: #8a3b06;
 }
-.side-panel.era-d .pc-pos-badge { border-radius: 8px; }
+
 
 /* ── narrow phones ────────────────────────────────────────────────────────── */
 /* At a 375px viewport the box is 94vw = 352 and its content 332, so the man has
