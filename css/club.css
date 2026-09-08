@@ -252,8 +252,14 @@
 
 .cm-bp-box { border-top: 1px solid #cfc7b8; padding: 5px 0; }
 .cm-bp-box-t { font-size: 0.6rem; color: #a32020; font-weight: 700; }
-.cm-bp-box-v { font-size: 0.78rem; }
-.cm-bp-box-v b { font-weight: 900; }
+/* Name on one side, figure on the other. A plain space between them collapsed
+   to nothing once bidi put a Latin numeral hard against a Hebrew name —
+   "קלשצ'ניקו16" — so the gap is laid out rather than typed. */
+.cm-bp-box-v {
+  font-size: 0.78rem;
+  display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+}
+.cm-bp-box-v b { font-weight: 900; flex-shrink: 0; }
 
 .cm-bp-table { margin-top: 10px; border-top: 3px solid #14181f; padding-top: 6px; }
 .cm-bp-table-t { font-size: 0.62rem; color: #a32020; font-weight: 700; margin-bottom: 3px; }
