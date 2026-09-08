@@ -113,7 +113,7 @@ function cmManHTML(club, m, size) {
               data-name="${cmEsc(m.key || m.name)}" aria-label="מספר של ${cmEsc(m.name)}">`
     : '';
   return `<div class="cm-man">
-    ${clubShirtSVG(club, size, m.num)}
+    ${clubShirtSVG(club, size, m.num, m.pos === 'GK')}
     <div class="cm-man-name">${cmEsc(m.name)}</div>
     ${editor}
   </div>`;
@@ -160,7 +160,7 @@ function cmHeadline(s) {
   if (myRank <= 4)                  return { big: 'אירופה!',      kick: 'הכרטיס נחתם במחזור האחרון', tone: 'good' };
   if (myRank > n - 2)               return { big: 'יורדים',       kick: 'עונה שנגמרה הרבה לפני הסוף', tone: 'bad' };
   if (myRank > n / 2)               return { big: 'עונה למחוק',   kick: `${losses} הפסדים, ושום דבר לחגוג`, tone: 'bad' };
-  return { big: 'עונה של ביסוס', kick: `${wins} ניצחונות, ויש על מה לבנות`, tone: 'mid' };
+  return { big: 'עונה של התבססות', kick: `${wins} ניצחונות, ויש על מה לבנות`, tone: 'mid' };
 }
 
 function clubBackPageHTML() {
@@ -172,6 +172,18 @@ function clubBackPageHTML() {
   const top = [...ps].sort((a, b) => b.goals - a.goals)[0];
   const asst = [...ps].sort((a, b) => b.assists - a.assists)[0];
   const table = Array.isArray(s.leagueTable) ? s.leagueTable.slice(0, 5) : [];
+
+  /* Clean sheets. simulatePlayerStats credits one to the keeper AND to every
+     defender on the same match, so any of their counts is the team's total —
+     the keeper's is the one to read, with the highest as a fallback for a
+     formation or a restored season that has no GK row. */
+  const gkRow = ps.find(p => p.slotPos === 'GK');
+  const cs = gkRow ? gkRow.cs
+           : (ps.length ? Math.max(...ps.map(p => p.cs || 0)) : null);
+
+  // The manager, if the season had one. A back page names him; ours did not.
+  const coach = (typeof coachActive === 'function' && coachActive())
+    ? coachActive().name : null;
 
   const shortName = n => (typeof playerShortName === 'function') ? playerShortName(n) : n;
 
@@ -198,13 +210,19 @@ function clubBackPageHTML() {
           <div><b>${pts}</b><span>נק׳</span></div>
         </div>
         <!-- "92 : 12" told the reader nothing about which number was which.
-             Labelled, and no longer forced LTR — the labels have to stay with
-             their own figures. -->
+             Labelled in full, and no longer forced LTR — the labels have to
+             stay with their own figures. -->
         <div class="cm-bp-line">
-          <span class="cm-bp-gf">${s.gfTotal}</span> כבשה
+          <span class="cm-bp-gf">${s.gfTotal}</span> שערים נכבשו
           <span class="cm-bp-dot">·</span>
-          <span class="cm-bp-ga">${s.gaTotal}</span> ספגה
+          <span class="cm-bp-ga">${s.gaTotal}</span> שערים נספגו
+          ${cs != null ? `<span class="cm-bp-dot">·</span>
+          <span class="cm-bp-cs">${cs}</span> שערים נקיים` : ''}
         </div>
+        ${coach ? `<div class="cm-bp-box">
+          <div class="cm-bp-box-t">המאמן</div>
+          <div class="cm-bp-box-v">${cmEsc(coach)}</div>
+        </div>` : ''}
         ${top && top.goals ? `<div class="cm-bp-box">
           <div class="cm-bp-box-t">מלך השערים</div>
           <div class="cm-bp-box-v">${cmEsc(shortName(top.name))} <b>${top.goals}</b></div>

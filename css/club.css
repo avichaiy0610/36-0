@@ -83,6 +83,13 @@
   font-size: 0.8rem; cursor: pointer;
 }
 .cl-note { font-size: 0.75rem; color: var(--dim); margin-top: 10px; line-height: 1.5; }
+/* the two strips in the kit tab need a visible seam, or the second set of
+   pattern chips reads as more options for the first */
+.cl-sub {
+  font-size: 0.82rem; font-weight: 800; color: var(--text);
+  margin: 4px 0 2px; padding-bottom: 4px; border-bottom: 1px solid var(--border);
+}
+.cl-sub-gk { margin-top: 16px; }
 .cl-bad { border-color: #e74c3c !important; }
 
 .cl-actions { display: flex; gap: 8px; margin-top: 16px; }

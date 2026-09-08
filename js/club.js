@@ -147,6 +147,11 @@ const CLUB_DEFAULT = {
   crest: { source: 'built', clubId: 'maccabi-haifa',
            shape: 'shield', pattern: 'half', icon: 'star', c1: '#1e6f3c', c2: '#f5f5f5' },
   kit:   { pattern: 'stripes', c1: '#1e6f3c', c2: '#f5f5f5' },
+  // The keeper plays in a different strip — that is a rule of the game, not a
+  // preference, and a team photo where he wears the outfield shirt reads wrong
+  // immediately. Defaults to the classic amber, which clashes with almost every
+  // outfield kit somebody is likely to build.
+  kitGK: { pattern: 'solid', c1: '#f0a500', c2: '#111418' },
 };
 
 let _clUid = 0;
@@ -180,6 +185,7 @@ function clubGet() {
       ...CLUB_DEFAULT, ...raw,
       crest: { ...CLUB_DEFAULT.crest, ...(raw.crest || {}) },
       kit:   { ...CLUB_DEFAULT.kit,   ...(raw.kit   || {}) },
+      kitGK: { ...CLUB_DEFAULT.kitGK, ...(raw.kitGK || {}) },
     };
   } catch (e) { return null; }
 }
@@ -214,6 +220,14 @@ function clubRandom() {
              shape: pick(Object.keys(CREST_SHAPES)), pattern: pick(Object.keys(CREST_PATTERNS)),
              icon: pick(Object.keys(CREST_ICONS)), c1, c2 },
     kit:   { pattern: pick(Object.keys(KIT_PATTERNS)), c1, c2 },
+    // The keeper is rolled from a shelf of colours the outfield kit did NOT
+    // use, because the one thing a keeper's strip has to do is not look like
+    // his own team's.
+    kitGK: (() => {
+      const away = CLUB_COLORS.filter(x => x !== c1 && x !== c2);
+      const g1 = pick(away.length ? away : CLUB_COLORS);
+      return { pattern: pick(['solid', 'solid', 'hoop', 'sleeves']), c1: g1, c2: clInk(g1) };
+    })(),
   };
 }
 
@@ -285,9 +299,10 @@ function clubCrestSVG(club, px) {
 /* ── the kit ────────────────────────────────────────────────────────────────
    A shirt seen flat from the front, with a number on it. Same clip-and-fill
    trick as the crest. Used by the team photo and by the back page. */
-function clubShirtSVG(club, px, number) {
+// `gk` picks the keeper's strip instead of the outfield one.
+function clubShirtSVG(club, px, number, gk) {
   const c = club || clubGet() || CLUB_DEFAULT;
-  const k = c.kit || CLUB_DEFAULT.kit;
+  const k = (gk ? (c.kitGK || CLUB_DEFAULT.kitGK) : (c.kit || CLUB_DEFAULT.kit));
   const c1 = k.c1 || '#1e6f3c', c2 = k.c2 || '#f5f5f5';
   const uid = 'clk' + (++_clUid);
   const body = 'M32,8 L44,4 C46,12 54,12 56,4 L68,8 L92,22 L82,42 L72,37 V96 H28 V37 L18,42 L8,22 Z';
@@ -421,7 +436,8 @@ function clubSwatches(name, current) {
 }
 
 function showClubEditor(onSaved) {
-  _clDraft = clubGet() || { ...CLUB_DEFAULT, crest: { ...CLUB_DEFAULT.crest }, kit: { ...CLUB_DEFAULT.kit } };
+  _clDraft = clubGet() || { ...CLUB_DEFAULT, crest: { ...CLUB_DEFAULT.crest },
+                            kit: { ...CLUB_DEFAULT.kit }, kitGK: { ...CLUB_DEFAULT.kitGK } };
 
   const wrap = document.createElement('div');
   wrap.className = 'modal-overlay cl-modal';
@@ -452,7 +468,7 @@ function showClubEditor(onSaved) {
   const drawPreview = () => {
     const c = _clDraft;
     document.getElementById('cl-preview').innerHTML = `
-      <div class="cl-pv-art">${clubCrestSVG(c, 62)}${clubShirtSVG(c, 62, 10)}</div>
+      <div class="cl-pv-art">${clubCrestSVG(c, 56)}${clubShirtSVG(c, 52, 10)}${clubShirtSVG(c, 52, 1, true)}</div>
       <div class="cl-pv-text">
         <div class="cl-pv-name">${clEsc(c.name || 'המועדון שלי')}</div>
         <div class="cl-pv-city">${clEsc(c.city || '—')}</div>
@@ -487,11 +503,18 @@ function showClubEditor(onSaved) {
             `<div class="cl-lbl">צבע משני</div>` + clubSwatches('crest2', c.crest.c2));
     } else if (tab === 'kit') {
       pane.innerHTML =
+        `<div class="cl-sub">חולצת שחקנים</div>` +
         `<div class="cl-lbl">דוגמה</div>` +
         clubRow('kpattern', Object.entries(KIT_PATTERNS), c.kit.pattern) +
         `<div class="cl-lbl">צבע ראשי</div>` + clubSwatches('kit1', c.kit.c1) +
         `<div class="cl-lbl">צבע משני</div>` + clubSwatches('kit2', c.kit.c2) +
-        `<button type="button" class="cl-mini" id="cl-copy-crest">↩ העתק את צבעי הסמל</button>`;
+        `<button type="button" class="cl-mini" id="cl-copy-crest">↩ העתק את צבעי הסמל</button>` +
+        `<div class="cl-sub cl-sub-gk">🧤 חולצת שוער</div>` +
+        `<div class="cl-lbl">דוגמה</div>` +
+        clubRow('gpattern', Object.entries(KIT_PATTERNS), c.kitGK.pattern) +
+        `<div class="cl-lbl">צבע ראשי</div>` + clubSwatches('gk1', c.kitGK.c1) +
+        `<div class="cl-lbl">צבע משני</div>` + clubSwatches('gk2', c.kitGK.c2) +
+        `<p class="cl-note">השוער לובש אחרת מכולם — כדאי צבע שלא מופיע בחולצת השחקנים.</p>`;
     } else {
       pane.innerHTML =
         `<div class="cl-lbl">שם המועדון</div>
@@ -524,12 +547,15 @@ function showClubEditor(onSaved) {
     else if (d.pattern)  _clDraft.crest.pattern = d.pattern;
     else if (d.icon)     _clDraft.crest.icon    = d.icon;
     else if (d.kpattern) _clDraft.kit.pattern   = d.kpattern;
+    else if (d.gpattern) _clDraft.kitGK.pattern = d.gpattern;
     else if (d.color) {
       const which = t.closest('.cl-swatches')?.dataset.sw;
       if (which === 'crest1') _clDraft.crest.c1 = d.color;
       if (which === 'crest2') _clDraft.crest.c2 = d.color;
       if (which === 'kit1')   _clDraft.kit.c1   = d.color;
       if (which === 'kit2')   _clDraft.kit.c2   = d.color;
+      if (which === 'gk1')    _clDraft.kitGK.c1 = d.color;
+      if (which === 'gk2')    _clDraft.kitGK.c2 = d.color;
     } else return;
 
     drawPreview(); drawPane();
