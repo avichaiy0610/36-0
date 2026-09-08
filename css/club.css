@@ -63,6 +63,10 @@
    by a ring OUTSIDE it — box-shadow, not border, or every swatch would jump 4px
    when picked and the whole row would reflow. */
 .cl-sw.sel { border-color: var(--text); box-shadow: 0 0 0 2px var(--accent); }
+.cl-sw-auto {
+  background: var(--surface2); color: var(--dim);
+  font-size: 11px; font-weight: 800; line-height: 1;
+}
 
 /* the badge shelf — 31 PNGs from /crests/ */
 .cl-crests {

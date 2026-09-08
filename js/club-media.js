@@ -63,6 +63,9 @@ function cmPhotoRows() {
     const full = p.player.name;
     men.push({
       name: (typeof playerShortName === 'function') ? playerShortName(full) : full,
+      // What goes ON the shirt: the surname only, with the position tag some
+      // cards carry stripped off — see clubSurname in js/club.js.
+      shirt: (typeof clubSurname === 'function') ? clubSurname(full) : full,
       key: full,                                   // overrides are keyed by the FULL name
       num: over[full] || nums[i], y: s.y, pos: s.pos,
     });
@@ -113,7 +116,7 @@ function cmManHTML(club, m, size) {
               data-name="${cmEsc(m.key || m.name)}" aria-label="מספר של ${cmEsc(m.name)}">`
     : '';
   return `<div class="cm-man">
-    ${clubShirtSVG(club, size, m.num, m.pos === 'GK')}
+    ${clubShirtSVG(club, size, m.num, m.pos === 'GK', m.shirt)}
     <div class="cm-man-name">${cmEsc(m.name)}</div>
     ${editor}
   </div>`;

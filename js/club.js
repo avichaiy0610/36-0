@@ -300,7 +300,7 @@ function clubCrestSVG(club, px) {
    A shirt seen flat from the front, with a number on it. Same clip-and-fill
    trick as the crest. Used by the team photo and by the back page. */
 // `gk` picks the keeper's strip instead of the outfield one.
-function clubShirtSVG(club, px, number, gk) {
+function clubShirtSVG(club, px, number, gk, name) {
   const c = club || clubGet() || CLUB_DEFAULT;
   const k = (gk ? (c.kitGK || CLUB_DEFAULT.kitGK) : (c.kit || CLUB_DEFAULT.kit));
   const c1 = k.c1 || '#1e6f3c', c2 = k.c2 || '#f5f5f5';
@@ -331,7 +331,34 @@ function clubShirtSVG(club, px, number, gk) {
       field = `<rect x="0" y="0" width="100" height="100" fill="${c1}"/>`;
   }
 
-  const ink = clInk(c1), edge = clInkOpposite(c1);
+  /* The number's colour is normally computed from the kit so it always reads,
+     but people want to choose it — gold numbers on a green shirt is a decision,
+     not a contrast failure. 'auto' (the default) keeps the computed pair; a
+     chosen colour keeps the computed OUTLINE, which is what stops a free choice
+     from becoming an unreadable one over a striped or halved field. */
+  const auto = clInk(c1), edge = clInkOpposite(c1);
+  const ink = (k.numColor && k.numColor !== 'auto') ? k.numColor : auto;
+
+  /* The surname across the chest, above the number — the number's glyph top is
+     around y 38.5, so a baseline of 33 clears it.
+
+     The sizes are set against MEASURED widths, not guessed from font metrics:
+     rendered in this face, a Hebrew surname runs about 0.44 units per character
+     per unit of font-size, so nine characters at 11 is ~44 — exactly the torso.
+     The first attempt used 8.5 and it came out under 5px on a 56px shirt in the
+     team photo, which is a smudge rather than a name.
+
+     Past nine characters no size both fits and reads, so those are condensed
+     with textLength instead. It is applied ONLY there: it would visibly stretch
+     a short name, and most names are short. */
+  const sn = String(name || '');
+  const nameFs = sn.length <= 4 ? 13 : sn.length <= 7 ? 12 : sn.length <= 9 ? 11 : 9.5;
+  const fit = sn.length > 9 ? ' textLength="42" lengthAdjust="spacingAndGlyphs"' : '';
+  const nameSVG = sn ? `<text x="50" y="33" text-anchor="middle"${fit}
+      font-family="Arial, Heebo, sans-serif" font-size="${nameFs}" font-weight="700"
+      fill="${ink}" stroke="${edge}" stroke-width="2.2" stroke-linejoin="round"
+      style="paint-order:stroke fill">${clEsc(sn)}</text>` : '';
+
   /* Both of these were measured against the rendered shape, not estimated —
      twice, because estimating them is what put the number low and cramped.
 
@@ -364,6 +391,7 @@ function clubShirtSVG(club, px, number, gk) {
   return `<svg class="club-shirt" viewBox="0 0 100 100" width="${w}" height="${h}" role="img" aria-label="חולצה">
     <defs><clipPath id="${uid}"><path d="${body}"/></clipPath></defs>
     <g clip-path="url(#${uid})">${field}</g>
+    ${nameSVG}
     ${num}
     <path d="${body}" fill="none" stroke="rgba(0,0,0,0.6)" stroke-width="3"/>
   </svg>`;
@@ -384,6 +412,33 @@ const CLUB_NUMS = {
   RM: [7], RW: [7, 11], CAM: [10], ST: [9, 11], CF: [9, 10], LM: [11], LW: [11, 7],
 };
 const CLUB_ATT_POS = ['ST', 'CF', 'CAM', 'RW', 'LW', 'RM', 'LM'];
+
+/* ── the name that goes on the back of a shirt ──────────────────────────────
+   Everything after the given name, minus the position tag some cards carry.
+
+   data.js disambiguates players who share a name by appending their position:
+   there are two Itzik Cohens (החלוץ and הבלם), two Tal Ben Haims, two Yaniv
+   Mizrahis and two Rafi Cohens. On a card that tag is what tells them apart; on
+   a shirt it is not a surname, and "בן חיים החלוץ" across a chest is wrong.
+
+   The list is exactly the four that occur — checked against all 2,649 names in
+   data.js, not guessed. It matters that it is a closed list: there are real
+   surnames that begin with ה (הרוש, האגן, הרמן, הלל), and a rule like "drop a
+   trailing ה-word" would eat them. The tag is also only dropped when something
+   is left after it.
+
+   Names carry directional marks — 550 lines have one, see crNormName in
+   career.js — so the tag has to be compared with those stripped, or
+   "שלומי אזולאי‎ החלוץ" never matches. */
+const CLUB_POS_TAGS = ['החלוץ', 'הבלם', 'הקשר', 'השוער'];
+
+function clubSurname(full) {
+  const clean = String(full ?? '').replace(/[‎‏‪-‮⁦-⁩]/g, '').trim();
+  let w = clean.split(/\s+/).filter(Boolean);
+  if (w.length > 1) w = w.slice(1);                       // drop the given name
+  if (w.length > 1 && CLUB_POS_TAGS.includes(w[w.length - 1])) w = w.slice(0, -1);
+  return w.join(' ') || clean;
+}
 
 function clubNumbersFor(slots, picks) {
   const out = new Array(slots.length).fill(null);
@@ -428,8 +483,14 @@ function clubRow(name, items, current, cb) {
   ).join('') + '</div>';
 }
 
-function clubSwatches(name, current) {
-  return `<div class="cl-swatches" data-sw="${name}">` + CLUB_COLORS.map(c =>
+function clubSwatches(name, current, withAuto) {
+  // The 'auto' chip is a swatch like any other so it sits in the same row and
+  // takes the same selected ring; it just carries the word instead of a colour.
+  const auto = withAuto
+    ? `<button type="button" class="cl-sw cl-sw-auto${(!current || current === 'auto') ? ' sel' : ''}"
+         data-color="auto" title="אוטומטי">א</button>`
+    : '';
+  return `<div class="cl-swatches" data-sw="${name}">` + auto + CLUB_COLORS.map(c =>
     `<button type="button" class="cl-sw${c === current ? ' sel' : ''}" data-color="${c}"
        style="background:${c}" aria-label="${c}"></button>`
   ).join('') + '</div>';
@@ -468,7 +529,7 @@ function showClubEditor(onSaved) {
   const drawPreview = () => {
     const c = _clDraft;
     document.getElementById('cl-preview').innerHTML = `
-      <div class="cl-pv-art">${clubCrestSVG(c, 56)}${clubShirtSVG(c, 52, 10)}${clubShirtSVG(c, 52, 1, true)}</div>
+      <div class="cl-pv-art">${clubCrestSVG(c, 56)}${clubShirtSVG(c, 52, 10, false, 'כהן')}${clubShirtSVG(c, 52, 1, true, 'לוי')}</div>
       <div class="cl-pv-text">
         <div class="cl-pv-name">${clEsc(c.name || 'המועדון שלי')}</div>
         <div class="cl-pv-city">${clEsc(c.city || '—')}</div>
@@ -508,12 +569,14 @@ function showClubEditor(onSaved) {
         clubRow('kpattern', Object.entries(KIT_PATTERNS), c.kit.pattern) +
         `<div class="cl-lbl">צבע ראשי</div>` + clubSwatches('kit1', c.kit.c1) +
         `<div class="cl-lbl">צבע משני</div>` + clubSwatches('kit2', c.kit.c2) +
+        `<div class="cl-lbl">צבע המספר</div>` + clubSwatches('knum', c.kit.numColor, true) +
         `<button type="button" class="cl-mini" id="cl-copy-crest">↩ העתק את צבעי הסמל</button>` +
         `<div class="cl-sub cl-sub-gk">🧤 חולצת שוער</div>` +
         `<div class="cl-lbl">דוגמה</div>` +
         clubRow('gpattern', Object.entries(KIT_PATTERNS), c.kitGK.pattern) +
         `<div class="cl-lbl">צבע ראשי</div>` + clubSwatches('gk1', c.kitGK.c1) +
         `<div class="cl-lbl">צבע משני</div>` + clubSwatches('gk2', c.kitGK.c2) +
+        `<div class="cl-lbl">צבע המספר</div>` + clubSwatches('gnum', c.kitGK.numColor, true) +
         `<p class="cl-note">השוער לובש אחרת מכולם — כדאי צבע שלא מופיע בחולצת השחקנים.</p>`;
     } else {
       pane.innerHTML =
@@ -556,6 +619,8 @@ function showClubEditor(onSaved) {
       if (which === 'kit2')   _clDraft.kit.c2   = d.color;
       if (which === 'gk1')    _clDraft.kitGK.c1 = d.color;
       if (which === 'gk2')    _clDraft.kitGK.c2 = d.color;
+      if (which === 'knum')   _clDraft.kit.numColor   = d.color;
+      if (which === 'gnum')   _clDraft.kitGK.numColor = d.color;
     } else return;
 
     drawPreview(); drawPane();
