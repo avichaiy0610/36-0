@@ -239,11 +239,16 @@
 .cm-bp-strip div { flex: 1; text-align: center; line-height: 1.1; }
 .cm-bp-strip b { display: block; font-size: 1rem; font-weight: 900; }
 .cm-bp-strip span { font-size: 0.55rem; color: #5a5348; }
-.cm-bp-line {
-  font-size: 0.7rem; color: #5a5348; text-align: center; margin: 5px 0; line-height: 1.5;
+/* label left, figure right, one per row — the same reading order as the strip
+   above it, so the sidebar stays one system instead of three */
+.cm-bp-goals { margin: 5px 0; }
+.cm-bp-goals > div {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 6px;
+  padding: 2px 0; border-bottom: 1px solid #e4dfd3;
 }
-.cm-bp-line .cm-bp-gf, .cm-bp-line .cm-bp-ga { font-size: 0.85rem; font-weight: 900; color: #14181f; }
-.cm-bp-line .cm-bp-dot { opacity: .5; margin: 0 2px; }
+.cm-bp-goals > div:last-child { border-bottom: 0; }
+.cm-bp-goals .k { font-size: 0.6rem; color: #5a5348; white-space: nowrap; }
+.cm-bp-goals .v { font-size: 0.82rem; font-weight: 900; color: #14181f; }
 
 .cm-bp-box { border-top: 1px solid #cfc7b8; padding: 5px 0; }
 .cm-bp-box-t { font-size: 0.6rem; color: #a32020; font-weight: 700; }

@@ -212,15 +212,14 @@ function clubBackPageHTML() {
           <div><b>${s.losses}</b><span>ה׳</span></div>
           <div><b>${pts}</b><span>נק׳</span></div>
         </div>
-        <!-- "92 : 12" told the reader nothing about which number was which.
-             Labelled in full, and no longer forced LTR — the labels have to
-             stay with their own figures. -->
-        <div class="cm-bp-line">
-          <span class="cm-bp-gf">${s.gfTotal}</span> שערים נכבשו
-          <span class="cm-bp-dot">·</span>
-          <span class="cm-bp-ga">${s.gaTotal}</span> שערים נספגו
-          ${cs != null ? `<span class="cm-bp-dot">·</span>
-          <span class="cm-bp-cs">${cs}</span> שערים נקיים` : ''}
+        <!-- Three labelled figures, one per ROW rather than run together as a
+             sentence. Inline, this column is 132px wide and the line broke in
+             the middle of a phrase — a figure ended up on one line with its
+             label on the next, which reads as a mistake. Rows cannot break. -->
+        <div class="cm-bp-goals">
+          <div><span class="k">שערים נכבשו</span><span class="v">${s.gfTotal}</span></div>
+          <div><span class="k">שערים נספגו</span><span class="v">${s.gaTotal}</span></div>
+          ${cs != null ? `<div><span class="k">שערים נקיים</span><span class="v">${cs}</span></div>` : ''}
         </div>
         ${coach ? `<div class="cm-bp-box">
           <div class="cm-bp-box-t">המאמן</div>
