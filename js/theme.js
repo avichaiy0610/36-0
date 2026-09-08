@@ -122,6 +122,14 @@ function applyTheme() {
 function setThemeMode(mode) { const s = themeState(); s.mode = mode; themeSave(s); applyTheme(); }
 function setThemeTeam(teamId) { const s = themeState(); s.team = teamId || null; themeSave(s); applyTheme(); }
 
+// מראה של תקופה (js/club.js) — stored here because it is a display preference
+// and belongs with the others. eraRefresh() replays the last skin so the change
+// is visible immediately instead of at the next roulette.
+function setThemeEras(on) {
+  const s = themeState(); s.eras = !!on; themeSave(s);
+  if (typeof eraRefresh === 'function') eraRefresh();
+}
+
 // apply as early as possible to avoid a flash of the wrong theme
 applyTheme();
 
@@ -151,12 +159,24 @@ function buildThemePanel() {
         ${teamOptions.map(([id, t]) => `<option value="${id}">${t.name}</option>`).join('')}
       </select>
     </div>
+    <div class="tp-row">
+      <span class="tp-label">מראה של תקופה</span>
+      <div class="tp-seg" id="tp-eras">
+        <button data-eras="1">מופעל</button>
+        <button data-eras="0">כבוי</button>
+      </div>
+    </div>
+    <div class="tp-note">כרטיס ההגרלה ורשימת השחקנים מקבלים את המראה של השנה שיצאה. כבוי — הכל נראה אותו דבר.</div>
     <div class="tp-swatch" id="tp-swatch"></div>`;
 
   const syncUI = () => {
     const st = themeState();
     panel.querySelectorAll('#tp-mode button').forEach(b =>
       b.classList.toggle('on', b.dataset.mode === (st.mode || 'dark')));
+    // st.eras is undefined for anyone who has never touched it, and the default
+    // is ON — so compare against `!== false`, not against a truthy read.
+    panel.querySelectorAll('#tp-eras button').forEach(b =>
+      b.classList.toggle('on', (b.dataset.eras === '1') === (st.eras !== false)));
     const sel = panel.querySelector('#tp-team');
     if (sel) sel.value = st.team || '';
     const sw = panel.querySelector('#tp-swatch');
@@ -173,6 +193,9 @@ function buildThemePanel() {
 
   panel.querySelectorAll('#tp-mode button').forEach(b =>
     b.onclick = () => { setThemeMode(b.dataset.mode); syncUI(); });
+
+  panel.querySelectorAll('#tp-eras button').forEach(b =>
+    b.onclick = () => { setThemeEras(b.dataset.eras === '1'); syncUI(); });
   panel.querySelector('#tp-team').onchange = e => { setThemeTeam(e.target.value); syncUI(); };
 
   const toggle = (show) => {

@@ -853,6 +853,14 @@ function startGame() {
   state.leagueCode = null;   // a normal game from the welcome screen isn't for a league
   state.duelCode = null;
   state.career = null;       // ...nor for a career: leaving one mid-run must not record this season into it
+  // A career pins the era range to its single season (crStartDraft sets
+  // eraMin = eraMax = year, because one season is one transfer market). Nothing
+  // ever released it, so the setup screen for an ORDINARY game afterwards still
+  // showed the slider clamped to the last season the dynasty played. Released
+  // here and only here: startGame is the "a normal game begins" door, so a run
+  // in flight is never disturbed — the range comes back once the career is
+  // behind you, not during it.
+  state.eraMin = YEAR_MIN; state.eraMax = YEAR_MAX;
   state.coach = null;        // ...and it certainly isn't still run by the last one's manager
   state.deck = null; state.mgw = null;   // ...nor for the fixed daily deck
   state.challenge = null; state.challengeDeck = null; state.challengeReqs = null;
@@ -1773,6 +1781,10 @@ function startRound() {
     document.getElementById('card-team-name').textContent = 'בחר עמדה...';
     document.getElementById('card-season').textContent = '';
     document.getElementById('squad-card-header').style.background = '#1a1a2e';
+    // No squad is drawn yet in pos-first, so the previous round's era skin has
+    // nothing to describe — clear it rather than let it sit on a blank card.
+    if (typeof applyEraSkin === 'function')
+      applyEraSkin(document.getElementById('squad-card'), null);
     emptySlotIndices().forEach(i => setTokenHighlight(i, 'compat'));
     setHint('בחר עמדה במגרש');
   } else {
@@ -1828,6 +1840,13 @@ function showSquadCardData(squad) {
   seasonEl.style.color = tx === '#111' ? '#000000b0' : '#ffffffaa';
   document.getElementById('squad-card-header').style.background =
     `linear-gradient(135deg, ${team.primaryColor} 0%, #1a1a2e 100%)`;
+  // מראה של תקופה — the card takes on the look of the year it just landed on.
+  // The club's colour and the ink computed for it go with it: everything on this
+  // header is set inline, so a skin can only paint over it unless those two are
+  // handed across, and a skin that cannot paint FLAT club colour cannot look
+  // like a year that predates gradients.
+  if (typeof applyEraSkin === 'function')
+    applyEraSkin(document.getElementById('squad-card'), squad.season, team.primaryColor, tx);
 }
 
 // ─── Draft: Player rendering ───────────────────────────────────────────────────
@@ -2642,10 +2661,101 @@ function buildPlayerStatsTable(ps) {
   });
 }
 
-function buildLeagueTable(table, spec = MODERN_FORMAT) {
+/* A club-season's record, for a table row that only carries points.
+
+   The historic formats build their rows as {name, pts} and nothing else, so a
+   period table with six columns has nothing to put in five of them. Deriving
+   them adds NO new fiction: the opponents' points are already invented (see
+   rowsFor / fakeRow), and this only shows the working behind a number the
+   screen was printing anyway. The player's own row is never derived — his real
+   record is passed in and used as-is, the same rule the rest of the file keeps.
+
+   THE HALVING ERA IS THE TRAP HERE, and the reference table is what exposes it.
+   Under שיטת הקיזוז the נק׳ column is NOT w*3+d: the real 2009/10 table shows
+   הפועל ת"א on 24-8-1 next to 45 points, because the regular season's points
+   were halved at the split. So forcing the record to agree with the printed
+   points — which is what the first version of this did — prints 12 wins for a
+   champion who won 24. When the format halves, the record is derived from the
+   points the club actually EARNED and the halved figure stays in the נק׳
+   column, exactly as the period table showed it. Where nothing is halved,
+   w*3+d is made to land on the points precisely.
+
+   The goal figures come off a hash of the club name rather than Math.random, so
+   a re-render (or reopening the <details>) shows the same numbers instead of
+   quietly reshuffling them. */
+function ltHash(s) {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return (h >>> 0);
+}
+function ltRecord(row, games, me, halve) {
+  if (row.us && me) return me;                       // never invent the player's own
+  if (row.w != null) return row;                     // modern path already has it
+  const g = Math.max(1, games);
+  const shown = Math.max(0, row.pts ?? 0);
+  const earned = Math.min(halve ? shown * 2 : shown, g * 3);
+  /* Solve 3w+d = earned with w+d <= g, rather than assuming a draw share and
+     deriving w from it. Assuming gave every club near the top the same record —
+     45 points and 42 points both came out 25-8-0, because both hit the ceiling
+     the assumed draws left. Here w is genuinely bounded: at least
+     ceil((earned-g)/2), at most floor(earned/3), and picked inside that window
+     nearest a ~22% draw season. Different points now give different records,
+     and 3w+d lands on the earned total every time. */
+  const lo = Math.max(0, Math.ceil((earned - g) / 2));
+  const hi = Math.max(lo, Math.min(g, Math.floor(earned / 3)));
+  let w = Math.round((earned - g * 0.22) / 3);
+  w = Math.max(lo, Math.min(hi, w));
+  const d = Math.max(0, Math.min(g - w, earned - 3 * w));
+  const l = Math.max(0, g - w - d);
+  const h = ltHash(row.name || '');
+  return { w, d, l, gf: w * 2 + d + (h % 9), ga: l * 2 + d + ((h >> 8) % 7) };
+}
+
+function buildLeagueTable(table, spec = MODERN_FORMAT, me = null) {
   const container = document.getElementById('league-table');
   if (!container) return;
   container.innerHTML = '';
+
+  /* מראה של תקופה, on the results side. The card follows the DRAWN squad's year
+     and changes every round; the table follows the league you actually played,
+     which is one year for the whole season — so this is the more honest place
+     for a period look, and the one the reference material is actually about. */
+  const box = container.closest('.league-details');
+  const side = document.querySelector('#screen-results .results-side');
+  const lgYear = (state.oppSeason ?? (typeof LATEST_SEASON_YEAR !== 'undefined' ? LATEST_SEASON_YEAR : null));
+  const skin = (typeof eraSkinFor === 'function' && typeof erasEnabled === 'function' && erasEnabled())
+    ? eraSkinFor(lgYear) : null;
+  // The whole results column takes the era, not only the table. A period that
+  // stops at one component reads as a component someone forgot to finish — the
+  // same thing that was wrong when the skin stopped at the draw card.
+  if (side && typeof ERA_ALL !== 'undefined') {
+    side.classList.remove(...ERA_ALL);
+    if (skin) side.classList.add(skin.cls);
+  }
+  if (box) {
+    if (typeof ERA_ALL !== 'undefined') box.classList.remove(...ERA_ALL);
+    box.removeAttribute('data-era');
+    if (skin) { box.classList.add(skin.cls); box.setAttribute('data-era', skin.label); }
+    // The name is printed by .league-summary::after, and attr() reads only the
+    // element its own pseudo belongs to — so the summary needs the attribute
+    // too, not just the <details> around it. Third time this has bitten.
+    const sum = box.querySelector('.league-summary');
+    if (sum) {
+      if (skin) sum.setAttribute('data-era', skin.label);
+      else sum.removeAttribute('data-era');
+    }
+    const head = box.querySelector('.lt-head');
+    if (head) {
+      head.innerHTML = skin
+        ? `<span class="lt-pos">#</span><span class="lt-name">קבוצה</span>
+           <span class="lt-stat">מש׳</span><span class="lt-stat">נצ׳</span>
+           <span class="lt-stat">ת׳</span><span class="lt-stat">הפ׳</span>
+           <span class="lt-goals">שערים</span><span class="lt-pts">נק׳</span>`
+        : `<span class="lt-pos">#</span><span class="lt-name">קבוצה</span>
+           <span class="lt-pts">נק׳</span>`;
+    }
+  }
+  const games = me ? (me.w + me.d + me.l) : 0;
   // Separator wherever a playoff group ends (none at all in a season without one)
   const bounds = new Set();
   if (spec.groups) spec.groups.slice(0, -1).reduce((acc, size) => { bounds.add(acc + size); return acc + size; }, 0);
@@ -2661,11 +2771,25 @@ function buildLeagueTable(table, spec = MODERN_FORMAT) {
     const nameHTML = t.us
       ? `<span class="lt-name">${myTeamName('הקבוצה שלי')} <span class="lt-us-badge">#${idx+1}</span></span>`
       : `<span class="lt-name">${t.name}</span>`;
-    row.innerHTML = `
-      <span class="lt-pos">${idx+1}</span>
-      ${nameHTML}
-      <span class="lt-pts" dir="ltr">${t.pts}</span>
-    `;
+    if (skin) {
+      const r = ltRecord(t, games, me, !!spec.halve);
+      row.innerHTML = `
+        <span class="lt-pos">${idx+1}</span>
+        ${nameHTML}
+        <span class="lt-stat">${r.w + r.d + r.l}</span>
+        <span class="lt-stat">${r.w}</span>
+        <span class="lt-stat">${r.d}</span>
+        <span class="lt-stat">${r.l}</span>
+        <span class="lt-goals" dir="ltr">${r.gf}-${r.ga}</span>
+        <span class="lt-pts" dir="ltr">${t.pts}</span>
+      `;
+    } else {
+      row.innerHTML = `
+        <span class="lt-pos">${idx+1}</span>
+        ${nameHTML}
+        <span class="lt-pts" dir="ltr">${t.pts}</span>
+      `;
+    }
     container.appendChild(row);
   });
 }
@@ -3317,11 +3441,21 @@ function animateResults(ovr) {
         ? `<span dir="ltr">${hi.bigWin.gf}-${hi.bigWin.ga}</span> נגד ${hi.bigWin.opponent}`
         : '—';
     }
-    buildLeagueTable(leagueTable, seasonSpec);
-    renderSeasonStory({ wins, draws, losses, gfTotal, gaTotal, ovr, myRank,
-                        n: leagueTable.length, spec: seasonSpec,
-                        projectedFinish: season.projectedFinish,
-                        projectedPoints: season.projectedPoints, ps: playerStats, tier });
+    // The player's real record goes in, so the period table's extra columns are
+    // derived for the opponents and never for him.
+    buildLeagueTable(leagueTable, seasonSpec,
+                     { w: wins, d: draws, l: losses, gf: gfTotal, ga: gaTotal });
+    const story = { wins, draws, losses, gfTotal, gaTotal, ovr, myRank,
+                    n: leagueTable.length, spec: seasonSpec,
+                    projectedFinish: season.projectedFinish,
+                    projectedPoints: season.projectedPoints, ps: playerStats, tier };
+    renderSeasonStory(story);
+    // The team photo and the back page (js/club-media.js) need the finishing
+    // POSITION and the table, and window._lastResult carries neither — it is the
+    // submission payload and other code reads it, so it is left alone and the
+    // fuller picture gets its own global next to the story that already had it.
+    window._lastSeason = { ...story, leagueTable };
+    if (typeof cmSyncResultButtons === 'function') cmSyncResultButtons();
     return tier;
   }
 
@@ -3880,6 +4014,28 @@ function populateShareCard() {
 
   const formation = FORMATIONS[state.formationId]?.label ?? '';
   const pts = r.wins * 3 + r.draws;
+
+  // המועדון שלך — the crest and the name ride on the card when the player has
+  // made a club. The 36–0 logo stays: the card is still a 36-0 result, this only
+  // says whose. Hidden entirely when there is no club, so nothing moves for a
+  // player who never opened the editor.
+  const scClub = document.getElementById('sc-club');
+  if (scClub) {
+    // myTeamName returns '' when there is neither a career nor a club, and it
+    // HTML-escapes what it does return. A career that named its club but never
+    // built a crest gets the NAME only — a default green shield it never chose
+    // would be a crest the player is being told is his.
+    const name = (typeof myTeamName === 'function') ? myTeamName('') : '';
+    const club = (typeof clubGet === 'function') ? clubGet() : null;
+    if (name) {
+      const crest = (club && typeof clubCrestSVG === 'function') ? clubCrestSVG(club, 30) : '';
+      scClub.innerHTML = `${crest}<span class="sc-club-name">${name}</span>`;
+      scClub.style.display = '';
+    } else {
+      scClub.innerHTML = '';
+      scClub.style.display = 'none';
+    }
+  }
 
   document.getElementById('sc-p-formation').textContent = formation;
   document.getElementById('sc-p-ovr').textContent = `OVR ${r.ovr}`;

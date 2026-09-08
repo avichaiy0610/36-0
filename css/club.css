@@ -1,0 +1,474 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   המועדון שלך — the club identity, its two artefacts, and the era skins.
+
+   Three sections:
+     1. the editor + its entry on the setup screen        (js/club.js)
+     2. the team photo and the back page                  (js/club-media.js)
+     3. מראה של תקופה — four skins for the squad card      (js/club.js)
+
+   Everything here is cosmetic. Nothing in this file may change a layout that
+   the draft or the results screen depend on.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── 1. the entry on the setup screen ─────────────────────────────────────── */
+
+.setup-club-card #scc-art {
+  display: flex; align-items: center; justify-content: center;
+  width: 40px; min-width: 40px;
+}
+.setup-club-card .scc-empty { font-size: 1.6rem; opacity: 0.75; }
+.setup-club-card #scc-art svg { display: block; }
+
+/* ── the editor ───────────────────────────────────────────────────────────── */
+
+.cl-box { width: 380px; max-width: 94vw; max-height: 92vh; overflow-y: auto; }
+
+.cl-preview {
+  display: flex; align-items: center; gap: 14px;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 10px; padding: 12px 14px; margin-bottom: 14px;
+}
+.cl-pv-art { display: flex; align-items: center; gap: 10px; }
+.cl-pv-art svg { display: block; }
+.cl-pv-text { min-width: 0; }
+.cl-pv-name {
+  font-size: 1.05rem; font-weight: 800; color: var(--text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.cl-pv-city { font-size: 0.8rem; color: var(--dim); margin-top: 2px; }
+
+.cl-tabs { display: flex; gap: 4px; margin-bottom: 12px; }
+.cl-tab {
+  flex: 1; padding: 7px; background: transparent; border: 1px solid var(--border);
+  color: var(--dim); border-radius: 6px; cursor: pointer; font-size: 0.85rem;
+}
+.cl-tab.sel { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 700; }
+
+.cl-pane { min-height: 190px; }
+.cl-lbl { font-size: 0.75rem; color: var(--dim); margin: 10px 0 5px; }
+
+.cl-row { display: flex; flex-wrap: wrap; gap: 5px; }
+.cl-chip {
+  padding: 5px 10px; background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 999px; color: var(--text); font-size: 0.8rem; cursor: pointer;
+}
+.cl-chip.sel { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 700; }
+
+.cl-swatches { display: flex; flex-wrap: wrap; gap: 6px; }
+.cl-sw {
+  width: 26px; height: 26px; border-radius: 6px; cursor: pointer;
+  border: 2px solid rgba(255,255,255,0.18);
+}
+/* The selected swatch cannot be shown by changing its own colour, so it is shown
+   by a ring OUTSIDE it — box-shadow, not border, or every swatch would jump 4px
+   when picked and the whole row would reflow. */
+.cl-sw.sel { border-color: var(--text); box-shadow: 0 0 0 2px var(--accent); }
+.cl-sw-auto {
+  background: var(--surface2); color: var(--dim);
+  font-size: 11px; font-weight: 800; line-height: 1;
+}
+
+/* the badge shelf — 31 PNGs from /crests/ */
+.cl-crests {
+  display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px;
+  max-height: 178px; overflow-y: auto; padding: 2px;
+}
+.cl-crest {
+  aspect-ratio: 1; padding: 4px; cursor: pointer;
+  background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+}
+.cl-crest img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.cl-crest.sel { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+
+.cl-mini {
+  margin-top: 12px; width: 100%; padding: 7px; background: transparent;
+  border: 1px dashed var(--border); border-radius: 8px; color: var(--dim);
+  font-size: 0.8rem; cursor: pointer;
+}
+.cl-note { font-size: 0.75rem; color: var(--dim); margin-top: 10px; line-height: 1.5; }
+/* the two strips in the kit tab need a visible seam, or the second set of
+   pattern chips reads as more options for the first */
+.cl-sub {
+  font-size: 0.82rem; font-weight: 800; color: var(--text);
+  margin: 4px 0 2px; padding-bottom: 4px; border-bottom: 1px solid var(--border);
+}
+.cl-sub-gk { margin-top: 16px; }
+.cl-bad { border-color: #e74c3c !important; }
+
+.cl-actions { display: flex; gap: 8px; margin-top: 16px; }
+.cl-actions .btn-primary { flex: 1; }
+.cl-dice { white-space: nowrap; }
+
+/* the one-line explanation under the era toggle in the ⚙️ panel */
+.tp-note {
+  font-size: 0.68rem; color: var(--dim); line-height: 1.5;
+  margin: -6px 0 12px;
+}
+
+/* ── the club, where a career starts from it ──────────────────────────────── */
+.cr-club-from {
+  display: flex; align-items: center; gap: 8px;
+  margin: -4px 0 10px; padding: 7px 9px;
+  background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
+  font-size: 0.74rem; color: var(--dim); line-height: 1.45;
+}
+.cr-club-from svg, .cr-club-from img { display: block; flex-shrink: 0; }
+
+/* ── the club on the share card ───────────────────────────────────────────── */
+/* The share card is a fixed dark graphic in both themes (style.css says so), so
+   these two colours are literal on purpose and must not become var(--text). */
+.sc-club {
+  display: flex; align-items: center; justify-content: center; gap: 7px;
+  margin-top: 8px;
+}
+.sc-club svg, .sc-club img { display: block; }
+.sc-club-name { font-size: 0.95rem; font-weight: 800; color: #fff; }
+
+/* ── 2. the two artefacts ─────────────────────────────────────────────────── */
+
+/* The widths here are a CHAIN, and it has to be walked whole or the photo gets
+   clipped: a back row of six 56px men plus gaps is 346, the pitch adds 8 of
+   padding and the card adds 20, so .cm-photo needs 374 — which means the box's
+   content area needs 380, which means the box needs 400 with 10px sides. At a
+   430px viewport 94vw is 404 and it fits. Below 420 the media query at the
+   bottom of this file shrinks the man instead, because nothing above can give. */
+.cm-box {
+  background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+  padding: 42px 10px 10px; width: 420px; max-width: 94vw;
+  max-height: 92vh; display: flex; flex-direction: column; gap: 12px; position: relative;
+}
+.cm-x { top: 10px; left: 10px; }
+/* auto, not hidden: if a future formation or a longer name breaks the sums
+   above, the photo scrolls instead of silently losing its left-hand man. */
+.cm-scroll { overflow: auto; flex: 1; min-height: 0; }
+
+/* the team photo */
+.cm-photo {
+  background: linear-gradient(180deg, #16321a 0%, #0f2413 100%);
+  border-radius: 12px; padding: 14px 10px 10px; color: #fff;
+  font-family: inherit; width: 100%; max-width: 380px; margin: 0 auto;
+}
+.cm-ph-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.cm-ph-crest svg { display: block; }
+.cm-ph-name { font-size: 1.15rem; font-weight: 900; line-height: 1.2; }
+.cm-ph-city { font-size: 0.75rem; opacity: 0.75; margin-top: 2px; }
+
+/* The two rows are the whole point of a team photo, so they are laid out as
+   rows and NOT as a wrapping grid: a grid would reflow six-and-five into
+   four-and-four-and-three on a narrow phone and stop reading as a team photo. */
+.cm-ph-pitch {
+  background: repeating-linear-gradient(90deg, rgba(255,255,255,0.035) 0 26px, transparent 26px 52px);
+  border-radius: 8px; padding: 10px 4px;
+}
+.cm-row { display: flex; justify-content: center; gap: 2px; }
+.cm-row-front { margin-top: -6px; }
+/* 56 x six-across plus gaps is what fits inside a 380px card. A wider man wraps
+   the back row onto a second line and the photo stops being a photo. */
+.cm-man { width: 56px; text-align: center; }
+/* The shirt is drawn at a fixed px size by clubShirtSVG(), but the man it sits
+   in shrinks on a narrow phone. Letting CSS drive the width keeps the two in
+   step — the viewBox scales, so the number stays centred and legible. */
+.cm-man svg { display: block; margin: 0 auto; width: 100%; height: auto; }
+.cm-man-name {
+  font-size: 0.6rem; margin-top: 1px; line-height: 1.15;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.cm-ph-foot {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-top: 10px; font-size: 0.75rem;
+}
+/* the number editor — only present while edit mode is on, so it can never be
+   caught by html2canvas in the saved PNG */
+.cm-num-in {
+  width: 40px; margin: 3px auto 0; display: block; padding: 2px;
+  background: rgba(0,0,0,.35); border: 1px solid rgba(255,255,255,.35);
+  border-radius: 3px; color: #fff; font: 700 11px inherit; text-align: center;
+  -moz-appearance: textfield;
+}
+.cm-num-in::-webkit-outer-spin-button,
+.cm-num-in::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.cm-actions { display: flex; gap: 8px; }
+.cm-actions .btn-primary { flex: 1; }
+.cm-actions .cm-edit { white-space: nowrap; }
+.cm-actions .cm-edit-on { border-color: var(--accent); color: var(--accent); }
+
+.cm-ph-sub { font-weight: 700; }
+.cm-ph-brand { opacity: 0.6; }
+
+/* the back page */
+.cm-back {
+  background: #f4f1ea; color: #14181f; border-radius: 6px;
+  padding: 14px; width: 100%; max-width: 380px; margin: 0 auto;
+  border: 1px solid #cfc7b8;
+}
+.cm-bp-masthead {
+  display: flex; align-items: center; gap: 8px;
+  border-bottom: 3px solid #14181f; padding-bottom: 6px;
+}
+.cm-bp-paper { font-size: 1.3rem; font-weight: 900; letter-spacing: -1px; }
+.cm-bp-strap { font-size: 0.7rem; color: #5a5348; flex: 1; }
+.cm-bp-crest svg { display: block; }
+
+.cm-bp-kicker {
+  font-size: 0.72rem; font-weight: 700; letter-spacing: 0.5px;
+  color: #a32020; margin-top: 10px; text-transform: none;
+}
+.cm-bp-head {
+  font-size: 2.3rem; font-weight: 900; line-height: 1; letter-spacing: -1.5px;
+  margin: 2px 0 10px;
+}
+.cm-tone-gold .cm-bp-head { color: #8a6d00; }
+.cm-tone-good .cm-bp-head { color: #14181f; }
+.cm-tone-bad  .cm-bp-head { color: #6a1414; }
+.cm-tone-mid  .cm-bp-head { color: #14181f; }
+
+.cm-bp-body { display: flex; gap: 10px; }
+.cm-bp-lead { flex: 1; min-width: 0; }
+.cm-bp-photo {
+  background: #e4dfd3; border: 1px solid #cfc7b8; border-radius: 4px;
+  padding: 10px; display: flex; justify-content: center;
+}
+.cm-bp-caption { font-size: 0.65rem; color: #5a5348; margin-top: 4px; line-height: 1.4; }
+.cm-bp-side { width: 132px; min-width: 132px; }
+
+.cm-bp-strip {
+  display: flex; gap: 3px; border-top: 1px solid #14181f; border-bottom: 1px solid #14181f;
+  padding: 5px 0;
+}
+.cm-bp-strip div { flex: 1; text-align: center; line-height: 1.1; }
+.cm-bp-strip b { display: block; font-size: 1rem; font-weight: 900; }
+.cm-bp-strip span { font-size: 0.55rem; color: #5a5348; }
+/* label left, figure right, one per row — the same reading order as the strip
+   above it, so the sidebar stays one system instead of three */
+.cm-bp-goals { margin: 5px 0; }
+.cm-bp-goals > div {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 6px;
+  padding: 2px 0; border-bottom: 1px solid #e4dfd3;
+}
+.cm-bp-goals > div:last-child { border-bottom: 0; }
+.cm-bp-goals .k { font-size: 0.6rem; color: #5a5348; white-space: nowrap; }
+.cm-bp-goals .v { font-size: 0.82rem; font-weight: 900; color: #14181f; }
+
+.cm-bp-box { border-top: 1px solid #cfc7b8; padding: 5px 0; }
+.cm-bp-box-t { font-size: 0.6rem; color: #a32020; font-weight: 700; }
+/* Name on one side, figure on the other. A plain space between them collapsed
+   to nothing once bidi put a Latin numeral hard against a Hebrew name —
+   "קלשצ'ניקו16" — so the gap is laid out rather than typed. */
+.cm-bp-box-v {
+  font-size: 0.78rem;
+  display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+}
+.cm-bp-box-v b { font-weight: 900; flex-shrink: 0; }
+
+.cm-bp-table { margin-top: 10px; border-top: 3px solid #14181f; padding-top: 6px; }
+.cm-bp-table-t { font-size: 0.62rem; color: #a32020; font-weight: 700; margin-bottom: 3px; }
+.cm-bp-tr { display: flex; gap: 6px; font-size: 0.75rem; padding: 2px 0; }
+.cm-bp-tr.us { font-weight: 900; background: #e9e2cf; }
+.cm-bp-pos { width: 16px; color: #5a5348; }
+.cm-bp-team { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cm-bp-pts { font-weight: 700; }
+.cm-bp-foot { font-size: 0.6rem; color: #5a5348; text-align: left; margin-top: 8px; }
+
+/* ── 3. מראה של תקופה ─────────────────────────────────────────────────────────
+
+   Eleven eras, ONE structure. Each era declares three custom properties and
+   nothing else; every rule that USES them is written once, below. That is
+   deliberate and it is the lesson from four rejected attempts: when each era
+   was its own design — its own radius, shadow, type weight and texture — the
+   set read as four unrelated widgets, and every one of them was called ugly.
+   Same chrome, different tint is what makes a run of eras read as one feature.
+
+   The palettes come from the league's own logos, era by era (see the sponsor
+   timeline the user supplied). NOT from the period newspaper table that seeded
+   the first version — its orange was the paper's styling, and the league in
+   those years was navy and red. The table still settles STRUCTURE: the column
+   set, goals as one cell, the position sitting with the name.
+
+   THE THREE STANDING RULES, all learned by breaking them on live screens:
+     1. Never touch the card header's `background` from CSS. game.js sets it
+        INLINE per drawn club, so `background-image: … !important` replaces the
+        club's gradient rather than layering over it.
+     2. Never assume the ink. game.js also sets the header's text colours inline,
+        from textColorFor(primary): white on a dark club, near-black on a light
+        one. So either leave the ink alone under a translucent plate, or force
+        plate and ink together as a pair. Nothing here forces anything — no era
+        lays an opaque plate over the header any more.
+     3. Stay in the app's dark palette. A cream border, thick white rules and
+        finally a whole white "printed" column were each rejected: a light slab
+        inside a #0d1117 app reads as a fault, not as a period.
+
+   And every TEAMS[].badge is two emoji ("⚫🟡"), so nothing may give
+   .card-badge a fixed box — it squashes both glyphs. */
+
+.squad-card-header { position: relative; overflow: hidden; }
+.squad-card-header > * { position: relative; z-index: 1; }
+.squad-card {
+  transition: background .2s ease, border-color .2s ease;
+  overflow: hidden; position: relative;
+}
+
+/* The era tag's BASE rule, up here with the shared plumbing on purpose: it has
+   been deleted twice by rewrites of the skins below, and both times the symptom
+   was the league bar silently not rendering — a ::before without `content`
+   produces no box at all. attr() reads only the element its own pseudo belongs
+   to, which is why this hangs off the CARD, where applyEraSkin writes data-era. */
+.squad-card[data-era]::before {
+  content: attr(data-era);
+  position: absolute; z-index: 3; top: 0; left: 0; right: 0;
+  direction: rtl; text-align: right;
+  padding: 4px 10px 5px;
+  font-family: Arial, Heebo, sans-serif; font-size: 12px; font-weight: 900;
+  letter-spacing: -.2px; line-height: 1.4; pointer-events: none;
+  color: var(--era-ink-bar, #fff);
+  background: var(--era-bar, #333);
+}
+
+/* ═══ the eleven palettes ═══════════════════════════════════════════════════
+   --era-accent : the one colour that carries the era everywhere
+   --era-bar    : the league bar, taken from that era's logo
+   --era-line   : the accent at border strength                             */
+
+/* Pelephone's green is a LIGHT green, and white type on it was barely legible.
+   The bar is darkened rather than the ink changed: dark ink on that green is no
+   better, and every other era's bar carries white. */
+.era-pelephone { --era-accent:#8dc63f; --era-bar:linear-gradient(180deg,#3f7a1f,#255012); --era-line:rgba(141,198,63,.34); }
+.era-plain1,
+.era-plain2    { --era-accent:#9fb0c0; --era-bar:linear-gradient(180deg,#2b3440,#1b222c); --era-line:rgba(159,176,192,.26); }
+.era-toto1     { --era-accent:#e03a3f; --era-bar:linear-gradient(180deg,#1d3f92,#132a63); --era-line:rgba(224,58,63,.32); }
+.era-toto2     { --era-accent:#3f6fd8; --era-bar:linear-gradient(180deg,#16306b,#0e1f47); --era-line:rgba(63,111,216,.32); }
+.era-winner1   { --era-accent:#f2c200; --era-bar:linear-gradient(180deg,#2a2a2a,#0d0d0d); --era-line:rgba(242,194,0,.34); }
+.era-winner2   { --era-accent:#ffd200; --era-bar:linear-gradient(180deg,#e02128,#a8121a); --era-line:rgba(255,210,0,.32); }
+.era-japanika  { --era-accent:#e03127; --era-bar:linear-gradient(180deg,#16204a,#0b1029); --era-line:rgba(224,49,39,.32); }
+.era-bursa     { --era-accent:#8fa3b8; --era-bar:linear-gradient(180deg,#5c6b7d,#3a4552); --era-line:rgba(143,163,184,.26); }
+/* ONE ZERO's mark is a multicolour figure, and a four-stop rainbow bar was the
+   literal reading of it — far too loud next to ten restrained ones. A digital
+   bank reads just as well as deep teal, which is representative without
+   shouting; the cyan accent carries the rest. */
+.era-onezero   { --era-accent:#22d3ee; --era-bar:linear-gradient(180deg,#14607a,#0a3244); --era-line:rgba(34,211,238,.30); }
+.era-winner3   { --era-accent:#ff3b46; --era-bar:linear-gradient(180deg,#e2001a,#9d0012); --era-line:rgba(255,59,70,.32); }
+
+/* ═══ the structure every era shares ════════════════════════════════════════ */
+
+/* ── the draw card ─────────────────────────────────────────────────────────
+   The club's own gradient is never covered: the bar sits above it and the club
+   colour becomes the flash down the side of the name, so the drawn club stays
+   readable at a glance while the era frames it. */
+.squad-card[data-era] {
+  background: var(--surface);
+  border: 1px solid var(--era-line);
+  border-radius: 3px;
+  box-shadow: none;
+}
+.squad-card[data-era] .squad-card-header { padding-top: 32px; }
+.squad-card[data-era] .card-text {
+  border-right: 3px solid var(--era-club, var(--era-accent));
+  padding-right: 8px;
+}
+.squad-card[data-era] .card-team {
+  font-family: Arial, Heebo, sans-serif; font-weight: 700; letter-spacing: -.2px;
+}
+.squad-card[data-era] .card-season {
+  font-family: Arial, Heebo, sans-serif; font-weight: 700; letter-spacing: .4px;
+}
+.squad-card[data-era] .reroll-row { border-top: 1px solid var(--era-line); }
+.squad-card[data-era] .btn-reroll-small { border-radius: 2px; border-color: var(--era-line); }
+.squad-card[data-era] .reroll-badge { background: var(--era-accent); color: #111; }
+
+/* ── the list under it ─────────────────────────────────────────────────────
+   Every [class*="era-"] below is SCOPED to .side-panel or .results-side, and it
+   has to stay that way: the setup screen's era slider already owns .era-btn,
+   .era-track, .era-thumb, .era-fill, .era-presets and .era-note, so a bare
+   [class*="era-"] would reach straight into it. */
+.side-panel[class*="era-"] .player-card { border-radius: 2px; border-color: var(--era-line); }
+.side-panel[class*="era-"] .pc-ovr {
+  color: var(--era-accent); font-family: Arial, Heebo, sans-serif; font-weight: 900;
+}
+.side-panel[class*="era-"] .pc-pos-badge { border-radius: 2px; border-color: var(--era-line); }
+
+/* ── after the whistle: the whole results column ───────────────────────────
+   Boxed things square off and re-tint to the era's accent, and every accented
+   FIGURE takes it. Deliberately left alone: anything whose colour carries
+   meaning — the green of a win, the gold of a draw, the red of a loss, the
+   win/draw/loss borders on the match rows. Those are information, not mood. */
+.results-side[class*="era-"] .tier-box,
+.results-side[class*="era-"] .ovr-card,
+.results-side[class*="era-"] .rec-box,
+.results-side[class*="era-"] .proj-tile,
+.results-side[class*="era-"] .narrative-box,
+.results-side[class*="era-"] .award-card,
+.results-side[class*="era-"] .highlight-box,
+.results-side[class*="era-"] .stats-table,
+.results-side[class*="era-"] .match-row { border-radius: 2px; }
+
+.results-side[class*="era-"] .tier-box,
+.results-side[class*="era-"] .ovr-card,
+.results-side[class*="era-"] .proj-tile,
+.results-side[class*="era-"] .narrative-box,
+.results-side[class*="era-"] .award-card,
+.results-side[class*="era-"] .highlight-box,
+.results-side[class*="era-"] .stats-table { border-color: var(--era-line); }
+
+.results-side[class*="era-"] .tier-box { border-top: 3px solid var(--era-accent); }
+.results-side[class*="era-"] .section-label {
+  color: var(--era-accent); font-family: Arial, Heebo, sans-serif;
+  border-bottom: 1px solid var(--era-line); padding-bottom: 4px;
+}
+.results-side[class*="era-"] .hl-val,
+.results-side[class*="era-"] .proj-val,
+.results-side[class*="era-"] .ovr-total-val,
+.results-side[class*="era-"] .award-winner,
+.results-side[class*="era-"] .narrative-title { color: var(--era-accent); }
+.results-side[class*="era-"] .hl-val,
+.results-side[class*="era-"] .ovr-total-val,
+.results-side[class*="era-"] .proj-val { font-family: Arial, Heebo, sans-serif; }
+.results-side[class*="era-"] .award-title,
+.results-side[class*="era-"] .st-num-head,
+.results-side[class*="era-"] .st-name-head { color: var(--era-accent); opacity: .8; }
+.results-side[class*="era-"] .stats-row { border-color: var(--era-line); }
+
+/* ── the league table ──────────────────────────────────────────────────────
+   Structure from the period table: the league bar, the column set
+   מש׳ · נצ׳ · ת׳ · הפ׳ · שערים · נק׳ right to left, goals as one cell rather
+   than split, and the position sitting with the name. */
+.league-details[data-era] { border: 1px solid var(--era-line); border-radius: 3px; }
+.league-details[data-era] .league-summary {
+  background: var(--era-bar); color: var(--era-ink-bar, #fff);
+  font-family: Arial, Heebo, sans-serif; font-weight: 900; border-radius: 0;
+}
+/* attr() reads only the element its own pseudo belongs to, so game.js puts
+   data-era on the SUMMARY as well as on the <details>. */
+.league-details[data-era] .league-summary::after {
+  content: attr(data-era); float: left;
+  font-size: 10px; font-weight: 700; opacity: .92; letter-spacing: .3px;
+}
+.league-details[data-era] .lt-head {
+  background: rgba(255,255,255,.04); color: var(--era-accent);
+  border-top: 0; border-bottom: 1px solid var(--era-line);
+  font-family: Arial, Heebo, sans-serif; letter-spacing: 0; font-size: 9px;
+}
+.league-details[data-era] .lt-row { border-top-color: var(--era-line); gap: 5px; padding-inline: 8px; }
+.league-details[data-era] .lt-row.lt-us {
+  background: rgba(255,255,255,.06);
+  border-color: var(--era-accent) !important;
+}
+.league-details[data-era] .lt-pts { color: var(--era-accent); font-family: Arial, Heebo, sans-serif; }
+.league-details[data-era] .lt-bracket-sep { border-top: 2px solid var(--era-accent); }
+.league-details[data-era] .lt-name {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* The five numeric columns. Fixed widths, not flex — a table whose columns do
+   not line up between rows is not a table, and the name takes the slack. */
+.lt-stat  { width: 20px; text-align: center; flex-shrink: 0; }
+.lt-goals { width: 44px; text-align: center; flex-shrink: 0; font-size: 10px; color: var(--dim); }
+
+/* ── narrow phones ────────────────────────────────────────────────────────── */
+/* At a 375px viewport the box is 94vw = 352 and its content 332, so the man has
+   to come down to 48: six of them plus gaps is 298, +8 pitch, +20 card = 326. */
+@media (max-width: 420px) {
+  .cm-man { width: 48px; }
+  .cm-bp-head { font-size: 1.9rem; }
+  .cm-bp-side { width: 112px; min-width: 112px; }
+  .cl-crests { grid-template-columns: repeat(5, 1fr); }
+}

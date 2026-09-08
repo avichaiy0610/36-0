@@ -37,6 +37,17 @@ function crEsc(s) {
   ));
 }
 
+/* The club the player already made (js/club.js) is what a new career starts
+   from. It is a PREFILL and not a lock: a career's clubName is stored on the run
+   and outranks the global club for all ten seasons (see myTeamName in
+   js/texts.js), so a dynasty is still free to be a different club — it just no
+   longer starts from an empty box for somebody who has already said who he is.
+   The crest and the kit come from the global club either way. */
+function crClubPrefill() {
+  try { return (typeof clubNameRaw === 'function') ? clubNameRaw() : ''; }
+  catch (e) { return ''; }
+}
+
 // Names in data.js carry directional marks (550 lines have one) and three
 // different apostrophes. A career looks the same player up across seasons by
 // name, so every comparison goes through here — otherwise players would
@@ -295,7 +306,11 @@ function crRenderSetup(box) {
       <div class="lg-card-title">התחלת קריירה חדשה</div>
       <div class="lg-config">
         <div class="lg-config-row"><span>שם המועדון</span>
-          <input id="cr-club" class="lg-input cr-club-input" maxlength="24" placeholder="המועדון שלי" value="${crEsc(_crSetup.clubName || '')}"></div>
+          <input id="cr-club" class="lg-input cr-club-input" maxlength="24" placeholder="המועדון שלי" value="${crEsc(_crSetup.clubName || crClubPrefill())}"></div>
+        ${crClubPrefill() ? `<div class="cr-club-from">
+          ${typeof clubCrestSVG === 'function' ? clubCrestSVG(clubGet(), 24) : ''}
+          <span>מהמועדון שלך. אפשר לשנות — הקריירה תשמור את השם הזה לכל עשר העונות.</span>
+        </div>` : ''}
         <div class="lg-config-row"><span>עונת פתיחה</span>
           <select id="cr-year" class="lg-input cr-select">${years}</select></div>
         <div class="lg-config-row"><span>מערך</span>

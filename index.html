@@ -81,6 +81,7 @@
   <link rel="stylesheet" href="css/player-builder.css?v=b595f873" />
   <link rel="stylesheet" href="css/europe.css?v=151f9861" />
   <link rel="stylesheet" href="css/cup.css?v=47e12ef1" />
+  <link rel="stylesheet" href="css/club.css?v=3cdf9e52" />
 </head>
 <body>
 
@@ -268,6 +269,15 @@
         <div class="setup-logo"><span dir="ltr">36–0</span></div>
         <div class="setup-subtitle">ליגת העל הישראלית</div>
       </div>
+
+      <button class="setup-mode-card setup-club-card" id="setup-club-card">
+        <span class="smc-icon" id="scc-art"><span class="scc-empty">🛡</span></span>
+        <span class="smc-body">
+          <span class="smc-title" id="scc-title">המועדון שלי <span class="smc-new">חדש</span></span>
+          <span class="smc-sub" id="scc-sub">שם, סמל וחולצה — ילוו אותך בכל המצבים</span>
+        </span>
+        <span class="smc-arrow">←</span>
+      </button>
 
       <button class="setup-mode-card" id="setup-career-card">
         <span class="smc-icon">👑</span>
@@ -777,6 +787,8 @@
         <button class="btn-primary btn-mgw-next" id="btn-mgw-next" style="display:none">⚽ לתוצאת הכדורדל</button>
         <button class="btn-primary btn-europe" id="btn-europe">🇪🇺 המשך למוקדמות אירופה</button>
         <button class="btn-primary" id="btn-share">שתף תוצאה</button>
+        <button class="btn-secondary" id="btn-team-photo" style="display:none">📸 תמונת הקבוצה</button>
+        <button class="btn-secondary" id="btn-back-page" style="display:none">📰 העיתון של ראשון</button>
         <button class="btn-secondary" id="btn-restart">משחק חדש</button>
         <a class="btn-coffee btn-coffee-results" href="https://ko-fi.com/360ligathaal" target="_blank" rel="noopener">☕ נהנית? קנה לי קפה</a>
       </div>
@@ -801,6 +813,7 @@
         <div class="sc-header">
           <div class="sc-logo" dir="ltr">36–0</div>
           <div class="sc-sub">ליגת העל הישראלית</div>
+          <div class="sc-club" id="sc-club" style="display:none"></div>
         </div>
         <div class="sc-pills">
           <span class="sc-pill formation-pill" id="sc-p-formation"></span>
@@ -1011,7 +1024,8 @@
   <script src="js/supabase-client.js?v=e9102a02"></script>
   <script src="js/errorlog.js?v=1da53f7f"></script>
   <script src="js/track.js?v=7ce56253"></script>
-  <script src="js/texts.js?v=e843b41e"></script>
+  <script src="js/texts.js?v=1cab6ae8"></script>
+  <script src="js/club.js?v=80878e81"></script>
   <script src="js/auth.js?v=d5305b14"></script>
   <script src="js/achievements.js?v=cfc1c564"></script>
   <script src="js/leaderboard.js?v=033b0c8d"></script>
@@ -1034,14 +1048,15 @@
   <script src="js/chemistry.js?v=60e55753"></script>
   <script src="js/data.js?v=e2436bbd"></script>
   <script src="js/sim-engine.js?v=784ec7b1"></script>
-  <script src="js/game.js?v=98ab4793"></script>
+  <script src="js/game.js?v=aa11ff3e"></script>
+  <script src="js/club-media.js?v=fcf688c0"></script>
   <script src="js/europe-data.js?v=48af5122"></script>
   <script src="js/eu-caps-data.js?v=ed8899a2"></script>
   <script src="js/europe.js?v=53abf49a"></script>
   <script src="js/europe-screens.js?v=3ee113a6"></script>
   <script src="js/cup-data.js?v=c72c5a27"></script>
   <script src="js/cup.js?v=5e262220"></script>
-  <script src="js/whatsnew.js?v=acfb757b"></script>
+  <script src="js/whatsnew.js?v=7b9ecdd6"></script>
   <script src="js/europe-admin.js?v=19ab9628"></script>
   <script src="js/season-admin.js?v=1f37a0db"></script>
   <script src="js/league-sim.js?v=178f8a92"></script>
@@ -1049,7 +1064,7 @@
   <script src="js/challenges.js?v=b1acda28"></script>
   <script src="js/trophy-art.js?v=75b5a98a"></script>
   <script src="js/trophies.js?v=8f674334"></script>
-  <script src="js/career.js?v=26adcbbe"></script>
+  <script src="js/career.js?v=0cf48d03"></script>
   <script src="js/career-admin.js?v=8d02ae14"></script>
   <script src="js/minigames.js?v=8cafa492"></script>
   <script src="js/mg-guess.js?v=98f90f25"></script>
@@ -1062,7 +1077,7 @@
   <script src="js/pb-career.js?v=94c14411"></script>
   <script src="js/pb-build.js?v=73edd454"></script>
   <script src="js/player-card.js?v=68612e32"></script>
-  <script src="js/theme.js?v=df76510b"></script>
+  <script src="js/theme.js?v=061d5509"></script>
   <script src="js/nav-drawer.js?v=d459aa88"></script>
   <script src="js/salary.js?v=e7056dfe"></script>
   <script src="js/january.js?v=9ab8d74b"></script>

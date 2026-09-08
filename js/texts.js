@@ -48,7 +48,13 @@ document.addEventListener('DOMContentLoaded', applySiteTexts);
    player typed and every caller interpolates it into a template literal —
    career.js has always run it through crEsc for the same reason. The fallback
    is handed back untouched: it is either a literal in the source or a string an
-   admin set, and escaping it here would mangle a deliberate entity. */
+   admin set, and escaping it here would mangle a deliberate entity.
+
+   A global club (js/club.js) is consulted SECOND, after the career. A dynasty is
+   a club the player committed to for ten seasons and named at the start; letting
+   a later global identity override it would rename a run halfway through. So the
+   order is career → club → the caller's own wording, and a player who never made
+   a club still reads exactly what he always did. */
 function myTeamName(fallback) {
   try {
     if (typeof state !== 'undefined' && state && state.career && typeof crRun === 'function') {
@@ -56,5 +62,11 @@ function myTeamName(fallback) {
       if (name) return (typeof crEsc === 'function') ? crEsc(name) : name;
     }
   } catch (e) { /* career module absent or storage unreadable — use the fallback */ }
+  try {
+    if (typeof clubNameRaw === 'function') {
+      const name = clubNameRaw();
+      if (name) return (typeof clEsc === 'function') ? clEsc(name) : name;
+    }
+  } catch (e) { /* club module absent or storage unreadable — use the fallback */ }
   return fallback;
 }
