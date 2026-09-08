@@ -38,9 +38,56 @@ function factsData() {
   try {
     _facts = new Function(fs.readFileSync(path.join(BASE, 'js', 'tag-data.js'), 'utf8') +
       '\n;return { PLAYER_REAL: typeof PLAYER_REAL !== "undefined" ? PLAYER_REAL : {},' +
-      '           SEASON_FACTS: typeof SEASON_FACTS !== "undefined" ? SEASON_FACTS : {} };')();
-  } catch (e) { _facts = { PLAYER_REAL: {}, SEASON_FACTS: {} }; }
+      '           SEASON_FACTS: typeof SEASON_FACTS !== "undefined" ? SEASON_FACTS : {},' +
+      '           TAG_DATA: typeof TAG_DATA !== "undefined" ? TAG_DATA : {} };')();
+  } catch (e) { _facts = { PLAYER_REAL: {}, SEASON_FACTS: {}, TAG_DATA: {} }; }
   return _facts;
+}
+
+// The rest of what the game knows about a man and these pages threw away. The
+// six attributes are the important one: js/attr-data.js carries a row for every
+// player in every squad — 366 of 366, no gaps — so unlike the scorers' table
+// (177 players) or the duos (131) it has something to say about EVERY page,
+// including the ones with nothing but a name and two seasons.
+function loadJs(file, names) {
+  try {
+    return new Function(fs.readFileSync(path.join(BASE, 'js', file), 'utf8') + '\n;return {' +
+      names.map(n => `${n}: typeof ${n} !== "undefined" ? ${n} : undefined`).join(',') + '};')();
+  } catch (e) { return {}; }
+}
+let _extra = null;
+function extraData() {
+  if (_extra) return _extra;
+  const a = loadJs('attr-data.js', ['ATTR_DATA', 'ATTR_PLAYER_WHY', 'ATTR_CLUB_WHY']);
+  _extra = {
+    ATTR_DATA:       a.ATTR_DATA       || {},
+    ATTR_PLAYER_WHY: a.ATTR_PLAYER_WHY || {},
+    ATTR_CLUB_WHY:   a.ATTR_CLUB_WHY   || {},
+    CHEM_PAIRS:  loadJs('chem-data.js',   ['CHEM_PAIRS']).CHEM_PAIRS   || {},
+    EU_CAPS:     loadJs('eu-caps-data.js', ['EU_CAPS']).EU_CAPS        || {},
+    PLAYER_NATS: loadJs('player_nats.js', ['PLAYER_NATS']).PLAYER_NATS || {},
+    // TAG_DATA stores the key ('golden_boot'), the count and the evidence, but
+    // not the words — those live with the game's tag rules.
+    TAG_DEFS:    loadJs('tags.js',        ['TAG_DEFS']).TAG_DEFS       || {},
+  };
+  return _extra;
+}
+
+// The six, in the packed order of js/attrs.js. Kept in step with it by hand:
+// this script runs in node and that file is a browser global.
+const ATTR_KEYS = ['pac', 'sho', 'pas', 'dri', 'def', 'phy'];
+const ATTR_NAME = { pac: 'מהירות', sho: 'בעיטה', pas: 'מסירה', dri: 'כדרור', def: 'הגנה', phy: 'פיזיות' };
+
+function attrsFor(squadId, i) {
+  const packed = extraData().ATTR_DATA[squadId];
+  if (!packed) return null;
+  const row = String(packed).split('|')[i];
+  if (!row) return null;
+  const n = row.split(',').map(Number);
+  if (n.length < ATTR_KEYS.length || n.some(x => !isFinite(x))) return null;
+  const out = {};
+  ATTR_KEYS.forEach((k, j) => { out[k] = n[j]; });
+  return out;
 }
 
 // season → the club that won it / kept the tightest defence, matched against
@@ -63,22 +110,61 @@ function playerFacts(e) {
   e.career.forEach(c => { (byClub[c.teamId] = byClub[c.teamId] || new Set()).add(c.season); });
   const home = Object.entries(byClub).map(([id, s]) => ({ id, n: s.size }))
     .sort((a, b) => b.n - a.n)[0];
+  // The six, averaged over his whole career rather than read off the peak year:
+  // one good season is a fluke, the average is the player. Rounded once, at the
+  // end, so the printed numbers still add up the way the game's do.
+  const rows = e.career.map(c => attrsFor(c.squadId, c.row)).filter(Boolean);
+  let attrs = null, attrTop = null, attrLow = null;
+  if (rows.length) {
+    attrs = {};
+    for (const k of ATTR_KEYS) attrs[k] = Math.round(rows.reduce((s, r) => s + r[k], 0) / rows.length);
+    const ranked = ATTR_KEYS.slice().sort((a, b) => attrs[b] - attrs[a]);
+    attrTop = ranked[0]; attrLow = ranked[ranked.length - 1];
+  }
+
   return {
     titles, walls, home, peakRow,
     goals:   (real.g || []).slice().sort((a, b) => b[1] - a[1]),
     assists: (real.a || []).slice().sort((a, b) => b[1] - a[1]),
     seasons: new Set(e.career.map(c => c.season)).size,
+    attrs, attrTop, attrLow,
+    tags:    (factsData().TAG_DATA[clean(e.name)] || []),
+    nats:    (extraData().PLAYER_NATS[clean(e.name)] || []),
+    europe:  extraData().EU_CAPS[clean(e.name)] || null,
+    duos:    duosFor(e.name),
   };
+}
+
+// name -> partners, strongest link first. CHEM_PAIRS is keyed by the sorted
+// pair, so the only way to ask "who did HE play with" is to invert it once.
+let _duoIdx = null;
+function duosFor(name) {
+  if (!_duoIdx) {
+    _duoIdx = {};
+    const norm = s => String(s ?? '').replace(/[‎‏]/g, '').replace(/[׳’`´']/g, "'").replace(/\s+/g, ' ').trim();
+    for (const [key, v] of Object.entries(extraData().CHEM_PAIRS)) {
+      const [a, b] = key.split('|');
+      (_duoIdx[norm(a)] = _duoIdx[norm(a)] || []).push({ who: b, tier: v[0], seasons: v[1], titles: v[2] });
+      (_duoIdx[norm(b)] = _duoIdx[norm(b)] || []).push({ who: a, tier: v[0], seasons: v[1], titles: v[2] });
+    }
+    for (const k in _duoIdx) _duoIdx[k].sort((x, y) => y.tier - x.tier || y.seasons - x.seasons);
+  }
+  const norm = s => String(s ?? '').replace(/[‎‏]/g, '').replace(/[׳’`´']/g, "'").replace(/\s+/g, ' ').trim();
+  return _duoIdx[norm(name)] || [];
 }
 
 // name -> { name, career:[{teamId,season,ovr,position}], peak, mainTeam, teams[] }
 function buildIndex(SQUADS) {
   const idx = {};
-  for (const s of SQUADS) for (const p of s.players) {
+  for (const s of SQUADS) for (let i = 0; i < s.players.length; i++) {
+    const p = s.players[i];
     const name = clean(p.name);
     if (!name) continue;
+    // squadId + the player's position INSIDE the squad: that pair is the key
+    // into js/attr-data.js, which stores rows positionally and never by name.
     (idx[name] = idx[name] || { name, career: [] }).career
-      .push({ teamId: s.teamId, season: s.season, ovr: p.ovr, position: p.position });
+      .push({ teamId: s.teamId, season: s.season, ovr: p.ovr, position: p.position,
+              squadId: s.id, row: i });
   }
   for (const name in idx) {
     const c = idx[name].career.sort((a, b) => a.season.localeCompare(b.season));
@@ -117,6 +203,16 @@ function pageHtml(TEAMS, e) {
   /* ── what actually happened to him, in prose and in numbers ─────────────── */
   const F = playerFacts(e);
   const nm = n => (TEAMS[n] ? TEAMS[n].name : n);
+
+  // A page we would not defend to a human. Not "few seasons" on its own — three
+  // seasons with a title and a golden boot is a real story — but few seasons AND
+  // nothing on record beyond a rating: no title, no goal in the scorers' table,
+  // no tag, no European night, no partner worth naming. Those get noindex and no
+  // ad slot. They stay online and linked (a reader who searches the name still
+  // finds him) and they keep passing link equity to the pages that earned it,
+  // which is what `follow` is for.
+  const thin = F.seasons <= 3 && !F.titles.length && !F.goals.length && !F.assists.length
+    && !F.tags.length && !F.europe && !F.duos.length && !F.walls.length;
   // Hebrew, not a template: "ב-1 עונות" and a list joined by repeated "ו" are
   // exactly what makes generated prose read as generated.
   const inS  = n => (n === 1 ? 'בעונה אחת' : `ב-${n} עונות`);
@@ -145,11 +241,56 @@ function pageHtml(TEAMS, e) {
   }
   if (F.walls.length) sentences.push(
     `הקבוצה שבה שיחק סיימה עם ההגנה הטובה בליגה ${list(F.walls.map(w => `ב-${esc(w.season)} (${w.ga} ספיגות)`))}.`);
+  if (F.europe) sentences.push(F.europe.k === 'abroad'
+    ? `הוא שיחק בליגת האלופות מחוץ לישראל, ב${esc(F.europe.c)} בעונת ${esc(F.europe.s)}.`
+    : `הוא היה בסגל ש${esc(nm(F.europe.c) || F.europe.c)} העלתה לשלב הבתים של ליגת האלופות ב-${esc(F.europe.s)}.`);
+  if (F.attrs) sentences.push(
+    `בשש התכונות שהמשחק גוזר מהנתונים הוא חזק במיוחד ב${ATTR_NAME[F.attrTop]} (${F.attrs[F.attrTop]}) ` +
+    `וחלש יחסית ב${ATTR_NAME[F.attrLow]} (${F.attrs[F.attrLow]}).`);
+  if (F.duos.length) {
+    // "הצמד ... היה עם X, Y ו-Z" is three men in a word that means two. One
+    // sentence names the longest partnership; a second, only when there is more
+    // than one, names who else he lined up with.
+    const d0 = F.duos[0], rest = F.duos.slice(1, 3);
+    sentences.push(`השותף הקבוע ביותר שלו על המגרש היה ${esc(d0.who)} — ` +
+      `${d0.seasons === 1 ? 'עונה אחת יחד' : `${d0.seasons} עונות יחד`}` +
+      (d0.titles ? `, ${d0.titles === 1 ? 'ואליפות משותפת אחת' : `ו-${d0.titles} אליפויות משותפות`}` : '') + '.');
+    if (rest.length) sentences.push(`הוא שיחק גם לצד ${list(rest.map(d => esc(d.who)))}.`);
+  }
   const intro = `<p class="lede">${sentences.join(' ')}</p>`;
+
+  /* ── the six attributes, as the game computes them ──────────────────────── */
+  // Bars, not a bare row of numbers: the shape of a player is the point, and a
+  // reader takes it in at a glance instead of comparing six two-digit numbers.
+  const attrHtml = !F.attrs ? '' :
+    `<h2>שש התכונות של ${esc(name)}</h2>
+    <p class="note">ממוצע כל עונותיו בליגה. התכונות נגזרות מהנתונים עצמם — בעיטה מטבלת המבקיעים, מסירה מטבלת הבישולים, הגנה ממה שספגה קבוצתו ופיזיות מאורך הקריירה. <a href="/methodology.html">איך זה מחושב</a>.</p>
+    <table class="attrs">${ATTR_KEYS.map(k =>
+      `<tr><td class="ak">${ATTR_NAME[k]}</td><td class="av">${F.attrs[k]}</td>` +
+      `<td class="ab"><i style="width:${Math.max(2, Math.min(100, F.attrs[k]))}%"></i></td></tr>`).join('')}</table>`;
+
+  // key, how many times, and the seasons it happened in — the evidence is the
+  // reason the row is worth printing at all.
+  const TD = extraData().TAG_DEFS;
+  const tagHtml = !F.tags.length ? '' :
+    `<h2>התארים של ${esc(name)}</h2><table class="facts">${F.tags.map(t => {
+      const d = TD[t[0]]; if (!d) return '';
+      const times = (t[1] > 1 && t[0] !== 'prime90') ? ` ×${t[1]}` : '';
+      return `<tr><td class="fk">${esc(d.icon || '')} ${esc(d.name)}${times}</td><td>${esc(t[2] || '')}</td></tr>`;
+    }).join('')}</table>`;
+
+  const duoHtml = !F.duos.length ? '' :
+    `<h2>שיחק לצד</h2><table class="facts">${F.duos.slice(0, 6).map(d =>
+      `<tr><td class="fk">${esc(d.who)}</td><td>${d.seasons === 1 ? 'עונה אחת' : `${d.seasons} עונות`} יחד` +
+      `${d.titles ? ` · ${d.titles === 1 ? 'אליפות אחת' : `${d.titles} אליפויות`}` : ''}</td></tr>`).join('')}</table>`;
 
   const factRow = (label, value) => `<tr><td class="fk">${label}</td><td>${value}</td></tr>`;
   const factRows = [
     factRow('עונות בליגה', F.seasons),
+    factRow('עמדה', esc(positions.join(', '))),
+    F.nats.length ? factRow(F.nats.length > 1 ? 'אזרחויות' : 'לאום', F.nats.map(esc).join(' · ')) : '',
+    F.europe ? factRow('ליגת האלופות', F.europe.k === 'abroad'
+      ? `${esc(F.europe.c)} · ${esc(F.europe.s)}` : `${esc(nm(F.europe.c) || F.europe.c)} · ${esc(F.europe.s)}`) : '',
     factRow('דירוג שיא', `<b class="ovr">${e.peak}</b>${F.peakRow ? ` · ${esc(F.peakRow.season)} · ${esc(nm(F.peakRow.teamId))}` : ''}`),
     F.home ? factRow('הכי הרבה עונות', `${esc(nm(F.home.id))} · ${F.home.n}`) : '',
     F.titles.length ? factRow('אליפויות בסגל', `${F.titles.length} · ${F.titles.map(esc).join(', ')}`) : '',
@@ -173,11 +314,12 @@ function pageHtml(TEAMS, e) {
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>${esc(title)}</title>
   <meta name="description" content="${esc(desc)}" />
-  <link rel="canonical" href="${url}" />
+  <link rel="canonical" href="${url}" />${thin ? `
+  <meta name="robots" content="noindex,follow" />` : ''}
   <meta property="og:title" content="${esc(title)}" /><meta property="og:description" content="${esc(desc)}" />
   <meta property="og:type" content="profile" /><meta property="og:url" content="${url}" /><meta property="og:image" content="${SITE}/og-image.png" />
-  <link rel="icon" href="/favicon.ico" sizes="any" />
-  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2000268715013437" crossorigin="anonymous"></script>
+  <link rel="icon" href="/favicon.ico" sizes="any" />${thin ? '' : `
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2000268715013437" crossorigin="anonymous"></script>`}
   <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;700;800;900&display=swap" rel="stylesheet">
   <script type="application/ld+json">${JSON.stringify(jsonld)}</script>
@@ -198,8 +340,13 @@ function pageHtml(TEAMS, e) {
     td a { color: #58a6ff; text-decoration: none; }
     td.ovr, .ovr { color: #FFD700; font-weight: 800; }
     .lede { color: #c9d1d9; font-size: 15.5px; margin: 18px 0 4px; }
+    .note { color: #8b949e; font-size: 13px; margin: -4px 0 12px; } .note a { color: #58a6ff; }
     table.facts td { vertical-align: top; }
     table.facts td.fk { color: #8b949e; font-size: 13px; white-space: nowrap; width: 1%; }
+    table.attrs td.ak { color: #8b949e; font-size: 13px; white-space: nowrap; width: 1%; }
+    table.attrs td.av { color: #FFD700; font-weight: 800; width: 1%; }
+    table.attrs td.ab { padding-left: 0; }
+    table.attrs td.ab i { display: block; height: 7px; border-radius: 4px; background: linear-gradient(90deg,#f0a500,#FFD700); }
     .chips { display: flex; flex-wrap: wrap; gap: 8px; }
     .chip { background: #161b22; border: 1px solid #30363d; border-radius: 50px; padding: 6px 14px; font-size: 13.5px; color: #e6edf3; text-decoration: none; }
     .foot { margin-top: 44px; border-top: 1px solid #30363d; padding-top: 16px; font-size: 12px; color: #5a6472; } .foot a { color: #8b949e; }
@@ -219,12 +366,16 @@ function pageHtml(TEAMS, e) {
 
     ${intro}
     ${factsHtml}
+    ${attrHtml}
+    ${tagHtml}
 
     <h2>${esc(name)} עונה אחר עונה</h2>
     <table>
       <tr><th>עונה</th><th>מועדון</th><th>עמדה</th><th>דירוג</th></tr>
       ${rows}
     </table>
+
+    ${duoHtml}
 
     <h2>המועדונים של ${esc(name)}</h2>
     <div class="chips">${clubLinks}</div>
@@ -233,7 +384,8 @@ function pageHtml(TEAMS, e) {
 
     <div class="foot">
       36-0 — משחק דראפט חינמי לחובבי הכדורגל הישראלי · הנתונים למטרות מידע ובידור בלבד ואינם רשמיים ·
-      <a href="/players/">כל השחקנים</a> · <a href="/about.html">אודות</a> · <a href="/">משחק</a>
+      <a href="/players/">כל השחקנים</a> · <a href="/methodology.html">מתודולוגיה</a> ·
+      <a href="/how-to-play.html">איך משחקים</a> · <a href="/about.html">אודות</a> · <a href="/">משחק</a>
     </div>
   </div>
 </body>
@@ -258,14 +410,24 @@ function writePlayer(TEAMS, e, force) {
 function writeSitemap() {
   const u = (loc, freq, pri) => `  <url>\n    <loc>${loc}</loc>\n    <changefreq>${freq}</changefreq>\n    <priority>${pri}</priority>\n  </url>`;
   const dirsIn = d => { try { return fs.readdirSync(path.join(BASE, d), { withFileTypes: true }).filter(x => x.isDirectory()).map(x => x.name); } catch { return []; } };
+  // A sitemap is a list of pages we are ASKING to be indexed, so a page carrying
+  // noindex must not appear in it — submitting one and then refusing it is a
+  // contradiction Search Console reports as an error.
+  const indexable = (d, s) => {
+    try { return !/<meta\s+name="robots"[^>]*noindex/i.test(fs.readFileSync(path.join(BASE, d, s, 'index.html'), 'utf8')); }
+    catch { return false; }
+  };
   const urls = [
     u(`${SITE}/`, 'daily', '1.0'),
+    u(`${SITE}/how-to-play.html`, 'monthly', '0.8'),
+    u(`${SITE}/methodology.html`, 'monthly', '0.8'),
     u(`${SITE}/about.html`, 'monthly', '0.4'),
     u(`${SITE}/privacy.html`, 'yearly', '0.2'),
     u(`${SITE}/contact.html`, 'yearly', '0.2'),
     u(`${SITE}/players/`, 'weekly', '0.5'),
     ...dirsIn('team').map(id => u(`${SITE}/team/${id}/`, 'monthly', '0.7')),
-    ...dirsIn('player').map(s => u(`${SITE}/player/${encodeURI(s)}/`, 'monthly', '0.6')),
+    ...dirsIn('player').filter(s => indexable('player', s))
+      .map(s => u(`${SITE}/player/${encodeURI(s)}/`, 'monthly', '0.6')),
   ];
   fs.writeFileSync(path.join(BASE, 'sitemap.xml'),
     `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.join('\n')}\n</urlset>\n`);
@@ -334,7 +496,7 @@ function writeIndex() {
     <div class="chips">${chips}</div>
     <h2>שחקנים (לפי דירוג שיא)</h2>
     <ul class="players">${list}</ul>
-    <div class="foot">36-0 — משחק דראפט חינמי לחובבי הכדורגל הישראלי · הנתונים למטרות מידע ובידור בלבד · <a href="/about.html">אודות</a> · <a href="/">משחק</a></div>
+    <div class="foot">36-0 — משחק דראפט חינמי לחובבי הכדורגל הישראלי · הנתונים למטרות מידע ובידור בלבד · <a href="/how-to-play.html">איך משחקים</a> · <a href="/methodology.html">מתודולוגיה</a> · <a href="/about.html">אודות</a> · <a href="/contact.html">צור קשר</a> · <a href="/">משחק</a></div>
   </div>
 </body>
 </html>`;
