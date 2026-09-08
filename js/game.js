@@ -853,6 +853,14 @@ function startGame() {
   state.leagueCode = null;   // a normal game from the welcome screen isn't for a league
   state.duelCode = null;
   state.career = null;       // ...nor for a career: leaving one mid-run must not record this season into it
+  // A career pins the era range to its single season (crStartDraft sets
+  // eraMin = eraMax = year, because one season is one transfer market). Nothing
+  // ever released it, so the setup screen for an ORDINARY game afterwards still
+  // showed the slider clamped to the last season the dynasty played. Released
+  // here and only here: startGame is the "a normal game begins" door, so a run
+  // in flight is never disturbed — the range comes back once the career is
+  // behind you, not during it.
+  state.eraMin = YEAR_MIN; state.eraMax = YEAR_MAX;
   state.coach = null;        // ...and it certainly isn't still run by the last one's manager
   state.deck = null; state.mgw = null;   // ...nor for the fixed daily deck
   state.challenge = null; state.challengeDeck = null; state.challengeReqs = null;

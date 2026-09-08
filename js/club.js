@@ -636,7 +636,7 @@ const ERA_SKINS = [
   { cls: 'era-winner2',   from: 2011, to: 2015, label: 'ליגת Winner' },
   { cls: 'era-plain2',    from: 2016, to: 2017, label: 'ליגת העל' },
   { cls: 'era-japanika',  from: 2018, to: 2018, label: "ליגת ג'פניקה" },
-  { cls: 'era-bursa',     from: 2019, to: 2021, label: 'ליגת הבורסה' },
+  { cls: 'era-bursa',     from: 2019, to: 2021, label: 'ליגת הבורסה לניירות ערך' },
   { cls: 'era-onezero',   from: 2022, to: 2023, label: 'ליגת ONE ZERO' },
   { cls: 'era-winner3',   from: 2024, to: 9999, label: 'ליגת Winner' },
 ];

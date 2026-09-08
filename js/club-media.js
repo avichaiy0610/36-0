@@ -55,13 +55,16 @@ function cmPhotoRows() {
   const picks = (typeof state !== 'undefined' && state.picks) || [];
   const nums  = clubNumbersFor(slots, picks);
 
+  const over = cmNums();
   const men = [];
   slots.forEach((s, i) => {
     const p = picks[i];
     if (!p || !p.player) return;
+    const full = p.player.name;
     men.push({
-      name: (typeof playerShortName === 'function') ? playerShortName(p.player.name) : p.player.name,
-      num: nums[i], y: s.y, pos: s.pos,
+      name: (typeof playerShortName === 'function') ? playerShortName(full) : full,
+      key: full,                                   // overrides are keyed by the FULL name
+      num: over[full] || nums[i], y: s.y, pos: s.pos,
     });
   });
   if (!men.length) return null;
@@ -78,10 +81,41 @@ function cmPhotoRows() {
   return { back, front };
 }
 
+/* ── numbers the player can change ─────────────────────────────────────────
+   clubNumbersFor() hands out a sensible teamsheet, but which number a man wears
+   is exactly the kind of thing people want to decide themselves. Overrides are
+   keyed by PLAYER NAME, so a man keeps the number you gave him if he turns up
+   in another XI, and they live in the club record — a shirt number is part of
+   the club, and it is worth no more storage than that.
+
+   The editor is a MODE, not an input sitting on the shirt: html2canvas renders
+   whatever is in the node, so a live <input> would end up printed in the saved
+   PNG. Edit mode shows the inputs, view mode has none, and saving is only
+   offered in view mode. */
+function cmNums() {
+  const c = clubGet();
+  return (c && c.numbers && typeof c.numbers === 'object') ? c.numbers : {};
+}
+function cmSetNum(name, n) {
+  const c = clubGet();
+  if (!c) return;
+  c.numbers = { ...cmNums() };
+  const v = Math.max(1, Math.min(99, parseInt(n, 10) || 0));
+  if (v) c.numbers[name] = v; else delete c.numbers[name];
+  clubSave(c);
+}
+
+let _cmEditing = false;
+
 function cmManHTML(club, m, size) {
+  const editor = _cmEditing
+    ? `<input class="cm-num-in" type="number" min="1" max="99" value="${m.num}"
+              data-name="${cmEsc(m.key || m.name)}" aria-label="מספר של ${cmEsc(m.name)}">`
+    : '';
   return `<div class="cm-man">
     ${clubShirtSVG(club, size, m.num)}
     <div class="cm-man-name">${cmEsc(m.name)}</div>
+    ${editor}
   </div>`;
 }
 
@@ -143,7 +177,7 @@ function clubBackPageHTML() {
 
   return `<div class="cm-back cm-tone-${h.tone}" id="cm-back-el" dir="rtl">
     <div class="cm-bp-masthead">
-      <span class="cm-bp-paper">הגב</span>
+      <span class="cm-bp-paper">מדור הספורט</span>
       <span class="cm-bp-strap">סיכום העונה · ${cmEsc(cmClubName())}</span>
       <span class="cm-bp-crest">${clubCrestSVG(club, 30)}</span>
     </div>
@@ -163,7 +197,14 @@ function clubBackPageHTML() {
           <div><b>${s.losses}</b><span>ה׳</span></div>
           <div><b>${pts}</b><span>נק׳</span></div>
         </div>
-        <div class="cm-bp-line" dir="ltr">${s.gfTotal} : ${s.gaTotal}</div>
+        <!-- "92 : 12" told the reader nothing about which number was which.
+             Labelled, and no longer forced LTR — the labels have to stay with
+             their own figures. -->
+        <div class="cm-bp-line">
+          <span class="cm-bp-gf">${s.gfTotal}</span> כבשה
+          <span class="cm-bp-dot">·</span>
+          <span class="cm-bp-ga">${s.gaTotal}</span> ספגה
+        </div>
         ${top && top.goals ? `<div class="cm-bp-box">
           <div class="cm-bp-box-t">מלך השערים</div>
           <div class="cm-bp-box-v">${cmEsc(shortName(top.name))} <b>${top.goals}</b></div>
@@ -212,23 +253,55 @@ async function cmSaveNode(nodeId, filename, btn) {
   }
 }
 
-function cmShow(html, nodeId, filename) {
+function cmShow(html, nodeId, filename, opts) {
   if (!html) return;
+  const o = opts || {};
   const wrap = document.createElement('div');
   wrap.className = 'modal-overlay cm-modal';
   wrap.innerHTML = `<div class="cm-box">
       <button class="modal-close cm-x">✕</button>
       <div class="cm-scroll">${html}</div>
-      <button class="btn-primary btn-full cm-save">⬇ שמור תמונה</button>
+      <div class="cm-actions">
+        ${o.numbers ? '<button class="btn-secondary cm-edit">✏️ ערוך מספרים</button>' : ''}
+        <button class="btn-primary cm-save">⬇ שמור תמונה</button>
+      </div>
     </div>`;
   document.body.appendChild(wrap);
-  const close = () => wrap.remove();
+  const close = () => { _cmEditing = false; wrap.remove(); };
   wrap.querySelector('.cm-x').onclick = close;
   wrap.addEventListener('click', e => { if (e.target === wrap) close(); });
   wrap.querySelector('.cm-save').onclick = e => cmSaveNode(nodeId, filename, e.currentTarget);
+
+  if (!o.numbers) return;
+
+  const scroll = wrap.querySelector('.cm-scroll');
+  const editBtn = wrap.querySelector('.cm-edit');
+  const saveBtn = wrap.querySelector('.cm-save');
+  const redraw = () => { scroll.innerHTML = o.render(); };
+  const syncMode = () => {
+    editBtn.textContent = _cmEditing ? '✓ סיום' : '✏️ ערוך מספרים';
+    editBtn.classList.toggle('cm-edit-on', _cmEditing);
+    // Saving is hidden while editing: the inputs are real DOM and html2canvas
+    // would print them into the PNG.
+    saveBtn.style.display = _cmEditing ? 'none' : '';
+    redraw();
+  };
+  editBtn.onclick = () => { _cmEditing = !_cmEditing; syncMode(); };
+
+  // Delegated, because the men are rebuilt on every change.
+  scroll.addEventListener('change', e => {
+    const el = e.target.closest('.cm-num-in');
+    if (!el) return;
+    cmSetNum(el.dataset.name, el.value);
+    redraw();
+  });
 }
 
-function showTeamPhoto() { cmShow(clubTeamPhotoHTML(), 'cm-photo-el', '36-0-team.png'); }
+function showTeamPhoto() {
+  _cmEditing = false;
+  cmShow(clubTeamPhotoHTML(), 'cm-photo-el', '36-0-team.png',
+         { numbers: true, render: clubTeamPhotoHTML });
+}
 function showBackPage()  { cmShow(clubBackPageHTML(),  'cm-back-el',  '36-0-backpage.png'); }
 
 /* ── the two buttons on the results screen ──────────────────────────────────

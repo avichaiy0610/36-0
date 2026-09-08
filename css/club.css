@@ -167,6 +167,21 @@
   display: flex; justify-content: space-between; align-items: center;
   margin-top: 10px; font-size: 0.75rem;
 }
+/* the number editor — only present while edit mode is on, so it can never be
+   caught by html2canvas in the saved PNG */
+.cm-num-in {
+  width: 40px; margin: 3px auto 0; display: block; padding: 2px;
+  background: rgba(0,0,0,.35); border: 1px solid rgba(255,255,255,.35);
+  border-radius: 3px; color: #fff; font: 700 11px inherit; text-align: center;
+  -moz-appearance: textfield;
+}
+.cm-num-in::-webkit-outer-spin-button,
+.cm-num-in::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.cm-actions { display: flex; gap: 8px; }
+.cm-actions .btn-primary { flex: 1; }
+.cm-actions .cm-edit { white-space: nowrap; }
+.cm-actions .cm-edit-on { border-color: var(--accent); color: var(--accent); }
+
 .cm-ph-sub { font-weight: 700; }
 .cm-ph-brand { opacity: 0.6; }
 
@@ -213,7 +228,11 @@
 .cm-bp-strip div { flex: 1; text-align: center; line-height: 1.1; }
 .cm-bp-strip b { display: block; font-size: 1rem; font-weight: 900; }
 .cm-bp-strip span { font-size: 0.55rem; color: #5a5348; }
-.cm-bp-line { font-size: 0.8rem; font-weight: 700; text-align: center; margin: 5px 0; }
+.cm-bp-line {
+  font-size: 0.7rem; color: #5a5348; text-align: center; margin: 5px 0; line-height: 1.5;
+}
+.cm-bp-line .cm-bp-gf, .cm-bp-line .cm-bp-ga { font-size: 0.85rem; font-weight: 900; color: #14181f; }
+.cm-bp-line .cm-bp-dot { opacity: .5; margin: 0 2px; }
 
 .cm-bp-box { border-top: 1px solid #cfc7b8; padding: 5px 0; }
 .cm-bp-box-t { font-size: 0.6rem; color: #a32020; font-weight: 700; }
@@ -288,7 +307,10 @@
    --era-bar    : the league bar, taken from that era's logo
    --era-line   : the accent at border strength                             */
 
-.era-pelephone { --era-accent:#7ab648; --era-bar:linear-gradient(180deg,#8dc63f,#4e8a2a); --era-line:rgba(122,182,72,.34); }
+/* Pelephone's green is a LIGHT green, and white type on it was barely legible.
+   The bar is darkened rather than the ink changed: dark ink on that green is no
+   better, and every other era's bar carries white. */
+.era-pelephone { --era-accent:#8dc63f; --era-bar:linear-gradient(180deg,#3f7a1f,#255012); --era-line:rgba(141,198,63,.34); }
 .era-plain1,
 .era-plain2    { --era-accent:#9fb0c0; --era-bar:linear-gradient(180deg,#2b3440,#1b222c); --era-line:rgba(159,176,192,.26); }
 .era-toto1     { --era-accent:#e03a3f; --era-bar:linear-gradient(180deg,#1d3f92,#132a63); --era-line:rgba(224,58,63,.32); }
@@ -297,7 +319,11 @@
 .era-winner2   { --era-accent:#ffd200; --era-bar:linear-gradient(180deg,#e02128,#a8121a); --era-line:rgba(255,210,0,.32); }
 .era-japanika  { --era-accent:#e03127; --era-bar:linear-gradient(180deg,#16204a,#0b1029); --era-line:rgba(224,49,39,.32); }
 .era-bursa     { --era-accent:#8fa3b8; --era-bar:linear-gradient(180deg,#5c6b7d,#3a4552); --era-line:rgba(143,163,184,.26); }
-.era-onezero   { --era-accent:#21c7d6; --era-bar:linear-gradient(90deg,#e8443f,#f2b632,#3fae5a,#2f8bd6); --era-line:rgba(33,199,214,.30); }
+/* ONE ZERO's mark is a multicolour figure, and a four-stop rainbow bar was the
+   literal reading of it — far too loud next to ten restrained ones. A digital
+   bank reads just as well as deep teal, which is representative without
+   shouting; the cyan accent carries the rest. */
+.era-onezero   { --era-accent:#22d3ee; --era-bar:linear-gradient(180deg,#14607a,#0a3244); --era-line:rgba(34,211,238,.30); }
 .era-winner3   { --era-accent:#ff3b46; --era-bar:linear-gradient(180deg,#e2001a,#9d0012); --era-line:rgba(255,59,70,.32); }
 
 /* ═══ the structure every era shares ════════════════════════════════════════ */
