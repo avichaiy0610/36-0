@@ -229,28 +229,36 @@
 .cm-bp-pts { font-weight: 700; }
 .cm-bp-foot { font-size: 0.6rem; color: #5a5348; text-align: left; margin-top: 8px; }
 
-/* ── 3. מראה של תקופה — ליגת טוטו, 2006–2013 ─────────────────────────────────
+/* ── 3. מראה של תקופה ─────────────────────────────────────────────────────────
 
-   Every value in this block was read off a real league table from the period
-   that the user supplied, not invented. That is the whole difference between
-   this and the four skins it replaces (kept in tag `era-v1`), which were argued
-   from general design history and were rejected four times running.
+   Eleven eras, ONE structure. Each era declares three custom properties and
+   nothing else; every rule that USES them is written once, below. That is
+   deliberate and it is the lesson from four rejected attempts: when each era
+   was its own design — its own radius, shadow, type weight and texture — the
+   set read as four unrelated widgets, and every one of them was called ugly.
+   Same chrome, different tint is what makes a run of eras read as one feature.
 
-   What the reference actually shows, and what is therefore reproduced here:
-     · an orange→red bar carrying the league's name of the day
-     · a WHITE body with black text — it is a printed table, not a dark UI
-     · numerals in a plain grotesque, tabular, with the club name bold
-     · goals written as one cell, "85-25", never split into columns
-     · red rules at the bracket cuts, not green/red position bands
-   The card cannot show columns, so what carries across to it is the bar, the
-   white printed body, the type, and the orange.
+   The palettes come from the league's own logos, era by era (see the sponsor
+   timeline the user supplied). NOT from the period newspaper table that seeded
+   the first version — its orange was the paper's styling, and the league in
+   those years was navy and red. The table still settles STRUCTURE: the column
+   set, goals as one cell, the position sitting with the name.
 
-   THE THREE STANDING RULES still apply and are what make this safe:
-     1. never touch the header's inline `background` — paint on ::after;
-     2. never assume the ink — here the ::after is opaque WHITE, so the ink is
-        forced black to match it, plate and ink as a pair;
-     3. the club's own colour is not lost: it becomes the flash down the side of
-        the name, drawn from --era-club. */
+   THE THREE STANDING RULES, all learned by breaking them on live screens:
+     1. Never touch the card header's `background` from CSS. game.js sets it
+        INLINE per drawn club, so `background-image: … !important` replaces the
+        club's gradient rather than layering over it.
+     2. Never assume the ink. game.js also sets the header's text colours inline,
+        from textColorFor(primary): white on a dark club, near-black on a light
+        one. So either leave the ink alone under a translucent plate, or force
+        plate and ink together as a pair. Nothing here forces anything — no era
+        lays an opaque plate over the header any more.
+     3. Stay in the app's dark palette. A cream border, thick white rules and
+        finally a whole white "printed" column were each rejected: a light slab
+        inside a #0d1117 app reads as a fault, not as a period.
+
+   And every TEAMS[].badge is two emoji ("⚫🟡"), so nothing may give
+   .card-badge a fixed box — it squashes both glyphs. */
 
 .squad-card-header { position: relative; overflow: hidden; }
 .squad-card-header > * { position: relative; z-index: 1; }
@@ -258,187 +266,154 @@
   transition: background .2s ease, border-color .2s ease;
   overflow: hidden; position: relative;
 }
-.squad-card[class*="era-"] .squad-card-header::after {
-  content: ''; position: absolute; inset: 0; z-index: 0; pointer-events: none;
-}
 
-/* The era tag's BASE rule, and it lives up here with the other shared plumbing
-   on purpose: it has been deleted twice by rewrites of the skin below it, and
-   both times the symptom was the league bar silently not rendering — a ::before
-   without `content` produces no box at all. attr() reads only the element its
-   own pseudo belongs to, which is why this hangs off the CARD, where
-   applyEraSkin writes data-era. */
+/* The era tag's BASE rule, up here with the shared plumbing on purpose: it has
+   been deleted twice by rewrites of the skins below, and both times the symptom
+   was the league bar silently not rendering — a ::before without `content`
+   produces no box at all. attr() reads only the element its own pseudo belongs
+   to, which is why this hangs off the CARD, where applyEraSkin writes data-era. */
 .squad-card[data-era]::before {
   content: attr(data-era);
-  position: absolute; z-index: 3; top: 0; left: 0;
-  line-height: 1.4; pointer-events: none;
-}
-
-/* ── the card ──────────────────────────────────────────────────────────────
-   The first build of this skin made the whole column WHITE, because the
-   reference table is white. That was taking the reference's COLOUR instead of
-   its IDENTITY, and the verdict was right: a white slab inside a #0d1117 app is
-   painful to look at, whatever period it is quoting. The table is white because
-   it is paper; this app is dark, and a skin has to live in the app.
-
-   So what carries over is everything about the period EXCEPT the paper: the
-   league's orange, the square geometry, the plain grotesque, the bar across the
-   top with the league's name of the day. The ground stays the app's own.
-
-   Note what this also buys: with no opaque plate there is nothing to force, so
-   `.card-team` and `.card-season` keep the ink game.js computed for the club,
-   and the club's gradient is left alone entirely. Fewer overrides, fewer ways
-   to be wrong. */
-
-.squad-card.era-toto {
-  background: var(--surface);
-  border: 1px solid rgba(240,130,30,.38);
-  border-radius: 3px;
-  box-shadow: none;
-}
-
-/* The league bar — the period's strongest signal, and it reads on dark. */
-.squad-card.era-toto::before {
-  left: 0; right: 0; top: 0;
+  position: absolute; z-index: 3; top: 0; left: 0; right: 0;
   direction: rtl; text-align: right;
   padding: 4px 10px 5px;
   font-family: Arial, Heebo, sans-serif; font-size: 12px; font-weight: 900;
-  letter-spacing: -.2px; color: #fff;
-  background: linear-gradient(180deg, #f79a1e 0%, #ef7c12 45%, #e2600c 100%);
+  letter-spacing: -.2px; line-height: 1.4; pointer-events: none;
+  color: var(--era-ink-bar, #fff);
+  background: var(--era-bar, #333);
 }
-.squad-card.era-toto .squad-card-header { padding-top: 32px; }
 
-.squad-card.era-toto .card-text {
-  border-right: 3px solid var(--era-club, #e2600c);
+/* ═══ the eleven palettes ═══════════════════════════════════════════════════
+   --era-accent : the one colour that carries the era everywhere
+   --era-bar    : the league bar, taken from that era's logo
+   --era-line   : the accent at border strength                             */
+
+.era-pelephone { --era-accent:#7ab648; --era-bar:linear-gradient(180deg,#8dc63f,#4e8a2a); --era-line:rgba(122,182,72,.34); }
+.era-plain1,
+.era-plain2    { --era-accent:#9fb0c0; --era-bar:linear-gradient(180deg,#2b3440,#1b222c); --era-line:rgba(159,176,192,.26); }
+.era-toto1     { --era-accent:#e03a3f; --era-bar:linear-gradient(180deg,#1d3f92,#132a63); --era-line:rgba(224,58,63,.32); }
+.era-toto2     { --era-accent:#3f6fd8; --era-bar:linear-gradient(180deg,#16306b,#0e1f47); --era-line:rgba(63,111,216,.32); }
+.era-winner1   { --era-accent:#f2c200; --era-bar:linear-gradient(180deg,#2a2a2a,#0d0d0d); --era-line:rgba(242,194,0,.34); }
+.era-winner2   { --era-accent:#ffd200; --era-bar:linear-gradient(180deg,#e02128,#a8121a); --era-line:rgba(255,210,0,.32); }
+.era-japanika  { --era-accent:#e03127; --era-bar:linear-gradient(180deg,#16204a,#0b1029); --era-line:rgba(224,49,39,.32); }
+.era-bursa     { --era-accent:#8fa3b8; --era-bar:linear-gradient(180deg,#5c6b7d,#3a4552); --era-line:rgba(143,163,184,.26); }
+.era-onezero   { --era-accent:#21c7d6; --era-bar:linear-gradient(90deg,#e8443f,#f2b632,#3fae5a,#2f8bd6); --era-line:rgba(33,199,214,.30); }
+.era-winner3   { --era-accent:#ff3b46; --era-bar:linear-gradient(180deg,#e2001a,#9d0012); --era-line:rgba(255,59,70,.32); }
+
+/* ═══ the structure every era shares ════════════════════════════════════════ */
+
+/* ── the draw card ─────────────────────────────────────────────────────────
+   The club's own gradient is never covered: the bar sits above it and the club
+   colour becomes the flash down the side of the name, so the drawn club stays
+   readable at a glance while the era frames it. */
+.squad-card[data-era] {
+  background: var(--surface);
+  border: 1px solid var(--era-line);
+  border-radius: 3px;
+  box-shadow: none;
+}
+.squad-card[data-era] .squad-card-header { padding-top: 32px; }
+.squad-card[data-era] .card-text {
+  border-right: 3px solid var(--era-club, var(--era-accent));
   padding-right: 8px;
 }
-.squad-card.era-toto .card-team {
+.squad-card[data-era] .card-team {
   font-family: Arial, Heebo, sans-serif; font-weight: 700; letter-spacing: -.2px;
 }
-.squad-card.era-toto .card-season {
+.squad-card[data-era] .card-season {
   font-family: Arial, Heebo, sans-serif; font-weight: 700; letter-spacing: .4px;
 }
-.squad-card.era-toto .reroll-row { border-top: 1px solid rgba(240,130,30,.28); }
-.squad-card.era-toto .btn-reroll-small {
-  border-radius: 2px; border-color: rgba(240,130,30,.32);
-}
-.squad-card.era-toto .reroll-badge { background: #e2600c; color: #fff; }
+.squad-card[data-era] .reroll-row { border-top: 1px solid var(--era-line); }
+.squad-card[data-era] .btn-reroll-small { border-radius: 2px; border-color: var(--era-line); }
+.squad-card[data-era] .reroll-badge { background: var(--era-accent); color: #111; }
 
-/* ── after the whistle: the league table ───────────────────────────────────
-   The card follows the DRAWN squad and changes every round; the table follows
-   the league you actually played, which is one year for the whole season. So
-   this is the more honest home for a period look, and the one the reference is
-   actually about — it IS a league table.
-
-   Structure taken from it: the league bar on top, the column set
-   מש׳ · נצ׳ · ת׳ · הפ׳ · שערים · נק׳ reading right to left, goals as one cell
-   rather than split, and the position sitting with the name. Palette stays the
-   app's, per the rule above. */
-
-/* ── the whole results column ──────────────────────────────────────────────
-   Every boxed thing on the screen squares off and re-tints its edge to the
-   era's one accent, and every accented FIGURE takes that accent. What is
-   deliberately left alone is anything whose colour carries meaning: the green
-   of a win, the red of a loss, the win/draw/loss borders on the match rows.
-   Those are information, not decoration, and repainting them would cost the
-   reader something to gain a mood. */
-
-.results-side.era-toto .tier-box,
-.results-side.era-toto .ovr-card,
-.results-side.era-toto .rec-box,
-.results-side.era-toto .proj-tile,
-.results-side.era-toto .narrative-box,
-.results-side.era-toto .award-card,
-.results-side.era-toto .highlight-box,
-.results-side.era-toto .stats-table,
-.results-side.era-toto .match-row {
-  border-radius: 2px;
+/* ── the list under it ─────────────────────────────────────────────────────
+   Every [class*="era-"] below is SCOPED to .side-panel or .results-side, and it
+   has to stay that way: the setup screen's era slider already owns .era-btn,
+   .era-track, .era-thumb, .era-fill, .era-presets and .era-note, so a bare
+   [class*="era-"] would reach straight into it. */
+.side-panel[class*="era-"] .player-card { border-radius: 2px; border-color: var(--era-line); }
+.side-panel[class*="era-"] .pc-ovr {
+  color: var(--era-accent); font-family: Arial, Heebo, sans-serif; font-weight: 900;
 }
-.results-side.era-toto .tier-box,
-.results-side.era-toto .ovr-card,
-.results-side.era-toto .proj-tile,
-.results-side.era-toto .narrative-box,
-.results-side.era-toto .award-card,
-.results-side.era-toto .highlight-box,
-.results-side.era-toto .stats-table {
-  border-color: rgba(240,130,30,.22);
-}
+.side-panel[class*="era-"] .pc-pos-badge { border-radius: 2px; border-color: var(--era-line); }
 
-/* the section headings — the loudest, cheapest signal that the era is on */
-.results-side.era-toto .section-label {
-  color: #f0821e; font-family: Arial, Heebo, sans-serif;
-  border-bottom: 1px solid rgba(240,130,30,.28); padding-bottom: 4px;
-}
+/* ── after the whistle: the whole results column ───────────────────────────
+   Boxed things square off and re-tint to the era's accent, and every accented
+   FIGURE takes it. Deliberately left alone: anything whose colour carries
+   meaning — the green of a win, the gold of a draw, the red of a loss, the
+   win/draw/loss borders on the match rows. Those are information, not mood. */
+.results-side[class*="era-"] .tier-box,
+.results-side[class*="era-"] .ovr-card,
+.results-side[class*="era-"] .rec-box,
+.results-side[class*="era-"] .proj-tile,
+.results-side[class*="era-"] .narrative-box,
+.results-side[class*="era-"] .award-card,
+.results-side[class*="era-"] .highlight-box,
+.results-side[class*="era-"] .stats-table,
+.results-side[class*="era-"] .match-row { border-radius: 2px; }
 
-/* accented figures follow the era instead of the site gold */
-.results-side.era-toto .hl-val,
-.results-side.era-toto .proj-val,
-.results-side.era-toto .ovr-total-val,
-.results-side.era-toto .award-winner,
-.results-side.era-toto .narrative-title {
-  color: #f0821e;
-}
-.results-side.era-toto .hl-val,
-.results-side.era-toto .ovr-total-val,
-.results-side.era-toto .proj-val {
-  font-family: Arial, Heebo, sans-serif;
-}
-.results-side.era-toto .award-title,
-.results-side.era-toto .st-num-head,
-.results-side.era-toto .st-name-head { color: #e8a35a; }
-.results-side.era-toto .stats-row { border-color: rgba(240,130,30,.14); }
+.results-side[class*="era-"] .tier-box,
+.results-side[class*="era-"] .ovr-card,
+.results-side[class*="era-"] .proj-tile,
+.results-side[class*="era-"] .narrative-box,
+.results-side[class*="era-"] .award-card,
+.results-side[class*="era-"] .highlight-box,
+.results-side[class*="era-"] .stats-table { border-color: var(--era-line); }
 
-/* the tier headline gets the league bar treatment, like the table's */
-.results-side.era-toto .tier-box {
-  border-top: 3px solid #e2600c;
+.results-side[class*="era-"] .tier-box { border-top: 3px solid var(--era-accent); }
+.results-side[class*="era-"] .section-label {
+  color: var(--era-accent); font-family: Arial, Heebo, sans-serif;
+  border-bottom: 1px solid var(--era-line); padding-bottom: 4px;
 }
+.results-side[class*="era-"] .hl-val,
+.results-side[class*="era-"] .proj-val,
+.results-side[class*="era-"] .ovr-total-val,
+.results-side[class*="era-"] .award-winner,
+.results-side[class*="era-"] .narrative-title { color: var(--era-accent); }
+.results-side[class*="era-"] .hl-val,
+.results-side[class*="era-"] .ovr-total-val,
+.results-side[class*="era-"] .proj-val { font-family: Arial, Heebo, sans-serif; }
+.results-side[class*="era-"] .award-title,
+.results-side[class*="era-"] .st-num-head,
+.results-side[class*="era-"] .st-name-head { color: var(--era-accent); opacity: .8; }
+.results-side[class*="era-"] .stats-row { border-color: var(--era-line); }
 
-.league-details.era-toto { border: 1px solid rgba(240,130,30,.30); border-radius: 3px; }
-.league-details.era-toto .league-summary {
-  background: linear-gradient(180deg, #f79a1e 0%, #ef7c12 45%, #e2600c 100%);
-  color: #fff; font-family: Arial, Heebo, sans-serif; font-weight: 900;
-  border-radius: 0;
+/* ── the league table ──────────────────────────────────────────────────────
+   Structure from the period table: the league bar, the column set
+   מש׳ · נצ׳ · ת׳ · הפ׳ · שערים · נק׳ right to left, goals as one cell rather
+   than split, and the position sitting with the name. */
+.league-details[data-era] { border: 1px solid var(--era-line); border-radius: 3px; }
+.league-details[data-era] .league-summary {
+  background: var(--era-bar); color: var(--era-ink-bar, #fff);
+  font-family: Arial, Heebo, sans-serif; font-weight: 900; border-radius: 0;
 }
-/* the era's league name, printed on the bar next to the summary's own label */
-.league-details.era-toto .league-summary::after {
+/* attr() reads only the element its own pseudo belongs to, so game.js puts
+   data-era on the SUMMARY as well as on the <details>. */
+.league-details[data-era] .league-summary::after {
   content: attr(data-era); float: left;
   font-size: 10px; font-weight: 700; opacity: .92; letter-spacing: .3px;
 }
-.league-details.era-toto .lt-head {
-  background: rgba(240,130,30,.10); color: #e8a35a;
-  border-top: 0; border-bottom: 1px solid rgba(240,130,30,.28);
-  font-family: Arial, Heebo, sans-serif; letter-spacing: 0;
+.league-details[data-era] .lt-head {
+  background: rgba(255,255,255,.04); color: var(--era-accent);
+  border-top: 0; border-bottom: 1px solid var(--era-line);
+  font-family: Arial, Heebo, sans-serif; letter-spacing: 0; font-size: 9px;
 }
-.league-details.era-toto .lt-row { border-top-color: rgba(240,130,30,.12); }
-.league-details.era-toto .lt-row.lt-us {
-  background: rgba(240,130,30,.13);
-  border-color: rgba(240,130,30,.35) !important;
+.league-details[data-era] .lt-row { border-top-color: var(--era-line); gap: 5px; padding-inline: 8px; }
+.league-details[data-era] .lt-row.lt-us {
+  background: rgba(255,255,255,.06);
+  border-color: var(--era-accent) !important;
 }
-.league-details.era-toto .lt-pts { color: #f0821e; font-family: Arial, Heebo, sans-serif; }
-.league-details.era-toto .lt-bracket-sep { border-top: 2px solid #d8321b; }
+.league-details[data-era] .lt-pts { color: var(--era-accent); font-family: Arial, Heebo, sans-serif; }
+.league-details[data-era] .lt-bracket-sep { border-top: 2px solid var(--era-accent); }
+.league-details[data-era] .lt-name {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 
 /* The five numeric columns. Fixed widths, not flex — a table whose columns do
-   not line up between rows is not a table, and the name is the only thing
-   allowed to take the slack. */
+   not line up between rows is not a table, and the name takes the slack. */
 .lt-stat  { width: 20px; text-align: center; flex-shrink: 0; }
 .lt-goals { width: 44px; text-align: center; flex-shrink: 0; font-size: 10px; color: var(--dim); }
-.league-details.era-toto .lt-head { font-size: 9px; }
-.league-details.era-toto .lt-row  { gap: 5px; padding-inline: 8px; }
-.league-details.era-toto .lt-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
-/* ── the list under it ─────────────────────────────────────────────────────
-   The panel takes the era too, but as the same one accent and the same square
-   geometry — not as a change of ground. */
-
-.side-panel.era-toto .player-card {
-  border-radius: 2px; border-color: rgba(240,130,30,.18);
-}
-.side-panel.era-toto .pc-ovr {
-  color: #f0821e; font-family: Arial, Heebo, sans-serif; font-weight: 900;
-}
-.side-panel.era-toto .pc-pos-badge {
-  border-radius: 2px; border-color: rgba(240,130,30,.30); color: #e8a35a;
-}
 
 /* ── narrow phones ────────────────────────────────────────────────────────── */
 /* At a 375px viewport the box is 94vw = 352 and its content 332, so the man has

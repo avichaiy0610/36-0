@@ -608,18 +608,37 @@ document.addEventListener('DOMContentLoaded', () => {
    A skin left over from the previous round is exactly the "a field nobody sets
    is a field that carries over" bug this project has now hit three times, and
    here it would be silent: the card would simply keep looking like 2003. */
-/* ONE era for now, and deliberately one.
-   Four bands shipped before this and all four were invented from general design
-   history — arbitrary years, arbitrary looks, and the verdict on every round of
-   them was some version of "ugly". This band is different: it is drawn from an
-   actual period league table the user supplied, so every choice in .era-toto has
-   a source. Its span is his, from looking at the table: roughly 2006–2013.
+/* ELEVEN eras, and not one of them invented.
 
-   Everything else falls through to no skin at all, which is the point — the card
-   is either the ליגת טוטו one or the ordinary one, so there is exactly one thing
-   to judge. The previous four are not deleted, they are in tag `era-v1`. */
+   Earlier versions of this list were made up from general design history —
+   arbitrary year bands, arbitrary looks — and every round of them was rejected.
+   This list is the league's own: what Ligat ha'Al was actually CALLED each
+   season, from the run of sponsor logos the user supplied, with the two
+   unsponsored stretches confirmed by him. The years are the game's season-start
+   years, so 2010 means 2010/11.
+
+   Two consequences worth stating, because they look like mistakes otherwise:
+     · 2005–2007 and 2008–2009 carry the same NAME and different classes. The
+       league was ליגת טוטו throughout, but the shield was redrawn in 2008, and
+       the user asked for a skin per logo rather than per name.
+     · 2001–2004 and 2016–2017 had no sponsor at all. They are not gaps in the
+       data; they are eras whose identity is simply "ליגת העל", and they get a
+       deliberately plain, unbranded treatment.
+
+   The colours live in css/club.css, two custom properties per era. This list
+   only decides WHEN each one applies and what it is called. */
 const ERA_SKINS = [
-  { cls: 'era-toto', from: 2006, to: 2013, label: 'ליגת טוטו' },
+  { cls: 'era-pelephone', from: 0,    to: 2000, label: 'ליגת פלאפון' },
+  { cls: 'era-plain1',    from: 2001, to: 2004, label: 'ליגת העל' },
+  { cls: 'era-toto1',     from: 2005, to: 2007, label: 'ליגת טוטו' },
+  { cls: 'era-toto2',     from: 2008, to: 2009, label: 'ליגת טוטו' },
+  { cls: 'era-winner1',   from: 2010, to: 2010, label: 'ליגת ווינר' },
+  { cls: 'era-winner2',   from: 2011, to: 2015, label: 'ליגת Winner' },
+  { cls: 'era-plain2',    from: 2016, to: 2017, label: 'ליגת העל' },
+  { cls: 'era-japanika',  from: 2018, to: 2018, label: "ליגת ג'פניקה" },
+  { cls: 'era-bursa',     from: 2019, to: 2021, label: 'ליגת הבורסה' },
+  { cls: 'era-onezero',   from: 2022, to: 2023, label: 'ליגת ONE ZERO' },
+  { cls: 'era-winner3',   from: 2024, to: 9999, label: 'ליגת Winner' },
 ];
 const ERA_ALL = ERA_SKINS.map(e => e.cls);
 
