@@ -333,6 +333,25 @@ function undatedPair(inRange, all) {
 /* ── periods that are still safe to write ─────────────────────────────────── */
 // Only ever the NEXT period: the current one may already be in play.
 function targets(now) {
+  // A manual run may name specific days instead of just tomorrow. Before a חג
+  // nobody is there to tap ✅ on the morning the engine would normally offer
+  // them, and a daily is only ever offered the day before — so those days would
+  // silently fall back to the deterministic generator. ONLY_DAYS is how you ask
+  // for them early; the scheduled run never sets it and is unaffected.
+  //
+  // `k > today` is the whole safety story: it keeps the one rule this engine
+  // must not break — a period that has already started is never rewritten.
+  const only = (process.env.ONLY_DAYS || '').split(',').map(s => s.trim()).filter(Boolean);
+  if (only.length) {
+    const today = dailyKey(now);
+    const future = only.filter(k => k > today);
+    only.filter(k => k <= today).forEach(k => console.log(`ONLY_DAYS: ${k} is today or past — refusing`));
+    // noon UTC is still the same calendar day in Asia/Jerusalem, so dailyKey(d) === k
+    return future.map(k => {
+      const d = new Date(k + 'T12:00:00Z');
+      return { period: 'daily', key: k, from: d, to: d };
+    });
+  }
   const tomorrow = new Date(now.getTime() + DAY);
   const nextWeek = new Date(now.getTime() + 7 * DAY);
   const nextMonth = new Date(now.getTime() + 31 * DAY);
