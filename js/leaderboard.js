@@ -8,6 +8,30 @@ function esc(s) {
     { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
   ));
 }
+/* ── whose club is this ─────────────────────────────────────────────────────
+   The crest and name a player built in המועדון שלך, shown under their username.
+   The club is a localStorage record on its owner's device; what reaches a board
+   is the published copy on their profile (set_my_club, migration
+   20260910000001), and it goes through clubSanitize() before it is drawn —
+   clubCrestSVG puts c1/c2 into an <svg fill="…"> and this string is injected as
+   HTML, so a colour off the network is never trusted.
+
+   Returns '' for a player who has no club, which is most of them: the line
+   appears only for somebody who made one.
+
+   `withName` is off on the dynasty board, where the row already says which club
+   the ten seasons were played at — there the crest joins that name instead of
+   repeating it underneath. */
+function lbClubTag(club, withName = true) {
+  if (typeof clubSanitize !== 'function' || typeof clubCrestSVG !== 'function') return '';
+  const c = clubSanitize(club);
+  if (!c) return '';
+  const crest = clubCrestSVG(c, withName ? 15 : 13);
+  return withName
+    ? `<span class="lb-club">${crest}<bdi>${esc(c.name)}</bdi></span>`
+    : `<span class="lb-club lb-club-bare">${crest}</span>`;
+}
+
 let lbMode   = 'all';   // all | season | peak
 // 'modern' = the general board: today's 36/33 format only, so every record on it
 // is comparable. Any other value is a season year — its own board, where everyone
@@ -111,7 +135,7 @@ async function loadCareerBoardTab(table) {
       <div class="lb-row${me ? ' lgsim-me' : ''}">
         <span class="lb-rank ${r.rank <= 3 ? 'lb-rank-top' : ''}">${r.rank}</span>
         <span class="lb-name">${esc(r.username || 'אנונימי')}${me ? ' (אתה)' : ''}
-          <span class="cr-board-club">${esc(r.club_name)} ${ending}</span></span>
+          <span class="cr-board-club">${lbClubTag(r.club, false)}${esc(r.club_name)} ${ending}</span></span>
         <span class="lb-stat">🏆 ${r.titles}</span>
         <span class="lb-sub" dir="rtl"><bdi>${r.seasons} עונות</bdi> · <bdi>${r.points} נק׳</bdi></span>
       </div>`;
@@ -139,6 +163,7 @@ async function loadSalaryBoardTab(table) {
       <div class="lb-row${me ? ' lgsim-me' : ''}">
         <span class="lb-rank ${r.rank <= 3 ? 'lb-rank-top' : ''}">${r.rank}</span>
         <span class="lb-name">${esc(r.username || 'אנונימי')}${me ? ' (אתה)' : ''}
+          ${lbClubTag(r.club)}
           <span class="cr-board-club">₪${r.spent}מ׳ מתוך ₪${r.budget}מ׳ · ${DIFF[r.difficulty] || r.difficulty}${free}</span></span>
         <span class="lb-stat">${r.points} נק׳</span>
         <span class="lb-sub" dir="rtl"><bdi>OVR ${r.ovr}</bdi> · <bdi>${r.wins}-${r.draws}-${r.losses}</bdi></span>
@@ -149,7 +174,7 @@ async function loadSalaryBoardTab(table) {
 async function loadGauntletBoard(table) {
   const { data: rows, error } = await _supabase
     .from('gauntlet_runs')
-    .select('depth, cleared, banner, team_ovr, ended, created_at, profiles(username, avatar_url)')
+    .select('depth, cleared, banner, team_ovr, ended, created_at, profiles(username, avatar_url, club)')
     .order('banner', { ascending: false })
     .order('depth', { ascending: false })
     .order('created_at', { ascending: true })
@@ -184,7 +209,8 @@ async function loadGauntletBoard(table) {
       <span class="lb-rank ${rank <= 3 ? 'lb-rank-top' : ''}">${medal}</span>
       <span class="lb-name">${esc(row.profiles?.username ?? 'אנונימי')}</span>
       <span class="lb-stat">${row.depth}<small>/8</small></span>
-      <span class="lb-sub" dir="rtl">${sub}</span>`;
+      <span class="lb-sub" dir="rtl">${sub}</span>
+      ${lbClubTag(row.profiles?.club)}`;
     table.appendChild(el);
   });
 }
@@ -204,7 +230,7 @@ async function loadLeaderboard() {
   const orderCol = lbTab === 'ovr' ? 'ovr' : 'points';
   let query = _supabase
     .from('game_results')
-    .select('id, ovr, wins, draws, losses, points, gf, ga, formation, tier, settings, created_at, profiles(username, avatar_url)')
+    .select('id, ovr, wins, draws, losses, points, gf, ga, formation, tier, settings, created_at, profiles(username, avatar_url, club)')
     .order(orderCol, { ascending: false })
     .limit(100);
 
@@ -271,6 +297,7 @@ async function loadLeaderboard() {
       <span class="lb-stat">${esc(mainStat)}</span>
       <span class="lb-sub" dir="rtl">${subStat}</span>
       <button class="lb-view-btn" data-id="${esc(row.id)}" data-user="${esc(username)}">הרכב</button>
+      ${lbClubTag(row.profiles?.club)}
     `;
     tr.querySelector('.lb-view-btn').addEventListener('click', e => {
       openSquadModal(e.target.dataset.id, e.target.dataset.user);

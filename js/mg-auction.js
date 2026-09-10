@@ -451,6 +451,13 @@ function mgaPlaySeason() {
   state.leagueCode = null; state.duelCode = null; state.gauntlet = null; state.career = null;
   state.challenge = null; state.challengeDeck = null; state.challengeReqs = null;
   state.deck = null; state.mgw = null;
+  // ...and a flag of its OWN. Nulling everybody else's field left this season
+  // indistinguishable from a free draft: daMode() fell through to 'draft', so
+  // the draft archive has been filing auctions as ordinary drafts (DA_MODE_HE
+  // has carried an 'auction' label that nothing could produce), and anything
+  // else that asks "which mode is this" would have got the same wrong answer.
+  // Cleared in startGame and crApplyStateFor, beside state.mgw.
+  state.mga = { spent: run.spent ?? null };
   window._leagueReviewMode = null; window._duelReviewMode = null;
   // Two flags that decide what the SEASON contains, set here rather than
   // inherited. Both modes clear challenge/league/gauntlet, which is exactly what

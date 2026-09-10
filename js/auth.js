@@ -85,8 +85,21 @@ function openUsernameEditor() {
 
 async function onSignIn(user) {
   currentUser = user;
-  const { data: profile } = await _supabase
-    .from('profiles').select('username, avatar_url').eq('id', user.id).single();
+  // `club` is asked for in the same round trip, and guarded: PostgREST fails the
+  // WHOLE select on a column it does not know, so a client deployed ahead of
+  // migration 20260910000001 would read no profile at all and show the
+  // choose-a-username modal to people who have had a name for a year. The
+  // fallback costs one extra request in exactly that window and nothing after.
+  let { data: profile } = await _supabase
+    .from('profiles').select('username, avatar_url, club').eq('id', user.id).single();
+  if (!profile) {
+    ({ data: profile } = await _supabase
+      .from('profiles').select('username, avatar_url').eq('id', user.id).single());
+  }
+  // המועדון שלך follows the account onto a new device — and a club built while
+  // signed out gets published now, which is the only moment we know both that
+  // there is a club and that there is somebody to attach it to.
+  if (typeof clubAdoptRemote === 'function') clubAdoptRemote(profile?.club);
   if (!profile?.username) {
     document.getElementById('auth-modal').style.display = 'none';
     document.getElementById('username-modal').style.display = 'flex';
