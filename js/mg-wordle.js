@@ -84,6 +84,7 @@ function mgwRenderIntro() {
 function mgwPlay() {
   const key = mgDayKey();
   state.leagueCode = null; state.duelCode = null; state.gauntlet = null; state.career = null;
+  state.mga = null;        // the auction's flag, if that was the mode before this one
   state.challenge = null; state.challengeDeck = null; state.challengeReqs = null;
   window._leagueReviewMode = null; window._duelReviewMode = null;
   window._restoredSeason = null; window._presetSeason = null;

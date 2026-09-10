@@ -526,7 +526,7 @@ async function crRenderBoard() {
         <div class="lb-row cr-row${me ? ' lgsim-me' : ''}">
           <span class="lb-rank ${r.rank <= 3 ? 'lb-rank-top' : ''}">${r.rank}</span>
           <span class="lb-name">${crEsc(r.username || 'אנונימי')}${me ? ' (אתה)' : ''}
-            <span class="cr-board-club">${crEsc(r.club_name)} ${ending}</span></span>
+            <span class="cr-board-club">${typeof lbClubTag === 'function' ? lbClubTag(r.club, false) : ''}${crEsc(r.club_name)} ${ending}</span></span>
           <span class="lb-stat">🏆 ${r.titles}</span>
           <span class="lb-sub" dir="rtl"><bdi>${r.seasons} עונות</bdi> · <bdi>${r.points} נק׳</bdi></span>
         </div>`;
@@ -805,7 +805,7 @@ function crApplyStateFor(run) {
   const year = crYear(run);
   state.leagueCode = null; state.duelCode = null; state.gauntlet = null;
   state.challenge = null; state.challengeDeck = null; state.challengeReqs = null;
-  state.deck = null; state.mgw = null;
+  state.deck = null; state.mgw = null; state.mga = null;
   window._leagueReviewMode = null; window._duelReviewMode = null;
   window._restoredSeason = null; window._presetSeason = null;
   document.getElementById('league-review-back')?.remove();

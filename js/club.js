@@ -192,6 +192,98 @@ function clubGet() {
 
 function clubSave(c) {
   try { localStorage.setItem(CLUB_KEY, JSON.stringify(c)); } catch (e) { /* full/blocked */ }
+  clubPublish(c);
+}
+
+/* ── the published copy ─────────────────────────────────────────────────────
+   The device stays the source of truth (see the header). What goes to the
+   server is a COPY, and it exists for one reason: a leaderboard shows other
+   people, and your browser has never heard of their club.
+
+   Everything here follows track.js's discipline — it never throws, never
+   blocks, never writes to the console. A crest must not be able to break a
+   save. */
+
+// The part of a club that other people are allowed to see: who you are, not
+// what your keeper wears. The kit is drawn on your own device by the team photo
+// and the back page, so publishing it would be storing a field nothing reads.
+function clubPublicPart(c) {
+  if (!c) return null;
+  const cr = c.crest || CLUB_DEFAULT.crest;
+  return {
+    v: 1,
+    name: String(c.name || '').trim(),
+    city: String(c.city || '').trim(),
+    crest: { source: cr.source, clubId: cr.clubId, shape: cr.shape,
+             pattern: cr.pattern, icon: cr.icon, c1: cr.c1, c2: cr.c2 },
+  };
+}
+
+function clubPublish(c) {
+  try {
+    if (typeof _supabase === 'undefined' || !_supabase) return;
+    if (typeof getCurrentUser !== 'function' || !getCurrentUser()) return;
+    const pub = clubPublicPart(c);
+    // An empty name is a real save: it means the club is gone, and the copy has
+    // to follow. set_my_club() reads that as "clear it".
+    const p = pub && pub.name ? pub : null;
+    _supabase.rpc('set_my_club', { p }).then(() => {}, () => {});
+  } catch (e) { /* a counter must not break a game */ }
+}
+
+/* A club that came off the network is somebody else's text and somebody else's
+   colours, and clubCrestSVG() drops c1/c2 straight into `fill="…"` inside a
+   string every board injects as HTML. set_my_club() already refuses to store
+   anything that is not a #rrggbb or a bare slug — this is the second lock, so
+   that a row written before that function existed, or by a future path nobody
+   remembers, still cannot paint outside its own crest.
+
+   Unknown shape/pattern/icon keys are LEFT ALONE on purpose: clubCrestSVG falls
+   back to a shield/star for a key it does not know, so an icon added after this
+   row was written degrades to a plain crest instead of a blank one. */
+function clubSanitize(raw) {
+  try {
+    if (!raw || typeof raw !== 'object') return null;
+    const name = String(raw.name || '').replace(/[<>]/g, '').trim().slice(0, 24);
+    if (!name) return null;
+    const cr  = (raw.crest && typeof raw.crest === 'object') ? raw.crest : {};
+    const hex = v => (/^#[0-9a-fA-F]{6}$/.test(String(v || '')) ? String(v) : null);
+    const key = v => (/^[a-z]{2,16}$/.test(String(v || '')) ? String(v) : null);
+    const isClub = cr.source === 'club' && CLUB_CREST_FILES.indexOf(String(cr.clubId)) !== -1;
+    return {
+      v: 1,
+      name,
+      city: String(raw.city || '').replace(/[<>]/g, '').trim().slice(0, 24),
+      crest: {
+        source:  isClub ? 'club' : 'built',
+        clubId:  isClub ? String(cr.clubId) : CLUB_DEFAULT.crest.clubId,
+        shape:   key(cr.shape)   || CLUB_DEFAULT.crest.shape,
+        pattern: key(cr.pattern) || CLUB_DEFAULT.crest.pattern,
+        icon:    key(cr.icon)    || CLUB_DEFAULT.crest.icon,
+        c1:      hex(cr.c1)      || CLUB_DEFAULT.crest.c1,
+        c2:      hex(cr.c2)      || CLUB_DEFAULT.crest.c2,
+      },
+    };
+  } catch (e) { return null; }
+}
+
+/* Signing in on a second device. The rule is one-way and deliberately timid:
+   a published club is adopted ONLY when this device has none of its own. A
+   device that already has a club keeps it and republishes it, because the club
+   the player is looking at is the one they last built by hand — and silently
+   swapping a crest under somebody who is mid-career is the kind of surprise
+   this project keeps promising not to ship. */
+function clubAdoptRemote(remote) {
+  try {
+    if (clubHas()) { clubPublish(clubGet()); return false; }
+    const safe = clubSanitize(remote);
+    if (!safe) return false;
+    // Straight to localStorage: clubSave would publish it back to the row it
+    // just came from.
+    try { localStorage.setItem(CLUB_KEY, JSON.stringify(safe)); } catch (e) { return false; }
+    if (typeof clubSyncSetupCard === 'function') clubSyncSetupCard();
+    return true;
+  } catch (e) { return false; }
 }
 
 function clubHas() { const c = clubGet(); return !!(c && String(c.name || '').trim()); }
@@ -669,7 +761,7 @@ function clubSyncSetupCard() {
   if (c && String(c.name || '').trim()) {
     if (art)   art.innerHTML = clubCrestSVG(c, 34);
     if (title) title.textContent = c.name;
-    if (sub)   sub.textContent = (c.city ? c.city + ' · ' : '') + 'לחץ כדי לערוך את הסמל והחולצה';
+    if (sub)   sub.textContent = (c.city ? c.city + ' · ' : '') + 'תארים, שיאים והאחד עשר של כל הזמנים';
   } else {
     if (art)   art.innerHTML = '<span class="scc-empty">🛡</span>';
     if (title) title.innerHTML = 'המועדון שלי <span class="smc-new">חדש</span>';
@@ -679,7 +771,13 @@ function clubSyncSetupCard() {
 
 document.addEventListener('DOMContentLoaded', () => {
   const card = document.getElementById('setup-club-card');
-  if (card) card.addEventListener('click', () => showClubEditor());
+  // With a club, the card is the door to בית המועדון — the cabinet, the records
+  // and the all-time XI, with the editor one button further in. Without one it
+  // still opens the editor directly: the shortest path to having a club at all.
+  if (card) card.addEventListener('click', () => {
+    if (clubHas() && typeof showClubHome === 'function') showClubHome();
+    else showClubEditor();
+  });
   clubSyncSetupCard();
 });
 

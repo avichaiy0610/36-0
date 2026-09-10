@@ -863,6 +863,7 @@ function startGame() {
   state.eraMin = YEAR_MIN; state.eraMax = YEAR_MAX;
   state.coach = null;        // ...and it certainly isn't still run by the last one's manager
   state.deck = null; state.mgw = null;   // ...nor for the fixed daily deck
+  state.mga = null;                      // ...nor still the auction's eleven
   state.challenge = null; state.challengeDeck = null; state.challengeReqs = null;
   window._leagueReviewMode = null;
   window._duelReviewMode = null;
@@ -3305,6 +3306,11 @@ function animateResults(ovr) {
     // the whole table: the cup seat cascades by league position, not just off
     // the champion, so the allocation needs to see who finished where
     wireEuropeButton(myRank, leagueTable);
+    // Cleared before the early return, not after it: a season whose January
+    // window is still open never reaches the consequences below, and the box
+    // would otherwise still be showing the records the PREVIOUS season broke.
+    const clrBox = document.getElementById('clr-broken-box');
+    if (clrBox) clrBox.innerHTML = '';
     if (!consequences) return;
     // A career season is an ordinary season plus a consequence. This runs for
     // restored seasons too (a refresh must not lose the result), so recording it
@@ -3323,6 +3329,15 @@ function animateResults(ovr) {
     if (typeof mgwOnSeasonEnd === 'function') {
       mgwOnSeasonEnd({ rank: myRank, n: leagueTable.length, ovr,
                        wins, draws, losses, gf: gfTotal, ga: gaTotal });
+    }
+    // The club's all-time records. Same seam and the same idempotency key shape
+    // as daRecord, and the same reason: this block runs again for a restored
+    // season, and a record counted twice is a record wrong forever. Which modes
+    // count is decided inside, by asking daMode() rather than by a second list.
+    if (typeof clubRecordSeason === 'function') {
+      const broke = clubRecordSeason({ points: wins * 3 + draws, gf: gfTotal, ga: gaTotal,
+                                       ovr, playerStats, matches });
+      if (clrBox) clrBox.innerHTML = (typeof clrBrokenHTML === 'function') ? clrBrokenHTML(broke) : '';
     }
   }
   // While a January window is pending the season on screen is provisional, so

@@ -472,3 +472,106 @@
   .cm-bp-side { width: 112px; min-width: 112px; }
   .cl-crests { grid-template-columns: repeat(5, 1fr); }
 }
+
+/* ── the club on a leaderboard ────────────────────────────────────────────────
+   Under the username, at the size of a subtitle: the point is that the row now
+   says WHO this is, not that a crest is on the screen. The crest is 15px, which
+   is the same optical weight as the 11px text beside it once its 5:6 box is
+   accounted for — bigger and it starts competing with the score column, which
+   is the one thing a board row is actually for. */
+.lb-club {
+  display: flex; align-items: center; gap: 5px;
+  margin-top: 3px; font-size: 11px; font-weight: 400;
+  color: var(--dim); line-height: 1;
+}
+.lb-club .club-crest { flex: none; }
+
+/* On the league and gauntlet boards the club is a CHILD OF THE ROW, not of the
+   name, and it opens a second grid row spanning everything from the name to the
+   left edge. Nested inside .lb-name it would inherit that column's width, and
+   the column is whatever the score and the stat line leave over — about 70px on
+   a 430 phone, which broke "הפועל ירוחם" across two lines. A club with a
+   two-word name is the normal case, not the edge case. */
+.lb-row > .lb-club { grid-column: 2 / -1; grid-row: 2; margin-top: 1px; }
+/* .lb-row's 8px gap is meant for the space BETWEEN columns; applied to the new
+   second row it opens a hole under the name. Closing it costs nothing where
+   :has() is missing — the row is merely airier. */
+.lb-row:has(> .lb-club) { row-gap: 0; }
+
+/* On the dynasty board the row already names the club the ten seasons were
+   played at, so the crest joins that line instead of opening one of its own. */
+.lb-club-bare { display: inline-flex; margin-top: 0; margin-left: 4px; vertical-align: -3px; }
+
+/* ═══ בית המועדון — הארון, השיאים והאחד עשר ═══════════════════════════════════
+   The room the club lives in. It stays inside the app's dark palette: the ground
+   is the same #0d1117 family every other screen uses, and the club's own colours
+   arrive only through the crest and the shirts, which carry them already. A
+   "trophy room" painted cream would read as a rendering fault here — that lesson
+   is written into the era skins above and it applies to a whole screen far more
+   than it applied to a 300x90 card. */
+.clr-head {
+  display: flex; align-items: center; gap: 14px;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 12px; padding: 14px; margin-bottom: 16px;
+}
+.clr-head-crest { flex: none; line-height: 0; }
+.clr-head-name  { font-size: 1.25rem; font-weight: 900; color: var(--text); }
+.clr-head-city  { font-size: 0.85rem; color: var(--dim); margin-top: 1px; }
+.clr-head-line  { font-size: 0.8rem;  color: #6b7684; margin-top: 6px; }
+
+.clr-intro { text-align: center; padding: 30px 16px; color: var(--dim); }
+.clr-intro p { margin-bottom: 16px; line-height: 1.7; }
+
+/* ── the records ──────────────────────────────────────────────────────────── */
+.clr-block {
+  display: flex; flex-direction: column; gap: 1px;
+  background: var(--border); border: 1px solid var(--border);
+  border-radius: 10px; overflow: hidden; margin-bottom: 14px;
+}
+.clr-row {
+  display: grid; grid-template-columns: 28px 1fr auto;
+  align-items: center; gap: 10px;
+  background: var(--surface2); padding: 10px 12px;
+}
+/* An unfilled record keeps its line, the way an unfilled trophy shelf keeps its
+   silhouette: the gap is the point. */
+.clr-row-empty { opacity: 0.45; }
+.clr-ico    { font-size: 1.05rem; text-align: center; }
+.clr-main   { display: flex; flex-direction: column; min-width: 0; }
+.clr-label  { font-size: 0.72rem; color: #6b7684; }
+.clr-holder { font-size: 0.92rem; color: var(--text); font-weight: 700;
+              white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.clr-none   { font-weight: 400; font-style: normal; color: #55606d; }
+.clr-val    { font-size: 0.95rem; font-weight: 900; color: #4CAF50; text-align: left; }
+.clr-val small { display: block; font-size: 0.68rem; font-weight: 400; color: #6b7684; }
+
+/* ── the eleven ───────────────────────────────────────────────────────────── */
+.clr-xi {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px 4px;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 12px; padding: 14px 8px;
+}
+.clr-man { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 0; }
+.clr-man-name { font-size: 0.72rem; font-weight: 700; color: var(--text);
+                text-align: center; white-space: nowrap; overflow: hidden;
+                text-overflow: ellipsis; max-width: 100%; }
+.clr-man-sub  { font-size: 0.65rem; color: #6b7684; }
+.clr-xi-note  { font-size: 0.72rem; color: #6b7684; text-align: center; margin-top: 8px; }
+.clr-empty    { color: #6b7684; font-size: 0.85rem; padding: 14px; text-align: center;
+                background: var(--surface2); border: 1px solid var(--border); border-radius: 12px; }
+
+.clr-actions { display: flex; gap: 8px; justify-content: center; margin: 20px 0 8px; }
+.clr-danger  { border-color: #6b3030 !important; color: #c96a6a !important; }
+
+/* ── the moment a record falls, on the results screen ─────────────────────── */
+.clr-broken {
+  display: flex; flex-direction: column; gap: 6px;
+  margin: 14px 0; padding: 12px 14px;
+  background: var(--surface2); border: 1px solid #3a3f22;
+  border-inline-start: 3px solid #d4af37; border-radius: 10px;
+}
+.clr-broken-line { font-size: 0.85rem; color: var(--text); line-height: 1.5; }
+
+@media (max-width: 420px) {
+  .clr-xi { grid-template-columns: repeat(3, 1fr); }
+}

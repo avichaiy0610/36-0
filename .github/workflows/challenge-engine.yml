@@ -16,6 +16,10 @@ on:
         description: 'הצע מחדש גם אם כבר יש הצעה ממתינה'
         type: boolean
         default: false
+      only_days:
+        description: 'ימים ספציפיים במקום מחר, YYYY-MM-DD מופרדים בפסיק (לחגים). עתיד בלבד.'
+        type: string
+        default: ''
 
 concurrency:
   group: challenge-engine
@@ -37,3 +41,4 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           DRY_RUN: ${{ inputs.dry_run && '1' || '' }}
           FORCE: ${{ inputs.force && '1' || '' }}
+          ONLY_DAYS: ${{ inputs.only_days }}

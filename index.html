@@ -81,7 +81,7 @@
   <link rel="stylesheet" href="css/player-builder.css?v=b595f873" />
   <link rel="stylesheet" href="css/europe.css?v=151f9861" />
   <link rel="stylesheet" href="css/cup.css?v=47e12ef1" />
-  <link rel="stylesheet" href="css/club.css?v=3cdf9e52" />
+  <link rel="stylesheet" href="css/club.css?v=0331f03a" />
 </head>
 <body>
 
@@ -722,6 +722,10 @@
           </div>
         </div>
 
+        <!-- What this season did to the club's all-time records (js/club-records.js).
+             Empty and hidden unless a record actually fell. -->
+        <div id="clr-broken-box"></div>
+
         <!-- Player Stats Table -->
         <div class="section-label" data-txt="sec-stats">סטטיסטיקות שחקנים</div>
         <div class="stats-table">
@@ -927,6 +931,19 @@
     </div>
   </div>
 
+  <!-- ══ בית המועדון ═══════════════════════════════════════════════════════════
+       The cabinet, the all-time records and the eleven of all time — everything
+       the club has to its name. Filled by showClubHome() in js/club-records.js. -->
+  <div id="screen-club-home" class="screen screen-page">
+    <div class="page-inner">
+      <div class="page-header">
+        <button class="back-btn" id="club-home-back">→ חזרה</button>
+        <h2 class="page-title">🏛 בית המועדון</h2>
+      </div>
+      <div id="club-home-body"></div>
+    </div>
+  </div>
+
   <!-- ══ PROFILE / LIFETIME STATS ══════════════════════════════════════════════ -->
   <div id="screen-profile" class="screen screen-page">
     <div class="page-inner">
@@ -1025,11 +1042,11 @@
   <script src="js/errorlog.js?v=1da53f7f"></script>
   <script src="js/track.js?v=7ce56253"></script>
   <script src="js/texts.js?v=1cab6ae8"></script>
-  <script src="js/club.js?v=80878e81"></script>
-  <script src="js/auth.js?v=d5305b14"></script>
+  <script src="js/club.js?v=d0b1ab0b"></script>
+  <script src="js/auth.js?v=0e52a3af"></script>
   <script src="js/achievements.js?v=cfc1c564"></script>
-  <script src="js/leaderboard.js?v=033b0c8d"></script>
-  <script src="js/draft-archive.js?v=aa3c8d7b"></script>
+  <script src="js/leaderboard.js?v=163eb038"></script>
+  <script src="js/draft-archive.js?v=97141cb9"></script>
   <script src="js/profile.js?v=db6cf053"></script>
   <script src="js/gauntlet-map.js?v=53e83fb5"></script>
   <script src="js/gauntlet.js?v=8affe351"></script>
@@ -1048,8 +1065,12 @@
   <script src="js/chemistry.js?v=60e55753"></script>
   <script src="js/data.js?v=e2436bbd"></script>
   <script src="js/sim-engine.js?v=784ec7b1"></script>
-  <script src="js/game.js?v=aa11ff3e"></script>
+  <script src="js/game.js?v=03c2be65"></script>
   <script src="js/club-media.js?v=fcf688c0"></script>
+  <!-- after club.js and draft-archive.js (its crest and its daMode), and it is
+       only ever called from a click or from the end of a season, so career.js
+       loading later is fine -->
+  <script src="js/club-records.js?v=881b86a1"></script>
   <script src="js/europe-data.js?v=48af5122"></script>
   <script src="js/eu-caps-data.js?v=ed8899a2"></script>
   <script src="js/europe.js?v=53abf49a"></script>
@@ -1064,13 +1085,13 @@
   <script src="js/challenges.js?v=b1acda28"></script>
   <script src="js/trophy-art.js?v=75b5a98a"></script>
   <script src="js/trophies.js?v=8f674334"></script>
-  <script src="js/career.js?v=0cf48d03"></script>
+  <script src="js/career.js?v=9a7313d6"></script>
   <script src="js/career-admin.js?v=8d02ae14"></script>
   <script src="js/minigames.js?v=8cafa492"></script>
   <script src="js/mg-guess.js?v=98f90f25"></script>
   <script src="js/mg-versus.js?v=c8bf9b7b"></script>
-  <script src="js/mg-auction.js?v=9cd435f4"></script>
-  <script src="js/mg-wordle.js?v=4cc6be90"></script>
+  <script src="js/mg-auction.js?v=6641a0ac"></script>
+  <script src="js/mg-wordle.js?v=7d3fcd39"></script>
   <script src="js/mg-grid.js?v=4bda27d5"></script>
   <script src="js/attr-data.js?v=8bb8940e"></script>
   <script src="js/attrs.js?v=aa09fd77"></script>

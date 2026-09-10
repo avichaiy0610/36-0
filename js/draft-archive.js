@@ -43,6 +43,7 @@ function daMode() {
   if (state.duelCode)  return 'duel';
   if (state.challenge) return 'challenge';
   if (state.mgw)       return 'wordle';
+  if (state.mga)       return 'auction';
   if (typeof salActive === 'function' && salActive()) return 'salary';
   return 'draft';
 }
