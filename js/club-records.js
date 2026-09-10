@@ -37,6 +37,12 @@ function clrGroupOf(pos) {
   return g ? g.id : 'mid';   // an unknown position is a midfielder, not a crash
 }
 
+// Hebrew counts one thing in the singular and says the number only from two up:
+// "עונה אחת", never "1 עונות". Every value on this screen can legitimately BE
+// one — a club with one season, a striker with one goal — so it goes through
+// here rather than being concatenated.
+function clrCount(n, one, many) { return n === 1 ? one : n + ' ' + many; }
+
 function clrEsc(s) {
   return String(s ?? '').replace(/[&<>"']/g, c => (
     { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
@@ -306,11 +312,15 @@ function clrRecordsHTML(l) {
   return `
     <div class="section-label">🏅 שיאי המועדון</div>
     <div class="clr-block">
-      ${clrRecordRow('👑', 'מלך השערים של כל הזמנים', scorer && scorer.p.name, scorer ? scorer.v + ' שערים' : '')}
-      ${clrRecordRow('🎩', 'מלך הבישולים', assist && assist.p.name, assist ? assist.v + ' בישולים' : '')}
-      ${clrRecordRow('🎖', 'אגדת המועדון', legend && legend.p.name, legend ? legend.v + ' עונות' : '')}
+      ${clrRecordRow('👑', 'מלך השערים של כל הזמנים', scorer && scorer.p.name,
+                     scorer ? clrCount(scorer.v, 'שער אחד', 'שערים') : '')}
+      ${clrRecordRow('🎩', 'מלך הבישולים', assist && assist.p.name,
+                     assist ? clrCount(assist.v, 'בישול אחד', 'בישולים') : '')}
+      ${clrRecordRow('🎖', 'אגדת המועדון', legend && legend.p.name,
+                     legend ? clrCount(legend.v, 'עונה אחת', 'עונות') : '')}
       ${clrRecordRow('⚽', 'הכי הרבה שערים בעונה', bestSeason && bestSeason.name,
-                     bestSeason ? bestSeason.n + ' שערים' : '', bestSeason && bestSeason.season)}
+                     bestSeason ? clrCount(bestSeason.n, 'שער אחד', 'שערים') : '',
+                     bestSeason && bestSeason.season)}
     </div>
     <div class="clr-block">
       ${clrRecordRow('📈', 'הכי הרבה נקודות בעונה', '', t.points ? t.points.n + ' נק׳' : '',
@@ -325,6 +335,13 @@ function clrRecordsHTML(l) {
     </div>`;
 }
 
+// The numbers are the CLUB's, not this screen's: cmSetNum in js/club-media.js
+// stores them on the club record keyed by the player's FULL name, so a man
+// keeps the number you gave him in the team photo when he turns up in the
+// eleven of all time — and the other way round. Same store, same key, same
+// edit-mode-not-an-input pattern.
+let _clrEditNums = false;
+
 function clrXIHTML(l) {
   const xi = clrAllTimeXI(l);
   if (!xi.length) {
@@ -338,16 +355,27 @@ function clrXIHTML(l) {
   const shirt = (name, n, gk) => (typeof clubShirtSVG === 'function')
     ? clubShirtSVG(club, 54, n, gk, (typeof clubSurname === 'function' ? clubSurname(name) : name))
     : '';
-  const cells = xi.map((p, i) => `
+  // A number you chose wins over the teamsheet default, which is simply the
+  // order the eleven is built in: 1 in goal, 2-5 across the back, 6-8 in
+  // midfield, 9-11 up front.
+  const over = (typeof cmNums === 'function') ? cmNums() : {};
+  const cells = xi.map((p, i) => {
+    const num = over[p.name] || (i + 1);
+    return `
     <div class="clr-man">
-      ${shirt(p.name, i + 1, p.group === 'gk')}
+      ${shirt(p.name, num, p.group === 'gk')}
       <span class="clr-man-name">${clrEsc(typeof playerShortName === 'function' ? playerShortName(p.name) : p.name)}</span>
       <span class="clr-man-sub">${p.ovr}${p.season ? ' · ' + clrEsc(p.season) : ''}</span>
-    </div>`).join('');
+      ${_clrEditNums ? `<input class="cm-num-in" type="number" min="1" max="99" value="${num}"
+              data-name="${clrEsc(p.name)}" aria-label="מספר של ${clrEsc(p.name)}">` : ''}
+    </div>`;
+  }).join('');
   return `
     <div class="section-label">⭐ האחד עשר של כל הזמנים</div>
     <div class="clr-xi">${cells}</div>
-    <div class="clr-xi-note">הדירוג הוא זה שהיה לו בעונה שבה שיחק אצלך.</div>`;
+    <div class="clr-xi-note">הדירוג הוא זה שהיה לו בעונה שבה שיחק אצלך.</div>
+    <button class="cl-mini${_clrEditNums ? ' cm-edit-on' : ''}" id="clr-nums">${
+      _clrEditNums ? '✓ סיום' : '✏️ ערוך מספרים'}</button>`;
 }
 
 function clubHomeHTML() {
@@ -397,6 +425,24 @@ function showClubHome() {
   if (back) back.onclick = () => {
     if (typeof clubSyncSetupCard === 'function') clubSyncSetupCard();
     if (typeof showScreen === 'function') showScreen('setup');
+  };
+
+  // Editing the numbers is a MODE, not an input parked on every shirt — the
+  // same call club-media.js made, for the same reason: eleven live inputs are
+  // eleven things between you and the team you came here to look at.
+  body.querySelector('#clr-nums')?.addEventListener('click', () => {
+    _clrEditNums = !_clrEditNums;
+    showClubHome();
+  });
+  // Delegated, and ASSIGNED rather than added: showClubHome re-renders itself
+  // after every change, and #club-home-body survives that — addEventListener
+  // here would stack one more listener per render until a single edit fired
+  // eleven of them.
+  body.onchange = e => {
+    const el = e.target.closest && e.target.closest('.cm-num-in');
+    if (!el || typeof cmSetNum !== 'function') return;
+    cmSetNum(el.dataset.name, el.value);
+    showClubHome();
   };
 
   const edit = () => { if (typeof showClubEditor === 'function') showClubEditor(() => showClubHome()); };

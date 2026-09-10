@@ -32,6 +32,22 @@ function lbClubTag(club, withName = true) {
     : `<span class="lb-club lb-club-bare">${crest}</span>`;
 }
 
+/* PostgREST fails the WHOLE select on a column it does not know — it does not
+   quietly drop the field — so a client asking for profiles.club before
+   migration 20260910000001 has run does not lose a crest, it loses the BOARD
+   and prints "אין ריצות עדיין" over a table full of runs. That is exactly what
+   happened the first time this shipped, on a gauntlet board holding cleared
+   depth-8 runs.
+
+   So every board asks twice: once with the club, and — only on 42703, the
+   undefined-column code, never on a real failure — once without it. Costs one
+   extra round trip in the window between the two deploys and nothing after. */
+async function lbWithClub(build) {
+  const first = await build('profiles(username, avatar_url, club)');
+  if (!first.error || String(first.error.code) !== '42703') return first;
+  return build('profiles(username, avatar_url)');
+}
+
 let lbMode   = 'all';   // all | season | peak
 // 'modern' = the general board: today's 36/33 format only, so every record on it
 // is comparable. Any other value is a season year — its own board, where everyone
@@ -172,13 +188,13 @@ async function loadSalaryBoardTab(table) {
 }
 
 async function loadGauntletBoard(table) {
-  const { data: rows, error } = await _supabase
+  const { data: rows, error } = await lbWithClub(prof => _supabase
     .from('gauntlet_runs')
-    .select('depth, cleared, banner, team_ovr, ended, created_at, profiles(username, avatar_url, club)')
+    .select('depth, cleared, banner, team_ovr, ended, created_at, ' + prof)
     .order('banner', { ascending: false })
     .order('depth', { ascending: false })
     .order('created_at', { ascending: true })
-    .limit(200);
+    .limit(200));
 
   if (error || !rows?.length) {
     table.innerHTML = '<div class="page-loading">אין ריצות עדיין — היה הראשון</div>';
@@ -228,36 +244,41 @@ async function loadLeaderboard() {
   if (lbTab === 'salary')   return loadSalaryBoardTab(table);
 
   const orderCol = lbTab === 'ovr' ? 'ovr' : 'points';
-  let query = _supabase
-    .from('game_results')
-    .select('id, ovr, wins, draws, losses, points, gf, ga, formation, tier, settings, created_at, profiles(username, avatar_url, club)')
-    .order(orderCol, { ascending: false })
-    .limit(100);
+  // Built as a function of the profiles embed so lbWithClub can run it twice —
+  // the filters below are the same either way and must not be written out twice.
+  const build = prof => {
+    let query = _supabase
+      .from('game_results')
+      .select('id, ovr, wins, draws, losses, points, gf, ga, formation, tier, settings, created_at, ' + prof)
+      .order(orderCol, { ascending: false })
+      .limit(100);
 
-  if (lbPeriod === 'today') {
-    const midnight = new Date(); midnight.setHours(0, 0, 0, 0);
-    query = query.gte('created_at', midnight.toISOString());
-  } else if (lbPeriod === 'week') {
-    query = query.gte('created_at', new Date(Date.now() - 7 * 86400000).toISOString());
-  } else if (lbPeriod === 'month') {
-    query = query.gte('created_at', new Date(Date.now() - 30 * 86400000).toISOString());
-  }
+    if (lbPeriod === 'today') {
+      const midnight = new Date(); midnight.setHours(0, 0, 0, 0);
+      query = query.gte('created_at', midnight.toISOString());
+    } else if (lbPeriod === 'week') {
+      query = query.gte('created_at', new Date(Date.now() - 7 * 86400000).toISOString());
+    } else if (lbPeriod === 'month') {
+      query = query.gte('created_at', new Date(Date.now() - 30 * 86400000).toISOString());
+    }
 
-  if (lbMode === 'peak')   query = query.eq('settings->>peak_mode', 'true');
-  if (lbMode === 'season') query = query.neq('settings->>peak_mode', 'true');
+    if (lbMode === 'peak')   query = query.eq('settings->>peak_mode', 'true');
+    if (lbMode === 'season') query = query.neq('settings->>peak_mode', 'true');
 
-  // League board: the general one excludes historical formats entirely; a season
-  // board shows only runs played in that season's own format.
-  if (lbLeague === 'modern') {
-    // rows saved before the format setting existed were all modern
-    query = query.or('settings->>league_format.is.null,settings->>league_format.eq.modern');
-  } else {
-    query = query.eq('settings->>opp_season', lbLeague).eq('settings->>league_format', 'authentic');
-  }
+    // League board: the general one excludes historical formats entirely; a season
+    // board shows only runs played in that season's own format.
+    if (lbLeague === 'modern') {
+      // rows saved before the format setting existed were all modern
+      query = query.or('settings->>league_format.is.null,settings->>league_format.eq.modern');
+    } else {
+      query = query.eq('settings->>opp_season', lbLeague).eq('settings->>league_format', 'authentic');
+    }
+    return query;
+  };
 
   lbUpdateSeasonNote();
 
-  const { data: rows, error } = await query;
+  const { data: rows, error } = await lbWithClub(build);
   if (error || !rows?.length) {
     table.innerHTML = '<div class="page-loading">אין תוצאות עדיין</div>';
     return;
