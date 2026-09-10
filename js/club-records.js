@@ -413,10 +413,56 @@ function clubHomeHTML() {
     </div>`;
 }
 
-function showClubHome() {
+/* REDRAWING IS NOT NAVIGATING, and conflating the two is a bug you feel rather
+   than see: calling showScreen() to re-render threw the reader back to the top
+   of the page, so toggling the number editor — which lives at the BOTTOM, under
+   the eleven — took you away from the thing you had just clicked.
+
+   The mechanism is worth writing down because it is not the obvious one.
+   showScreen ends with `el.scrollTop = 0`, but on this page the SCREEN is not
+   the scroller — the window is, and that line does nothing. What actually moves
+   you is the line above it: showScreen removes `.active` from every screen and
+   then puts it back, and for that instant the document has no height, so the
+   browser clamps the window scroll to 0. Measured, 998 → 0.
+
+   So the render lives here on its own, and showClubHome() is only the part that
+   arrives at the screen. Anything the page does to itself calls clrRender(). */
+function clrRender() {
   const body = document.getElementById('club-home-body');
   if (!body) return;
   body.innerHTML = clubHomeHTML();
+
+  // Editing the numbers is a MODE, not an input parked on every shirt — the
+  // same call club-media.js made, for the same reason: eleven live inputs are
+  // eleven things between you and the team you came here to look at.
+  body.querySelector('#clr-nums')?.addEventListener('click', () => {
+    _clrEditNums = !_clrEditNums;
+    clrRender();
+  });
+  // Delegated, and ASSIGNED rather than added: the page re-renders itself after
+  // every change and #club-home-body survives that — addEventListener here
+  // would stack one more listener per render until a single edit fired eleven.
+  body.onchange = e => {
+    const el = e.target.closest && e.target.closest('.cm-num-in');
+    if (!el || typeof cmSetNum !== 'function') return;
+    cmSetNum(el.dataset.name, el.value);
+    clrRender();
+  };
+
+  const edit = () => { if (typeof showClubEditor === 'function') showClubEditor(() => clrRender()); };
+  body.querySelector('#clr-make')?.addEventListener('click', edit);
+  body.querySelector('#clr-edit')?.addEventListener('click', edit);
+  body.querySelector('#clr-reset')?.addEventListener('click', () => {
+    // Wiping is never automatic — not on a rename, not on a career ending. It
+    // happens here, once, and it says what it is taking.
+    if (!confirm('לאפס את כל שיאי המועדון? התארים והקריירות יישארו, השיאים יימחקו.')) return;
+    clrWipe();
+    clrRender();
+  });
+}
+
+function showClubHome() {
+  clrRender();
   if (typeof showScreen === 'function') showScreen('club-home');
   if (typeof track === 'function') track('open', 'club');
 
@@ -426,33 +472,4 @@ function showClubHome() {
     if (typeof clubSyncSetupCard === 'function') clubSyncSetupCard();
     if (typeof showScreen === 'function') showScreen('setup');
   };
-
-  // Editing the numbers is a MODE, not an input parked on every shirt — the
-  // same call club-media.js made, for the same reason: eleven live inputs are
-  // eleven things between you and the team you came here to look at.
-  body.querySelector('#clr-nums')?.addEventListener('click', () => {
-    _clrEditNums = !_clrEditNums;
-    showClubHome();
-  });
-  // Delegated, and ASSIGNED rather than added: showClubHome re-renders itself
-  // after every change, and #club-home-body survives that — addEventListener
-  // here would stack one more listener per render until a single edit fired
-  // eleven of them.
-  body.onchange = e => {
-    const el = e.target.closest && e.target.closest('.cm-num-in');
-    if (!el || typeof cmSetNum !== 'function') return;
-    cmSetNum(el.dataset.name, el.value);
-    showClubHome();
-  };
-
-  const edit = () => { if (typeof showClubEditor === 'function') showClubEditor(() => showClubHome()); };
-  body.querySelector('#clr-make')?.addEventListener('click', edit);
-  body.querySelector('#clr-edit')?.addEventListener('click', edit);
-  body.querySelector('#clr-reset')?.addEventListener('click', () => {
-    // Wiping is never automatic — not on a rename, not on a career ending. It
-    // happens here, once, and it says what it is taking.
-    if (!confirm('לאפס את כל שיאי המועדון? התארים והקריירות יישארו, השיאים יימחקו.')) return;
-    clrWipe();
-    showClubHome();
-  });
 }
