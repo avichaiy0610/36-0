@@ -101,7 +101,11 @@ CREATE TABLE IF NOT EXISTS player_votes (
   -- 1999/00 to 2025/26. Unbounded client text here would be unauthenticated
   -- storage amplification, since p_voter is forgeable and costs nothing.
   season     text        NOT NULL CHECK (season ~ '^[0-9]{4}/[0-9]{2}$'),
-  voter      text        NOT NULL,
+  -- The namespace invariant, in the database rather than only in two function
+  -- bodies and a comment above them. A future backfill, an admin tool or a
+  -- Task 7 RPC cannot quietly write an unprefixed voter and collapse the two
+  -- identity spaces back into one.
+  voter      text        NOT NULL CHECK (voter ~ '^[ua]:'),
   is_user    boolean     NOT NULL DEFAULT false,
   ovr        smallint    NOT NULL CHECK (ovr BETWEEN 40 AND 99),
   tag        text        REFERENCES crowd_tags(key),
@@ -114,8 +118,14 @@ CREATE TABLE IF NOT EXISTS player_votes (
 -- columns alone this index would be dead weight paid for on every write. The
 -- INCLUDE is what earns it: crowd_ratings groups the entire table by
 -- (player_key, season) and needs ovr and tag, neither of which is in the PK, so
--- without the payload the planner sequentially scans and sorts. With it the
+-- without the payload the planner seq-scans and hash-aggregates. With it the
 -- view is an index-only scan over groups that arrive already in order.
+--
+-- It is not free, and the cost lands where it is least obvious: INCLUDE columns
+-- count in indnatts and sit in the HOT-blocking attribute bitmap, so changing
+-- ovr or tag now blocks a HOT update. A revision writes a new heap tuple at a
+-- new TID plus an entry in every index — see the upsert in vote_player, which
+-- is written so that a re-vote changing nothing writes nothing.
 CREATE INDEX IF NOT EXISTS player_votes_ps
   ON player_votes (player_key, season) INCLUDE (ovr, tag);
 
@@ -181,12 +191,28 @@ CREATE TABLE IF NOT EXISTS note_reports (
   PRIMARY KEY (note_id, user_id)
 );
 
+-- Postgres does not index a foreign key column for you, and the PK here leads
+-- with note_id — so without this, deleting an account seq-scans the whole table
+-- to service the ON DELETE CASCADE.
+CREATE INDEX IF NOT EXISTS note_reports_user ON note_reports (user_id);
+
 ALTER TABLE note_reports ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON TABLE note_reports FROM anon, authenticated;
 
 -- ── approved ratings ────────────────────────────────────────────────────────
 -- What the owner approved in the dashboard. scripts/apply_crowd_ratings.js
 -- reads from here.
+--
+-- WHY player_key AND season ARE NOT CLAMPED HERE, WHILE THEY ARE ON THE TWO
+-- TABLES ABOVE. Read this before Task 7 leans on it, because the obvious
+-- version of the reason is wrong. It is true of approve_rating, which copies a
+-- row that already passed the CHECKs on player_votes. It is NOT true of
+-- dismiss_rating, which reads a vote count with SELECT … INTO and then inserts
+-- COALESCE(v_n, 0) without requiring that the player-season exists at all — so
+-- it will write whatever key it is handed. What actually makes both tables safe
+-- is not their input path but their door: every RPC that writes them is behind
+-- is_site_admin(), so the only person who can put junk here is the owner, on
+-- his own dashboard. Widen that gate and these two columns need the CHECKs.
 CREATE TABLE IF NOT EXISTS rating_approvals (
   id          bigserial PRIMARY KEY,
   player_key  text        NOT NULL,
@@ -251,12 +277,32 @@ AS $$
    WHERE s.rn > k.cut AND s.rn <= k.c - k.cut;
 $$;
 
--- Not cosmetic. A function is EXECUTE-able by PUBLIC by default and PostgREST
--- publishes everything in this schema, so without this REVOKE the endpoint
--- /rpc/crowd_trimmed_avg is open to anon, takes an unbounded smallint[], and
--- sorts whatever it is handed. Nothing but the view calls it, and the view runs
--- with its owner's rights.
+-- A function is EXECUTE-able by PUBLIC by default, so the REVOKE narrows the
+-- grant to something deliberate. But unlike the four RPCs at the bottom of this
+-- file, this one MUST be granted back to anon and authenticated, and getting
+-- that wrong takes the whole feature dark.
+--
+-- WHY THE VIEW DOES NOT COVER IT. security_invoker = false redirects permission
+-- checks on RELATIONS to the view owner — it sets checkAsUser on the range
+-- table entry. It does not change GetUserId(), and EXECUTE on a function in the
+-- query tree is checked against the CURRENT user at executor init
+-- (init_fcache → pg_proc_aclcheck with GetUserId()). A security-definer view
+-- confers no function execute rights. Without the GRANT below, every
+-- `SELECT … FROM crowd_ratings` fails with "permission denied for function
+-- crowd_trimmed_avg" — every player-card hover, dead. Nor does inlining rescue
+-- it: inline_function() declines to inline when the ACL check fails, so the
+-- error surfaces either way.
+--
+-- THE BETTER END STATE, AND WHY IT IS NOT HERE. Folding this arithmetic
+-- directly into the view body would leave no function call to authorise and no
+-- /rpc/crowd_trimmed_avg endpoint at all. That is cleaner, and it is the thing
+-- to do the day somebody has a database in front of them. It was not done now
+-- because this migration has never been executed anywhere: an untested rewrite
+-- of the only real arithmetic in the file is a worse risk than an exposed pure
+-- calculator that touches no data, whose only abuse is burning CPU on an array
+-- already bounded by the request body limit.
 REVOKE ALL ON FUNCTION crowd_trimmed_avg(smallint[]) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION crowd_trimmed_avg(smallint[]) TO anon, authenticated;
 
 -- ── the public aggregate ────────────────────────────────────────────────────
 -- The only thing the world reads.
@@ -365,10 +411,17 @@ BEGIN
     RETURN jsonb_build_object('error', 'bad tag');
   END IF;
 
-  -- The limit applies to new opinions only. A revision rewrites a row that
-  -- already exists and adds nothing to the table, so budgeting it would punish
-  -- exactly the behaviour this feature invites — "you can change your mind".
-  -- What is budgeted is rows created, which is the quantity that actually grows.
+  -- The limit applies to new opinions only. Budgeting revisions would punish
+  -- exactly the behaviour this feature invites — "you can change your mind" —
+  -- so what is budgeted is rows created, the quantity that grows without bound.
+  --
+  -- A revision is NOT free, though, and the earlier draft of this comment
+  -- claimed it was. The INCLUDE on player_votes_ps blocks HOT, so changing ovr
+  -- or tag costs a new heap tuple plus an entry in all three indexes. Unmetered
+  -- revisions and a covering index multiply into a 4x-amplified bloat loop from
+  -- one client-chosen identity. The WHERE on the upsert below is what makes
+  -- that loop unprofitable: the common case, re-sending an unchanged vote,
+  -- writes nothing at all.
   SELECT EXISTS (SELECT 1 FROM player_votes
                   WHERE player_key = p_player_key AND season = p_season
                     AND voter = v_voter) INTO v_known;
@@ -392,13 +445,21 @@ BEGIN
   -- later vote signed-in and only ovr/tag/updated_at would move, and the stale
   -- false flag then let the attacker read the row back. The prefix above closes
   -- that at the root; this keeps the flag honest rather than load-bearing.
+  --
+  -- The WHERE turns an identical re-vote into a no-op: no heap tuple, no index
+  -- tuples, no error, and the function still answers ok. Nothing in this file
+  -- or in the Task 7 dashboard reads updated_at, so leaving it stale on a write
+  -- that changed nothing costs nothing.
   INSERT INTO player_votes (player_key, season, voter, is_user, ovr, tag, updated_at)
   VALUES (p_player_key, p_season, v_voter, uid IS NOT NULL, p_ovr, p_tag, now())
   ON CONFLICT (player_key, season, voter)
   DO UPDATE SET ovr        = EXCLUDED.ovr,
                 tag        = EXCLUDED.tag,
                 is_user    = EXCLUDED.is_user,
-                updated_at = now();
+                updated_at = now()
+          WHERE player_votes.ovr     IS DISTINCT FROM EXCLUDED.ovr
+             OR player_votes.tag     IS DISTINCT FROM EXCLUDED.tag
+             OR player_votes.is_user IS DISTINCT FROM EXCLUDED.is_user;
 
   RETURN jsonb_build_object('ok', true);
 END $$;
@@ -454,6 +515,15 @@ DECLARE
   clean text;
 BEGIN
   IF uid IS NULL THEN RETURN jsonb_build_object('error', 'not signed in'); END IF;
+
+  -- The guard that comes with a profiles(id) foreign key, and the reason the
+  -- convention is safe to adopt: submit_career_run and submit_salary_run both
+  -- check this before inserting. Without it an authenticated caller whose
+  -- profile row is missing gets a raw 23503 and a 500 — where the auth.users
+  -- key this column used to carry would simply have succeeded.
+  IF NOT EXISTS (SELECT 1 FROM profiles WHERE id = uid) THEN
+    RETURN jsonb_build_object('error', 'no profile');
+  END IF;
 
   IF p_player_key IS NULL
      OR char_length(p_player_key) < 1 OR char_length(p_player_key) > 64 THEN
@@ -516,6 +586,13 @@ DECLARE
   uid uuid := auth.uid();
 BEGIN
   IF uid IS NULL THEN RETURN jsonb_build_object('error', 'not signed in'); END IF;
+
+  -- Same guard as submit_player_note: note_reports.user_id is a profiles(id)
+  -- key, so a caller without a profile row would raise 23503 rather than be
+  -- told what went wrong.
+  IF NOT EXISTS (SELECT 1 FROM profiles WHERE id = uid) THEN
+    RETURN jsonb_build_object('error', 'no profile');
+  END IF;
 
   -- The INSERT is the gate. It writes nothing when the note is missing or
   -- unapproved (the SELECT yields no row) and nothing when this person already
