@@ -1,20 +1,39 @@
 -- ─────────────────────────────────────────────────────────────────────────────
--- דירוגי הקהל.
+-- דירוגי הקהל — the crowd's ratings.
 --
--- כל התגיות הקיימות (js/tags.js) הן עובדות שהדאטה מוכיחה: מלך שערים, זוכה
--- אליפויות, נאמן למועדון. אף אחת מהן איננה דעה. הטבלאות כאן פותחות בדיוק את
--- מה שהדאטה לא יכולה לדעת — מי בעט נייחות, מי היה מנהיג, מי לא מומש.
+-- Every tag the game already has (js/tags.js) is a fact the data proves: top
+-- scorer, title winner, one-club man. Not one of them is an opinion. The tables
+-- here open exactly what the data cannot know — who took the free kicks, who
+-- led the dressing room, who never became what he was supposed to be.
 --
--- שום דבר כאן לא נוגע במשחק בזמן ריצה. דירוג שהבעלים אישר עובר ל-js/data.js
--- דרך scripts/apply_crowd_ratings.js, בדיוק כמו כימיה ותגיות. הסימולציה
--- נשארת דטרמיניסטית ועובדת אופליין, ואין מצב שכשל רשת מזיז איזון או לוחות.
+-- Nothing here touches the game at runtime. A rating the owner approves reaches
+-- js/data.js through scripts/apply_crowd_ratings.js, the same way chemistry and
+-- tags already do. The simulation stays deterministic and works offline, and no
+-- network failure can move a balance number or a board.
 --
--- הצבעות גולמיות אף פעם לא נקראות מבחוץ. העולם רואה את crowd_ratings בלבד.
+-- Raw votes are never read from outside. The world sees crowd_ratings and
+-- nothing else.
+--
+-- ── WHAT THIS SCHEMA DELIBERATELY DOES NOT DEFEND AGAINST ────────────────────
+-- Sybil attacks. An anonymous voter supplies his own p_voter, so a loop of
+-- fresh UUIDs is a loop of fresh rate-limit buckets, and `n` on any
+-- player-season is manufacturable by one person with a script. Trimming 10%
+-- from each end defends against a handful of outliers; it does nothing against
+-- a forged majority. That is inherent to voting without an account, and
+-- anonymous voting was chosen on purpose, to get volume.
+--
+-- What bounds the damage is the human gate: nothing reaches the game until the
+-- owner approves a row in the dashboard and then runs the apply script by hand.
+-- But `n` is the trust signal the owner reads off that dashboard — "412 people
+-- said 86" — and `n` is precisely the number an attacker can inflate. Read it
+-- as "at least this many opinions were submitted", never as "this many people
+-- think so". This is a decision that was made, not a hole that was missed.
 -- ─────────────────────────────────────────────────────────────────────────────
 
--- ── רשימת התגיות הסגורה ─────────────────────────────────────────────────────
--- שלושה עשר מפתחות. הלקוח מציג עשרה: לשוער מוחלפות set_piece→reflexes,
--- magic→sweeper, pace→distribution. האכיפה כאן כדי ששום ערך אחר לא ייכנס.
+-- ── the closed tag list ─────────────────────────────────────────────────────
+-- Thirteen keys. The client shows ten: for a keeper set_piece→reflexes,
+-- magic→sweeper, pace→distribution are swapped in. Enforced here so that no
+-- other value can ever enter the table.
 CREATE TABLE IF NOT EXISTS crowd_tags (
   key   text PRIMARY KEY,
   label text NOT NULL
@@ -40,51 +59,92 @@ ALTER TABLE crowd_tags ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS crowd_tags_read ON crowd_tags;
 CREATE POLICY crowd_tags_read ON crowd_tags FOR SELECT USING (true);
 
--- REVOKE לפני GRANT, וזה לא קישוט. Supabase מריצה בבוטסטרפ
+-- REVOKE before GRANT, and it is not decoration. Supabase's bootstrap runs
 -- `ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon,
--- authenticated`, כך שכל טבלה חדשה בסכימה הזו נולדת עם SELECT/INSERT/UPDATE/
--- DELETE לשני התפקידים האלה עוד לפני שכתבנו שורת GRANT אחת. RLS עוצר את
--- הכתיבות, אבל "אין GRANT" זו אמירה שפשוט לא נכונה בפרויקט הזה אלא אם מבטלים
--- אותה במפורש. service_role לא נוגעים בו — apply_crowd_ratings.js צריך אותו.
+-- authenticated`, so every table a migration creates in this schema is born
+-- with SELECT/INSERT/UPDATE/DELETE for both roles before a single GRANT is
+-- written. RLS still stops the rows, but "there is no GRANT" is simply not a
+-- true sentence in this project unless it is made true. service_role is left
+-- alone on purpose — apply_crowd_ratings.js needs it.
 REVOKE ALL ON TABLE crowd_tags FROM anon, authenticated;
 GRANT SELECT ON TABLE crowd_tags TO anon, authenticated;
 
--- ── ההצבעות ─────────────────────────────────────────────────────────────────
--- voter = auth.uid()::text כשמחובר, אחרת client_id מ-js/track.js. המפתח
--- הייחודי הוא מה שהופך הצבעה חוזרת לעדכון: מותר לשנות דעה, ואי אפשר להצביע
--- פעמיים על אותו שחקן-עונה מאותה זהות.
+-- ── the votes ───────────────────────────────────────────────────────────────
+-- `voter` is a namespaced identity, and the prefix is the security model of
+-- this whole table: 'u:' || auth.uid() for a signed-in voter, 'a:' || client_id
+-- (the uuid js/track.js already keeps) for an anonymous one.
+--
+-- WHY THE PREFIX EXISTS. Without it the two identity spaces share one key
+-- space, and auth.uid()::text is a bare UUID — indistinguishable from the
+-- client-supplied client_id, which has to match the same regex. Those UUIDs are
+-- public: career_board() is granted to anon and returns user_id next to
+-- username (20260825000003_career_board.sql). So one unauthenticated call
+-- harvests real user ids, and a second call to vote_player with a harvested id
+-- as p_voter would collide with that person's primary key, overwrite his rating
+-- through the ON CONFLICT branch, and let the attacker read it back through
+-- my_player_vote afterwards. The prefix makes that unreachable by construction:
+-- nothing a client sends can ever address a 'u:' row, because 'u:' is built
+-- inside vote_player and only from a verified token.
+--
+-- The unique key is what turns a repeat vote into an update: changing your mind
+-- is allowed; voting twice on one player-season from one identity is not.
+--
+-- created_at is written once and never again — note that it is absent from the
+-- ON CONFLICT DO UPDATE list further down, and updated_at is the opposite. The
+-- first draft had only updated_at, and the rate limit built on it measured the
+-- wrong quantity entirely: "distinct player-seasons this identity touched this
+-- hour". Hammering ONE player-season held that count at 1 forever, while
+-- somebody legitimately revising forty old opinions was locked out.
 CREATE TABLE IF NOT EXISTS player_votes (
-  player_key text        NOT NULL,
-  season     text        NOT NULL,
+  player_key text        NOT NULL CHECK (char_length(player_key) BETWEEN 1 AND 64),
+  -- The season format every squad in js/data.js uses, all 27 of them, from
+  -- 1999/00 to 2025/26. Unbounded client text here would be unauthenticated
+  -- storage amplification, since p_voter is forgeable and costs nothing.
+  season     text        NOT NULL CHECK (season ~ '^[0-9]{4}/[0-9]{2}$'),
   voter      text        NOT NULL,
   is_user    boolean     NOT NULL DEFAULT false,
   ovr        smallint    NOT NULL CHECK (ovr BETWEEN 40 AND 99),
   tag        text        REFERENCES crowd_tags(key),
+  created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY (player_key, season, voter)
 );
 
--- ה-PK כבר מתחיל ב-(player_key, season), ולכן הוא משרת גם את השליפה לפי
--- שחקן-עונה. האינדקס הזה קיים בכל זאת כי VIEW ה-crowd_ratings סורק את הטבלה
--- כולה ב-GROUP BY ומעדיף אינדקס צר על פני ה-PK הרחב. השני הוא זה שבאמת חייב
--- להתקיים: בדיקת קצב הריצה שואלת "כמה הצבעות מהמצביע הזה בשעה האחרונה".
-CREATE INDEX IF NOT EXISTS player_votes_ps    ON player_votes (player_key, season);
-CREATE INDEX IF NOT EXISTS player_votes_rate  ON player_votes (voter, updated_at);
+-- The PK already indexes (player_key, season) as a prefix, so on those two
+-- columns alone this index would be dead weight paid for on every write. The
+-- INCLUDE is what earns it: crowd_ratings groups the entire table by
+-- (player_key, season) and needs ovr and tag, neither of which is in the PK, so
+-- without the payload the planner sequentially scans and sorts. With it the
+-- view is an index-only scan over groups that arrive already in order.
+CREATE INDEX IF NOT EXISTS player_votes_ps
+  ON player_votes (player_key, season) INCLUDE (ovr, tag);
 
--- קריאה ישירה חסומה לחלוטין. אין policy ל-SELECT, ואין GRANT — ראו ההערה
--- אצל crowd_tags: בלי ה-REVOKE הזה, PostgREST היה מחזיר 200 עם מערך ריק
--- במקום 403, וזה בדיוק ההבדל שאי אפשר להבחין בו בטבלה ריקה ביום הראשון.
+-- Not optional: the rate limit asks "how many votes did this identity CREATE in
+-- the last hour", and it asks on every single vote.
+CREATE INDEX IF NOT EXISTS player_votes_rate
+  ON player_votes (voter, created_at);
+
+-- Direct reads are closed completely. No SELECT policy, and no GRANT — see the
+-- note at crowd_tags: without this REVOKE, PostgREST would answer
+-- /rest/v1/player_votes with 200 and an empty array instead of 403, and on a
+-- table that is empty for its first weeks those two are indistinguishable.
 ALTER TABLE player_votes ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON TABLE player_votes FROM anon, authenticated;
 
--- ── ההערות ──────────────────────────────────────────────────────────────────
--- טקסט על אדם אמיתי חי. user_id חובה, מודרציה לפני פרסום, וכל הערה מאושרת
--- ניתנת לדיווח. זו ההחלטה הכבדה במפרט והיא נאכפת כאן, לא בלקוח.
+-- ── the notes ───────────────────────────────────────────────────────────────
+-- Text about a real, living person. user_id is mandatory, moderation comes
+-- before publication, and every approved note can be reported. That is the
+-- heaviest decision in the spec and it is enforced here, not in the client.
+--
+-- profiles(id) rather than auth.users(id): the convention throughout this
+-- schema (001_initial.sql:34, :59, :87, career_runs, gauntlet_runs, and ten
+-- more), and it restores the guarantee that a note's author has a profile row —
+-- which is what the moderation queue needs in order to show a username.
 CREATE TABLE IF NOT EXISTS player_notes (
   id          bigserial PRIMARY KEY,
-  player_key  text        NOT NULL,
-  season      text        NOT NULL,
-  user_id     uuid        NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  player_key  text        NOT NULL CHECK (char_length(player_key) BETWEEN 1 AND 64),
+  season      text        NOT NULL CHECK (season ~ '^[0-9]{4}/[0-9]{2}$'),
+  user_id     uuid        NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   body        text        NOT NULL CHECK (char_length(body) BETWEEN 2 AND 80),
   status      text        NOT NULL DEFAULT 'pending'
                           CHECK (status IN ('pending','approved','rejected')),
@@ -94,42 +154,65 @@ CREATE TABLE IF NOT EXISTS player_notes (
 
 CREATE INDEX IF NOT EXISTS player_notes_ps     ON player_notes (player_key, season, status);
 CREATE INDEX IF NOT EXISTS player_notes_queue  ON player_notes (status, created_at);
+-- Both of submit_player_note's daily limits count rows by author and date.
+CREATE INDEX IF NOT EXISTS player_notes_author ON player_notes (user_id, created_at);
 
 ALTER TABLE player_notes ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS player_notes_read_approved ON player_notes;
 CREATE POLICY player_notes_read_approved ON player_notes
   FOR SELECT USING (status = 'approved');
 
--- SELECT בלבד. הכתיבה עוברת רק דרך submit_player_note, שהיא SECURITY DEFINER
--- ולכן לא צריכה הרשאה על הטבלה — ומי שיכול לכתוב ישירות יכול לדלג על
--- המודרציה, שהיא כל הנקודה בטבלה הזו.
+-- SELECT only. Writing goes through submit_player_note, which is SECURITY
+-- DEFINER and therefore needs no privilege on the table — and anyone who could
+-- write directly could skip moderation, which is the entire point of the table.
 REVOKE ALL ON TABLE player_notes FROM anon, authenticated;
 GRANT SELECT ON TABLE player_notes TO anon, authenticated;
 
--- ── אישורי דירוג ────────────────────────────────────────────────────────────
--- מה שהבעלים אישר בדשבורד. scripts/apply_crowd_ratings.js קורא מכאן.
+-- ── who reported what ───────────────────────────────────────────────────────
+-- The reports counter on player_notes is only meaningful if one person can push
+-- it up by one. Without this table report_note was an open anonymous endpoint
+-- with no dedupe, and note ids are enumerable because approved notes are
+-- world-readable — so a single loop could drive any note's counter to any
+-- number and decide what the owner sees at the top of his queue.
+CREATE TABLE IF NOT EXISTS note_reports (
+  note_id    bigint      NOT NULL REFERENCES player_notes(id) ON DELETE CASCADE,
+  user_id    uuid        NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (note_id, user_id)
+);
+
+ALTER TABLE note_reports ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE note_reports FROM anon, authenticated;
+
+-- ── approved ratings ────────────────────────────────────────────────────────
+-- What the owner approved in the dashboard. scripts/apply_crowd_ratings.js
+-- reads from here.
 CREATE TABLE IF NOT EXISTS rating_approvals (
   id          bigserial PRIMARY KEY,
   player_key  text        NOT NULL,
   season      text        NOT NULL,
-  old_ovr     smallint    NOT NULL,
+  -- Both sides are range-checked. old_ovr arrives from the admin client just as
+  -- new_ovr does, and an unchecked one would quietly corrupt the before/after
+  -- log that the apply script writes.
+  old_ovr     smallint    NOT NULL CHECK (old_ovr BETWEEN 40 AND 99),
   new_ovr     smallint    NOT NULL CHECK (new_ovr BETWEEN 40 AND 99),
   votes       int         NOT NULL,
   applied_at  timestamptz,
   created_at  timestamptz NOT NULL DEFAULT now()
 );
 
--- אישור אחד ממתין לשחקן-עונה. אחרי שהסקריפט מסמן applied_at, אותו שחקן יכול
--- לקבל אישור חדש — ההיסטוריה נשמרת, התור לא מתמלא בכפילויות.
+-- One pending approval per player-season. Once the script stamps applied_at
+-- that player can be approved again — history is kept, the queue stays clean.
 CREATE UNIQUE INDEX IF NOT EXISTS rating_approvals_pending
   ON rating_approvals (player_key, season) WHERE applied_at IS NULL;
 
 ALTER TABLE rating_approvals ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON TABLE rating_approvals FROM anon, authenticated;
 
--- ── דחיות ───────────────────────────────────────────────────────────────────
--- "בטל" מוריד שורה מהתור עד שיצטברו עוד הצבעות. שומרים את מספר ההצבעות שבו
--- נדחתה, כדי שהשורה תחזור רק כשבאמת נאמר משהו חדש.
+-- ── dismissals ──────────────────────────────────────────────────────────────
+-- "Dismiss" drops a row off the queue until more votes accumulate. The vote
+-- count at the moment of dismissal is kept, so the row only comes back when
+-- something genuinely new has been said.
 CREATE TABLE IF NOT EXISTS rating_dismissals (
   player_key text NOT NULL,
   season     text NOT NULL,
@@ -141,13 +224,15 @@ CREATE TABLE IF NOT EXISTS rating_dismissals (
 ALTER TABLE rating_dismissals ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON TABLE rating_dismissals FROM anon, authenticated;
 
--- ── הממוצע הגזום ────────────────────────────────────────────────────────────
--- ממיינים, משמיטים GREATEST(1, floor(n*0.1)) מכל קצה, ממצעים, מעגלים.
--- מתחת ל-5 → NULL. פונקציה נפרדת כדי שאפשר יהיה לבדוק אותה ב-SELECT אחד.
+-- ── the trimmed average ─────────────────────────────────────────────────────
+-- Sort, drop GREATEST(1, floor(n*0.1)) from each end, average what is left,
+-- round. Below 5 votes it returns NULL. A separate function so that it can be
+-- checked in a single SELECT.
 --
--- למה בדיקת הסף היא תת-שאילתה ולא k.c: השאילתה החיצונית מצטברת (avg), ולכן
--- כל התייחסות ישירה ל-k.c בתוך ה-SELECT הייתה נופלת על "must appear in the
--- GROUP BY clause". ב-WHERE זה מותר, כי ה-WHERE רץ לפני הצבירה.
+-- Why the threshold test is a scalar subquery and not k.c: the outer query
+-- aggregates (avg), so any direct reference to k.c inside its SELECT list would
+-- fail with "must appear in the GROUP BY clause". In the WHERE it is fine —
+-- WHERE runs before aggregation.
 CREATE OR REPLACE FUNCTION crowd_trimmed_avg(vals smallint[])
 RETURNS smallint
 LANGUAGE sql
@@ -166,41 +251,63 @@ AS $$
    WHERE s.rn > k.cut AND s.rn <= k.c - k.cut;
 $$;
 
--- ── ההצבר הציבורי ───────────────────────────────────────────────────────────
--- הדבר היחיד שהעולם קורא.
+-- Not cosmetic. A function is EXECUTE-able by PUBLIC by default and PostgREST
+-- publishes everything in this schema, so without this REVOKE the endpoint
+-- /rpc/crowd_trimmed_avg is open to anon, takes an unbounded smallint[], and
+-- sorts whatever it is handed. Nothing but the view calls it, and the view runs
+-- with its owner's rights.
+REVOKE ALL ON FUNCTION crowd_trimmed_avg(smallint[]) FROM PUBLIC;
+
+-- ── the public aggregate ────────────────────────────────────────────────────
+-- The only thing the world reads.
 --
--- מה נחשף ומה לא, וזה ההבדל שקל לפספס: המונה n יוצא תמיד, הדירוג יוצא רק
--- מחמש הצבעות ומעלה (crowd_trimmed_avg מחזיר NULL מתחת לזה). ניסיון ראשון
--- סינן כאן HAVING count(*) >= 5, וזה היה הורג את המצב שהמפרט קורא לו "עוד
--- 2 הצבעות והדירוג ייחשף" — הלקוח לא היה מקבל שורה בכלל, היה נופל למצב
--- הריק, והמונה שאמור לשמש תמריץ פשוט לא היה קיים.
+-- What is exposed and what is not, and this is the distinction that is easy to
+-- miss: the counter n always comes out, the rating only from five votes up
+-- (crowd_trimmed_avg returns NULL below that). A first attempt filtered with
+-- HAVING count(*) >= 5, which would have killed the state the spec calls "two
+-- more votes and the rating appears" — the client would not have received a row
+-- at all, would have fallen into the empty state, and the counter meant to work
+-- as the incentive simply would not have existed.
 --
--- security_invoker = false הוא מה שמאפשר ל-VIEW לקרוא את player_votes בזמן
--- שלקורא עצמו אין שום גישה אליה: ה-VIEW רץ בהרשאות הבעלים (postgres), שהוא
--- גם הבעלים של הטבלה ולכן עוקף את ה-RLS שלה. זו ברירת המחדל, והיא כתובה כאן
--- במפורש כי היא ההנחה שכל הפרטיות של הפיצ'ר תלויה בה.
+-- The tag is gated on the same five. At n=1 an ungated tag_top publishes one
+-- individual's answer under the words "the crowd" — which is the raw-vote
+-- exposure the header of this file says never happens. The threshold appears
+-- twice in this file, here and inside crowd_trimmed_avg; they move together.
+--
+-- security_invoker = false is what lets the view read player_votes while the
+-- caller has no access to it at all: the view runs with its owner's rights
+-- (postgres), and postgres owns the table and therefore bypasses its RLS. That
+-- is the default, and it is written out explicitly because it is the assumption
+-- the whole privacy of this feature rests on.
 CREATE OR REPLACE VIEW crowd_ratings
 WITH (security_invoker = false) AS
   SELECT v.player_key,
          v.season,
          count(*)::int                                  AS n,
          crowd_trimmed_avg(array_agg(v.ovr))            AS avg_trimmed,
-         (SELECT t.tag FROM player_votes t
-           WHERE t.player_key = v.player_key AND t.season = v.season
-             AND t.tag IS NOT NULL
-           GROUP BY t.tag ORDER BY count(*) DESC, t.tag ASC LIMIT 1)  AS tag_top,
-         (SELECT count(*) FROM player_votes t
-           WHERE t.player_key = v.player_key AND t.season = v.season
-             AND t.tag IS NOT NULL
-           GROUP BY t.tag ORDER BY count(*) DESC, t.tag ASC LIMIT 1)::int AS tag_top_n
+         CASE WHEN count(*) >= 5 THEN
+           (SELECT t.tag FROM player_votes t
+             WHERE t.player_key = v.player_key AND t.season = v.season
+               AND t.tag IS NOT NULL
+             GROUP BY t.tag ORDER BY count(*) DESC, t.tag ASC LIMIT 1)
+         END                                            AS tag_top,
+         CASE WHEN count(*) >= 5 THEN
+           (SELECT count(*) FROM player_votes t
+             WHERE t.player_key = v.player_key AND t.season = v.season
+               AND t.tag IS NOT NULL
+             GROUP BY t.tag ORDER BY count(*) DESC, t.tag ASC LIMIT 1)::int
+         END                                            AS tag_top_n
     FROM player_votes v
    GROUP BY v.player_key, v.season;
 
-GRANT SELECT ON crowd_ratings TO anon, authenticated;
+REVOKE ALL ON TABLE crowd_ratings FROM anon, authenticated;
+GRANT SELECT ON TABLE crowd_ratings TO anon, authenticated;
 
--- ── הצבעה ───────────────────────────────────────────────────────────────────
--- p_voter מגיע מהלקוח רק כשהוא אנונימי. משתמש מחובר לא יכול להתחזות: אם יש
--- auth.uid() הוא גובר על כל מה שנשלח.
+-- ── voting ──────────────────────────────────────────────────────────────────
+-- p_voter reaches this function from the client only when the client is
+-- anonymous. A signed-in user cannot be impersonated and cannot impersonate: if
+-- auth.uid() exists it overrides anything that was sent, and the identity it
+-- builds lands in a namespace no client string can reach.
 CREATE OR REPLACE FUNCTION vote_player(
   p_player_key text,
   p_season     text,
@@ -216,42 +323,82 @@ DECLARE
   uid      uuid := auth.uid();
   v_voter  text;
   v_recent int;
+  v_known  boolean;
 BEGIN
   IF uid IS NOT NULL THEN
-    v_voter := uid::text;
+    -- The 'u:' prefix is built here, from the token, and nowhere else in the
+    -- schema. That is the invariant the table's header comment relies on.
+    v_voter := 'u:' || uid::text;
   ELSE
-    -- client_id מ-js/track.js הוא uuid. כל דבר אחר נדחה, אחרת הטבלה נפתחת
-    -- למפתחות שרירותיים ומונה ההצבעות מאבד כל משמעות.
+    -- client_id from js/track.js is a uuid. Anything else is refused, or the
+    -- table opens up to arbitrary keys and the vote counter loses all meaning.
     --
-    -- בדיקת ה-NULL היא לא ייתור: `NULL !~ '…'` מחזיר NULL, ו-IF על NULL הוא
-    -- לא-אמת, כך שהענף היה נופל דרך, v_voter היה נשאר NULL, וה-INSERT היה
-    -- מתפוצץ על NOT NULL ומחזיר 500 במקום {"error":"bad voter"} מסודר.
+    -- The IS NULL test is not redundant: `NULL !~ '…'` evaluates to NULL, and
+    -- IF on NULL is not-true, so the branch would fall straight through,
+    -- v_voter would stay NULL, and the INSERT would raise on NOT NULL — a 500
+    -- instead of a tidy {"error":"bad voter"}. Reachable in ordinary use the
+    -- moment localStorage is blocked, which is every private window.
     IF p_voter IS NULL
        OR p_voter !~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN
       RETURN jsonb_build_object('error', 'bad voter');
     END IF;
-    v_voter := p_voter;
+    v_voter := 'a:' || p_voter;
   END IF;
 
   IF p_ovr IS NULL OR p_ovr < 40 OR p_ovr > 99 THEN
     RETURN jsonb_build_object('error', 'bad ovr');
   END IF;
 
+  -- These two mirror the table's CHECK constraints so that a bad key comes back
+  -- as a readable error the client can act on, instead of a raw 23514 it has to
+  -- parse. The CHECKs stay as the real enforcement; these are the manners.
+  IF p_player_key IS NULL
+     OR char_length(p_player_key) < 1 OR char_length(p_player_key) > 64 THEN
+    RETURN jsonb_build_object('error', 'bad player');
+  END IF;
+
+  IF p_season IS NULL OR p_season !~ '^[0-9]{4}/[0-9]{2}$' THEN
+    RETURN jsonb_build_object('error', 'bad season');
+  END IF;
+
   IF p_tag IS NOT NULL AND NOT EXISTS (SELECT 1 FROM crowd_tags WHERE key = p_tag) THEN
     RETURN jsonb_build_object('error', 'bad tag');
   END IF;
 
-  SELECT count(*) INTO v_recent
-    FROM player_votes
-   WHERE voter = v_voter AND updated_at > now() - interval '1 hour';
-  IF v_recent >= 40 THEN
-    RETURN jsonb_build_object('error', 'rate limited');
+  -- The limit applies to new opinions only. A revision rewrites a row that
+  -- already exists and adds nothing to the table, so budgeting it would punish
+  -- exactly the behaviour this feature invites — "you can change your mind".
+  -- What is budgeted is rows created, which is the quantity that actually grows.
+  SELECT EXISTS (SELECT 1 FROM player_votes
+                  WHERE player_key = p_player_key AND season = p_season
+                    AND voter = v_voter) INTO v_known;
+
+  IF NOT v_known THEN
+    SELECT count(*) INTO v_recent
+      FROM player_votes
+     WHERE voter = v_voter AND created_at > now() - interval '1 hour';
+    IF v_recent >= 40 THEN
+      RETURN jsonb_build_object('error', 'rate limited');
+    END IF;
   END IF;
 
+  -- created_at is intentionally not listed, on either side: it is the DEFAULT
+  -- on insert and untouched on update, which is what makes the count above
+  -- mean "created this hour".
+  --
+  -- is_user follows whoever is writing now. Omitting it from this list was a
+  -- real hole while the two namespaces were shared: an attacker could pre-seed
+  -- a row anonymously under a victim's uuid (is_user false), the victim would
+  -- later vote signed-in and only ovr/tag/updated_at would move, and the stale
+  -- false flag then let the attacker read the row back. The prefix above closes
+  -- that at the root; this keeps the flag honest rather than load-bearing.
   INSERT INTO player_votes (player_key, season, voter, is_user, ovr, tag, updated_at)
   VALUES (p_player_key, p_season, v_voter, uid IS NOT NULL, p_ovr, p_tag, now())
   ON CONFLICT (player_key, season, voter)
-  DO UPDATE SET ovr = EXCLUDED.ovr, tag = EXCLUDED.tag, updated_at = now();
+  DO UPDATE SET ovr        = EXCLUDED.ovr,
+                tag        = EXCLUDED.tag,
+                is_user    = EXCLUDED.is_user,
+                updated_at = now();
 
   RETURN jsonb_build_object('ok', true);
 END $$;
@@ -259,7 +406,13 @@ END $$;
 REVOKE ALL ON FUNCTION vote_player(text, text, smallint, text, text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION vote_player(text, text, smallint, text, text) TO anon, authenticated;
 
--- ── ההצבעה שלי (כדי שהכרטיס יידע להראות "אתה 86") ──────────────────────────
+-- ── my own vote (so the card can say "you said 86") ─────────────────────────
+-- The prefixes are mirrored from vote_player, and that mirror is the access
+-- control. A signed-in caller can only ever be handed a 'u:' row built from his
+-- own token; a client-supplied p_voter can only ever reach the 'a:' space. The
+-- two spaces are disjoint, so no string a caller invents addresses somebody
+-- else's signed-in row — which is why is_user is not consulted here. It is a
+-- record of who wrote the row, not a permission check.
 CREATE OR REPLACE FUNCTION my_player_vote(
   p_player_key text,
   p_season     text,
@@ -272,18 +425,13 @@ SET search_path = public, pg_temp
 AS $$
 DECLARE
   uid     uuid := auth.uid();
-  v_voter text := CASE WHEN uid IS NOT NULL THEN uid::text ELSE p_voter END;
+  v_voter text := CASE WHEN uid IS NOT NULL     THEN 'u:' || uid::text
+                       WHEN p_voter IS NOT NULL THEN 'a:' || p_voter END;
   r       player_votes%ROWTYPE;
 BEGIN
   IF v_voter IS NULL THEN RETURN jsonb_build_object('vote', NULL); END IF;
-
-  -- is_user = false כשהזהות הגיעה מהלקוח, וזה שומר על משהו אמיתי: מזהי
-  -- המשתמשים חשופים לכל העולם בלוחות (career_board מחזיר user_id), כך שבלי
-  -- התנאי הזה כל אנונימי היה יכול לשלוח user_id של אדם אחר ולקרוא מה הוא
-  -- חושב על כל שחקן-עונה. הצבעה של מחובר נקראת רק דרך הטוקן שלו.
   SELECT * INTO r FROM player_votes
-   WHERE player_key = p_player_key AND season = p_season AND voter = v_voter
-     AND (uid IS NOT NULL OR is_user = false);
+   WHERE player_key = p_player_key AND season = p_season AND voter = v_voter;
   IF NOT FOUND THEN RETURN jsonb_build_object('vote', NULL); END IF;
   RETURN jsonb_build_object('vote', jsonb_build_object('ovr', r.ovr, 'tag', r.tag));
 END $$;
@@ -291,7 +439,7 @@ END $$;
 REVOKE ALL ON FUNCTION my_player_vote(text, text, text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION my_player_vote(text, text, text) TO anon, authenticated;
 
--- ── הערה ────────────────────────────────────────────────────────────────────
+-- ── writing a line ──────────────────────────────────────────────────────────
 CREATE OR REPLACE FUNCTION submit_player_note(
   p_player_key text,
   p_season     text,
@@ -307,16 +455,36 @@ DECLARE
 BEGIN
   IF uid IS NULL THEN RETURN jsonb_build_object('error', 'not signed in'); END IF;
 
-  -- אותו ניקוי כמו set_my_club: שורה אחת, בלי תווי בקרה ובלי סוגריים משולשים
+  IF p_player_key IS NULL
+     OR char_length(p_player_key) < 1 OR char_length(p_player_key) > 64 THEN
+    RETURN jsonb_build_object('error', 'bad player');
+  END IF;
+
+  IF p_season IS NULL OR p_season !~ '^[0-9]{4}/[0-9]{2}$' THEN
+    RETURN jsonb_build_object('error', 'bad season');
+  END IF;
+
+  -- The same cleaning as set_my_club: one line, no control characters, no
+  -- angle brackets.
   clean := NULLIF(btrim(left(regexp_replace(COALESCE(p_body, ''), '[\r\n\t<>]', ' ', 'g'), 80)), '');
   IF clean IS NULL OR char_length(clean) < 2 THEN
     RETURN jsonb_build_object('error', 'empty');
   END IF;
 
+  -- Two limits, answering two different questions. One line per person per
+  -- player per day, so nobody floods one footballer. And ten lines per person
+  -- per day in total, so nobody works through the dataset a player at a time
+  -- and buries the moderation queue — which the first limit alone permits
+  -- exactly, once per player, every single day.
   IF EXISTS (SELECT 1 FROM player_notes
               WHERE user_id = uid AND player_key = p_player_key
                 AND created_at > now() - interval '1 day') THEN
     RETURN jsonb_build_object('error', 'already today');
+  END IF;
+
+  IF (SELECT count(*) FROM player_notes
+       WHERE user_id = uid AND created_at > now() - interval '1 day') >= 10 THEN
+    RETURN jsonb_build_object('error', 'too many today');
   END IF;
 
   INSERT INTO player_notes (player_key, season, user_id, body)
@@ -328,19 +496,41 @@ END $$;
 REVOKE ALL ON FUNCTION submit_player_note(text, text, text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION submit_player_note(text, text, text) TO authenticated;
 
--- ── דיווח ───────────────────────────────────────────────────────────────────
--- מחזיר ok גם על מזהה שלא קיים ועל הערה שלא אושרה: תשובה שמבדילה בין השניים
--- היא בדיוק הכלי שמאפשר למפות את התור שעוד לא פורסם.
+-- ── reporting a line ────────────────────────────────────────────────────────
+-- authenticated only, and one report per person per note. The counter is a
+-- moderation signal the owner sorts his queue by, so it has to cost an account
+-- to move it — approved note ids are world-readable and therefore enumerable,
+-- and an anonymous unbounded increment would let one script decide what the
+-- owner looks at first.
+--
+-- Still returns ok for an id that does not exist and for a note that was never
+-- approved: an answer that distinguishes the two is precisely the tool for
+-- mapping the queue that has not been published yet.
 CREATE OR REPLACE FUNCTION report_note(p_id bigint)
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
+DECLARE
+  uid uuid := auth.uid();
 BEGIN
-  UPDATE player_notes SET reports = reports + 1 WHERE id = p_id AND status = 'approved';
+  IF uid IS NULL THEN RETURN jsonb_build_object('error', 'not signed in'); END IF;
+
+  -- The INSERT is the gate. It writes nothing when the note is missing or
+  -- unapproved (the SELECT yields no row) and nothing when this person already
+  -- reported it (the PK conflicts), so FOUND is true only for a report that is
+  -- genuinely new — and only then does the counter move.
+  INSERT INTO note_reports (note_id, user_id)
+  SELECT p_id, uid FROM player_notes WHERE id = p_id AND status = 'approved'
+  ON CONFLICT (note_id, user_id) DO NOTHING;
+
+  IF FOUND THEN
+    UPDATE player_notes SET reports = reports + 1 WHERE id = p_id;
+  END IF;
+
   RETURN jsonb_build_object('ok', true);
 END $$;
 
 REVOKE ALL ON FUNCTION report_note(bigint) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION report_note(bigint) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION report_note(bigint) TO authenticated;
