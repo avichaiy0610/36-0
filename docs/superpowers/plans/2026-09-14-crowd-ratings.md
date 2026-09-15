@@ -2148,7 +2148,7 @@ git status
 <script>
 window._errs = [];
 window.addEventListener('error', e => window._errs.push(e.message));
-setTimeout(() => { try { beginDraftWithState('classic'); } catch (e) { window._errs.push(e.message); } }, 300);
+setTimeout(() => { try { beginDraftWithState({ classic: true }); } catch (e) { window._errs.push(e.message); } }, 300);
 setTimeout(() => {
   try {
     const sq = state.currentSquad;
@@ -2174,7 +2174,7 @@ timeout 120 "$CH" --headless=new --disable-gpu \
 
 צפוי: `classic card=none errs=[]` — הכרטיס לא נפתח כלל ושום שגיאה לא נזרקה. `errs` לא ריק פירושו ש-`crowdBlock` או `crowdMount` רצו במסלול שלא נועדו לו.
 
-**לוודא את שם הפונקציה לפני ההרצה** — `beginDraftWithState` מקבל את סגנון המשחק כארגומנט:
+**`beginDraftWithState` מקבל אובייקט, לא מחרוזת.** `state.classic = !!(style && style.classic)` ב-[game.js:1205](js/game.js#L1205) — מחרוזת עוברת בשקט ומשאירה את המצב הקלאסי כבוי, כלומר הבדיקה הייתה מדווחת "עבר" בלי לבדוק כלום. לאמת:
 
 ```bash
 grep -n "function beginDraftWithState" -A 4 "c:/Users/avich/Desktop/Claude/Project Two/36-0/js/game.js"
