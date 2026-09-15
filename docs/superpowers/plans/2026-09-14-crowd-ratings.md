@@ -983,8 +983,45 @@ function pcShow(player, anchor, slotPos, modal, squad) {
 ```js
   el.innerHTML = (modal ? '<button class="pc-x" aria-label="סגור">✕</button>' : '') +
     pcHTML(player, slotPos, squad);
-  if (typeof crowdMount === 'function') crowdMount(el);
+  const crowdMounted = (typeof crowdMount === 'function')
+    ? Promise.resolve(crowdMount(el)) : null;
 ```
+
+**שים לב איפה זה יושב.** ‎`pcShow` יוצא מוקדם בענף המודאלי (‎`if (modal) { … return; }`), אז קריאה ל-`crowdMount` אחרי בלוק המיקום לא הייתה רצה כלל במגע — והמגע הוא כל הנייד. לכן היא מיד אחרי ה-`innerHTML`, לפני הפיצול.
+
+**והמיקום שצריך להימדד שוב.** `pcShow` מודד `el.offsetWidth/offsetHeight` וממקם את הכרטיס **סינכרונית**, בזמן שהווידג'ט עדיין שלד של "טוען…". `crowdMount` ממלא אותו בקשה אחת מאוחר יותר, ובמצב הריק הוא גם פותח את החוגה — כ-150px נוספים שהגיעו אחרי שהמדידה כבר נגמרה. על כרטיס מעוגן לשחקן בשורה התחתונה זה נתלה מתחת לקצה המסך, ודווקא החוגה היא החלק שנחתך. כלומר **המצב שהכי חשוב לנו הוא זה שהכי סביר שייראה שבור.**
+
+להוציא את בלוק המיקום הקיים (‎`js/player-card.js:490-500` בערך, מ-`const r = anchor.getBoundingClientRect()` ועד שתי השמות ה-`style`) לפונקציה משלו:
+
+```js
+// המיקום של כרטיס מעוגן: לצד הקלף, בצד המגרש, ולעולם לא מחוץ למסך.
+// נקרא פעמיים — פעם על המידות הסינכרוניות, ושוב אחרי שדירוג הקהל נטען
+// ושינה את הגובה.
+function pcPosition(el, anchor) {
+  const r = anchor.getBoundingClientRect();
+  const w = el.offsetWidth, h = el.offsetHeight, pad = 10;
+  let left = r.left - w - pad;
+  if (left < pad) left = Math.min(r.right + pad, window.innerWidth - w - pad);
+  let top = r.top - 8;
+  if (top + h > window.innerHeight - pad) top = window.innerHeight - h - pad;
+  if (top < pad) top = pad;
+  el.style.left = Math.max(pad, left) + 'px';
+  el.style.top = top + 'px';
+}
+```
+
+ובסוף `pcShow`, במקום הבלוק שהוצא:
+
+```js
+  pcPosition(el, anchor);
+  // ושוב, אחרי שדירוג הקהל נחת ושינה את הגובה
+  if (crowdMounted) crowdMounted.then(() => {
+    // הכרטיס אולי כבר נסגר, או שכרטיס אחר תפס את מקומו
+    if (el.style.display === 'block' && anchor.isConnected) pcPosition(el, anchor);
+  });
+```
+
+המדידה מחדש קיימת רק בענף המעוגן. מודאל ממורכז ב-CSS ולא מודד כלום, ולכן גובה משתנה לא מזיז אותו.
 
 - [ ] **שלב 3: לעדכן את ארבעת הקוראים**
 
