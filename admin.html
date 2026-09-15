@@ -176,8 +176,12 @@
     .ca-act .ca-pub.on { border-color: #2ea043; color: #3fb950; }
     /* פירוט ההצבעות: כל הצבעה בשורה, ממוינות לפי הדירוג — טרול מכריז על עצמו
        בקצה של עמודה ממוינת, לא באמצע רשימה כרונולוגית. */
-    .ca-peek { background: none; border: 0; color: #8b949e; cursor: pointer; font-size: 11px; padding: 0 3px; }
-    .ca-peek:hover { color: #e6edf3; }
+    /* עמודת ההצבעות היא הכפתור: המספר הוא בדיוק מה שרוצים להסתכל בתוכו,
+       וחץ אפרורי ליד השם היה שקט מכדי להיקרא כפקד. */
+    .ca-peek { background: #21262d; border: 1px solid #30363d; border-radius: 7px;
+               color: #e6edf3; cursor: pointer; font: inherit; font-size: 13px;
+               padding: 3px 9px; white-space: nowrap; }
+    .ca-peek:hover { background: #2d333b; border-color: #8b949e; }
     .cv-wrap td { background: #0d1117; padding: 8px 12px; }
     .cv-head { color: #8b949e; font-size: 12px; margin-bottom: 6px; }
     .cv-row { display: flex; align-items: center; gap: 12px; padding: 3px 0; font-size: 13px; }
@@ -388,7 +392,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js?v=3dd47ca1"></script>
 <script src="js/supabase-client.js?v=e9102a02"></script>
-<script src="js/text-catalog.js?v=e9abf35d"></script>
+<script src="js/text-catalog.js?v=99a694f5"></script>
 <!-- the challenge editor derives each challenge's automatic conditions with the
      exact same code the game uses (game.js provides FORMATIONS + era range and
      skips all its UI wiring on this page) -->
@@ -406,7 +410,7 @@
 <!-- chem-data: כדי שתור הצמדים ידע מה כבר במשחק. league_tables כבר
        נטען מעליו ומשמש לחישוב האליפויות המשותפות. -->
   <script src="js/chem-data.js?v=e5cdbc98"></script>
-  <script src="js/crowd-admin.js?v=6f8a0b85"></script>
+  <script src="js/crowd-admin.js?v=37a2d73c"></script>
 <script>
 const statusEl = document.getElementById('status');
 let overrides = {};   // key -> value currently stored in site_texts

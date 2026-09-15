@@ -128,7 +128,7 @@ async function caLoadRatings() {
   body.innerHTML = rows.map(r => `
     <tr data-key="${caEsc(r.player_key)}" data-season="${caEsc(r.season)}"
         data-old="${r.official}" data-new="${r.avg_trimmed}">
-      <td><button class="ca-peek" type="button" title="הצג כל הצבעה בנפרד">▾</button> ${caEsc(r.player_key)}</td>
+      <td>${caEsc(r.player_key)}</td>
       <td dir="ltr">${caEsc(r.season)}</td>
       <td>${r.teams.map(caTeamName).map(caEsc).join(' · ')}</td>
       <td dir="ltr"${r.ovrs.length > 1
@@ -137,7 +137,7 @@ async function caLoadRatings() {
              .sort((a, b) => b - a).join('/')})</span>` : ''}</td>
       <td dir="ltr">${r.avg_trimmed}</td>
       <td dir="ltr" class="${r.gap > 0 ? 'ca-up' : 'ca-down'}">${r.gap > 0 ? '+' : ''}${r.gap}</td>
-      <td dir="ltr">${r.n}</td>
+      <td><button class="ca-peek" type="button" dir="ltr" title="הצג כל הצבעה בנפרד">${r.n} ▾</button></td>
       <td>${caTagCell(r.tag_top, r.tag_top_n)}</td>
       <td class="ca-act"><button class="ca-pub${r.published ? ' on' : ''}" type="button"
             title="${r.published ? 'מוצג לציבור — לחץ כדי להסתיר' : 'מוסתר — לחץ כדי להציג לציבור'}"
@@ -411,7 +411,8 @@ async function cdaOpenVotes(tr) {
     if (d.avg != null) {
       const cells = tr.querySelectorAll('td');
       cells[4].textContent = d.avg;
-      cells[6].textContent = d.n;
+      const nBtn = cells[6].querySelector('.ca-peek');
+      if (nBtn) nBtn.textContent = d.n + ' ▾'; else cells[6].textContent = d.n;
       const official = +tr.dataset.old;
       const gap = d.avg - official;
       cells[5].textContent = (gap > 0 ? '+' : '') + gap;
