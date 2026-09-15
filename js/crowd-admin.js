@@ -407,17 +407,35 @@ async function cdaOpenVotes(tr) {
     ev.target.title = on ? 'הוחרגה מהממוצע — לחץ כדי להחזיר' : 'הוצא מהממוצע';
     // השרת מחזיר את ההצבר החדש, אז השורה שמעל מתעדכנת מאותה נסיעה ולא
     // מטעינה מחדש של כל התור.
+    /* המספרים בשורה שמעל מתעדכנים תמיד, גם — ובעיקר — כשהקהל נשאר בלי דעה.
+       הוצאת הצבעה יכולה להוריד את הספירה מתחת לחמש, ואז crowd_trimmed_avg
+       מחזיר NULL. גרסה קודמת כאן בדקה `if (d.avg != null)` ודילגה על העדכון
+       בדיוק במקרה הזה, כלומר השאירה על המסך דירוג קהל ופער שכבר לא קיימים.
+       זה הרגע שבו המסך משקר הכי בקלות: הכל נראה תקין והמספר פשוט ישן. */
     const d = r.data || {};
-    if (d.avg != null) {
-      const cells = tr.querySelectorAll('td');
+    const cells = tr.querySelectorAll('td');
+    const nBtn = cells[6].querySelector('.ca-peek');
+    if (nBtn) nBtn.textContent = (d.n ?? 0) + ' ▾'; else cells[6].textContent = d.n ?? 0;
+
+    const okBtn = tr.querySelector('.ca-ok');
+    const pubBtn = tr.querySelector('.ca-pub');
+    if (d.avg == null) {
+      // אין דירוג קהל. אין גם מה לאשר ואין מה לפרסם.
+      cells[4].textContent = '—';
+      cells[5].textContent = `פחות מ-${CROWD_MIN_VOTES}`;
+      cells[5].className = 'ca-alt';
+      delete tr.dataset.new;
+      if (okBtn)  { okBtn.disabled = true;  okBtn.title = 'אין מספיק הצבעות נספרות'; }
+      if (pubBtn) { pubBtn.disabled = true; pubBtn.title = 'אין מספיק הצבעות נספרות'; }
+    } else {
       cells[4].textContent = d.avg;
-      const nBtn = cells[6].querySelector('.ca-peek');
-      if (nBtn) nBtn.textContent = d.n + ' ▾'; else cells[6].textContent = d.n;
-      const official = +tr.dataset.old;
-      const gap = d.avg - official;
+      const gap = d.avg - (+tr.dataset.old);
       cells[5].textContent = (gap > 0 ? '+' : '') + gap;
       cells[5].className = gap > 0 ? 'ca-up' : 'ca-down';
       tr.dataset.new = d.avg;
+      if (okBtn)  { okBtn.disabled = false;  okBtn.title = 'קבל את הדירוג לדאטה'; }
+      if (pubBtn) { pubBtn.disabled = false; pubBtn.title = pubBtn.classList.contains('on')
+        ? 'מוצג לציבור — לחץ כדי להסתיר' : 'מוסתר — לחץ כדי להציג לציבור'; }
     }
     const head = body.querySelector('.cv-head');
     if (head) head.textContent = `${data.length} הצבעות · ` +
