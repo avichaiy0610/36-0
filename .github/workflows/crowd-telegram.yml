@@ -6,9 +6,9 @@ name: crowd-telegram
 # גם הקצב שבו הפיצ'ר נחשף לציבור — שום דירוג לא מוצג לפני שפורסם. אז הכלי
 # שמזיז את זה הוא שלוש לחיצות בטלפון.
 #
-# הלחיצות עצמן לא נקראות כאן: הן מגיעות ל-supabase/functions/challenge-tap,
-# אותו וובהוק שכבר עונה להקשות של האתגרים. בוט אחד יכול להחזיק וובהוק אחד,
-# ולכן זו אותה פונקציה עם ניתוב לפי קידומת — ולא פונקציה שנייה.
+# הלחיצות עצמן לא נקראות כאן: הן מגיעות ל-supabase/functions/crowd-tap, וובהוק
+# משלו על בוט משלו. לבוט טלגרם אחד יש וובהוק אחד, ולכן בוט נפרד הוא הדרך
+# היחידה שהפיצ'ר הזה לא ייגע בהקשות של האתגרים שכבר עובדות.
 #
 # פעמיים ביום בכוונה. הפריטים לא בורחים לשום מקום, והודעה שמגיעה כל שעה היא
 # הודעה שמפסיקים לקרוא.
@@ -26,10 +26,10 @@ on:
         type: string
         default: ''
 
-# חולק קבוצה עם challenge-engine: שניהם מדברים עם אותו בוט, ושתי הרצות
-# במקביל היו מייצרות שתי סדרות הודעות שמתערבבות בצ'אט אחד.
+# קבוצה משלו. בוט נפרד פירושו שאין תחרות מול האתגרים — רק מול הרצה שנייה
+# של עצמו, שהייתה שולחת את אותם פריטים פעמיים.
 concurrency:
-  group: challenge-engine
+  group: crowd-telegram
   cancel-in-progress: false
 
 jobs:
@@ -44,6 +44,6 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
-          TELEGRAM_CHAL_BOT_TOKEN: ${{ secrets.TELEGRAM_CHAL_BOT_TOKEN }}
+          TELEGRAM_CROWD_BOT_TOKEN: ${{ secrets.TELEGRAM_CROWD_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           CROWD_TG_BATCH: ${{ inputs.batch }}

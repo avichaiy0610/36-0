@@ -6,8 +6,10 @@
 // שום דירוג לא מוצג לפני שהוא פורסם. אז צוואר הבקבוק הוא לא ההצבעות, הוא
 // שלוש לחיצות בטלפון.
 //
-// זה בדיוק מה שהאתגרים כבר עושים: הצעה נשלחת לטלגרם עם כפתורים, והוובהוק
-// supabase/functions/challenge-tap עונה ברגע שלוחצים.
+// זה בדיוק מה שהאתגרים כבר עושים, אבל בבוט נפרד משלו: הצעה נשלחת לטלגרם עם
+// כפתורים, והוובהוק supabase/functions/crowd-tap עונה ברגע שלוחצים. בוט נפרד
+// ולא הרחבה של זה של האתגרים, כי לבוט אחד יש וובהוק אחד — ואין סיבה שקוד חדש
+// ייגע בהקשות שכבר עובדות.
 //
 // ── החלוקה שחשוב להבין לפני שנוגעים כאן ────────────────────────────────────
 // **השולח מחליט מה הלחיצה תעשה. הוובהוק רק מבצע.**
@@ -22,19 +24,19 @@
 //   node scripts/crowd_telegram.js            # שולח מה שעוד לא נשלח
 //   node scripts/crowd_telegram.js --dry      # מראה מה היה נשלח
 //
-// דורש SUPABASE_URL, SUPABASE_SERVICE_KEY, TELEGRAM_CHAL_BOT_TOKEN,
+// דורש SUPABASE_URL, SUPABASE_SERVICE_KEY, TELEGRAM_CROWD_BOT_TOKEN,
 // TELEGRAM_CHAT_ID.
 
 const DRY = process.argv.includes('--dry');
 
 const URL   = process.env.SUPABASE_URL;
 const KEY   = process.env.SUPABASE_SERVICE_KEY;
-const TOKEN = process.env.TELEGRAM_CHAL_BOT_TOKEN;
+const TOKEN = process.env.TELEGRAM_CROWD_BOT_TOKEN;
 const CHAT  = process.env.TELEGRAM_CHAT_ID;
 
 if (!URL || !KEY) { console.error('חסר SUPABASE_URL או SUPABASE_SERVICE_KEY'); process.exit(1); }
 if (!DRY && (!TOKEN || !CHAT)) {
-  console.error('חסר TELEGRAM_CHAL_BOT_TOKEN או TELEGRAM_CHAT_ID');
+  console.error('חסר TELEGRAM_CROWD_BOT_TOKEN או TELEGRAM_CHAT_ID');
   process.exit(1);
 }
 
@@ -132,6 +134,25 @@ function shortId(s) {
 
 const esc = s => String(s ?? '').replace(/[<&>]/g, c => ({ '<': '&lt;', '&': '&amp;', '>': '&gt;' }[c]));
 
+/* התגית נשלחת בעברית ולא כמפתח. CROWD_TAGS מוגדר ב-js/crowd.js ונטען מכאן
+   דרך vm במקום להיות מועתק — שתי רשימות תגיות שנפרדות זו מזו הן בדיוק סוג
+   הבאג שהצינור הזה כבר שילם עליו פעם. */
+let _tags = null;
+function tagLabel(key) {
+  if (!key) return key;
+  if (!_tags) {
+    try {
+      const ctx = { console };
+      vm.createContext(ctx);
+      vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'js', 'crowd.js'), 'utf8') +
+                      ';this.CROWD_TAGS=CROWD_TAGS;', ctx);
+      _tags = ctx.CROWD_TAGS || {};
+    } catch (e) { _tags = {}; }
+  }
+  const t = _tags[key];
+  return t ? t.icon + ' ' + t.label : key;
+}
+
 /* ── מה נשלח ───────────────────────────────────────────────────────────────
    שתי תורים, אותו מנגנון. הדירוגים ממוינים בשרת לפי מספר מצביעים; הצמדים
    לפי כמה אנשים הציעו. כאן רק חותכים לאצווה ומדלגים על מה שכבר ממתין לתשובה. */
@@ -169,7 +190,7 @@ async function collect() {
       text:
         `⭐ <b>${esc(r.player_key)}</b> · ${esc(r.season)}\n` +
         `הקהל: <b>${r.avg_trimmed}</b> · ${r.n} הצבעות` +
-        (r.tag_top ? `\nתגית מובילה: ${esc(r.tag_top)} (${r.tag_top_n})` : '') +
+        (r.tag_top ? `\nתגית מובילה: ${esc(tagLabel(r.tag_top))} (${r.tag_top_n})` : '') +
         (r.published ? '\n👁 כבר מוצג לציבור' : '\n🚫 מוסתר מהציבור'),
       buttons: [[
         { text: '✅ קבל לדאטה', callback_data: `cw:${shortId(itemKey)}:a` },
