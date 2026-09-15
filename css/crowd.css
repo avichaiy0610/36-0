@@ -1,55 +1,65 @@
 /* css/crowd.css — דירוגי הקהל, בתוך כרטיס השחקן.
    נשאר בפלטה הכהה של האפליקציה. משטח לבן כאן נקרא כתקלת רינדור, לא כהדגשה —
-   זה נאמר בפרויקט הזה שלוש פעמים. */
+   זה נאמר בפרויקט הזה שלוש פעמים.
+
+   ולכן הכל כאן בטוקנים ולא בהקסים. הכרטיס המארח צבוע ב-var(--panel), ו-js/theme.js
+   הופך אותו ללבן במצב בהיר ומחליף את var(--accent) לפי המועדון. ווידג'ט שכתוב
+   בהקסים קבועים לא היה משתתף באף אחד משני הדברים: במצב בהיר הוא היה אי כהה בתוך
+   כרטיס לבן, עם שדה טקסט כמעט שחור וטקסט אפור על לבן מתחת לסף הקריאות — כלומר
+   בדיוק ה"חרא הלבן" מהצד השני, ובזהב שהמצב הבהיר כבר מסמן כבלתי קריא. */
 
 .crowd-line {
   display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
-  font-size: 12px; color: #9aa4b2; line-height: 1.7;
+  font-size: 12px; color: var(--dim); line-height: 1.7;
 }
 .crowd-n   { opacity: .65; }
-.crowd-you { color: #e6edf3; font-weight: 600; }
-.crowd-tag { color: #cbd5e1; }
+.crowd-you { color: var(--text); font-weight: 600; }
+.crowd-tag { color: var(--text); }
 
 .crowd-open {
   margin-inline-start: auto;
-  background: #1c2432; color: #9aa4b2;
-  border: 1px solid #2b3648; border-radius: 999px;
+  background: var(--surface2); color: var(--dim);
+  border: 1px solid var(--border); border-radius: 999px;
   padding: 2px 10px; font: inherit; font-size: 11px; cursor: pointer;
 }
-.crowd-open:hover { background: #232d3d; color: #e6edf3; }
+.crowd-open:hover { background: var(--hover); color: var(--text); }
 
 .crowd-panel { display: flex; flex-direction: column; gap: 8px; }
 
 .crowd-dial-row { display: flex; align-items: center; gap: 10px; }
-.crowd-dial { flex: 1; accent-color: #f0b429; }
+.crowd-dial { flex: 1; accent-color: var(--accent); }
 .crowd-val {
   min-width: 34px; text-align: center;
-  font-weight: 700; font-size: 15px; color: #f0b429;
+  font-weight: 700; font-size: 15px; color: var(--accent);
 }
-.crowd-dial-note { font-size: 11px; color: #7d8695; }
+.crowd-dial-note { font-size: 11px; color: var(--dim); }
 
 .crowd-shelf { display: flex; flex-wrap: wrap; gap: 4px; }
 .crowd-chip {
-  background: #161c26; color: #9aa4b2;
-  border: 1px solid #2b3648; border-radius: 999px;
+  background: var(--surface); color: var(--dim);
+  border: 1px solid var(--border); border-radius: 999px;
   padding: 3px 8px; font: inherit; font-size: 11px; cursor: pointer;
 }
-.crowd-chip:hover { border-color: #3d4a61; color: #e6edf3; }
+.crowd-chip:hover { border-color: var(--dim); color: var(--text); }
+/* התגית הנבחרת מסומנת במסגרת ובדיו, לא במילוי זהב כהה: מילוי קבוע היה נשאר
+   כהה גם כשהכרטיס מסביבו לבן. */
 .crowd-chip.on {
-  background: #2a2313; border-color: #f0b429; color: #f0b429;
+  background: var(--surface2); border-color: var(--accent); color: var(--accent);
 }
 
 .crowd-note-row { display: flex; gap: 6px; }
 .crowd-note {
   flex: 1; min-width: 0;
-  background: #0d1117; color: #e6edf3;
-  border: 1px solid #2b3648; border-radius: 6px;
+  background: var(--bg); color: var(--text);
+  border: 1px solid var(--border); border-radius: 6px;
   padding: 4px 8px; font: inherit; font-size: 12px;
 }
+.crowd-note:disabled { opacity: .6; }
 .crowd-note-send, .crowd-done {
-  background: #1c2432; color: #e6edf3;
-  border: 1px solid #2b3648; border-radius: 6px;
+  background: var(--surface2); color: var(--text);
+  border: 1px solid var(--border); border-radius: 6px;
   padding: 4px 12px; font: inherit; font-size: 12px; cursor: pointer;
 }
-.crowd-done { align-self: flex-start; border-color: #f0b429; color: #f0b429; }
-.crowd-note-hint { font-size: 11px; color: #7d8695; }
+.crowd-note-send:disabled, .crowd-done:disabled { opacity: .55; cursor: default; }
+.crowd-done { align-self: flex-start; border-color: var(--accent); color: var(--accent); }
+.crowd-note-hint { font-size: 11px; color: var(--dim); }
