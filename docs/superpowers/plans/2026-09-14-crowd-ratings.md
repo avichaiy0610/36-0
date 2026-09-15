@@ -1002,28 +1002,69 @@ _pcTimer = setTimeout(() => pcShow(p, el, pcSlotOf(el), false, pcSquadFor(el)), 
     if (p) pcShow(p, el, pcSlotOf(el), true, pcSquadFor(el));
 ```
 
-- [ ] **שלב 4: לנעול את הסגירה בזמן הצבעה**
+- [ ] **שלב 4: לנעול את הסגירה בזמן הצבעה — עם דלת מילוט**
 
-`pcHide` ב-517 — שורה ראשונה בגוף:
+`pcHide` ב-517. **המנעול חייב לחסום רק סגירה מרומזת.** אם הוא חוסם גם את הדרכים המפורשות לסגור — Escape, ה-✕, לחיצה על הרקע — אז גרירה חיה הופכת כרטיס שאי אפשר לסגור, וזה גרוע יותר מהבאג שהמנעול בא למנוע:
 
 ```js
-function pcHide() {
-  // גרירת החוגה יוצאת מגבולות הכרטיס דרך קבע, ו-mouseleave היה סוגר אותו
-  // באמצע ההצבעה. לא ליטוש: בלי זה הפאנל שבור בשימוש רגיל בדסקטופ.
-  if (typeof crowdBusy === 'function' && crowdBusy()) return;
+// force = סגירה מפורשת (Escape · ✕ · הרקע). רק סגירה מרומזת — mouseleave,
+// גלילה — נחסמת בזמן הצבעה: גרירת החוגה יוצאת מגבולות הכרטיס דרך קבע, ובלי
+// זה הפאנל שבור בשימוש רגיל בדסקטופ. אבל מנעול שחוסם גם את ה-✕ הופך את
+// הכרטיס לכלוא, אז לשלוש הדרכים המפורשות יש דלת.
+function pcHide(force) {
+  if (!force && typeof crowdBusy === 'function' && crowdBusy()) return;
   clearTimeout(_pcTimer);
 ```
 
-- [ ] **שלב 5: הקישור לעמוד המלא**
-
-מפרט §5.1. הכרטיס הוא המקום היחיד במשחק שכבר מדבר על שחקן מסוים, ולכן הוא הדרך הטבעית לעמוד שלו. בסוף `crowdBlock` ב-`js/crowd.js`, בתוך אותו `.pc-sec`:
+**זהירות: `pcHide` מועבר ישירות כמאזין אירועים** בשני מקומות (`x.addEventListener('click', pcHide)` ו-`b.addEventListener('click', pcHide)`), כלומר הוא מקבל את אובייקט ה-Event כארגומנט ראשון — שהוא truthy. זה במקרה נותן את ההתנהגות הרצויה, ובדיוק בגלל זה אסור להשאיר את זה ככה: זה עובד בטעות ויישבר ברגע שמישהו יקרא לפונקציה אחרת. לעטוף במפורש:
 
 ```js
-      <a class="crowd-full" href="/player/${crowdEsc(encodeURIComponent(crowdSlug(name)))}/"
-         target="_blank" rel="noopener">העמוד המלא של ${crowdEsc(name)} ↗</a>
+if (x) x.addEventListener('click', () => pcHide(true));
 ```
 
-ו-CSS ב-`css/crowd.css`:
+```js
+      b.addEventListener('click', () => pcHide(true));
+```
+
+ואת Escape (‎`js/player-card.js:619` בערך):
+
+```js
+  document.addEventListener('keydown', ev => { if (ev.key === 'Escape') pcHide(true); });
+```
+
+- [ ] **שלב 5: הקישור לעמוד המלא — ומבנה שלא נמחק**
+
+מפרט §5.1. הכרטיס הוא המקום היחיד במשחק שכבר מדבר על שחקן מסוים, ולכן הוא הדרך הטבעית לעמוד שלו.
+
+**הבעיה שצריך לפתור קודם:** `crowdRenderLine` ו-`crowdOpenPanel` מחליפים את `box.innerHTML` כולו. קישור שיושב ישירות בתוך `.pc-sec.crowd` יימחק על ידי `crowdMount` כמה מאות מילישניות אחרי שהכרטיס נפתח, ושוב בכל פתיחת פאנל — כלומר הוא יהיה גלוי רק בהבזק של "טוען…".
+
+לכן `crowdBlock` מקבל מעטפת פנימית, והקישור הוא **אח שלה ולא צאצא**:
+
+```js
+function crowdBlock(name, season, pos, official) {
+  if (!name || !season) return '';
+  // .crowd-body הוא מה ש-crowdRenderLine ו-crowdOpenPanel מחליפים. כל דבר
+  // שאמור לשרוד רינדור מחדש יושב מחוץ לו, כאן.
+  return `
+    <div class="pc-sec crowd" data-key="${crowdEsc(crowdKey(name))}"
+         data-season="${crowdEsc(season)}" data-pos="${crowdEsc(pos || '')}"
+         data-official="${parseInt(official, 10) || 0}">
+      <div class="crowd-body"><div class="crowd-line">טוען…</div></div>
+      <a class="crowd-full" href="/player/${encodeURIComponent(crowdSlug(name))}/"
+         target="_blank" rel="noopener">העמוד המלא של ${crowdEsc(name)} ↗</a>
+    </div>`;
+}
+```
+
+ושתי פונקציות הרינדור כותבות ל-`.crowd-body` במקום ל-`box`. בראש כל אחת מהן:
+
+```js
+  const body = box.querySelector('.crowd-body') || box;
+```
+
+ואז `body.innerHTML = …` במקום `box.innerHTML = …`. ה-`|| box` הוא כדי שעמודי `/player/` (משימה 9) יוכלו להשתמש באותן פונקציות גם בלי המעטפת.
+
+CSS ב-`css/crowd.css`:
 
 ```css
 .crowd-full {
@@ -1033,7 +1074,37 @@ function pcHide() {
 .crowd-full:hover { color: #f0b429; }
 ```
 
-הקישור נבנה מ-`crowdSlug`, אותה פונקציה שמסך `👥 שחקנים` ו-`scripts/player_pages.js` משתמשים בה — משימה 10 שלב 3 היא הבדיקה שכולם באמת מסכימים.
+הקישור נבנה מ-`crowdSlug`, אותה פונקציה שמסך `👥 שחקנים` ו-`scripts/player_pages.js` משתמשים בה — משימה 10 שלב 3 היא הבדיקה שכולם באמת מסכימים. שים לב שה-href עובר `encodeURIComponent` בלבד ולא `crowdEsc` — הוא כבר בתוך מרכאות כפולות ו-`encodeURIComponent` מקודד גרשים ממילא.
+
+- [ ] **שלב 5ב: לשורות המאושרות אין מסך**
+
+`crowdNotes` נכתבה במשימה 3 ואף אחד לא קורא לה. מפרט §1 אומר ששורות מאושרות הופכות לתוכן אמיתי בכרטיס — בלי זה, כל מסלול המודרציה מוביל לשום מקום והבעלים מאשר טקסט שאיש לא יראה.
+
+ב-`crowdMount`, לשלוף אותן יחד עם השאר:
+
+```js
+  const [row, mine, notes] = await Promise.all([
+    crowdFetch(key, season), crowdFetchMine(key, season), crowdNotes(key, season),
+  ]);
+  if (!box.isConnected) return;
+  crowdRenderLine(box, row, mine, notes);
+```
+
+ו-`crowdRenderLine` מוסיפה אותן מתחת לשורה. עד שלוש, וכלום כשאין:
+
+```js
+  const notesHtml = (notes && notes.length)
+    ? `<div class="crowd-notes">${notes.map(nt =>
+        `<div class="crowd-note-row-r">“${crowdEsc(nt.body)}”</div>`).join('')}</div>`
+    : '';
+```
+
+```css
+.crowd-notes { margin-top: 6px; display: flex; flex-direction: column; gap: 3px; }
+.crowd-note-row-r { font-size: 11px; color: #9aa4b2; font-style: italic; }
+```
+
+`crowdOpenPanel` לא מציגה אותן — כשהפאנל פתוח המשתמש כותב, לא קורא.
 
 - [ ] **שלב 6: לטעון את הקבצים החדשים**
 
