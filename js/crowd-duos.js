@@ -20,6 +20,16 @@ function cdPairKey(a, b) {
   return (x < y ? x + '|' + y : y + '|' + x);
 }
 
+/* הצעה להוריד צמד היא הצעה נגדית, לא הצעה. אותו מפתח בדיוק עם קידומת, כדי
+   ששני התורים יחיו באותה טבלה ושאי אפשר יהיה לבלבל ביניהם: "-" אינו תו חוקי
+   בשם מנורמל, אז מפתח שמתחיל בו לא יכול להיות צמד רגיל. */
+function cdDropKey(a, b) { return '-' + cdPairKey(a, b); }
+
+// הכרטיס נסגר ב-mouseleave. הקלדה בשדה החיפוש מחזיקה אותו פתוח, בדיוק כמו
+// שורת ההערה של דירוג הקהל.
+let _cdBusy = false;
+function cdBusy() { return _cdBusy; }
+
 /* ── מי בכלל חלק מגרש עם מי ────────────────────────────────────────────────
    שני שחקנים שלא היו באותו סגל באותה עונה אינם צמד, ואין טעם להציע אותם.
    נבנה עצל: SQUADS לא קיים בהקשר של ה-harness, והפניה אליו ברמה העליונה
@@ -70,6 +80,51 @@ function cdCandidates(name) {
   return out;
 }
 
+/* ── חיפוש בכל המשחק ──────────────────────────────────────────────────────
+   ה-11 הוא קיצור דרך, לא הגבול. הגרסה הראשונה הגבילה את ההצעה לשחקנים
+   שבמקרה נמצאים על המגרש שלך, וזה פתר בעיית ממשק על חשבון הפיצ'ר: רוב
+   הצמדים שאנשים באמת זוכרים לא ייפגשו באותו הרכב במקרה.
+
+   הסינון נשאר אותו סינון — מי שלא חלק סגל איתו אינו צמד — אבל המאגר הוא
+   עכשיו כל מי ששיחק אי פעם. הבנייה עצלה: SQUADS לא קיים בהקשר של ה-harness. */
+let _cdAll = null;
+function cdAllNames() {
+  if (_cdAll) return _cdAll;
+  if (typeof SQUADS === 'undefined') return (_cdAll = []);
+  const seen = new Map();
+  SQUADS.forEach(sq => sq.players.forEach(p => {
+    const k = crowdKey(p.name);
+    // השם המוצג הוא זה של העונה החזקה ביותר שלו, כדי ששני איותים של אותו
+    // אדם לא יופיעו כשתי תוצאות חיפוש.
+    const cur = seen.get(k);
+    if (!cur || p.ovr > cur.ovr) seen.set(k, { name: p.name, ovr: p.ovr });
+  }));
+  return (_cdAll = [...seen.values()].sort((a, b) => b.ovr - a.ovr).map(x => x.name));
+}
+
+// אותה נרמול שבה מסך 👥 שחקנים ועמודי /player/ מחפשים, כדי ששלושת שדות
+// החיפוש באתר יענו אותו דבר על אותה הקלדה.
+function cdSearchNorm(s) {
+  return String(s ?? '').replace(/["'׳״.()]/g, '').replace(/[-\s]+/g, ' ').trim();
+}
+
+function cdSearch(name, q) {
+  const v = cdSearchNorm(q);
+  if (v.length < 2) return [];
+  const self = crowdKey(name);
+  const out = [];
+  for (const other of cdAllNames()) {
+    if (out.length >= 8) break;
+    const k = crowdKey(other);
+    if (k === self) continue;
+    if (!cdSearchNorm(other).includes(v)) continue;
+    if (typeof chemPair === 'function' && chemPair(name, other)) continue;
+    if (!cdSharedSquad(name, other)) continue;
+    out.push(other);
+  }
+  return out;
+}
+
 /* ── רשת ───────────────────────────────────────────────────────────────────
    נכשל בשקט, כמו כל שאר שכבת הרשת של דירוגי הקהל: זה נפתח בתוך דראפט חי. */
 let _cdMine = null;
@@ -117,36 +172,67 @@ function cdMount(root) {
 
 async function cdOpen(wrap) {
   const name = wrap.dataset.name;
-  const cands = cdCandidates(name);
-  if (!cands.length) return;
   const mine = await cdLoadMine();
   if (!wrap.isConnected) return;
 
-  wrap.innerHTML =
-    `<div class="cd-note">מי מהם היה צמד איתו?</div>` +
-    `<div class="cd-shelf">${cands.map(o => {
-      const key = cdPairKey(name, o);
-      const done = mine.has(key);
-      return `<button class="cd-chip${done ? ' done' : ''}" type="button"` +
-             ` data-key="${crowdEsc(key)}"${done ? ' disabled' : ''}>` +
-             `${done ? '✓ ' : ''}${crowdEsc(o)}</button>`;
-    }).join('')}</div>`;
+  const chip = (other, kind) => {
+    const key = kind === 'drop' ? cdDropKey(name, other) : cdPairKey(name, other);
+    const done = mine.has(key);
+    return `<button class="cd-chip${done ? ' done' : ''}${kind === 'drop' ? ' drop' : ''}"` +
+           ` type="button" data-key="${crowdEsc(key)}"${done ? ' disabled' : ''}>` +
+           `${done ? '✓ ' : ''}${crowdEsc(other)}</button>`;
+  };
 
-  wrap.querySelectorAll('.cd-chip:not(.done)').forEach(chip => {
-    chip.addEventListener('click', async () => {
-      chip.disabled = true;
-      const r = await cdSuggest(chip.dataset.key);
-      if (!chip.isConnected) return;
-      if (r.ok) {
-        chip.classList.add('done');
-        chip.textContent = '✓ ' + chip.textContent;
-      } else {
-        chip.disabled = false;
-        const n = wrap.querySelector('.cd-note');
-        if (n) n.textContent = r.error === 'rate limited'
-          ? 'יותר מדי הצעות בשעה האחרונה.' : 'לא נשלח, נסה שוב.';
-      }
+  const cands = cdCandidates(name);
+  // הצמדים שכבר במשחק, כדי שאפשר יהיה לומר שאחד מהם שגוי. 271 הצמדים נאספו
+  // בכלל אוטומטי (ארבע עונות יחד, קווים תואמים), וכלל לא יודע מי באמת היה
+  // צמד — אז מי שרואה טעות צריך דרך לומר את זה, ולא רק דרך להוסיף.
+  // pcPartnersOf חי ב-js/player-card.js ומחזיר [{who, tier, seasons, titles}].
+  // who כבר מנורמל, וזה בסדר: chemNorm ב-js/chemistry.js זהה תו-בתו ל-crowdKey,
+  // אז המפתח שנבנה ממנו הוא בדיוק המפתח של CHEM_PAIRS.
+  const existing = (typeof pcPartnersOf === 'function' ? pcPartnersOf(name) : [])
+    .slice(0, 8).map(p => p.who || p);
+
+  wrap.innerHTML =
+    (cands.length
+      ? `<div class="cd-note">מי מהם היה צמד איתו?</div><div class="cd-shelf">${
+          cands.map(o => chip(o, 'add')).join('')}</div>` : '') +
+    `<div class="cd-search-row">
+       <input class="cd-q" maxlength="24" placeholder="או חפש כל שחקן אחר…">
+     </div>
+     <div class="cd-shelf cd-results"></div>` +
+    (existing.length
+      ? `<div class="cd-note cd-drop-note">צמד שלא היה? סמן אותו:</div>
+         <div class="cd-shelf">${existing.map(o => chip(o, 'drop')).join('')}</div>` : '');
+
+  // חיפוש מקומי לגמרי — SQUADS כבר בזיכרון, אז אין כאן בקשת רשת ואין השהיה.
+  const q = wrap.querySelector('.cd-q');
+  const res = wrap.querySelector('.cd-results');
+  if (q) {
+    q.addEventListener('focus', () => { _cdBusy = true; });
+    q.addEventListener('blur',  () => { _cdBusy = false; });
+    q.addEventListener('input', () => {
+      const hits = cdSearch(name, q.value);
+      res.innerHTML = hits.map(o => chip(o, 'add')).join('');
+      if (typeof crowdResized === 'function') crowdResized(wrap);
     });
+  }
+
+  wrap.addEventListener('click', async ev => {
+    const b = ev.target.closest('.cd-chip');
+    if (!b || b.disabled) return;
+    b.disabled = true;
+    const r = await cdSuggest(b.dataset.key);
+    if (!b.isConnected) return;
+    if (r.ok) {
+      b.classList.add('done');
+      b.textContent = '✓ ' + b.textContent;
+    } else {
+      b.disabled = false;
+      const n = wrap.querySelector('.cd-note');
+      if (n) n.textContent = r.error === 'rate limited'
+        ? 'יותר מדי הצעות בשעה האחרונה.' : 'לא נשלח, נסה שוב.';
+    }
   });
 
   if (typeof crowdResized === 'function') crowdResized(wrap);

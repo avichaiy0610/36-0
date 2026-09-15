@@ -110,10 +110,24 @@ function readCsv() {
      apply_crowd_ratings מסרב.
    - כבר בקובץ → אין מה לעשות. */
 function decide(idx, LEAGUE_TABLES, TEAMS, have, pairKey) {
-  const parts = pairKey.split('|');
+  /* מפתח שמתחיל ב-"-" הוא הצעה **להוריד** צמד קיים. "-" אינו תו חוקי בשם
+     מנורמל, אז מפתח רגיל לא יכול להיראות ככה בטעות.
+     הורדה לא מוסיפה שורה — היא הופכת keep ל-n בשורה שכבר בקובץ. הצמד נשאר
+     עם ההיסטוריה שלו ו-build_chem_js.js פשוט לא יכניס אותו ל-chem-data.js;
+     מחיקת השורה הייתה מוחקת גם את הראיות וגם את הדרך לחזור. */
+  const isDrop = pairKey.charAt(0) === '-';
+  const bare = isDrop ? pairKey.slice(1) : pairKey;
+
+  const parts = bare.split('|');
   if (parts.length !== 2) return { ok: false, reason: 'bad_key' };
   const [ka, kb] = parts;
-  if (have.has(pairKey)) return { ok: false, reason: 'already' };
+
+  if (isDrop) {
+    if (!have.has(bare)) return { ok: false, reason: 'not_in_file' };
+    return { ok: true, drop: true, bare };
+  }
+
+  if (have.has(bare)) return { ok: false, reason: 'already' };
   if (!idx.has(ka) || !idx.has(kb)) return { ok: false, reason: 'not_found' };
 
   for (const k of [ka, kb]) {
@@ -220,6 +234,25 @@ function selftest() {
   decide(idx, LEAGUE_TABLES, TEAMS, have, known);
   is(fs.readFileSync(CSV, 'utf8') === before, true, 'chemistry_duos.csv לא נגע');
 
+
+  // ── הצעה להוריד צמד ──────────────────────────────────────────────────────
+  // מפתח עם "-" בהתחלה. "-" אינו תו חוקי בשם מנורמל, אז אין התנגשות אפשרית
+  // עם הצעה רגילה — וזו בדיוק הבדיקה: ששני הסוגים לא מתבלבלים.
+  const knownDrop = '-' + known;
+  const dd = decide(idx, LEAGUE_TABLES, TEAMS, have, knownDrop);
+  is(dd.ok, true, 'הצעה להוריד צמד שקיים בקובץ מתקבלת');
+  is(dd.drop, true, 'והיא מסומנת כהורדה ולא כהוספה');
+  is(dd.bare, known, 'והמפתח שנשלח להורדה הוא בלי הקידומת');
+
+  // צמד שלא בקובץ — אין מה להוריד
+  const ghost = '-' + key('אלון מזרחי', 'עבאס סואן');
+  is(decide(idx, LEAGUE_TABLES, TEAMS, have, ghost).reason, 'not_in_file',
+     'הצעה להוריד צמד שלא בקובץ נדחית');
+
+  // והכיוון ההפוך: אותו מפתח בלי "-" הוא הצעה להוסיף, ומתנהג אחרת לגמרי
+  is(decide(idx, LEAGUE_TABLES, TEAMS, have, known).reason, 'already',
+     'אותו מפתח בלי הקידומת נקרא כהוספה ונדחה כי הוא כבר בקובץ');
+
   console.log(failed ? '\nנפלו ' + failed : '\nהכל עבר');
   process.exit(failed ? 1 : 0);
 }
@@ -241,11 +274,12 @@ async function main() {
   const idx = buildIndex(SQUADS);
   const { raw, header, have } = readCsv();
 
-  const done = [], skipped = [];
+  const done = [], skipped = [], drops = [];
   const lines = [];
   for (const r of rows) {
     const d = decide(idx, LEAGUE_TABLES, TEAMS, have, r.pair_key);
     if (!d.ok) { skipped.push({ ...r, ...d }); continue; }
+    if (d.drop) { drops.push({ ...r, bare: d.bare }); have.delete(d.bare); continue; }
     if (d.row.length !== header.length) {
       skipped.push({ ...r, reason: 'bad_shape' });
       continue;
@@ -257,22 +291,42 @@ async function main() {
 
   const why = {
     already: 'כבר בקובץ', not_found: 'שם לא נמצא בדאטה',
+    not_in_file: 'הצמד הזה כבר לא בקובץ',
     never_together: 'מעולם לא היו באותו סגל', bad_key: 'מפתח פגום',
     bad_shape: 'מספר עמודות לא תואם', ambiguous: 'שם עמום — ייתכן שני אנשים',
   };
-  console.log(`יתווספו ${done.length} · דולגו ${skipped.length}`);
+  console.log(`יתווספו ${done.length} · יורדו ${drops.length} · דולגו ${skipped.length}`);
   done.forEach(d => console.log(`  + ${d.pair_key}  דרגה ${d.tier}  (${d.votes} הציעו)`));
+  drops.forEach(d => console.log(`  − ${d.bare}  (${d.votes} אמרו שזה לא צמד)`));
   skipped.forEach(s => console.log(`  ⚠ ${s.pair_key} — ${why[s.reason] || s.reason}`));
 
   if (!WRITE) { console.log('\nיבש. להרצה אמיתית: --write'); return; }
-  if (!done.length) return;
+  if (!done.length && !drops.length) return;
 
-  const sep = raw.endsWith('\n') ? '' : '\n';
-  fs.appendFileSync(CSV, sep + lines.join('\n') + '\n');
+  // ההורדות קודם: הן עורכות שורות שכבר בקובץ, וההוספות נכתבות בסופו.
+  if (drops.length) {
+    const dropSet = new Set(drops.map(d => d.bare));
+    const cur = fs.readFileSync(CSV, 'utf8');
+    const out = cur.split(/\r?\n/).map((ln, k) => {
+      if (k === 0 || !ln.trim()) return ln;
+      const c = ln.split(',');
+      const a = norm(c[1]), b = norm(c[4]);
+      const key = a < b ? a + '|' + b : b + '|' + a;
+      if (!dropSet.has(key)) return ln;
+      c[0] = 'n';                      // keep → n. השורה נשארת, הצמד יוצא.
+      return c.join(',');
+    });
+    fs.writeFileSync(CSV, out.join('\n'));
+  }
+
+  if (lines.length) {
+    const cur2 = fs.readFileSync(CSV, 'utf8');
+    fs.appendFileSync(CSV, (cur2.endsWith('\n') ? '' : '\n') + lines.join('\n') + '\n');
+  }
   const head = fs.existsSync(LOG) ? '' : 'when,pair,tier,votes\n';
   fs.appendFileSync(LOG, head + done.map(d =>
     `${new Date().toISOString()},"${d.pair_key}",${d.tier},${d.votes}`).join('\n') + '\n');
-  await markApplied(URL, KEY, done.map(d => d.pair_key));
+  await markApplied(URL, KEY, [...done, ...drops].map(d => d.pair_key));
   console.log(`\nנכתב ל-${CSV}.\nעכשיו: node scripts/build_chem_js.js`);
 }
 

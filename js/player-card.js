@@ -582,6 +582,8 @@ function pcBackdrop(on) {
 // it prevents, so the three explicit ways out have a door.
 function pcHide(force) {
   if (!force && typeof crowdBusy === 'function' && crowdBusy()) return;
+  // ואותו דבר להקלדה בחיפוש הצמדים — אותה סיבה בדיוק.
+  if (!force && typeof cdBusy === 'function' && cdBusy()) return;
   clearTimeout(_pcTimer);
   _pcOpenFor = null;
   _pcAnchor = null;

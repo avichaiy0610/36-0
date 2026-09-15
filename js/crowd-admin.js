@@ -318,21 +318,30 @@ async function cdaLoad() {
 
   const shipped = (typeof CHEM_PAIRS !== 'undefined') ? CHEM_PAIRS : {};
   body.innerHTML = data.map(r => {
-    const [ka, kb] = r.pair_key.split('|');
+    // מפתח שמתחיל ב-"-" הוא הצעה **להוריד** צמד קיים, לא להוסיף אחד. בלי
+    // ההבחנה הזאת אישור של "זה לא צמד" היה מוסיף אותו למשחק — היפוך מוחלט
+    // של מה שהמצביעים ביקשו, ובלי שום סימן על המסך.
+    const isDrop = r.pair_key.charAt(0) === '-';
+    const bareKey = isDrop ? r.pair_key.slice(1) : r.pair_key;
+    const [ka, kb] = bareKey.split('|');
     const t = cdaTogether(ka, kb);
-    const already = !!shipped[r.pair_key];
+    const already = !!shipped[bareKey];
     const tier = t.seasons ? cdTierOf(t.seasons, t.titles) : 0;
     return `
-    <tr data-key="${caEsc(r.pair_key)}">
-      <td>${caEsc(ka)} + ${caEsc(kb)}</td>
+    <tr data-key="${caEsc(r.pair_key)}" data-drop="${isDrop ? 1 : 0}">
+      <td>${isDrop ? '<span class="cda-drop">להוריד</span> ' : ''}${caEsc(ka)} + ${caEsc(kb)}</td>
       <td dir="ltr">${r.n}</td>
       <td dir="ltr">${t.seasons}</td>
       <td dir="ltr">${t.titles}</td>
-      <td>${already ? '<span class="ca-alt">כבר במשחק</span>'
+      <td>${isDrop
+           ? (already ? '<span class="cda-drop">יוסר מהמשחק</span>'
+                      : '<span class="ca-alt">כבר לא במשחק</span>')
+           : already ? '<span class="ca-alt">כבר במשחק</span>'
            : !t.seasons ? '<span class="ca-alt">לא חלקו סגל</span>'
            : `דרגה ${tier} · +${(({1:0.4,2:0.7,3:1})[tier])}`}</td>
       <td class="ca-act">
-        <button class="cda-ok" type="button"${already || !t.seasons ? ' disabled' : ''}>✅</button>
+        <button class="cda-ok" type="button"${
+          (isDrop ? !already : (already || !t.seasons)) ? ' disabled' : ''}>✅</button>
         <button class="cda-no" type="button">🗑️</button></td>
     </tr>`;
   }).join('');

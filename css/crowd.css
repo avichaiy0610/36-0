@@ -241,3 +241,19 @@
 /* הוצע כבר — נשאר על המסך כדי שלא תציע שוב, ושקט כדי שלא יתחרה בשאר. */
 .cd-chip.done { border-color: var(--accent); color: var(--accent); opacity: .6; cursor: default; }
 .cd-chip:disabled { cursor: default; }
+
+/* חיפוש והורדה בפאנל הצמדים */
+.cd-search-row { margin-top: 6px; }
+.cd-q {
+  width: 100%; box-sizing: border-box;
+  background: var(--bg); color: var(--text);
+  border: 1px solid var(--border); border-radius: 6px;
+  padding: 4px 8px; font: inherit; font-size: 12px;
+}
+.cd-results:not(:empty) { margin-top: 4px; }
+.cd-drop-note { margin-top: 8px; }
+/* הצעה להוריד היא הצעה נגדית, ולכן היא לא נראית כמו הצעה. אותו גודל וצורה,
+   דיו אדמדם ומסגרת מקווקוות — כדי שלא יילחץ בטעות במקום להוסיף. */
+.cd-chip.drop { border-style: dashed; }
+.cd-chip.drop:hover:not(:disabled) { border-color: #f85149; color: #f85149; }
+.cd-chip.drop.done { border-color: #f85149; color: #f85149; }
