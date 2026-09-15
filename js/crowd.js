@@ -219,6 +219,14 @@ async function crowdSubmitNote(key, season, body) {
 // ממוטמן מאותה סיבה בדיוק כמו crowdFetch: הכרטיס נפתח בהובר, לפעמים כמה פעמים
 // בשנייה, וקריאה לא ממוטמנת כאן הייתה בקשה שלישית בכל ריחוף. שורה מאושרת
 // משתנה רק דרך מודרציה של הבעלים, אז מטמון לכל חיי העמוד בטוח בדיוק כמו שם.
+async function crowdReportNote(id) {
+  try {
+    const { data, error } = await _supabase.rpc('report_note', { p_id: id });
+    if (error || (data && data.error)) return { ok: false };
+    return { ok: true };
+  } catch (e) { return { ok: false }; }
+}
+
 async function crowdNotes(key, season) {
   const ck = crowdCacheKey(key, season);
   if (_crowdNotesC.has(ck)) return _crowdNotesC.get(ck);
@@ -339,9 +347,16 @@ function crowdRenderLine(box, row, mine, notes) {
   const you = mine ? `<span class="crowd-you">אתה <span dir="ltr">${mine.ovr}</span></span> · ` : '';
   // עד שלוש שורות מאושרות מתחת לשורת הסיכום, וכלום כשאין. בפאנל הפתוח הן לא
   // מוצגות — שם המשתמש כותב, לא קורא.
+  // כל שורה נושאת דיווח. זו לא קישוטיות: אלה משפטים שאנשים כותבים על כדורגלנים
+  // ישראלים חיים, והבעלים הוא בעל התוכן. מודרציה לפני פרסום תופסת את הרוב,
+  // והדיווח הוא מה שתופס את מה שעבר — בלעדיו לצופה אין שום דרך לומר שמשהו
+  // חוצה גבול, וזו ההגנה שמפרט §7 מבטיח.
   const notesHtml = (notes && notes.length)
     ? `<div class="crowd-notes">${notes.map(nt =>
-        `<div class="crowd-note-row-r">“${crowdEsc(nt.body)}”</div>`).join('')}</div>`
+        `<div class="crowd-note-row-r">“${crowdEsc(nt.body)}”` +
+        `<button class="crowd-report" type="button" data-id="${parseInt(nt.id, 10) || 0}"` +
+        ` title="דווח על השורה הזאת" aria-label="דווח על השורה הזאת">⚑</button></div>`
+      ).join('')}</div>`
     : '';
   // הטקסט עטוף ב-span אחד כדי שהגלישה תקרה בתוכו. בלי זה .crowd-line הוא
   // flex-wrap עם margin-inline-start:auto על הכפתור, ו"אתה 86 · " שנוסף
@@ -350,6 +365,18 @@ function crowdRenderLine(box, row, mine, notes) {
   body.innerHTML = `<div class="crowd-line"><span class="crowd-sum">${you}${txt}</span>` +
     `<button class="crowd-open" type="button">${mine ? 'שנה' : 'דרג'}</button></div>${notesHtml}`;
   body.querySelector('.crowd-open').addEventListener('click', () => crowdOpenPanel(box, row, mine));
+
+  // דיווח נשלח פעם אחת ולא חוזר. הכפתור ננעל מיד ולא נפתח גם בכישלון: מי
+  // שלחץ אמר את מה שהיה לו לומר, ו-report_note ממילא מונע כפילות לפי המשתמש.
+  body.querySelectorAll('.crowd-report').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      const r = await crowdReportNote(+btn.dataset.id);
+      btn.textContent = '✓';
+      btn.title = btn.getAttribute('aria-label') =
+        r.ok ? 'דווח, תודה' : 'לא נשלח';
+    });
+  });
 
   // אין פתיחה אוטומטית. היא נוסתה ובוטלה אחרי שראו אותה בדפדפן: crowdOpenPanel
   // כותב לאותו .crowd-body שהשורה הרגע נכתבה אליו, באותו tick — כלומר
