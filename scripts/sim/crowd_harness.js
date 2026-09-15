@@ -44,7 +44,14 @@ is(ctx.crowdSlug("ויקטור פאצ’ו"), "ויקטור-פאצ'ו", 'slug no
 is(ctx.crowdDisplay(null),                    { state: 'empty',   left: 5 },  'no rows at all → empty');
 is(ctx.crowdDisplay({ n: 0 }),                { state: 'empty',   left: 5 },  'zero votes → empty');
 is(ctx.crowdDisplay({ n: 3 }),                { state: 'few',     left: 2 },  'three votes → two to go');
+is(ctx.crowdDisplay({ n: 4, avg_trimmed: null }), { state: 'few', left: 1 },  'four votes → one to go');
 is(ctx.crowdDisplay({ n: 5, avg_trimmed: 82 }),
                                               { state: 'shown', n: 5, avg: 82 }, 'five votes → shown');
+// המסד לא אמור להחזיר את זה לעולם — crowd_trimmed_avg מחזיר NULL אם ורק אם
+// n < 5. הבדיקה קיימת כי ההחלטה מה ניתן להציג היא של הפונקציה הזאת, ואסור לה
+// להיות נכונה רק כל עוד אינווריאנט מרוחק מחזיק. בלי השומר מופיעה המילה "null"
+// במקום שבו אמור להופיע דירוג.
+is(ctx.crowdDisplay({ n: 7, avg_trimmed: null }), { state: 'few', left: 1 },
+   'a count with no average is never shown');
 
 process.exit(failed ? 1 : 0);
