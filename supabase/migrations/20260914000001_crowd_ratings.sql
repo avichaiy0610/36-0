@@ -611,3 +611,191 @@ END $$;
 
 REVOKE ALL ON FUNCTION report_note(bigint) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION report_note(bigint) TO authenticated;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- THE DASHBOARD
+--
+-- Everything below is read and written by admin.html through js/crowd-admin.js,
+-- and by nobody else. The queue is not "everything the crowd said" — it is where
+-- the crowd and the data disagree. But the official rating lives in js/data.js,
+-- which does not exist in this database and never will, so the ranking cannot
+-- happen here: the RPC returns the aggregate and the client crosses it against
+-- SQUADS. See js/crowd-admin.js for the other half.
+-- ─────────────────────────────────────────────────────────────────────────────
+
+-- ── the disagreement queue ──────────────────────────────────────────────────
+-- Everyone with enough votes, minus what was dismissed and has said nothing new
+-- since.
+--
+-- The filter is avg_trimmed IS NOT NULL and not a test on n, and the difference
+-- is not cosmetic. crowd_ratings returns a row for ANY number of votes — that is
+-- deliberate, it is what makes "two more votes and the rating appears" possible
+-- on the card — so n alone is satisfied by a single vote. What "enough votes"
+-- means is defined in exactly one place, crowd_trimmed_avg, and NULL is how that
+-- place says no. A second threshold written here as `n >= 5` would be a copy
+-- that silently stops agreeing the day the first one moves.
+--
+-- is_site_admin() gates this even though crowd_ratings itself is world-readable,
+-- so no row here is new exposure. What the gate protects is the join: which
+-- player-seasons the owner dismissed, and at what vote count, is the shape of
+-- his moderation, and it is inferable from the rows this function omits. Same
+-- door as notes_queue and as the rest of the panel.
+--
+-- ORDER BY n DESC with a LIMIT is not the order the owner sees: the real sort is
+-- |crowd − official| × log(n) and it can only happen in the client, which is the
+-- only side that knows the official rating. So this is a prefilter, and it keeps
+-- the most-voted 500 rather than the most-disagreed-with 500 — a huge gap backed
+-- by six votes can in principle fall off the end. Acceptable while the queue is
+-- nowhere near 500 rows with five votes each; the day it is, this needs the join
+-- against data.js that the database cannot do, i.e. a materialised copy of the
+-- official ratings, not a bigger LIMIT.
+CREATE OR REPLACE FUNCTION crowd_queue()
+RETURNS TABLE (player_key text, season text, n int, avg_trimmed smallint,
+               tag_top text, tag_top_n int)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+  SELECT c.player_key, c.season, c.n, c.avg_trimmed, c.tag_top, c.tag_top_n
+    FROM crowd_ratings c
+    LEFT JOIN rating_dismissals d
+      ON d.player_key = c.player_key AND d.season = c.season
+   WHERE is_site_admin()
+     AND c.avg_trimmed IS NOT NULL        -- below five votes there is nothing to decide
+     AND (d.player_key IS NULL OR c.n > d.at_votes)
+   ORDER BY c.n DESC
+   LIMIT 500;
+$$;
+
+REVOKE ALL ON FUNCTION crowd_queue() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION crowd_queue() TO authenticated;
+
+-- ── the owner's two answers ─────────────────────────────────────────────────
+-- is_site_admin() is defined in 20260824000001_usage_events.sql and already
+-- gates every other section of the panel. Not a new gate: two gates that drift
+-- apart is one dashboard section that opens for somebody the other one blocks.
+--
+-- "Approve" does not touch the game. It writes a row here, and
+-- scripts/apply_crowd_ratings.js is what writes js/data.js, by hand, later.
+CREATE OR REPLACE FUNCTION approve_rating(
+  p_player_key text, p_season text, p_old smallint, p_new smallint)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE v_n int;
+BEGIN
+  IF NOT is_site_admin() THEN RETURN jsonb_build_object('error', 'forbidden'); END IF;
+
+  -- The same avg_trimmed IS NOT NULL test as the queue, and for the same reason:
+  -- n alone comes out true on a single vote, and approving a single vote is
+  -- precisely what the threshold exists to prevent. It is repeated here rather
+  -- than trusted from the queue because this function is reachable directly —
+  -- the client's row is a suggestion, not an authorisation.
+  SELECT n INTO v_n FROM crowd_ratings
+   WHERE player_key = p_player_key AND season = p_season AND avg_trimmed IS NOT NULL;
+  IF v_n IS NULL THEN RETURN jsonb_build_object('error', 'not enough votes'); END IF;
+
+  -- old_ovr is in the UPDATE list on purpose. It is the official rating as the
+  -- client read it out of js/data.js a moment ago, so on a second approval of
+  -- the same pending row — after the queue was reloaded, or after data.js moved,
+  -- which is the whole point of this feature — the stored one is stale. It is
+  -- the "before" half of the line the apply script logs, and a stale before with
+  -- a fresh after is a log entry that describes a change nobody made.
+  INSERT INTO rating_approvals (player_key, season, old_ovr, new_ovr, votes)
+  VALUES (p_player_key, p_season, p_old, p_new, v_n)
+  ON CONFLICT (player_key, season) WHERE applied_at IS NULL
+  DO UPDATE SET old_ovr = EXCLUDED.old_ovr,
+                new_ovr = EXCLUDED.new_ovr,
+                votes   = EXCLUDED.votes;
+
+  RETURN jsonb_build_object('ok', true);
+END $$;
+
+REVOKE ALL ON FUNCTION approve_rating(text, text, smallint, smallint) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION approve_rating(text, text, smallint, smallint) TO authenticated;
+
+-- "Dismiss" is not "no". It is "not at this many votes" — the count is kept, and
+-- the row returns to the queue only when something genuinely new has been said.
+CREATE OR REPLACE FUNCTION dismiss_rating(p_player_key text, p_season text)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE v_n int;
+BEGIN
+  IF NOT is_site_admin() THEN RETURN jsonb_build_object('error', 'forbidden'); END IF;
+  -- No avg_trimmed test and no NOT FOUND branch: dismissing a player-season that
+  -- has no votes is harmless and writes at_votes 0, which just means the row
+  -- appears the moment it gets its first. The rating_dismissals header records
+  -- that this is the path which will write whatever key it is handed, and that
+  -- the gate above is the only thing keeping the table clean.
+  SELECT n INTO v_n FROM crowd_ratings
+   WHERE player_key = p_player_key AND season = p_season;
+  INSERT INTO rating_dismissals (player_key, season, at_votes)
+  VALUES (p_player_key, p_season, COALESCE(v_n, 0))
+  ON CONFLICT (player_key, season) DO UPDATE SET at_votes = EXCLUDED.at_votes;
+  RETURN jsonb_build_object('ok', true);
+END $$;
+
+REVOKE ALL ON FUNCTION dismiss_rating(text, text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION dismiss_rating(text, text) TO authenticated;
+
+-- ── moderating a line ───────────────────────────────────────────────────────
+-- Text about a real, living person. Nothing reaches a screen before it passes
+-- through here.
+CREATE OR REPLACE FUNCTION moderate_note(p_id bigint, p_status text)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+  IF NOT is_site_admin() THEN RETURN jsonb_build_object('error', 'forbidden'); END IF;
+  -- 'pending' is refused as well as everything else. The column's CHECK would
+  -- accept it, and it would be a quiet way to un-decide a note that was already
+  -- answered — including un-rejecting one.
+  IF p_status NOT IN ('approved', 'rejected') THEN
+    RETURN jsonb_build_object('error', 'bad status');
+  END IF;
+  UPDATE player_notes SET status = p_status WHERE id = p_id;
+  RETURN jsonb_build_object('ok', true);
+END $$;
+
+REVOKE ALL ON FUNCTION moderate_note(bigint, text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION moderate_note(bigint, text) TO authenticated;
+
+-- ── the moderation queue ────────────────────────────────────────────────────
+-- A plain JOIN and not a LEFT JOIN: player_notes.user_id is NOT NULL and
+-- REFERENCES profiles(id) ON DELETE CASCADE, so a pending note whose author has
+-- no profile row cannot exist — submit_player_note refuses to create one, and
+-- deleting the account takes the note with it.
+--
+-- The column is username. profiles has no display_name, and a migration that
+-- says otherwise fails on push.
+--
+-- reports is deliberately not selected, though the queue is the one place it
+-- would seem to belong. report_note only ever increments a note that is already
+-- approved, so on a pending row the counter is 0 by construction — a column that
+-- can only ever read zero invites the owner to read meaning into it.
+CREATE OR REPLACE FUNCTION notes_queue()
+RETURNS TABLE (id bigint, player_key text, season text, username text,
+               body text, created_at timestamptz)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+  SELECT nt.id, nt.player_key, nt.season, p.username, nt.body, nt.created_at
+    FROM player_notes nt
+    JOIN profiles p ON p.id = nt.user_id
+   WHERE nt.status = 'pending' AND is_site_admin()
+   ORDER BY nt.created_at ASC
+   LIMIT 200;
+$$;
+
+REVOKE ALL ON FUNCTION notes_queue() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION notes_queue() TO authenticated;
