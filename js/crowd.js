@@ -164,6 +164,31 @@ function crowdClientId() {
   try { return localStorage.getItem('t360_cid') || null; } catch (e) { return null; }
 }
 
+/* ── "האם האדם הזה כבר הצביע פעם אחת" ──────────────────────────────────────
+   דגל אחד לכל הדפדפן, לא לכל שחקן: השאלה היחידה שהוא עונה עליה היא "האם צריך
+   עוד להסביר לו שהפיצ'ר קיים". ברגע שהצביע — פעם אחת, על מישהו — הוא יודע, וכל
+   ארבעת הרמזים מסירים את עצמם.
+
+   הוא נשמר כאן ולא ב-js/crowd-nudges.js כי כאן נמצאת העובדה: crowdVote היא
+   המקום היחיד שבו הצבעה באמת מצליחה, ו-mine הוא המקום היחיד שבו השרת מעיד
+   שהצביע כבר קודם. שני קוראים בקובץ אחר היו נשענים על עדכון שמישהו יזכור לעשות.
+
+   try/catch משני הצדדים: בגלישה פרטית localStorage זורק, ורמז שנופל לא יכול
+   להפיל את השורה שהוא יושב עליה. כשהוא זורק התשובה היא false — כלומר הרמז
+   יוצג שוב בטעינה הבאה. זו הטעות הנכונה מבין השתיים.
+
+   הפניות ל-localStorage כאן הן בתוך פונקציות בלבד. scripts/sim/crowd_harness.js
+   מריץ את הקובץ הזה ב-vm בלי דפדפן, וכל פנייה ברמה העליונה הייתה הורגת אותו. */
+const CROWD_VOTED_KEY = '36-0-crowd-voted';
+
+function crowdHasVoted() {
+  try { return localStorage.getItem(CROWD_VOTED_KEY) === '1'; } catch (e) { return false; }
+}
+
+function crowdMarkVoted() {
+  try { localStorage.setItem(CROWD_VOTED_KEY, '1'); } catch (e) { /* גלישה פרטית */ }
+}
+
 async function crowdFetch(key, season) {
   const ck = crowdCacheKey(key, season);
   if (_crowdCache.has(ck)) return _crowdCache.get(ck);
@@ -209,6 +234,7 @@ async function crowdVote(key, season, ovr, tag) {
     const ck = crowdCacheKey(key, season);
     _crowdCache.delete(ck);      // ההצבר כבר לא נכון — שיישלף מחדש
     _crowdMine.set(ck, { ovr, tag: tag || null });
+    crowdMarkVoted();            // מכאן והלאה הוא יודע מה זה — כל הרמזים יורדים
     return { ok: true };
   } catch (e) { return { ok: false, error: 'network' }; }
 }
@@ -355,7 +381,19 @@ function crowdRenderLine(box, row, mine, notes) {
     txt = name ? `עוד אין דעות על ${crowdEsc(name)} — תהיה הראשון`
                : 'עוד אין דעות עליו — תהיה הראשון';
   }
+  // mine מגיע מהשרת, ולכן הוא גם עדות שהאדם הזה כבר הצביע פעם — גם אם זה קרה
+  // בדפדפן אחר, או לפני שהדגל המקומי בכלל נולד. בלי השורה הזאת "חדש" היה נשאר
+  // דלוק לנצח למי שכבר משתמש בפיצ'ר, וזה בדיוק מה שהופך תג לרעש.
+  if (mine) crowdMarkVoted();
   const you = mine ? `<span class="crowd-you">אתה <span dir="ltr">${mine.ovr}</span></span> · ` : '';
+  /* "חדש" על הכפתור, עד ההצבעה הראשונה של האדם הזה — ולא עד תאריך קבוע.
+     הפיצ'ר הזה חי בתוך כרטיס שנפתח בריחוף או בלחיצה ארוכה, ומי שלא יודע שהכרטיס
+     קיים גם לא קרא את "מה חדש". התג הוא מה שאומר "יש כאן משהו חדש" ברגע היחיד
+     שבו הוא בכל זאת פתח כרטיס.
+     גם התג וגם הכיתוב יושבים בתוך הכפתור: הכפתור הוא הדבר שצריך שילחצו עליו,
+     ותג שצף לידו רק גונב לו מקום בשורה שכבר צפופה. */
+  const isNew = !mine && !crowdHasVoted();
+  const newTag = isNew ? '<span class="crowd-new">חדש</span>' : '';
   // עד שלוש שורות מאושרות מתחת לשורת הסיכום, וכלום כשאין. בפאנל הפתוח הן לא
   // מוצגות — שם המשתמש כותב, לא קורא.
   // כל שורה נושאת דיווח. זו לא קישוטיות: אלה משפטים שאנשים כותבים על כדורגלנים
@@ -374,7 +412,8 @@ function crowdRenderLine(box, row, mine, notes) {
   // בהתחלה דוחף את הכפתור לשורה משלו, נטוש משמאל — וזה המצב הרגיל של כל מי
   // שכבר הצביע פעם, כלומר המצב הרגיל ברגע שיש לפיצ'ר משתמשים.
   body.innerHTML = `<div class="crowd-line"><span class="crowd-sum">${you}${txt}</span>` +
-    `<button class="crowd-open" type="button">${mine ? 'שנה' : 'דרג'}</button></div>${notesHtml}`;
+    `<button class="crowd-open${isNew ? ' crowd-open-new' : ''}" type="button">` +
+    `${mine ? 'שנה' : 'דרג'}${newTag}</button></div>${notesHtml}`;
   body.querySelector('.crowd-open').addEventListener('click', () => crowdOpenPanel(box, row, mine));
 
   // דיווח נשלח פעם אחת ולא חוזר. הכפתור ננעל מיד ולא נפתח גם בכישלון: מי

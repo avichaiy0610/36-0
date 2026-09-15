@@ -133,6 +133,86 @@
 .crowd-report:hover:not(:disabled) { opacity: 1; color: var(--accent); }
 .crowd-report:disabled { opacity: .7; cursor: default; }
 
+/* ═══ ארבעת הרמזים ═════════════════════════════════════════════════════════
+   js/crowd-nudges.js מסביר מה כל אחד עושה ומתי הוא נעלם. כאן רק איך הם נראים,
+   ובאותם טוקנים כמו כל השאר: --accent הוא #FFD700 כהה ו-#b8860b בהיר, ורק דרכו
+   התג הזהוב נשאר קריא בשני המצבים. */
+
+/* 1. "חדש" בתוך כפתור הדירוג, עד ההצבעה הראשונה.
+   זה אותו תג שקריירה קיבלה (.label-new ב-css/style.css) — מילוי זהב, דיו כהה,
+   9px במשקל 900 — ובכוונה לא המצאנו שפה שנייה לאותה הודעה.
+   ההבדל היחיד הוא הפעימה: .label-new פועם כי הוא יושב במסך עמוס בצ'יפים ובלי
+   תנועה הוא נבלע. כאן הוא יושב בכרטיס שנפתח רק במכוון, בשורה אחת ולידה כפתור
+   אחד — פעימה כאן היא רעש, לא הדגשה. */
+.crowd-new {
+  display: inline-block;
+  margin-inline-start: 5px;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 8.5px;
+  font-weight: 900;
+  letter-spacing: .4px;
+  line-height: 1.5;
+  vertical-align: middle;
+}
+
+/* ‎.crowd-open מקבל מתחת ל-700px ריפוד רוחבי של 18px, כדי שלא ייראה כעיגול אפור
+   ריק. עם התג בפנים הרוחב הזה כבר מיותר — ‎.crowd-line הוא nowrap, וכפתור רחב
+   מדי חותך את המשפט שלצידו. התג עצמו נותן את הרוחב. */
+@media (max-width: 700px) {
+  .crowd-open-new { padding-inline: 10px; }
+}
+
+/* 3. הנקודה על 👥 שחקנים. הצורה של ‎.wn-dot ("מה חדש"), בזהב של הערכה במקום
+   באדום קבוע — אדום כאן הוא התראה, וזה לא. */
+.crowd-dot {
+  display: inline-block;
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  margin-inline-start: 5px;
+  vertical-align: 3px;
+}
+
+/* 2 ו-4. שורת הרמז. קו זהב על הקצה המוביל (ב-RTL זה הימני) במקום מילוי צבעוני:
+   מילוי היה מושך את העין חזק מהתוכן שהוא מצביע עליו. */
+.crowd-tip {
+  margin: 6px 0;
+  padding: 7px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-inline-start: 2px solid var(--accent);
+  border-radius: 8px;
+  font-size: 11.5px;
+  line-height: 1.65;
+  color: var(--dim);
+}
+.crowd-tip b { color: var(--text); font-weight: 700; }
+
+/* הרמז של מסך התוצאות יושב בראש פאנל המגרש, ולכן הוא רצועה ולא כרטיס מרחף:
+   בדסקטופ הפאנל הזה צבוע ברקע אצטדיון כהה קבוע (css/style.css) שלא מתחלף במצב
+   בהיר, וכרטיס מעוגל עם שוליים היה נראה שם כמו פתק שנשכח. רצועה עם קו תחתון היא
+   בדיוק מה ש-.progress-bar-wrap עושה בראש אותו פאנל במסך הדראפט. */
+.crowd-tip-xi {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 8px 14px;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+}
+.crowd-tip-xi .cn-t { display: block; }
+
+/* הגרסה הנכונה לכל מכשיר. אותה שאילתה בדיוק שמדליקה את כפתור ה-ⓘ ב-
+   css/style.css — שתיהן חייבות לומר את אותו דבר על אותו מכשיר. */
+.cn-touch { display: none; }
+@media (hover: none), (pointer: coarse) {
+  .cn-hover { display: none; }
+  .cn-touch { display: inline; }
+}
+
 /* הקישור יושב מחוץ ל-.crowd-body ולכן שורד כל רינדור מחדש של הווידג'ט. */
 .crowd-full {
   display: inline-block; margin-top: 6px;
