@@ -82,6 +82,8 @@
   <link rel="stylesheet" href="css/europe.css?v=151f9861" />
   <link rel="stylesheet" href="css/cup.css?v=47e12ef1" />
   <link rel="stylesheet" href="css/club.css?v=0331f03a" />
+  <link rel="stylesheet" href="css/crowd.css?v=a0fffca0" />
+  <link rel="stylesheet" href="css/players-index.css?v=00720430" />
 </head>
 <body>
 
@@ -100,6 +102,9 @@
       <div class="nav-actions" id="nav-actions">
         <button class="nav-btn" id="nav-daily">🗓️ אתגרים</button>
         <button class="nav-btn" id="nav-minigames">🎲 משחקונים <span class="nav-beta">בטא</span></button>
+        <!-- כפתור שישי בתוך המגירה. js/nav-drawer.js מתעד למה הסרגל בטלפון
+             הפך למגירה — בדיוק כדי שתוספת כזאת לא תיפול מעבר לקצה. -->
+        <button class="nav-btn" id="nav-players">👥 שחקנים</button>
         <button class="nav-btn" id="nav-leagues">ליגות</button>
         <button class="nav-btn" id="nav-duel">1v1 <span class="nav-beta">בטא</span></button>
         <button class="nav-btn" id="nav-leaderboard">לוח שיאים</button>
@@ -232,7 +237,7 @@
       </button>
       <a class="btn-coffee btn-coffee-welcome" id="btn-coffee-welcome" href="https://ko-fi.com/360ligathaal" target="_blank" rel="noopener">☕ אוהב את המשחק? קנה לי קפה</a>
       <button class="wn-link" id="btn-whatsnew"><span id="wn-label">מה חדש!</span><span class="wn-dot" id="wn-dot"></span></button>
-      <div class="wn-version" id="wn-version" dir="ltr">v1.51</div>
+      <div class="wn-version" id="wn-version" dir="ltr">v1.57</div>
     </div>
     <footer class="site-disclaimer">
       <p>
@@ -931,6 +936,22 @@
     </div>
   </div>
 
+  <!-- ══ 👥 שחקנים ═════════════════════════════════════════════════════════════
+       השער מתוך האתר אל 1,570 עמודי /player/. הרשימה נמשכת מ-player/index.json
+       בפתיחה הראשונה — js/players-index.js. -->
+  <div id="screen-players" class="screen screen-page">
+    <div class="page-inner">
+      <div class="page-header">
+        <button class="back-btn" id="players-back">→ חזרה</button>
+        <h2 class="page-title">👥 שחקנים</h2>
+      </div>
+      <p class="pi-sub">כל מי ששיחק בליגה מאז 1999 ויש לו לפחות שתי עונות — לכל אחד עמוד משלו, עם הקריירה המלאה ודירוג הקהל.</p>
+      <input id="pi-q" class="pi-q" type="text" autocomplete="off" placeholder="חפש שחקן…">
+      <div id="pi-list" class="pi-list"></div>
+      <div id="pi-foot" class="pi-foot"></div>
+    </div>
+  </div>
+
   <!-- ══ בית המועדון ═══════════════════════════════════════════════════════════
        The cabinet, the all-time records and the eleven of all time — everything
        the club has to its name. Filled by showClubHome() in js/club-records.js. -->
@@ -1065,7 +1086,7 @@
   <script src="js/chemistry.js?v=60e55753"></script>
   <script src="js/data.js?v=e2436bbd"></script>
   <script src="js/sim-engine.js?v=784ec7b1"></script>
-  <script src="js/game.js?v=03c2be65"></script>
+  <script src="js/game.js?v=7d6f493d"></script>
   <script src="js/club-media.js?v=fcf688c0"></script>
   <!-- after club.js and draft-archive.js (its crest and its daMode), and it is
        only ever called from a click or from the end of a season, so career.js
@@ -1077,7 +1098,7 @@
   <script src="js/europe-screens.js?v=3ee113a6"></script>
   <script src="js/cup-data.js?v=c72c5a27"></script>
   <script src="js/cup.js?v=5e262220"></script>
-  <script src="js/whatsnew.js?v=7b9ecdd6"></script>
+  <script src="js/whatsnew.js?v=d996d806"></script>
   <script src="js/europe-admin.js?v=19ab9628"></script>
   <script src="js/season-admin.js?v=1f37a0db"></script>
   <script src="js/league-sim.js?v=178f8a92"></script>
@@ -1097,7 +1118,11 @@
   <script src="js/attrs.js?v=aa09fd77"></script>
   <script src="js/pb-career.js?v=94c14411"></script>
   <script src="js/pb-build.js?v=73edd454"></script>
-  <script src="js/player-card.js?v=68612e32"></script>
+  <script src="js/player-card.js?v=b39e72e7"></script>
+  <script src="js/crowd.js?v=8fb571a9"></script>
+  <script src="js/crowd-duos.js?v=7c926570"></script>
+  <script src="js/crowd-nudges.js?v=768c915a"></script>
+  <script src="js/players-index.js?v=1d242508"></script>
   <script src="js/theme.js?v=061d5509"></script>
   <script src="js/nav-drawer.js?v=d459aa88"></script>
   <script src="js/salary.js?v=e7056dfe"></script>

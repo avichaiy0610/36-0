@@ -153,6 +153,48 @@
     .us-table td:first-child, .us-table th:first-child { text-align: start; color: #e6edf3; font-weight: 700; }
     .us-table tr:last-child td { border-bottom: none; }
     .us-table .us-zero { color: #484f58; }
+
+    /* ⭐ דירוגי הקהל. שתי הטבלאות יושבות על .us-table, טבלת הדשבורד הקיימת. */
+    .ca-note { color: #8b949e; font-size: 13px; margin: 0 0 10px; line-height: 1.6; }
+    .ca-note code { color: #FFD700; background: #0d1117; padding: 1px 6px; border-radius: 5px; }
+    .ca-wrap { overflow-x: auto; border: 1px solid #30363d; border-radius: 10px; background: #161b22; }
+    /* nowrap על .us-table נכון לרשת של מספרים ולא לתשע עמודות שנושאות שמות
+       מועדונים ותוויות תגיות, ולא לשורה של 80 תווים שמישהו כתב על שחקן. נמדד
+       בדפדפן: הטבלה גלשה מעבר למעטפת ודחפה את עמודת ✅/🗑️ מחוץ לתמונה מאחורי
+       פס גלילה — כלומר שני הכפתורים שכל המסך הזה קיים בשבילם לא היו נגישים בלי
+       לגלול הצידה. רק התאים שחייבים להישאר בשורה אחת שומרים nowrap. */
+    .ca-wrap .us-table { white-space: normal; table-layout: auto; }
+    .ca-wrap .us-table .ca-act, .ca-wrap .us-table td[dir="ltr"] { white-space: nowrap; }
+    .ca-body { white-space: normal; text-align: start; min-width: 200px; }
+    .ca-alt { color: #8b949e; font-size: 11.5px; }
+    .ca-up { color: #3fb950; font-weight: 800; }
+    .ca-down { color: #f85149; font-weight: 800; }
+    .ca-act button { background: #21262d; border: 1px solid #30363d; border-radius: 7px; color: #e6edf3; font-size: 14px; padding: 3px 8px; cursor: pointer; }
+    .ca-act button:disabled { opacity: .45; cursor: default; }
+    /* פרסום הוא מצב, לא פעולה חד-פעמית — הכפתור נשאר על המסך ומראה איפה
+       השחקן הזה עומד: 🚫 מוסתר מהציבור, 👁 מוצג. */
+    .ca-act .ca-pub.on { border-color: #2ea043; color: #3fb950; }
+    /* פירוט ההצבעות: כל הצבעה בשורה, ממוינות לפי הדירוג — טרול מכריז על עצמו
+       בקצה של עמודה ממוינת, לא באמצע רשימה כרונולוגית. */
+    /* עמודת ההצבעות היא הכפתור: המספר הוא בדיוק מה שרוצים להסתכל בתוכו,
+       וחץ אפרורי ליד השם היה שקט מכדי להיקרא כפקד. */
+    .ca-peek { background: #21262d; border: 1px solid #30363d; border-radius: 7px;
+               color: #e6edf3; cursor: pointer; font: inherit; font-size: 13px;
+               padding: 3px 9px; white-space: nowrap; }
+    .ca-peek:hover { background: #2d333b; border-color: #8b949e; }
+    .cv-wrap td { background: #0d1117; padding: 8px 12px; }
+    .cv-head { color: #8b949e; font-size: 12px; margin-bottom: 6px; }
+    .cv-row { display: flex; align-items: center; gap: 12px; padding: 3px 0; font-size: 13px; }
+    .cv-ovr { min-width: 34px; font-weight: 700; color: #e6edf3; }
+    .cv-tag { min-width: 190px; color: #8b949e; }
+    .cv-who { color: #8b949e; font-size: 12px; }
+    .cv-x { margin-inline-start: auto; background: #21262d; border: 1px solid #30363d;
+            border-radius: 6px; color: #8b949e; cursor: pointer; padding: 1px 7px; }
+    .cv-x:hover:not(:disabled) { color: #e6edf3; border-color: #8b949e; }
+    /* הוחרגה — נשארת ברשימה, מסומנת, כדי שההחלטה תהיה נראית והפיכה */
+    .cv-row.out .cv-ovr, .cv-row.out .cv-tag { text-decoration: line-through; opacity: .45; }
+    .ca-err { color: #f85149; font-size: 11.5px; margin-top: 3px; white-space: normal; }
+    .ca-wait { opacity: .5; }
     .us-fin { color: #8b949e; font-size: 12px; }
     .us-share { color: #d29922; font-size: 12px; }
     .us-h3 { font-size: 13.5px; color: #e6edf3; margin: 0 0 6px; font-weight: 800; }
@@ -267,6 +309,58 @@
       <div id="pq-list"><div class="chal-note">טוען…</div></div>
     </div>
 
+    <div id="ca-section" style="display:none">
+      <h2 style="margin-top:34px">⭐ דירוגי הקהל</h2>
+      <p class="ca-note">
+        לא כל מה שהקהל אמר — רק המקומות שבהם הקהל והדאטה לא מסכימים, ממוינים לפי
+        עוצמת המחלוקת כפול מספר המצביעים. "קבל" רושם אישור בלבד; המשחק משתנה רק
+        כשמריצים <code dir="ltr">node scripts/apply_crowd_ratings.js</code>.
+        מספר ההצבעות הוא "כך הרבה דעות נשלחו", לא "כך הרבה אנשים חושבים".
+      </p>
+      <div class="us-controls">
+        <button id="ca-refresh" class="seo-btn ghost">↻ רענן</button>
+        <span id="ca-status" class="chal-status"></span>
+      </div>
+      <div class="ca-wrap">
+        <table class="us-table">
+          <thead><tr>
+            <th>שחקן</th><th>עונה</th><th>מועדון</th><th>רשמי</th>
+            <th>קהל</th><th>פער</th><th>הצבעות</th><th>תגית מובילה</th><th></th>
+          </tr></thead>
+          <tbody id="ca-rows"><tr><td colspan="9">טוען…</td></tr></tbody>
+        </table>
+      </div>
+
+      <h2 style="margin-top:26px">📝 שורות ממתינות לאישור</h2>
+      <p class="ca-note">
+        שורה לא מוצגת בשום מקום לפני אישור. אלה בני אדם אמיתיים.
+      </p>
+      <div class="ca-wrap">
+        <table class="us-table">
+          <thead><tr><th>שחקן</th><th>עונה</th><th>מאת</th><th>הטקסט</th><th></th></tr></thead>
+          <tbody id="ca-notes"><tr><td colspan="5">טוען…</td></tr></tbody>
+        </table>
+
+      <h3 style="margin-top:26px">🔗 צמדים שהוצעו</h3>
+      <p style="color:#8b949e;font-size:13px">
+        הקהל מציע זוג בלבד — הדרגה מחושבת מהעונות והאליפויות המשותפות, ומוצגת
+        כאן לפני האישור. צמד הוא שינוי איזון: הוא שווה 0.4 עד 1.0 נקודות דירוג.
+        "קבל" רושם אישור בלבד; המשחק משתנה רק כשמריצים
+        <code>node scripts/apply_crowd_duos.js --write</code> ואז
+        <code>node scripts/build_chem_js.js</code>.
+      </p>
+      <div class="ca-wrap">
+      <table class="us-table">
+        <thead><tr>
+          <th>הצמד</th><th>הציעו</th><th>עונות יחד</th><th>אליפויות</th>
+          <th>מה יקרה</th><th></th>
+        </tr></thead>
+        <tbody id="cda-rows"><tr><td colspan="6">טוען…</td></tr></tbody>
+      </table>
+      </div>
+      </div>
+    </div>
+
     <h2>📨 הודעות יצירת קשר <span id="cm-unread" class="cm-badge" style="display:none"></span></h2>
     <div class="chal-note">כל הודעה שנשלחה דרך עמוד "צור קשר" מגיעה לכאן. אין תיבת מייל — הכל כאן.</div>
     <div id="cm-list"><div class="chal-note">טוען…</div></div>
@@ -298,16 +392,25 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js?v=3dd47ca1"></script>
 <script src="js/supabase-client.js?v=e9102a02"></script>
-<script src="js/text-catalog.js?v=e9abf35d"></script>
+<script src="js/text-catalog.js?v=99a694f5"></script>
 <!-- the challenge editor derives each challenge's automatic conditions with the
      exact same code the game uses (game.js provides FORMATIONS + era range and
      skips all its UI wiring on this page) -->
 <script src="js/data.js?v=e2436bbd"></script>
 <script src="js/sim-engine.js?v=784ec7b1"></script>
-<script src="js/game.js?v=03c2be65"></script>
+<script src="js/game.js?v=7d6f493d"></script>
 <script src="js/player_nats.js?v=a527d5f3"></script>
 <script src="js/league_tables.js?v=8c22710d"></script>
 <script src="js/challenges.js?v=b1acda28"></script>
+<!-- crowd.js comes first and is not optional: crowd-admin.js builds its
+     cross-reference with crowdKey() and names its tags out of CROWD_TAGS. Those
+     are the same functions the player card files the votes under — a second
+     copy here would miss exactly the names with an apostrophe. -->
+<script src="js/crowd.js?v=8fb571a9"></script>
+<!-- chem-data: כדי שתור הצמדים ידע מה כבר במשחק. league_tables כבר
+       נטען מעליו ומשמש לחישוב האליפויות המשותפות. -->
+  <script src="js/chem-data.js?v=e5cdbc98"></script>
+  <script src="js/crowd-admin.js?v=f2a7e45d"></script>
 <script>
 const statusEl = document.getElementById('status');
 let overrides = {};   // key -> value currently stored in site_texts
@@ -718,6 +821,11 @@ async function init() {
     initSeoEditor();
     document.getElementById('pq-section').style.display = 'block';
     loadPostQueue();
+    // ⭐ דירוגי הקהל. אותו שער בדיוק כמו שאר הסקשנים כאן, ובמסד הוא
+    // is_site_admin() — שני שערים שנפרדים הם סקשן שנפתח למי שהשני חוסם.
+    document.getElementById('ca-section').style.display = 'block';
+    caInit();
+    cdaInit();
   }
 }
 

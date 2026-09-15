@@ -1,0 +1,69 @@
+/* css/players-index.css — מסך 👥 שחקנים.
+
+   הכל בטוקנים ולא בהקסים, כמו ב-css/crowd.css ומאותה סיבה בדיוק: js/theme.js
+   הופך את --bg/--surface/--text במצב בהיר ומחליף את --accent לפי המועדון.
+   רשימה שכתובה בהקסים קבועים הייתה נשארת אי כהה בתוך עמוד לבן, עם זהב #FFD700
+   על לבן שהמצב הבהיר כבר מסמן כבלתי קריא (שם הוא יורד ל-#b8860b). */
+
+.pi-sub { font-size: 0.8rem; color: var(--dim); line-height: 1.5; margin-bottom: 12px; }
+
+.pi-q {
+  width: 100%; box-sizing: border-box;
+  background: var(--surface); color: var(--text);
+  border: 1px solid var(--border); border-radius: 10px;
+  padding: 11px 13px; font: inherit; font-size: 15px; margin-bottom: 10px;
+}
+.pi-q::placeholder { color: var(--dim); }
+.pi-q:focus { outline: none; border-color: var(--accent); }
+
+.pi-list { display: flex; flex-direction: column; gap: 6px; }
+
+/* כרטיס לשורה, במשקל של מדף המשחקונים (.mg-card) אבל נמוך ממנו — כאן יש
+   1,570 שורות ולא שש. */
+.pi-row {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  padding: 9px 12px; text-decoration: none; color: var(--text);
+  transition: border-color .15s;
+}
+.pi-row:hover { border-color: var(--accent2); background: var(--hover); }
+.pi-badge { font-size: 1.25rem; line-height: 1; flex: 0 0 auto; }
+/* min-width:0 כדי ששם ארוך יתכווץ בתוך השורה במקום לדחוף את הדירוג החוצה. */
+.pi-body { display: flex; flex-direction: column; gap: 2px; flex: 1 1 auto; min-width: 0; }
+.pi-name { font-size: 0.95rem; font-weight: 700; }
+/* שורת המטא היא הקשר, לא כותרת: היא נחתכת ולא עוטפת, כדי שכל שורה תישאר
+   בגובה קבוע וצייד השמות ירוץ מהר עם העין. */
+.pi-meta {
+  font-size: 0.72rem; color: var(--dim); line-height: 1.45;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pi-b { white-space: nowrap; }
+.pi-peak {
+  flex: 0 0 auto; font-weight: 800; font-size: 0.95rem; color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+.pi-arrow { flex: 0 0 auto; color: var(--dim); font-size: 1rem; }
+
+.pi-note {
+  color: var(--dim); font-size: 0.85rem; line-height: 1.6;
+  padding: 18px 2px; text-align: center;
+}
+.pi-retry {
+  display: inline-block; margin-inline-start: 8px;
+  background: var(--surface2); color: var(--text);
+  border: 1px solid var(--border); border-radius: 999px;
+  padding: 4px 14px; font: inherit; font-size: 0.8rem; cursor: pointer;
+}
+.pi-retry:hover { border-color: var(--accent); color: var(--accent); }
+
+.pi-foot { color: var(--dim); font-size: 0.72rem; margin-top: 10px; text-align: center; }
+
+/* בטלפון החץ מוותר על רוחבו לטובת השם: השורה כולה קישור, אז הוא היה קישוט.
+   ושורת המטא מותרת לעטוף — נמדד ב-390: עם ellipsis היא נחתכה בדיוק על מספר
+   העונות, כלומר הפרט היחיד שאין לו תחליף במסך. שתי שורות עדיפות על עובדה
+   שנעלמת. */
+@media (max-width: 420px) {
+  .pi-row { gap: 8px; padding: 9px 10px; }
+  .pi-arrow { display: none; }
+  .pi-meta { white-space: normal; overflow: visible; }
+}

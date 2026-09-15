@@ -10,9 +10,110 @@
 //                          node scripts/player_pages.js --sitemap
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 const BASE = path.join(__dirname, '..');          // repo root
 const SITE = 'https://www.36-0.co.il';
+
+// ── js/crowd.js, run once, as the browser would ──────────────────────────────
+// The crowd-ratings widget's markup is written in exactly one place. js/crowd.js
+// is a browser global, not a module, so it is evaluated in its own context and
+// the functions are lifted out. Copying crowdBlock's HTML into this file instead
+// would be a second implementation that silently drifts from the first the day
+// anyone edits either one — and 1,570 pages would carry the stale copy.
+//
+// SQUADS is deliberately absent from that context: crowdHasPage checks `typeof`
+// and returns false rather than throwing. These pages pass { selfPage: true }
+// anyway, which suppresses the link before that ever comes up — a link from a
+// player's page to a player's page is a self-link.
+let _crowd = null;
+function crowdLib() {
+  if (_crowd) return _crowd;
+  const vm = require('vm');
+  const ctx = { console };
+  vm.createContext(ctx);
+  vm.runInContext(fs.readFileSync(path.join(BASE, 'js', 'crowd.js'), 'utf8'), ctx);
+  _crowd = ctx;
+  return _crowd;
+}
+
+// ── cache-busting stamps ─────────────────────────────────────────────────────
+// vercel.json serves /js/ and /css/ as `immutable, max-age=31536000`. A page
+// that links them by bare name is a page that will never see a fix to them for
+// a year. scripts/stamp_assets.js solves this for the three hand-written pages,
+// but its regex only matches RELATIVE refs (`src="js/x.js"`) inside those three
+// files — these 1,570 generated pages use absolute paths and are not in its
+// list, so they stamp themselves. Same rule, so the two agree: sha1 of the
+// content with CR stripped (git checks out CRLF here and LF on the build box),
+// first eight hex.
+const _stamps = new Map();
+function stamp(rel) {
+  if (_stamps.has(rel)) return _stamps.get(rel);
+  let h = '';
+  try {
+    const raw = fs.readFileSync(path.join(BASE, rel)).toString('utf8').split('\r').join('');
+    h = crypto.createHash('sha1').update(raw, 'utf8').digest('hex').slice(0, 8);
+  } catch (e) { h = ''; }          // a dead reference stays dead, but visible
+  _stamps.set(rel, h);
+  return h;
+}
+const asset = rel => `/${rel}${stamp(rel) ? `?v=${stamp(rel)}` : ''}`;
+
+// ── the one inline script every page carries ─────────────────────────────────
+// Written compact ON PURPOSE, and explained here instead. A comment inside the
+// emitted string is not a comment — it is 1,570 copies of itself shipped down
+// the wire on the pages whose speed is part of why they rank. The first draft
+// of this block explained itself in Hebrew inline and cost 4.6KB a page.
+//
+// Everything above it is `defer`: a classic deferred script never blocks the
+// parser, runs in document order, and finishes BEFORE DOMContentLoaded — which
+// is exactly why the wiring below waits for that event instead of running at
+// parse time, when crowdMount does not exist yet.
+//
+// The voter id. js/track.js mints `t360_cid` inside the game; it is NOT loaded
+// here, deliberately — it would start firing a new 'entry' event from these
+// pages and change the meaning of analytics already collected. But without that
+// key crowdClientId() returns null, vote_player answers 'bad voter', and every
+// visitor who arrived from Google — which is the entire audience of these pages
+// — gets a rate button that cannot save. Same key, same shape, so one person
+// keeps one identity when they go on to the game itself.
+//
+// The search, and why the name is cleaned on both sides: Israeli names are full
+// of apostrophes (ויקטור פאצ'ו, מתי חג'ג') and someone typing them without one
+// is looking for exactly that man. A hyphen folds to a space so a name pasted
+// out of a /player/ URL finds its way home too. Prefix hits rank above
+// mid-string hits — typing "אלון" means Alon, not everyone with it buried
+// inside. The list is fetched on first touch of the field: a reader who never
+// searches pays nothing for it.
+const BOOT_JS = `document.addEventListener('DOMContentLoaded',function(){
+try{if(!localStorage.getItem('t360_cid'))localStorage.setItem('t360_cid',(window.crypto&&crypto.randomUUID)?crypto.randomUUID():'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,function(c){var r=Math.random()*16|0;return (c==='x'?r:(r&3|8)).toString(16);}));}catch(e){}
+if(typeof crowdMount==='function')crowdMount(document);
+var q=document.getElementById('pp-q'),res=document.getElementById('pp-res');
+if(!q||!res)return;
+var all=null,pend=false;
+function st(s){return String(s).replace(/["'׳״.()]/g,'').replace(/[-\\s]+/g,' ').trim();}
+function ec(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+function hint(t){res.innerHTML='<li class="pp-hint">'+t+'</li>';}
+function draw(){
+var v=st(q.value);
+if(!v){res.innerHTML='';return;}
+if(!all){hint('טוען…');return;}
+var a=[],b=[],i,at;
+for(i=0;i<all.length&&a.length<12;i++){at=all[i][2].indexOf(v);if(at===0)a.push(all[i]);else if(at>0&&b.length<12)b.push(all[i]);}
+var h=a.concat(b).slice(0,12);
+if(!h.length){hint('אין שחקן כזה בספרייה');return;}
+res.innerHTML=h.map(function(p){return '<li><a href="/player/'+encodeURIComponent(p[1])+'/">'+ec(p[0])+'</a></li>';}).join('');
+}
+function load(){
+if(all||pend)return;pend=true;
+fetch('/player/index.json').then(function(r){return r.json();}).then(function(d){
+for(var i=0;i<d.length;i++)d[i][2]=st(d[i][0]);
+all=d;draw();
+}).catch(function(){pend=false;hint('החיפוש לא נטען. נסה שוב.');});
+}
+q.addEventListener('focus',load);
+q.addEventListener('input',function(){load();draw();});
+});`;
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -244,9 +345,7 @@ function pageHtml(TEAMS, e) {
   if (F.europe) sentences.push(F.europe.k === 'abroad'
     ? `הוא שיחק בליגת האלופות מחוץ לישראל, ב${esc(F.europe.c)} בעונת ${esc(F.europe.s)}.`
     : `הוא היה בסגל ש${esc(nm(F.europe.c) || F.europe.c)} העלתה לשלב הבתים של ליגת האלופות ב-${esc(F.europe.s)}.`);
-  if (F.attrs) sentences.push(
-    `בשש התכונות שהמשחק גוזר מהנתונים הוא חזק במיוחד ב${ATTR_NAME[F.attrTop]} (${F.attrs[F.attrTop]}) ` +
-    `וחלש יחסית ב${ATTR_NAME[F.attrLow]} (${F.attrs[F.attrLow]}).`);
+  // התכונות לא נכנסות לטקסט. ראה את ההערה מעל attrHtml.
   if (F.duos.length) {
     // "הצמד ... היה עם X, Y ו-Z" is three men in a word that means two. One
     // sentence names the longest partnership; a second, only when there is more
@@ -259,15 +358,30 @@ function pageHtml(TEAMS, e) {
   }
   const intro = `<p class="lede">${sentences.join(' ')}</p>`;
 
-  /* ── the six attributes, as the game computes them ──────────────────────── */
-  // Bars, not a bare row of numbers: the shape of a player is the point, and a
-  // reader takes it in at a glance instead of comparing six two-digit numbers.
-  const attrHtml = !F.attrs ? '' :
-    `<h2>שש התכונות של ${esc(name)}</h2>
-    <p class="note">ממוצע כל עונותיו בליגה. התכונות נגזרות מהנתונים עצמם — בעיטה מטבלת המבקיעים, מסירה מטבלת הבישולים, הגנה ממה שספגה קבוצתו ופיזיות מאורך הקריירה. <a href="/methodology.html">איך זה מחושב</a>.</p>
-    <table class="attrs">${ATTR_KEYS.map(k =>
-      `<tr><td class="ak">${ATTR_NAME[k]}</td><td class="av">${F.attrs[k]}</td>` +
-      `<td class="ab"><i style="width:${Math.max(2, Math.min(100, F.attrs[k]))}%"></i></td></tr>`).join('')}</table>`;
+  /* ── the six attributes: REMOVED from the public pages, deliberately ──────
+     Owner's call, 2026-09-15: "לא להציג נתונים כאלה בדף השחקן!!! הם לא מבוססים
+     וכבר רואים שהם מחורבנים."
+
+     He is right, and the numbers say so themselves. js/attr-data.js was built
+     offline by scripts/build_attrs.js, and its own coverage was measured when
+     it shipped: LEAGUE_SCORERS names 152 players and LEAGUE_ASSISTS 101, about
+     2% of the 9,568 player-seasons. For the other 98% the attribute is inferred
+     from the CLUB's goals and defensive record that season — so a defender at a
+     leaky club reads as a bad defender whatever he did. And מהירות has no
+     source at all; it was flagged ATTR_EST from the day it was written.
+
+     That is defensible inside a game where every player is judged by the same
+     rough rule. It is not defensible on a public page about a named, living
+     footballer, next to real scoring tables, where a reader takes it as a fact
+     about the man.
+
+     These pages print things that actually happened. The replacement for this
+     section is the crowd's rating — people who watched him play — and that is
+     what the crowd-ratings widget below the career table is for.
+
+     The data itself is untouched: ATTR_DATA still drives בונה כדורגלן and the
+     in-game card. Only the public claim is withdrawn. */
+  const attrHtml = '';
 
   // key, how many times, and the seasons it happened in — the evidence is the
   // reason the row is worth printing at all.
@@ -300,6 +414,50 @@ function pageHtml(TEAMS, e) {
       `${F.assists.reduce((s, r) => s + r[1], 0)} · ${F.assists.map(r => `${esc(r[0])} (${r[1]}${r[2] === 1 ? ' 👑' : ''})`).join(' · ')}`) : '',
   ].filter(Boolean).join('');
   const factsHtml = `<h2>העובדות על ${esc(name)}</h2><table class="facts">${factRows}</table>`;
+
+  /* ── מה שהדאטה לא יכולה לדעת ─────────────────────────────────────────────
+     איזו עונה מדורגת כאן, וזו השאלה היחידה שהעמוד הזה שואל אחרת מהמשחק. בכרטיס
+     השחקן העונה מגיעה מהסגל שעל המסך; כאן אין דראפט, אין סגל נוכחי, ואין עונה
+     "שמולך" — העמוד הוא על קריירה שלמה.
+
+     הבחירה היא עונת השיא, כי היא העונה שהעמוד עצמו כבר מוביל איתה: היא בכותרת
+     המשנה ("דירוג שיא 84"), היא שורה בטבלת העובדות, והיא המשפט השני ב-lede.
+     לשאול על עונה אחרת היה מפצל את העמוד לשניים — מה שכתוב למעלה ומה שמצביעים
+     עליו למטה. ובמעשה: השיא הוא גם הטענה השנויה ביותר במחלוקת שיש לנו על אדם,
+     כלומר זו השאלה שבאמת יש עליה מה לומר.
+
+     F.peakRow נבחרת ב-playerFacts כעונה המוקדמת מבין אלה שבהן הדירוג שווה לשיא,
+     כך שאותו שחקן מקבל את אותה עונה בכל בנייה מחדש — מפתח הצבעה יציב ולא כזה
+     שמשתנה כשמישהו נוגע בדאטה. השומר על undefined הוא לא קישוט: בלי peakRow אין
+     עונה, ו-crowdBlock ממילא מחזיר מחרוזת ריקה — עדיף כותרת שלא נכתבה מאשר
+     כותרת שמעליה כלום.
+
+     ועוד דבר אחד שיושב למעלה ב-<style>: שמונת הטוקנים ב-:root. css/crowd.css
+     כתוב כולו ב-var(--accent) וחבריו כדי שהווידג'ט יציית למצב הבהיר ולצבעי
+     המועדון בתוך המשחק. לעמוד הזה אין css/style.css, ובלי הטוקנים כל הצהרה
+     שנשענת עליהם נפסלת ב-computed-value time — הווידג'ט היה מגיע למסך בלי
+     מסגרות, בלי צבע ועם חוגה אפורה. הערכים מועתקים מ-css/style.css והם בדיוק
+     אלה שהעמוד כבר משתמש בהם בהקסים למעלה. */
+  const crowdHtml = !F.peakRow ? '' :
+    `<h2>מה הקהל אומר על ${esc(name)}</h2>
+    <p class="note">המשחק נותן לו ${e.peak} בעונת ${esc(F.peakRow.season)} — עונת השיא שלו. מה אתה היית נותן?</p>
+    ${crowdLib().crowdBlock(name, F.peakRow.season, F.peakRow.position, e.peak, { selfPage: true })}`;
+
+  /* ── לא מבוי סתום ────────────────────────────────────────────────────────
+     כל עמוד כאן הוא דף נחיתה של זר שהגיע מגוגל, וכל אחד מהם נגמר עד היום בכלום.
+     החיפוש הוא הדלת החוצה.
+
+     הרשימה חיצונית ולא מוטבעת, וזאת מדידה: 1,553 זוגות שם+slug הם 74,823 בתים,
+     מעל הסף של ~60KB שהתוכנית קבעה, וכפול 1,570 עמודים זה ~117MB של ריפו על
+     פיצ'ר שרוב המבקרים לא ייגעו בו. קובץ אחד שנטען רק כשנוגעים בשדה עולה אפס
+     בתים לעמוד, נשמר במטמון הדפדפן, ומשותף לכל העמודים. */
+  const searchHtml = `<h2>עוד שחקנים</h2>
+    <div class="pp-more">
+      <input id="pp-q" type="search" placeholder="חפש שחקן…" autocomplete="off"
+             aria-label="חיפוש שחקן" aria-controls="pp-res" />
+      <ul id="pp-res"></ul>
+      <p class="note"><a href="/players/">או עבור על אינדקס כל השחקנים ←</a></p>
+    </div>`;
 
   const jsonld = {
     '@context': 'https://schema.org', '@type': 'Person', name,
@@ -350,6 +508,20 @@ function pageHtml(TEAMS, e) {
     .chips { display: flex; flex-wrap: wrap; gap: 8px; }
     .chip { background: #161b22; border: 1px solid #30363d; border-radius: 50px; padding: 6px 14px; font-size: 13.5px; color: #e6edf3; text-decoration: none; }
     .foot { margin-top: 44px; border-top: 1px solid #30363d; padding-top: 16px; font-size: 12px; color: #5a6472; } .foot a { color: #8b949e; }
+
+    :root { --bg:#0d1117; --surface:#161b22; --surface2:#21262d; --border:#30363d;
+            --text:#e6edf3; --dim:#8b949e; --accent:#FFD700; --hover:#2d333b; }
+    .crowd { margin-top: 2px; }
+    .crowd-line { font-size: 13px; }
+    .crowd-open { font-size: 12px; padding: 4px 14px; }
+
+    .pp-more input { width: 100%; max-width: 360px; background: #161b22; color: #e6edf3;
+      border: 1px solid #30363d; border-radius: 8px; padding: 10px 13px; font: inherit; font-size: 15px; }
+    .pp-more input:focus { outline: none; border-color: #FFD700; }
+    .pp-more ul { list-style: none; margin: 8px 0 0; }
+    .pp-more li { padding: 4px 0; font-size: 14.5px; }
+    .pp-more a { color: #58a6ff; text-decoration: none; font-weight: 700; }
+    .pp-more li.pp-hint { color: #5a6472; font-size: 13px; font-weight: 400; }
   </style>
 </head>
 <body>
@@ -375,6 +547,8 @@ function pageHtml(TEAMS, e) {
       ${rows}
     </table>
 
+    ${crowdHtml}
+
     ${duoHtml}
 
     <h2>המועדונים של ${esc(name)}</h2>
@@ -382,12 +556,21 @@ function pageHtml(TEAMS, e) {
 
     <div style="text-align:center;margin-top:28px"><a class="cta" href="/">שחק עכשיו ב-36-0 ←</a></div>
 
+    ${searchHtml}
+
     <div class="foot">
       36-0 — משחק דראפט חינמי לחובבי הכדורגל הישראלי · הנתונים למטרות מידע ובידור בלבד ואינם רשמיים ·
       <a href="/players/">כל השחקנים</a> · <a href="/methodology.html">מתודולוגיה</a> ·
       <a href="/how-to-play.html">איך משחקים</a> · <a href="/about.html">אודות</a> · <a href="/">משחק</a>
     </div>
   </div>
+
+  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script defer src="${asset('js/config.js')}"></script>
+  <script defer src="${asset('js/supabase-client.js')}"></script>
+  <script defer src="${asset('js/crowd.js')}"></script>
+  <link rel="stylesheet" href="${asset('css/crowd.css')}" />
+  <script>${BOOT_JS}</script>
 </body>
 </html>`;
 }
@@ -431,6 +614,39 @@ function writeSitemap() {
   ];
   fs.writeFileSync(path.join(BASE, 'sitemap.xml'),
     `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.join('\n')}\n</urlset>\n`);
+}
+
+// ── the search list every page fetches on demand ─────────────────────────────
+// Built from what is actually ON DISK, exactly like the sitemap and the hub: a
+// search result that 404s is worse than one that finds nothing, and there is no
+// SPA fallback in vercel.json to catch it. In particular this is what keeps the
+// 1,191 single-season players — the thin pages commit 2f599397 deliberately
+// removed — out of the search box. They have no page, so they are not offered.
+//
+// [name, slug] pairs. The slug is carried and not derived: 197 of the 1,570
+// names differ from `name.replace(/\s+/g,'-')` because slugFor also strips
+// apostrophes, quotes, dots and brackets — deriving it in the browser would be
+// a second implementation of the one function this project has already been
+// bitten by splitting.
+function allSlugs() {
+  const { SQUADS } = load();
+  const idx = buildIndex(SQUADS);
+  const onDisk = new Set();
+  try {
+    for (const d of fs.readdirSync(path.join(BASE, 'player'), { withFileTypes: true }))
+      if (d.isDirectory()) onDisk.add(d.name);
+  } catch (e) { /* no library yet */ }
+  return Object.values(idx)
+    .filter(e => onDisk.has(slugFor(e.name)))
+    .sort((a, b) => b.peak - a.peak)      // best first: a bare prefix hit is the famous one
+    .map(e => [e.name, slugFor(e.name)]);
+}
+
+function writeSearchIndex() {
+  const pairs = allSlugs();
+  fs.mkdirSync(path.join(BASE, 'player'), { recursive: true });
+  fs.writeFileSync(path.join(BASE, 'player', 'index.json'), JSON.stringify(pairs));
+  return pairs.length;
 }
 
 // browsable hub at /players/ — lists every player that has a page (best-rated
@@ -502,9 +718,18 @@ function writeIndex() {
 </html>`;
   fs.mkdirSync(path.join(BASE, 'players'), { recursive: true });
   fs.writeFileSync(path.join(BASE, 'players', 'index.html'), html);
+
+  // The same list the hub above prints, in the format the search box at the
+  // bottom of every /player/ page fetches. Written from in here rather than
+  // left to each caller: scripts/news_engine.js imports this module and calls
+  // writeSitemap + writeIndex after creating pages, and a caller that updates
+  // the hub while leaving the search list stale would ship new pages the search
+  // box cannot find.
+  writeSearchIndex();
 }
 
-module.exports = { load, buildIndex, slugFor, pageHtml, writePlayer, writeSitemap, writeIndex, BASE };
+module.exports = { load, buildIndex, slugFor, pageHtml, writePlayer, writeSitemap,
+                   writeIndex, writeSearchIndex, allSlugs, BASE };
 
 // ── CLI ──────────────────────────────────────────────────────────────────────
 if (require.main === module) {

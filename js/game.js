@@ -1765,6 +1765,11 @@ function pickNextSquad() {
 
 function startRound() {
   state.selectedPlayer = null; state.selectedSlotIdx = null;
+  // The one-time crowd hint lives above the players list and belongs to the round
+  // that drew it. Clearing it here is what keeps it to a single round: it is only
+  // ever re-drawn when its own localStorage flag is still unset, which it never
+  // is a second time.
+  if (typeof crowdDraftTipClear === 'function') crowdDraftTipClear();
   clearAllHighlights();
   // A move started while the previous pick was settling — keep it alive
   if (state.movingFromIdx !== null && state.picks[state.movingFromIdx]) {
@@ -1988,6 +1993,11 @@ function renderSquadPlayers(squad, filterSlotIdx = null) {
     if (!unavailable) card.addEventListener('click', () => handlePlayerClick(player, card));
     list.appendChild(card);
   });
+  // Once ever, over the list that was just drawn: how to open a player's card,
+  // which is the only door to דירוגי הקהל. Called from here rather than from
+  // startRound so it lands after the roulette, and so pos-first — which renders
+  // the list from handleSlotClick — gets it too.
+  if (typeof crowdDraftTip === 'function') crowdDraftTip();
 }
 
 // ─── Draft: Selection logic ────────────────────────────────────────────────────
@@ -3114,6 +3124,11 @@ function wireEuropeButton(rank, table) {
 
 function showResults() {
   const ovr = teamOVR();
+  // Every season starts by taking last season's crowd hint off the pitch panel.
+  // The results screen is entered by six different owners (career, challenge,
+  // league, duel, Europe's return, a plain draft) and a node nobody removes is a
+  // node that turns up in the next mode — the bug this project keeps re-learning.
+  if (typeof crowdXiTipClear === 'function') crowdXiTipClear();
   // League draft: no personal reveal. Simulate silently, record the season to
   // the league, and send the player back to the (still-locked) league table —
   // the standings are only unveiled once every member has played.
@@ -3675,6 +3690,9 @@ function animateResults(ovr) {
     // Show the placement popup first; only reveal the finish/stats once it's closed.
     setTimeout(() => showPlacementPopup(tier, myRank, () => {
       revealSummary();
+      // Once ever, beside the eleven he just watched play — the moment his
+      // opinion of them is best informed. A quiet strip, not a prompt to dismiss.
+      if (typeof crowdXiTip === 'function') crowdXiTip();
       // a beat after the summary appears, so it is a follow-up and not a wall
       setTimeout(maybeSeasonSharePrompt, 1200);
     }), 350);

@@ -16,3 +16,11 @@ entrypoint = "./functions/submit-result/index.ts"
 enabled = true
 verify_jwt = false
 entrypoint = "./functions/challenge-tap/index.ts"
+
+# אותה סיבה בדיוק כמו challenge-tap: טלגרם קורא עם ה-secret-token header שלו
+# ולעולם לא עם JWT של Supabase, אז אימות JWT חייב להיות כבוי — הפונקציה בודקת
+# את ה-header בעצמה. בלי השורה הזאת כל לחיצה מקבלת 401 והבוט נראה מת.
+[functions.crowd-tap]
+enabled = true
+verify_jwt = false
+entrypoint = "./functions/crowd-tap/index.ts"

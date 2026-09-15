@@ -40,6 +40,20 @@
     .chips { display: flex; flex-wrap: wrap; gap: 8px; }
     .chip { background: #161b22; border: 1px solid #30363d; border-radius: 50px; padding: 6px 14px; font-size: 13.5px; color: #e6edf3; text-decoration: none; }
     .foot { margin-top: 44px; border-top: 1px solid #30363d; padding-top: 16px; font-size: 12px; color: #5a6472; } .foot a { color: #8b949e; }
+
+    :root { --bg:#0d1117; --surface:#161b22; --surface2:#21262d; --border:#30363d;
+            --text:#e6edf3; --dim:#8b949e; --accent:#FFD700; --hover:#2d333b; }
+    .crowd { margin-top: 2px; }
+    .crowd-line { font-size: 13px; }
+    .crowd-open { font-size: 12px; padding: 4px 14px; }
+
+    .pp-more input { width: 100%; max-width: 360px; background: #161b22; color: #e6edf3;
+      border: 1px solid #30363d; border-radius: 8px; padding: 10px 13px; font: inherit; font-size: 15px; }
+    .pp-more input:focus { outline: none; border-color: #FFD700; }
+    .pp-more ul { list-style: none; margin: 8px 0 0; }
+    .pp-more li { padding: 4px 0; font-size: 14.5px; }
+    .pp-more a { color: #58a6ff; text-decoration: none; font-weight: 700; }
+    .pp-more li.pp-hint { color: #5a6472; font-size: 13px; font-weight: 400; }
   </style>
 </head>
 <body>
@@ -54,11 +68,9 @@
       <a class="cta" href="/team/beitar-jerusalem/">בנה את הרכב כל הזמנים של בית&quot;ר ירושלים ←</a>
     </div>
 
-    <p class="lede">ברק משה רשום אצלנו ב-6 עונות של ליגת העל, כולן בבית&quot;ר ירושלים. הדירוג הגבוה ביותר שלו, 71, נרשם בעונת 2011/12 בבית&quot;ר ירושלים. בשש התכונות שהמשחק גוזר מהנתונים הוא חזק במיוחד בפיזיות (74) וחלש יחסית בבעיטה (47).</p>
+    <p class="lede">ברק משה רשום אצלנו ב-6 עונות של ליגת העל, כולן בבית&quot;ר ירושלים. הדירוג הגבוה ביותר שלו, 71, נרשם בעונת 2011/12 בבית&quot;ר ירושלים.</p>
     <h2>העובדות על ברק משה</h2><table class="facts"><tr><td class="fk">עונות בליגה</td><td>6</td></tr><tr><td class="fk">עמדה</td><td>קשר הגנתי</td></tr><tr><td class="fk">לאום</td><td>ישראל</td></tr><tr><td class="fk">דירוג שיא</td><td><b class="ovr">71</b> · 2011/12 · בית&quot;ר ירושלים</td></tr><tr><td class="fk">הכי הרבה עונות</td><td>בית&quot;ר ירושלים · 6</td></tr></table>
-    <h2>שש התכונות של ברק משה</h2>
-    <p class="note">ממוצע כל עונותיו בליגה. התכונות נגזרות מהנתונים עצמם — בעיטה מטבלת המבקיעים, מסירה מטבלת הבישולים, הגנה ממה שספגה קבוצתו ופיזיות מאורך הקריירה. <a href="/methodology.html">איך זה מחושב</a>.</p>
-    <table class="attrs"><tr><td class="ak">מהירות</td><td class="av">56</td><td class="ab"><i style="width:56%"></i></td></tr><tr><td class="ak">בעיטה</td><td class="av">47</td><td class="ab"><i style="width:47%"></i></td></tr><tr><td class="ak">מסירה</td><td class="av">59</td><td class="ab"><i style="width:59%"></i></td></tr><tr><td class="ak">כדרור</td><td class="av">55</td><td class="ab"><i style="width:55%"></i></td></tr><tr><td class="ak">הגנה</td><td class="av">69</td><td class="ab"><i style="width:69%"></i></td></tr><tr><td class="ak">פיזיות</td><td class="av">74</td><td class="ab"><i style="width:74%"></i></td></tr></table>
+    
     
 
     <h2>ברק משה עונה אחר עונה</h2>
@@ -67,6 +79,18 @@
       <tr><td>2013/14</td><td><a href="/team/beitar-jerusalem/">בית&quot;ר ירושלים</a></td><td>קשר הגנתי</td><td class="ovr">70</td></tr><tr><td>2012/13</td><td><a href="/team/beitar-jerusalem/">בית&quot;ר ירושלים</a></td><td>קשר הגנתי</td><td class="ovr">70</td></tr><tr><td>2011/12</td><td><a href="/team/beitar-jerusalem/">בית&quot;ר ירושלים</a></td><td>קשר הגנתי</td><td class="ovr">71</td></tr><tr><td>2010/11</td><td><a href="/team/beitar-jerusalem/">בית&quot;ר ירושלים</a></td><td>קשר הגנתי</td><td class="ovr">66</td></tr><tr><td>2009/10</td><td><a href="/team/beitar-jerusalem/">בית&quot;ר ירושלים</a></td><td>קשר הגנתי</td><td class="ovr">66</td></tr><tr><td>2008/09</td><td><a href="/team/beitar-jerusalem/">בית&quot;ר ירושלים</a></td><td>קשר הגנתי</td><td class="ovr">66</td></tr>
     </table>
 
+    <h2>מה הקהל אומר על ברק משה</h2>
+    <p class="note">המשחק נותן לו 71 בעונת 2011/12 — עונת השיא שלו. מה אתה היית נותן?</p>
+    
+    <div class="pc-sec crowd" data-key="ברק משה"
+         data-name="ברק משה"
+         data-season="2011/12" data-pos="CDM"
+         data-official="71">
+      
+      <div class="crowd-body"><div class="crowd-line">טוען…</div></div>
+      
+    </div>
+
     
 
     <h2>המועדונים של ברק משה</h2>
@@ -74,11 +98,54 @@
 
     <div style="text-align:center;margin-top:28px"><a class="cta" href="/">שחק עכשיו ב-36-0 ←</a></div>
 
+    <h2>עוד שחקנים</h2>
+    <div class="pp-more">
+      <input id="pp-q" type="search" placeholder="חפש שחקן…" autocomplete="off"
+             aria-label="חיפוש שחקן" aria-controls="pp-res" />
+      <ul id="pp-res"></ul>
+      <p class="note"><a href="/players/">או עבור על אינדקס כל השחקנים ←</a></p>
+    </div>
+
     <div class="foot">
       36-0 — משחק דראפט חינמי לחובבי הכדורגל הישראלי · הנתונים למטרות מידע ובידור בלבד ואינם רשמיים ·
       <a href="/players/">כל השחקנים</a> · <a href="/methodology.html">מתודולוגיה</a> ·
       <a href="/how-to-play.html">איך משחקים</a> · <a href="/about.html">אודות</a> · <a href="/">משחק</a>
     </div>
   </div>
+
+  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script defer src="/js/config.js?v=3dd47ca1"></script>
+  <script defer src="/js/supabase-client.js?v=e9102a02"></script>
+  <script defer src="/js/crowd.js?v=8fb571a9"></script>
+  <link rel="stylesheet" href="/css/crowd.css?v=940771d0" />
+  <script>document.addEventListener('DOMContentLoaded',function(){
+try{if(!localStorage.getItem('t360_cid'))localStorage.setItem('t360_cid',(window.crypto&&crypto.randomUUID)?crypto.randomUUID():'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,function(c){var r=Math.random()*16|0;return (c==='x'?r:(r&3|8)).toString(16);}));}catch(e){}
+if(typeof crowdMount==='function')crowdMount(document);
+var q=document.getElementById('pp-q'),res=document.getElementById('pp-res');
+if(!q||!res)return;
+var all=null,pend=false;
+function st(s){return String(s).replace(/["'׳״.()]/g,'').replace(/[-\s]+/g,' ').trim();}
+function ec(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+function hint(t){res.innerHTML='<li class="pp-hint">'+t+'</li>';}
+function draw(){
+var v=st(q.value);
+if(!v){res.innerHTML='';return;}
+if(!all){hint('טוען…');return;}
+var a=[],b=[],i,at;
+for(i=0;i<all.length&&a.length<12;i++){at=all[i][2].indexOf(v);if(at===0)a.push(all[i]);else if(at>0&&b.length<12)b.push(all[i]);}
+var h=a.concat(b).slice(0,12);
+if(!h.length){hint('אין שחקן כזה בספרייה');return;}
+res.innerHTML=h.map(function(p){return '<li><a href="/player/'+encodeURIComponent(p[1])+'/">'+ec(p[0])+'</a></li>';}).join('');
+}
+function load(){
+if(all||pend)return;pend=true;
+fetch('/player/index.json').then(function(r){return r.json();}).then(function(d){
+for(var i=0;i<d.length;i++)d[i][2]=st(d[i][0]);
+all=d;draw();
+}).catch(function(){pend=false;hint('החיפוש לא נטען. נסה שוב.');});
+}
+q.addEventListener('focus',load);
+q.addEventListener('input',function(){load();draw();});
+});</script>
 </body>
 </html>

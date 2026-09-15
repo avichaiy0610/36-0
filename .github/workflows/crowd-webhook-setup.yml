@@ -1,0 +1,96 @@
+name: crowd-webhook-setup
+
+# מריצים פעם אחת כדי לחבר את בוט הקהל לוובהוק שלו, ואז לא נוגעים.
+#
+# בוט נפרד מזה של האתגרים, בכוונה. לבוט טלגרם אחד יש וובהוק אחד, ולכן הדרך
+# היחידה שפיצ'ר חדש לא ייגע בהקשות שכבר עובדות היא בוט שני — טוקן משלו,
+# פונקציה משלו, סוד משלו. תקלה כאן לא יכולה להפיל את האתגרים.
+#
+# המפתחות ב-engine_state נפרדים לגמרי: tg_crowd_bot_token ו-
+# tg_crowd_webhook_secret, ולא tg_chal_bot_token ו-tg_webhook_secret. רק
+# tg_chat_id משותף, כי זו אותה שיחה.
+#
+# למה זה כאן ולא פקודה מהמחשב: TELEGRAM_CROWD_BOT_TOKEN חי ב-GitHub secrets
+# ובשום מקום אחר, אז זה המקום היחיד שיכול להעביר אותו ל-Edge Function.
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        # במרכאות, כי YAML קורא on/off חשוף כבוליאני ו-GitHub דוחה אותו.
+        description: 'on = חיבור הוובהוק · off = ניתוק · info = רק דיווח'
+        type: choice
+        options: ['on', 'off', 'info']
+        default: 'on'
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+      TELEGRAM_CROWD_BOT_TOKEN: ${{ secrets.TELEGRAM_CROWD_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      MODE: ${{ inputs.mode }}
+    steps:
+      - name: switch
+        run: |
+          set -euo pipefail
+          if [ -z "${TELEGRAM_CROWD_BOT_TOKEN:-}" ]; then
+            echo "חסר TELEGRAM_CROWD_BOT_TOKEN ב-GitHub secrets."
+            echo "צור בוט חדש ב-@BotFather, ושים את הטוקן שלו שם."
+            exit 1
+          fi
+          API="https://api.telegram.org/bot${TELEGRAM_CROWD_BOT_TOKEN}"
+          HOOK="$(echo "$SUPABASE_URL" | sed 's#/*$##')/functions/v1/crowd-tap"
+
+          state() {   # state <key> <value>
+            curl -sS -X POST "$SUPABASE_URL/rest/v1/engine_state" \
+              -H "apikey: $SUPABASE_SERVICE_KEY" \
+              -H "Authorization: Bearer $SUPABASE_SERVICE_KEY" \
+              -H "Content-Type: application/json" \
+              -H "Prefer: resolution=merge-duplicates" \
+              -d "$(jq -nc --arg k "$1" --arg v "$2" '{key:$k, value:$v}')" > /dev/null
+          }
+
+          echo "--- מי הבוט הזה ---"
+          curl -sS "$API/getMe" | jq -c '{ok, user: .result.username}'
+
+          if [ "$MODE" = "info" ]; then
+            echo "--- getWebhookInfo ---"
+            curl -sS "$API/getWebhookInfo" | jq '.result | {url, pending_update_count, last_error_date, last_error_message, allowed_updates}'
+            exit 0
+          fi
+
+          if [ "$MODE" = "off" ]; then
+            echo "מנתק את הוובהוק"
+            curl -sS -X POST "$API/deleteWebhook" | jq -c .
+            state tg_crowd_webhook_secret ""
+            exit 0
+          fi
+
+          # סוד חדש בכל הרצה, כך שהרצה חוזרת מחליפה ולא ממחזרת.
+          # טלגרם מתיר A-Z a-z 0-9 _ - בלבד.
+          SECRET="$(head -c 32 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 40)"
+
+          echo "כותב ל-engine_state"
+          state tg_crowd_bot_token      "$TELEGRAM_CROWD_BOT_TOKEN"
+          state tg_chat_id              "$TELEGRAM_CHAT_ID"
+          state tg_crowd_webhook_secret "$SECRET"
+
+          echo "רושם $HOOK"
+          curl -sS -X POST "$API/setWebhook" \
+            -H 'Content-Type: application/json' \
+            -d "$(jq -nc --arg u "$HOOK" --arg s "$SECRET" \
+                  '{url:$u, secret_token:$s, allowed_updates:["callback_query"], drop_pending_updates:false}')" \
+            | jq -c .
+
+          echo "--- getWebhookInfo ---"
+          curl -sS "$API/getWebhookInfo" | jq '.result | {url, pending_update_count, last_error_date, last_error_message, allowed_updates}'
+
+          echo "--- בדיקה ---"
+          curl -sS -X POST "$API/sendMessage" \
+            -H 'Content-Type: application/json' \
+            -d "$(jq -nc --arg c "$TELEGRAM_CHAT_ID" \
+                  '{chat_id:$c, text:"🔌 בוט הקהל מחובר. לחץ כדי לוודא שהתגובה מיידית.",
+                    reply_markup:{inline_keyboard:[[{text:"בדיקה",callback_data:"ping"}]]}}')" \
+            | jq -c '{ok, error: .description}'

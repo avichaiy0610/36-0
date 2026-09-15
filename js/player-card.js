@@ -15,6 +15,10 @@
 
 const PCARD_ID = 'pcard';
 let _pcTimer = null, _pcOpenFor = null;
+// The token the open ANCHORED card is pinned to, or null for a modal or a
+// closed card. The crowd widget changes the card's height after it has already
+// been measured, and this is what the re-measure aims at.
+let _pcAnchor = null;
 
 function pcEsc(s) {
   return String(s ?? '').replace(/[&<>"]/g, c =>
@@ -316,7 +320,7 @@ function pcList(items) {
 }
 
 /* ── the card ─────────────────────────────────────────────────────────────── */
-function pcHTML(player, slotPos) {
+function pcHTML(player, slotPos, squad) {
   const name = typeof player === 'string' ? player : player.name;
   const classic = typeof classicMode === 'function' && classicMode();
   const f = pcFacts(name);
@@ -435,7 +439,11 @@ function pcHTML(player, slotPos) {
     </div>` : '';
 
   /* who he played with */
-  const partners = (!classic && f.partners.length) ? `
+  // הסקשן נפתח גם כשאין לו אף צמד, ובלבד שיש למי להציע: שחקן בלי צמדים הוא
+  // בדיוק מי שהכי צריך שמישהו יציע לו אחד, ולפני זה לא הייתה לו שורה בכרטיס
+  // שאפשר לתלות עליה את ההצעה.
+  const duoSuggest = (!classic && typeof cdBlock === 'function') ? cdBlock(name) : '';
+  const partners = (!classic && (f.partners.length || duoSuggest)) ? `
     <div class="pc-sec">
       <div class="pc-sec-t">צמדים</div>
       <div class="pc-duos">${f.partners.slice(0, 6).map(p => {
@@ -444,10 +452,28 @@ function pcHTML(player, slotPos) {
         return `<span class="pc-duo chem-t${p.tier}${inXI ? ' pc-duo-on' : ''}" title="${p.seasons} עונות יחד${p.titles ? ` · ${p.titles} אליפויות` : ''}">${
           inXI ? '🔗 ' : ''}${pcEsc(p.who)}${showR ? ` +${chemFmt(chemBonusOf(p.tier))}` : ''}</span>`;
       }).join('')}</div>
-      <div class="pc-note">חבר לצמד באותה הרכב = בונוס לשניהם.</div>
+      ${f.partners.length ? '<div class="pc-note">חבר לצמד באותה הרכב = בונוס לשניהם.</div>' : ''}
+      ${duoSuggest}
     </div>` : '';
 
-  return head + realBlock + tagBlock + partners + career;
+  /* what the data cannot know */
+  // A crowd rating is about a player IN A SEASON, so with no squad there is no
+  // question to ask and the widget is simply left out. In a classic game the
+  // card never opens at all — this only makes sure nothing is built on that
+  // path either.
+  const crowd = (!classic && squad && typeof crowdBlock === 'function')
+    ? crowdBlock(name, squad.season,
+                 typeof player === 'object' && typeof playerPositions === 'function'
+                   ? playerPositions(player)[0] : null,
+                 typeof player === 'object' ? (player.ovr || 0) : 0)
+    : '';
+
+  // Directly under the official rating in the head, because the two numbers
+  // are the same measure and the whole point is to read them against each
+  // other: "דירוג 84 · דירוג קהל ממוצע 82". Placed after במציאות instead, any
+  // player with scorer, assist or title rows gets that whole section wedged
+  // between them, and the comparison stops being one.
+  return head + crowd + realBlock + tagBlock + partners + career;
 }
 
 /* ── showing it ───────────────────────────────────────────────────────────── */
@@ -459,33 +485,30 @@ function pcEl() {
     el.className = 'pcard';
     el.addEventListener('mouseenter', () => clearTimeout(_pcTimer));
     el.addEventListener('mouseleave', () => pcHide());
+    // The crowd widget says when it has changed the card's height: the skeleton
+    // filling in, the dial opening (by itself in the empty state, or because
+    // the reader pressed דרג), and the panel folding back after a vote. The
+    // card was measured and placed before any of that, so a bottom-row player
+    // ends up with the dial cut off below the edge of the screen.
+    //
+    // ONE listener, here, where the element is created — #pcard is a singleton
+    // reused by every card, so a listener added per pcShow would pile up with
+    // the hovers, exactly the leak pcInit's comment is about. It reads
+    // _pcAnchor rather than a captured one, so it is always aiming at the card
+    // that is actually open: no staleness to guard against.
+    el.addEventListener('crowd:resize', () => {
+      if (el.style.display === 'block' && _pcAnchor && _pcAnchor.isConnected)
+        pcPosition(el, _pcAnchor);
+    });
     document.body.appendChild(el);
   }
   return el;
 }
 
-function pcShow(player, anchor, slotPos, modal) {
-  // A classic game is eleven ratings and nothing else. The card exists to
-  // explain chemistry, tags and the history behind them — with all of that
-  // switched off it is a panel that answers a question nobody asked.
-  if (typeof classicMode === 'function' && classicMode()) return;
-  const name = typeof player === 'string' ? player : player && player.name;
-  if (!name) return;
-  clearTimeout(_pcTimer);
-  const el = pcEl();
-  el.innerHTML = (modal ? '<button class="pc-x" aria-label="סגור">✕</button>' : '') +
-    pcHTML(player, slotPos);
-  _pcOpenFor = name;
-  el.classList.toggle('pcard-modal', !!modal);
-  el.style.display = 'block';
-  if (modal) {
-    el.style.left = el.style.top = '';
-    const x = el.querySelector('.pc-x');
-    if (x) x.addEventListener('click', pcHide);
-    pcBackdrop(true);
-    return;
-  }
-  // Anchored: beside the card, on the pitch side, and never off-screen.
+// The anchored card's position: beside the token, on the pitch side, and never
+// off-screen. Called once on the synchronous measurement in pcShow, and then
+// again on every crowd:resize — the card's height is not final when it opens.
+function pcPosition(el, anchor) {
   const r = anchor.getBoundingClientRect();
   const w = el.offsetWidth, h = el.offsetHeight, pad = 10;
   let left = r.left - w - pad;
@@ -497,6 +520,46 @@ function pcShow(player, anchor, slotPos, modal) {
   el.style.top = top + 'px';
 }
 
+function pcShow(player, anchor, slotPos, modal, squad) {
+  // A classic game is eleven ratings and nothing else. The card exists to
+  // explain chemistry, tags and the history behind them — with all of that
+  // switched off it is a panel that answers a question nobody asked.
+  if (typeof classicMode === 'function' && classicMode()) return;
+  const name = typeof player === 'string' ? player : player && player.name;
+  if (!name) return;
+  clearTimeout(_pcTimer);
+  const el = pcEl();
+  el.innerHTML = (modal ? '<button class="pc-x" aria-label="סגור">✕</button>' : '') +
+    pcHTML(player, slotPos, squad);
+  // Mounted HERE, before the modal branch returns below — a call placed after
+  // the positioning block would never run on touch, and touch is the whole of
+  // mobile. Nothing is awaited: the widget reports back through crowd:resize,
+  // which also covers the height changes that have no promise behind them.
+  if (typeof crowdMount === 'function') crowdMount(el);
+  if (typeof cdMount === 'function') cdMount(el);
+  _pcOpenFor = name;
+  // Set before the branch so a modal cannot leave a previous anchor standing.
+  _pcAnchor = modal ? null : anchor;
+  el.classList.toggle('pcard-modal', !!modal);
+  el.style.display = 'block';
+  if (modal) {
+    el.style.left = el.style.top = '';
+    const x = el.querySelector('.pc-x');
+    // Wrapped, not passed straight through: a listener hands pcHide the Event
+    // as its first argument, which is truthy and would make `force` true by
+    // accident. That happens to be what we want here — which is exactly why it
+    // must be said out loud rather than relied on.
+    if (x) x.addEventListener('click', () => pcHide(true));
+    pcBackdrop(true);
+    return;
+  }
+  // Anchored: beside the card, on the pitch side, and never off-screen. Every
+  // later re-measure is driven by crowd:resize, wired once in pcEl. Only the
+  // anchored branch has an anchor at all — a modal is centred in CSS and
+  // measures nothing, so a changing height cannot move it.
+  pcPosition(el, anchor);
+}
+
 function pcBackdrop(on) {
   let b = document.getElementById('pcard-bd');
   if (on) {
@@ -504,16 +567,24 @@ function pcBackdrop(on) {
       b = document.createElement('div');
       b.id = 'pcard-bd';
       b.className = 'pcard-bd';
-      b.addEventListener('click', pcHide);
+      b.addEventListener('click', () => pcHide(true));   // explicit, like the ✕
       document.body.appendChild(b);
     }
     b.style.display = 'block';
   } else if (b) b.style.display = 'none';
 }
 
-function pcHide() {
+// force = an explicit close (Escape · the ✕ · the backdrop). Only an IMPLIED
+// close — mouseleave, scroll — is blocked while a vote is in progress: dragging
+// the dial takes the pointer outside the card as a matter of course, and
+// without this the panel is broken in ordinary desktop use. But a lock that
+// also swallows the ✕ turns the card into a cell, which is worse than the bug
+// it prevents, so the three explicit ways out have a door.
+function pcHide(force) {
+  if (!force && typeof crowdBusy === 'function' && crowdBusy()) return;
   clearTimeout(_pcTimer);
   _pcOpenFor = null;
+  _pcAnchor = null;
   const el = document.getElementById(PCARD_ID);
   if (el) el.style.display = 'none';
   pcBackdrop(false);
@@ -535,6 +606,24 @@ function pcPlayerFor(el) {
   if (idx != null && typeof state !== 'undefined' && state.picks) {
     const pick = state.picks[+idx];
     return (pick && pick.player) || null;
+  }
+  return null;
+}
+
+// pcPlayerFor's brother: which squad did this man come from. The player row
+// itself cannot answer — a player in SQUADS is {name, position, ovr} and the
+// season belongs to the SQUAD, not to the row — and a crowd rating is about a
+// player IN A SEASON, so without this there is nothing to vote on.
+function pcSquadFor(el) {
+  if (el.classList.contains('player-card')) {
+    return (typeof state !== 'undefined' && state.currentSquad) || null;
+  }
+  // A pick is { player, squad } — the squad it was drafted from, which is not
+  // necessarily the one on the board now.
+  const idx = el.dataset ? el.dataset.idx : null;
+  if (idx != null && typeof state !== 'undefined' && state.picks) {
+    const pick = state.picks[+idx];
+    return (pick && pick.squad) || null;
   }
   return null;
 }
@@ -563,7 +652,7 @@ function pcInit() {
     const p = pcPlayerFor(el);
     if (!p) return;
     clearTimeout(_pcTimer);
-    _pcTimer = setTimeout(() => pcShow(p, el, pcSlotOf(el), false), 140);
+    _pcTimer = setTimeout(() => pcShow(p, el, pcSlotOf(el), false, pcSquadFor(el)), 140);
   });
   document.addEventListener('mouseout', ev => {
     if (!pcHasHover()) return;
@@ -574,7 +663,11 @@ function pcInit() {
     clearTimeout(_pcTimer);
     // long enough to cross the gap between the card and the panel on the way to
     // reading it — a card this tall is meant to be scrolled, not glanced at
-    _pcTimer = setTimeout(pcHide, 300);
+    // Wrapped: pcHide's first argument stopped being decorative when the vote
+    // lock landed. Modern browsers pass nothing, but Gecko historically handed
+    // the callback a lateness number — truthy, and it would force a close in
+    // the middle of a vote. Same discipline as the ✕ and the backdrop.
+    _pcTimer = setTimeout(() => pcHide(), 300);
   });
   // Touch, on the pitch: HOLD a player to open his card.
   //
@@ -596,7 +689,7 @@ function pcInit() {
     clearTimeout(holdTimer);
     holdTimer = setTimeout(() => {
       held = true;
-      pcShow(p, el, pcSlotOf(el), true);
+      pcShow(p, el, pcSlotOf(el), true, pcSquadFor(el));
     }, 420);
   }, { passive: true });
   ['touchmove', 'touchend', 'touchcancel'].forEach(t =>
@@ -616,9 +709,9 @@ function pcInit() {
     ev.preventDefault();
     const el = info.closest('.player-card, .slot-token.filled');
     const p = el && pcPlayerFor(el);
-    if (p) pcShow(p, el, pcSlotOf(el), true);
+    if (p) pcShow(p, el, pcSlotOf(el), true, pcSquadFor(el));
   }, true);
-  document.addEventListener('keydown', ev => { if (ev.key === 'Escape') pcHide(); });
+  document.addEventListener('keydown', ev => { if (ev.key === 'Escape') pcHide(true); });
   // An anchored panel is pinned to a card that moves when the page scrolls, so
   // it closes — but this listener is on capture and therefore also sees the
   // panel's OWN scrolling. Without the first check, reading a long card is

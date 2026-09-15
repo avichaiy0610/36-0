@@ -40,6 +40,20 @@
     .chips { display: flex; flex-wrap: wrap; gap: 8px; }
     .chip { background: #161b22; border: 1px solid #30363d; border-radius: 50px; padding: 6px 14px; font-size: 13.5px; color: #e6edf3; text-decoration: none; }
     .foot { margin-top: 44px; border-top: 1px solid #30363d; padding-top: 16px; font-size: 12px; color: #5a6472; } .foot a { color: #8b949e; }
+
+    :root { --bg:#0d1117; --surface:#161b22; --surface2:#21262d; --border:#30363d;
+            --text:#e6edf3; --dim:#8b949e; --accent:#FFD700; --hover:#2d333b; }
+    .crowd { margin-top: 2px; }
+    .crowd-line { font-size: 13px; }
+    .crowd-open { font-size: 12px; padding: 4px 14px; }
+
+    .pp-more input { width: 100%; max-width: 360px; background: #161b22; color: #e6edf3;
+      border: 1px solid #30363d; border-radius: 8px; padding: 10px 13px; font: inherit; font-size: 15px; }
+    .pp-more input:focus { outline: none; border-color: #FFD700; }
+    .pp-more ul { list-style: none; margin: 8px 0 0; }
+    .pp-more li { padding: 4px 0; font-size: 14.5px; }
+    .pp-more a { color: #58a6ff; text-decoration: none; font-weight: 700; }
+    .pp-more li.pp-hint { color: #5a6472; font-size: 13px; font-weight: 400; }
   </style>
 </head>
 <body>
@@ -54,11 +68,9 @@
       <a class="cta" href="/team/maccabi-haifa/">בנה את הרכב כל הזמנים של מכבי חיפה ←</a>
     </div>
 
-    <p class="lede">ניר דוידוביץ' רשום אצלנו ב-14 עונות של ליגת העל, כולן במכבי חיפה. הדירוג הגבוה ביותר שלו, 90, נרשם בעונת 2000/01 במכבי חיפה. הוא היה בסגל האלוף ב-7 עונות: 2000/01, 2001/02, 2003/04, 2004/05, 2005/06, 2008/09 ו-2010/11. הקבוצה שבה שיחק סיימה עם ההגנה הטובה בליגה ב-2000/01 (28 ספיגות), ב-2005/06 (25 ספיגות), ב-2008/09 (24 ספיגות), ב-2009/10 (16 ספיגות) וב-2010/11 (28 ספיגות). הוא היה בסגל שמכבי חיפה העלתה לשלב הבתים של ליגת האלופות ב-2002/03. בשש התכונות שהמשחק גוזר מהנתונים הוא חזק במיוחד בפיזיות (84) וחלש יחסית בכדרור (31). השותף הקבוע ביותר שלו על המגרש היה אלון חרזי — 11 עונות יחד, ו-6 אליפויות משותפות. הוא שיחק גם לצד אדורם קייסי ואריק בנאדו.</p>
+    <p class="lede">ניר דוידוביץ' רשום אצלנו ב-14 עונות של ליגת העל, כולן במכבי חיפה. הדירוג הגבוה ביותר שלו, 90, נרשם בעונת 2000/01 במכבי חיפה. הוא היה בסגל האלוף ב-7 עונות: 2000/01, 2001/02, 2003/04, 2004/05, 2005/06, 2008/09 ו-2010/11. הקבוצה שבה שיחק סיימה עם ההגנה הטובה בליגה ב-2000/01 (28 ספיגות), ב-2005/06 (25 ספיגות), ב-2008/09 (24 ספיגות), ב-2009/10 (16 ספיגות) וב-2010/11 (28 ספיגות). הוא היה בסגל שמכבי חיפה העלתה לשלב הבתים של ליגת האלופות ב-2002/03. השותף הקבוע ביותר שלו על המגרש היה אלון חרזי — 11 עונות יחד, ו-6 אליפויות משותפות. הוא שיחק גם לצד אדורם קייסי ואריק בנאדו.</p>
     <h2>העובדות על ניר דוידוביץ&#39;</h2><table class="facts"><tr><td class="fk">עונות בליגה</td><td>14</td></tr><tr><td class="fk">עמדה</td><td>שוער</td></tr><tr><td class="fk">לאום</td><td>ישראל</td></tr><tr><td class="fk">ליגת האלופות</td><td>מכבי חיפה · 2002/03</td></tr><tr><td class="fk">דירוג שיא</td><td><b class="ovr">90</b> · 2000/01 · מכבי חיפה</td></tr><tr><td class="fk">הכי הרבה עונות</td><td>מכבי חיפה · 14</td></tr><tr><td class="fk">אליפויות בסגל</td><td>7 · 2000/01, 2001/02, 2003/04, 2004/05, 2005/06, 2008/09, 2010/11</td></tr></table>
-    <h2>שש התכונות של ניר דוידוביץ&#39;</h2>
-    <p class="note">ממוצע כל עונותיו בליגה. התכונות נגזרות מהנתונים עצמם — בעיטה מטבלת המבקיעים, מסירה מטבלת הבישולים, הגנה ממה שספגה קבוצתו ופיזיות מאורך הקריירה. <a href="/methodology.html">איך זה מחושב</a>.</p>
-    <table class="attrs"><tr><td class="ak">מהירות</td><td class="av">47</td><td class="ab"><i style="width:47%"></i></td></tr><tr><td class="ak">בעיטה</td><td class="av">37</td><td class="ab"><i style="width:37%"></i></td></tr><tr><td class="ak">מסירה</td><td class="av">55</td><td class="ab"><i style="width:55%"></i></td></tr><tr><td class="ak">כדרור</td><td class="av">31</td><td class="ab"><i style="width:31%"></i></td></tr><tr><td class="ak">הגנה</td><td class="av">76</td><td class="ab"><i style="width:76%"></i></td></tr><tr><td class="ak">פיזיות</td><td class="av">84</td><td class="ab"><i style="width:84%"></i></td></tr></table>
+    
     <h2>התארים של ניר דוידוביץ&#39;</h2><table class="facts"><tr><td class="fk">🏆 זוכה אליפויות ×7</td><td>2000/01 2001/02 2003/04 2004/05 2005/06 2008/09 2010/11</td></tr><tr><td class="fk">❤️ נאמן למועדון ×14</td><td>מכבי חיפה</td></tr><tr><td class="fk">🗿 ותיק הליגה ×14</td><td>14 עונות</td></tr><tr><td class="fk">🧤 שער נעול ×5</td><td>2000/01 2005/06 2008/09 2009/10 2010/11</td></tr><tr><td class="fk">🏅 כדורגלן העונה</td><td>2003/04</td></tr><tr><td class="fk">🕰 שלושה עשורים ×3</td><td>שנות ה-1990 · שנות ה-2000 · שנות ה-2010</td></tr><tr><td class="fk">🌟 דירוג 90+</td><td>שיא 90</td></tr></table>
 
     <h2>ניר דוידוביץ&#39; עונה אחר עונה</h2>
@@ -67,6 +79,18 @@
       <tr><td>2012/13</td><td><a href="/team/maccabi-haifa/">מכבי חיפה</a></td><td>שוער</td><td class="ovr">79</td></tr><tr><td>2011/12</td><td><a href="/team/maccabi-haifa/">מכבי חיפה</a></td><td>שוער</td><td class="ovr">84</td></tr><tr><td>2010/11</td><td><a href="/team/maccabi-haifa/">מכבי חיפה</a></td><td>שוער</td><td class="ovr">86</td></tr><tr><td>2009/10</td><td><a href="/team/maccabi-haifa/">מכבי חיפה</a></td><td>שוער</td><td class="ovr">90</td></tr><tr><td>2008/09</td><td><a href="/team/maccabi-haifa/">מכבי חיפה</a></td><td>שוער</td><td class="ovr">88</td></tr><tr><td>2007/08</td><td><a href="/team/maccabi-haifa/">מכבי חיפה</a></td><td>שוער</td><td class="ovr">88</td></tr><tr><td>2006/07</td><td><a href="/team/maccabi-haifa/">מכבי חיפה</a></td><td>שוער</td><td class="ovr">89</td></tr><tr><td>2005/06</td><td><a href="/team/maccabi-haifa/">מכבי חיפה</a></td><td>שוער</td><td class="ovr">89</td></tr><tr><td>2004/05</td><td><a href="/team/maccabi-haifa/">מכבי חיפה</a></td><td>שוער</td><td class="ovr">86</td></tr><tr><td>2003/04</td><td><a href="/team/maccabi-haifa/">מכבי חיפה</a></td><td>שוער</td><td class="ovr">90</td></tr><tr><td>2002/03</td><td><a href="/team/maccabi-haifa/">מכבי חיפה</a></td><td>שוער</td><td class="ovr">82</td></tr><tr><td>2001/02</td><td><a href="/team/maccabi-haifa/">מכבי חיפה</a></td><td>שוער</td><td class="ovr">82</td></tr><tr><td>2000/01</td><td><a href="/team/maccabi-haifa/">מכבי חיפה</a></td><td>שוער</td><td class="ovr">90</td></tr><tr><td>1999/00</td><td><a href="/team/maccabi-haifa/">מכבי חיפה</a></td><td>שוער</td><td class="ovr">88</td></tr>
     </table>
 
+    <h2>מה הקהל אומר על ניר דוידוביץ&#39;</h2>
+    <p class="note">המשחק נותן לו 90 בעונת 2000/01 — עונת השיא שלו. מה אתה היית נותן?</p>
+    
+    <div class="pc-sec crowd" data-key="ניר דוידוביץ&#39;"
+         data-name="ניר דוידוביץ&#39;"
+         data-season="2000/01" data-pos="GK"
+         data-official="90">
+      
+      <div class="crowd-body"><div class="crowd-line">טוען…</div></div>
+      
+    </div>
+
     <h2>שיחק לצד</h2><table class="facts"><tr><td class="fk">אלון חרזי</td><td>11 עונות יחד · 6 אליפויות</td></tr><tr><td class="fk">אדורם קייסי</td><td>8 עונות יחד · 4 אליפויות</td></tr><tr><td class="fk">אריק בנאדו</td><td>8 עונות יחד · 6 אליפויות</td></tr><tr><td class="fk">דקל קינן</td><td>8 עונות יחד · 4 אליפויות</td></tr><tr><td class="fk">אבישי ז&#39;אנו</td><td>5 עונות יחד · 3 אליפויות</td></tr><tr><td class="fk">ואליד באדיר</td><td>5 עונות יחד · 4 אליפויות</td></tr></table>
 
     <h2>המועדונים של ניר דוידוביץ&#39;</h2>
@@ -74,11 +98,54 @@
 
     <div style="text-align:center;margin-top:28px"><a class="cta" href="/">שחק עכשיו ב-36-0 ←</a></div>
 
+    <h2>עוד שחקנים</h2>
+    <div class="pp-more">
+      <input id="pp-q" type="search" placeholder="חפש שחקן…" autocomplete="off"
+             aria-label="חיפוש שחקן" aria-controls="pp-res" />
+      <ul id="pp-res"></ul>
+      <p class="note"><a href="/players/">או עבור על אינדקס כל השחקנים ←</a></p>
+    </div>
+
     <div class="foot">
       36-0 — משחק דראפט חינמי לחובבי הכדורגל הישראלי · הנתונים למטרות מידע ובידור בלבד ואינם רשמיים ·
       <a href="/players/">כל השחקנים</a> · <a href="/methodology.html">מתודולוגיה</a> ·
       <a href="/how-to-play.html">איך משחקים</a> · <a href="/about.html">אודות</a> · <a href="/">משחק</a>
     </div>
   </div>
+
+  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script defer src="/js/config.js?v=3dd47ca1"></script>
+  <script defer src="/js/supabase-client.js?v=e9102a02"></script>
+  <script defer src="/js/crowd.js?v=8fb571a9"></script>
+  <link rel="stylesheet" href="/css/crowd.css?v=940771d0" />
+  <script>document.addEventListener('DOMContentLoaded',function(){
+try{if(!localStorage.getItem('t360_cid'))localStorage.setItem('t360_cid',(window.crypto&&crypto.randomUUID)?crypto.randomUUID():'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,function(c){var r=Math.random()*16|0;return (c==='x'?r:(r&3|8)).toString(16);}));}catch(e){}
+if(typeof crowdMount==='function')crowdMount(document);
+var q=document.getElementById('pp-q'),res=document.getElementById('pp-res');
+if(!q||!res)return;
+var all=null,pend=false;
+function st(s){return String(s).replace(/["'׳״.()]/g,'').replace(/[-\s]+/g,' ').trim();}
+function ec(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+function hint(t){res.innerHTML='<li class="pp-hint">'+t+'</li>';}
+function draw(){
+var v=st(q.value);
+if(!v){res.innerHTML='';return;}
+if(!all){hint('טוען…');return;}
+var a=[],b=[],i,at;
+for(i=0;i<all.length&&a.length<12;i++){at=all[i][2].indexOf(v);if(at===0)a.push(all[i]);else if(at>0&&b.length<12)b.push(all[i]);}
+var h=a.concat(b).slice(0,12);
+if(!h.length){hint('אין שחקן כזה בספרייה');return;}
+res.innerHTML=h.map(function(p){return '<li><a href="/player/'+encodeURIComponent(p[1])+'/">'+ec(p[0])+'</a></li>';}).join('');
+}
+function load(){
+if(all||pend)return;pend=true;
+fetch('/player/index.json').then(function(r){return r.json();}).then(function(d){
+for(var i=0;i<d.length;i++)d[i][2]=st(d[i][0]);
+all=d;draw();
+}).catch(function(){pend=false;hint('החיפוש לא נטען. נסה שוב.');});
+}
+q.addEventListener('focus',load);
+q.addEventListener('input',function(){load();draw();});
+});</script>
 </body>
 </html>
