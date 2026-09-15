@@ -40,6 +40,20 @@
     .chips { display: flex; flex-wrap: wrap; gap: 8px; }
     .chip { background: #161b22; border: 1px solid #30363d; border-radius: 50px; padding: 6px 14px; font-size: 13.5px; color: #e6edf3; text-decoration: none; }
     .foot { margin-top: 44px; border-top: 1px solid #30363d; padding-top: 16px; font-size: 12px; color: #5a6472; } .foot a { color: #8b949e; }
+
+    :root { --bg:#0d1117; --surface:#161b22; --surface2:#21262d; --border:#30363d;
+            --text:#e6edf3; --dim:#8b949e; --accent:#FFD700; --hover:#2d333b; }
+    .crowd { margin-top: 2px; }
+    .crowd-line { font-size: 13px; }
+    .crowd-open { font-size: 12px; padding: 4px 14px; }
+
+    .pp-more input { width: 100%; max-width: 360px; background: #161b22; color: #e6edf3;
+      border: 1px solid #30363d; border-radius: 8px; padding: 10px 13px; font: inherit; font-size: 15px; }
+    .pp-more input:focus { outline: none; border-color: #FFD700; }
+    .pp-more ul { list-style: none; margin: 8px 0 0; }
+    .pp-more li { padding: 4px 0; font-size: 14.5px; }
+    .pp-more a { color: #58a6ff; text-decoration: none; font-weight: 700; }
+    .pp-more li.pp-hint { color: #5a6472; font-size: 13px; font-weight: 400; }
   </style>
 </head>
 <body>
@@ -67,6 +81,18 @@
       <tr><td>2014/15</td><td><a href="/team/ms-ashdod/">מ.ס. אשדוד</a></td><td>חלוץ</td><td class="ovr">78</td></tr><tr><td>2014/15</td><td><a href="/team/maccabi-pt/">מכבי פתח תקווה</a></td><td>חלוץ</td><td class="ovr">71</td></tr><tr><td>2013/14</td><td><a href="/team/ms-ashdod/">מ.ס. אשדוד</a></td><td>חלוץ</td><td class="ovr">80</td></tr><tr><td>2011/12</td><td><a href="/team/ironi-ks/">עירוני קריית שמונה</a></td><td>חלוץ</td><td class="ovr">79</td></tr>
     </table>
 
+    <h2>מה הקהל אומר על דויד סולארי</h2>
+    <p class="note">המשחק נותן לו 80 בעונת 2013/14 — עונת השיא שלו. מה אתה היית נותן?</p>
+    
+    <div class="pc-sec crowd" data-key="דויד סולארי"
+         data-name="דויד סולארי"
+         data-season="2013/14" data-pos="CF"
+         data-official="80">
+      
+      <div class="crowd-body"><div class="crowd-line">טוען…</div></div>
+      
+    </div>
+
     
 
     <h2>המועדונים של דויד סולארי</h2>
@@ -74,11 +100,54 @@
 
     <div style="text-align:center;margin-top:28px"><a class="cta" href="/">שחק עכשיו ב-36-0 ←</a></div>
 
+    <h2>עוד שחקנים</h2>
+    <div class="pp-more">
+      <input id="pp-q" type="search" placeholder="חפש שחקן…" autocomplete="off"
+             aria-label="חיפוש שחקן" aria-controls="pp-res" />
+      <ul id="pp-res"></ul>
+      <p class="note"><a href="/players/">או עבור על אינדקס כל השחקנים ←</a></p>
+    </div>
+
     <div class="foot">
       36-0 — משחק דראפט חינמי לחובבי הכדורגל הישראלי · הנתונים למטרות מידע ובידור בלבד ואינם רשמיים ·
       <a href="/players/">כל השחקנים</a> · <a href="/methodology.html">מתודולוגיה</a> ·
       <a href="/how-to-play.html">איך משחקים</a> · <a href="/about.html">אודות</a> · <a href="/">משחק</a>
     </div>
   </div>
+
+  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script defer src="/js/config.js?v=3dd47ca1"></script>
+  <script defer src="/js/supabase-client.js?v=e9102a02"></script>
+  <script defer src="/js/crowd.js?v=8353f862"></script>
+  <link rel="stylesheet" href="/css/crowd.css?v=0df50193" />
+  <script>document.addEventListener('DOMContentLoaded',function(){
+try{if(!localStorage.getItem('t360_cid'))localStorage.setItem('t360_cid',(window.crypto&&crypto.randomUUID)?crypto.randomUUID():'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,function(c){var r=Math.random()*16|0;return (c==='x'?r:(r&3|8)).toString(16);}));}catch(e){}
+if(typeof crowdMount==='function')crowdMount(document);
+var q=document.getElementById('pp-q'),res=document.getElementById('pp-res');
+if(!q||!res)return;
+var all=null,pend=false;
+function st(s){return String(s).replace(/["'׳״.()]/g,'').replace(/[-\s]+/g,' ').trim();}
+function ec(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+function hint(t){res.innerHTML='<li class="pp-hint">'+t+'</li>';}
+function draw(){
+var v=st(q.value);
+if(!v){res.innerHTML='';return;}
+if(!all){hint('טוען…');return;}
+var a=[],b=[],i,at;
+for(i=0;i<all.length&&a.length<12;i++){at=all[i][2].indexOf(v);if(at===0)a.push(all[i]);else if(at>0&&b.length<12)b.push(all[i]);}
+var h=a.concat(b).slice(0,12);
+if(!h.length){hint('אין שחקן כזה בספרייה');return;}
+res.innerHTML=h.map(function(p){return '<li><a href="/player/'+encodeURIComponent(p[1])+'/">'+ec(p[0])+'</a></li>';}).join('');
+}
+function load(){
+if(all||pend)return;pend=true;
+fetch('/player/index.json').then(function(r){return r.json();}).then(function(d){
+for(var i=0;i<d.length;i++)d[i][2]=st(d[i][0]);
+all=d;draw();
+}).catch(function(){pend=false;hint('החיפוש לא נטען. נסה שוב.');});
+}
+q.addEventListener('focus',load);
+q.addEventListener('input',function(){load();draw();});
+});</script>
 </body>
 </html>

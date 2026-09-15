@@ -250,8 +250,14 @@ function crowdEsc(s) {
 
 // הווידג'ט נכנס לכרטיס כשלד ריק ומתמלא אסינכרונית. pcHTML הוא סינכרוני
 // ולא ניתן להמתין בתוכו בלי להקפיא את פתיחת הכרטיס.
-function crowdBlock(name, season, pos, official) {
+//
+// opts.selfPage — הווידג'ט יושב על עמוד /player/ של אותו אדם. שני דברים
+// משתנים שם ורק שם: הקישור "העמוד המלא" הוא קישור לעצמו, והכותרת הפנימית
+// כפולה כי לעמוד כבר יש <h2> משלו. המארח הוא שיודע את זה, לא הווידג'ט.
+// scripts/player_pages.js הוא הקורא היחיד עם הדגל הזה.
+function crowdBlock(name, season, pos, official, opts) {
   if (!name || !season) return '';
+  const selfPage = !!(opts && opts.selfPage);
   // הדירוג הרשמי נכתב כמספר ולא כמחרוזת חופשית: הוא נקרא בחזרה עם parseInt,
   // ומה שלא מספר אין לו מה לעשות בתוך תכונה ב-HTML.
   const off = parseInt(official, 10);
@@ -268,7 +274,7 @@ function crowdBlock(name, season, pos, official) {
   //
   // והקישור נפלט רק למי שיש לו עמוד. קישור שנפתח בלשונית חדשה אל 404 גרוע
   // מלא לקשר בכלל, ול-vercel.json אין SPA fallback שיתפוס אותו.
-  const full = crowdHasPage(name)
+  const full = (!selfPage && crowdHasPage(name))
     ? `<a class="crowd-full" href="/player/${encodeURIComponent(crowdSlug(name))}/"
          target="_blank" rel="noopener">העמוד המלא של ${crowdEsc(name)} ↗</a>`
     : '';
@@ -280,7 +286,7 @@ function crowdBlock(name, season, pos, official) {
          data-name="${crowdEsc(name)}"
          data-season="${crowdEsc(season)}" data-pos="${crowdEsc(pos || '')}"
          data-official="${off || ''}">
-      <div class="pc-sec-t">דירוג הקהל</div>
+      ${selfPage ? '' : '<div class="pc-sec-t">דירוג הקהל</div>'}
       <div class="crowd-body"><div class="crowd-line">טוען…</div></div>
       ${full}
     </div>`;
