@@ -689,6 +689,15 @@ DECLARE v_n int;
 BEGIN
   IF NOT is_site_admin() THEN RETURN jsonb_build_object('error', 'forbidden'); END IF;
 
+  -- rating_approvals CHECKs both columns, so an out-of-range value would land as
+  -- a raw 23514 — a 500-shaped error out of a function that answers every other
+  -- bad input with a tidy {"error": …}. Checked here so the failure mode is the
+  -- same shape whatever goes wrong.
+  IF p_old IS NULL OR p_old NOT BETWEEN 40 AND 99
+     OR p_new IS NULL OR p_new NOT BETWEEN 40 AND 99 THEN
+    RETURN jsonb_build_object('error', 'bad ovr');
+  END IF;
+
   -- The same avg_trimmed IS NOT NULL test as the queue, and for the same reason:
   -- n alone comes out true on a single vote, and approving a single vote is
   -- precisely what the threshold exists to prevent. It is repeated here rather
@@ -762,6 +771,9 @@ BEGIN
     RETURN jsonb_build_object('error', 'bad status');
   END IF;
   UPDATE player_notes SET status = p_status WHERE id = p_id;
+  -- An id that matches nothing affected no rows, and answering ok to that would
+  -- tell the dashboard a note was decided when none was.
+  IF NOT FOUND THEN RETURN jsonb_build_object('error', 'no such note'); END IF;
   RETURN jsonb_build_object('ok', true);
 END $$;
 
