@@ -171,6 +171,9 @@
     .ca-down { color: #f85149; font-weight: 800; }
     .ca-act button { background: #21262d; border: 1px solid #30363d; border-radius: 7px; color: #e6edf3; font-size: 14px; padding: 3px 8px; cursor: pointer; }
     .ca-act button:disabled { opacity: .45; cursor: default; }
+    /* פרסום הוא מצב, לא פעולה חד-פעמית — הכפתור נשאר על המסך ומראה איפה
+       השחקן הזה עומד: 🚫 מוסתר מהציבור, 👁 מוצג. */
+    .ca-act .ca-pub.on { border-color: #2ea043; color: #3fb950; }
     .ca-err { color: #f85149; font-size: 11.5px; margin-top: 3px; white-space: normal; }
     .ca-wait { opacity: .5; }
     .us-fin { color: #8b949e; font-size: 12px; }
@@ -366,8 +369,8 @@
      cross-reference with crowdKey() and names its tags out of CROWD_TAGS. Those
      are the same functions the player card files the votes under — a second
      copy here would miss exactly the names with an apostrophe. -->
-<script src="js/crowd.js?v=202e5352"></script>
-<script src="js/crowd-admin.js?v=c1a7d0f4"></script>
+<script src="js/crowd.js?v=0f8695ff"></script>
+<script src="js/crowd-admin.js?v=7c3c820e"></script>
 <script>
 const statusEl = document.getElementById('status');
 let overrides = {};   // key -> value currently stored in site_texts

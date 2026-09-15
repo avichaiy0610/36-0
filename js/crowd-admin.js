@@ -139,8 +139,11 @@ async function caLoadRatings() {
       <td dir="ltr" class="${r.gap > 0 ? 'ca-up' : 'ca-down'}">${r.gap > 0 ? '+' : ''}${r.gap}</td>
       <td dir="ltr">${r.n}</td>
       <td>${caTagCell(r.tag_top, r.tag_top_n)}</td>
-      <td class="ca-act"><button class="ca-ok" type="button">✅</button>
-          <button class="ca-no" type="button">🗑️</button></td>
+      <td class="ca-act"><button class="ca-pub${r.published ? ' on' : ''}" type="button"
+            title="${r.published ? 'מוצג לציבור — לחץ כדי להסתיר' : 'מוסתר — לחץ כדי להציג לציבור'}"
+            >${r.published ? '👁' : '🚫'}</button>
+          <button class="ca-ok" type="button" title="קבל את הדירוג לדאטה">✅</button>
+          <button class="ca-no" type="button" title="הורד מהתור">🗑️</button></td>
     </tr>`).join('');
   caCount();
 }
@@ -204,13 +207,31 @@ function caInit() {
   if (!sec) return;
 
   document.getElementById('ca-rows').addEventListener('click', async ev => {
-    const ok = ev.target.classList.contains('ca-ok');
-    const no = ev.target.classList.contains('ca-no');
-    if (!ok && !no) return;
+    const ok  = ev.target.classList.contains('ca-ok');
+    const no  = ev.target.classList.contains('ca-no');
+    const pub = ev.target.classList.contains('ca-pub');
+    if (!ok && !no && !pub) return;
     const tr = ev.target.closest('tr');
     if (!tr || !tr.dataset.key) return;
     caBusy(tr, true);
     const args = { p_player_key: tr.dataset.key, p_season: tr.dataset.season };
+
+    // פרסום הוא החלטה נפרדת מאישור, ולכן הוא לא מוריד את השורה מהתור: אפשר
+    // להציג לציבור מספר בלי לקחת אותו לדאטה, ואפשר לקחת אותו לדאטה בלי
+    // להציג. הכפתור מתחלף במקום והשורה נשארת.
+    if (pub) {
+      const btn = ev.target;
+      const turningOn = !btn.classList.contains('on');
+      const r = await caCall('publish_crowd', Object.assign({ p_on: turningOn }, args));
+      caBusy(tr, false);
+      if (!r.ok) return caFailed(tr, r.msg);
+      btn.classList.toggle('on', turningOn);
+      btn.textContent = turningOn ? '👁' : '🚫';
+      btn.title = turningOn ? 'מוצג לציבור — לחץ כדי להסתיר'
+                            : 'מוסתר — לחץ כדי להציג לציבור';
+      return;
+    }
+
     const r = ok
       ? await caCall('approve_rating',
           Object.assign({ p_old: +tr.dataset.old, p_new: +tr.dataset.new }, args))

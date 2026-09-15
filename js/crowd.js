@@ -120,6 +120,15 @@ const CROWD_MIN_VOTES = 5;
 function crowdDisplay(row) {
   const n = (row && row.n) || 0;
   if (!n) return { state: 'empty', left: CROWD_MIN_VOTES };
+  // Votes are in and the threshold is cleared, but the owner has not published
+  // this player yet — crowd_ratings hands over the count and withholds the two
+  // judgements until he does (20260915000001). Without its own state this fell
+  // into 'few' and said "2 more votes and the rating unlocks" to somebody
+  // looking at forty votes, which is simply false. Nothing is being hidden from
+  // the reader here that he could otherwise have; the honest word is "waiting".
+  if (n >= CROWD_MIN_VOTES && row.avg_trimmed == null) {
+    return { state: 'pending', n };
+  }
   // A row with a count but no average. crowd_trimmed_avg returns NULL if and
   // only if n < 5, so the database should never hand us n >= 5 with no rating —
   // but deciding what is displayable is THIS function's job, and it must not be
@@ -333,6 +342,8 @@ function crowdRenderLine(box, row, mine, notes) {
     // נקרא "(38)", כלומר הבחירה המעוצבת מגיעה למסך כתאונה.
     txt = `דירוג קהל ממוצע <span dir="ltr">${d.avg}</span> <span class="crowd-n">(${d.n})</span>` +
           (tag ? ` · <span class="crowd-tag">${tag.icon} ${crowdEsc(tag.label)}</span>` : '');
+  } else if (d.state === 'pending') {
+    txt = `${d.n} הצבעות · ממתין לאישור`;
   } else if (d.state === 'few') {
     txt = `עוד ${d.left} הצבעות והדירוג ייחשף`;
   } else if (mine) {

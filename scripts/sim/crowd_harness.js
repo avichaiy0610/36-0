@@ -60,11 +60,21 @@ is(ctx.crowdDisplay({ n: 3 }),                { state: 'few',     left: 2 },  't
 is(ctx.crowdDisplay({ n: 4, avg_trimmed: null }), { state: 'few', left: 1 },  'four votes → one to go');
 is(ctx.crowdDisplay({ n: 5, avg_trimmed: 82 }),
                                               { state: 'shown', n: 5, avg: 82 }, 'five votes → shown');
-// המסד לא אמור להחזיר את זה לעולם — crowd_trimmed_avg מחזיר NULL אם ורק אם
-// n < 5. הבדיקה קיימת כי ההחלטה מה ניתן להציג היא של הפונקציה הזאת, ואסור לה
-// להיות נכונה רק כל עוד אינווריאנט מרוחק מחזיק. בלי השומר מופיעה המילה "null"
-// במקום שבו אמור להופיע דירוג.
-is(ctx.crowdDisplay({ n: 7, avg_trimmed: null }), { state: 'few', left: 1 },
+// מונה בלי ממוצע. פעם זה היה מצב בלתי אפשרי שנשמר כרשת ביטחון; מאז מיגרציה
+// 20260915000001 זה המצב הרגיל של כל שחקן שהבעלים עוד לא פרסם. הכוונה של
+// הבדיקה לא השתנתה — לעולם לא להציג דירוג שאין לנו — רק השם שלה.
+is(ctx.crowdDisplay({ n: 7, avg_trimmed: null }), { state: 'pending', n: 7 },
    'a count with no average is never shown');
+
+// ── פרסום ─────────────────────────────────────────────────────────────────
+// הדעה של הקהל לא מוצגת לפני שהבעלים אישר (מיגרציה 20260915000001), אז
+// crowd_ratings מוסר את המונה ומחזיק את שתי ההכרעות. בלי מצב משלו זה נפל
+// ל-few ואמר "עוד 2 הצבעות והדירוג ייחשף" למי שמסתכל על ארבעים הצבעות.
+is(ctx.crowdDisplay({ n: 40, avg_trimmed: null }), { state: 'pending', n: 40 },
+   'votes in, not published yet');
+is(ctx.crowdDisplay({ n: 5, avg_trimmed: null }),  { state: 'pending', n: 5 },
+   'pending starts exactly at the threshold');
+is(ctx.crowdDisplay({ n: 40, avg_trimmed: 77 }),   { state: 'shown', n: 40, avg: 77 },
+   'published rows still show');
 
 process.exit(failed ? 1 : 0);
