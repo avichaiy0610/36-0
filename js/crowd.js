@@ -190,12 +190,22 @@ function crowdBlock(name, season, pos, official) {
   const off = parseInt(official, 10);
   // data-key הוא המפתח המנורמל, וממנו אי אפשר להרכיב בחזרה את השם כפי שהוא
   // נכתב. המצב הריק פונה לשחקן בשמו, ולכן השם נשמר כאן בנפרד.
+  //
+  // .crowd-body הוא מה ש-crowdRenderLine ו-crowdOpenPanel מחליפים. כל דבר
+  // שאמור לשרוד רינדור מחדש יושב מחוץ לו — הקישור לעמוד המלא הוא אח שלו ולא
+  // צאצא, אחרת crowdMount היה מוחק אותו כמה מאות מילישניות אחרי פתיחת הכרטיס
+  // והוא היה גלוי רק בהבזק של "טוען…".
+  //
+  // ה-href עובר encodeURIComponent בלבד ולא crowdEsc: הוא כבר בתוך מרכאות
+  // כפולות ו-encodeURIComponent מקודד גרשים ממילא.
   return `
     <div class="pc-sec crowd" data-key="${crowdEsc(crowdKey(name))}"
          data-name="${crowdEsc(name)}"
          data-season="${crowdEsc(season)}" data-pos="${crowdEsc(pos || '')}"
          data-official="${off || ''}">
-      <div class="crowd-line">טוען…</div>
+      <div class="crowd-body"><div class="crowd-line">טוען…</div></div>
+      <a class="crowd-full" href="/player/${encodeURIComponent(crowdSlug(name))}/"
+         target="_blank" rel="noopener">העמוד המלא של ${crowdEsc(name)} ↗</a>
     </div>`;
 }
 
@@ -208,14 +218,21 @@ async function crowdMount(root) {
     if (!box) return;
     box.setAttribute('data-ready', '1');
     const key = box.dataset.key, season = box.dataset.season;
-    const [row, mine] = await Promise.all([crowdFetch(key, season), crowdFetchMine(key, season)]);
+    // השורות המאושרות נשלפות כאן ולא בפתיחת הפאנל: בלי מסך הן לא קיימות, וכל
+    // מסלול המודרציה מוביל לשום מקום — הבעלים מאשר טקסט שאיש לא יראה.
+    const [row, mine, notes] = await Promise.all([
+      crowdFetch(key, season), crowdFetchMine(key, season), crowdNotes(key, season),
+    ]);
     // הכרטיס עלול להיסגר בזמן ההמתנה — כתיבה לאלמנט מנותק היא בזבוז שקט
     if (!box.isConnected) return;
-    crowdRenderLine(box, row, mine);
+    crowdRenderLine(box, row, mine, notes);
   } catch (e) { /* הווידג'ט נשאר על "טוען…" — הכרטיס עצמו לא נפגע */ }
 }
 
-function crowdRenderLine(box, row, mine) {
+function crowdRenderLine(box, row, mine, notes) {
+  // כותבים למעטפת הפנימית בלבד, כדי שהקישור לעמוד המלא ישרוד. ה-|| box הוא
+  // כדי שעמודי /player/ יוכלו להשתמש באותן פונקציות גם בלי המעטפת.
+  const body = box.querySelector('.crowd-body') || box;
   const d = crowdDisplay(row);
   const tag = row && row.tag_top ? CROWD_TAGS[row.tag_top] : null;
   const name = box.dataset.name || '';
@@ -231,9 +248,15 @@ function crowdRenderLine(box, row, mine) {
                : 'עוד אין דעות עליו — תהיה הראשון';
   }
   const you = mine ? `<span class="crowd-you">אתה <span dir="ltr">${mine.ovr}</span></span> · ` : '';
-  box.innerHTML = `<div class="crowd-line">${you}${txt}<button class="crowd-open" type="button">${
-    mine ? 'שנה' : 'דרג'}</button></div>`;
-  box.querySelector('.crowd-open').addEventListener('click', () => crowdOpenPanel(box, row, mine));
+  // עד שלוש שורות מאושרות מתחת לשורת הסיכום, וכלום כשאין. בפאנל הפתוח הן לא
+  // מוצגות — שם המשתמש כותב, לא קורא.
+  const notesHtml = (notes && notes.length)
+    ? `<div class="crowd-notes">${notes.map(nt =>
+        `<div class="crowd-note-row-r">“${crowdEsc(nt.body)}”</div>`).join('')}</div>`
+    : '';
+  body.innerHTML = `<div class="crowd-line">${you}${txt}<button class="crowd-open" type="button">${
+    mine ? 'שנה' : 'דרג'}</button></div>${notesHtml}`;
+  body.querySelector('.crowd-open').addEventListener('click', () => crowdOpenPanel(box, row, mine));
 
   // במצב הריק השורה לא נושאת מידע, ואין מה לקבור מתחת לפאנל — הבעיה כאן היא
   // ההפך, להוציא הצבעה ראשונה. במצב shown הפאנל היה מסתיר מספר אמיתי, ולכן
@@ -282,6 +305,8 @@ function crowdBusyGuards() {
 }
 
 function crowdOpenPanel(box, row, mine) {
+  // אותה מעטפת פנימית כמו ב-crowdRenderLine, ומאותה סיבה
+  const body = box.querySelector('.crowd-body') || box;
   const key = box.dataset.key, season = box.dataset.season;
   const pos = box.dataset.pos;
   const official = parseInt(box.dataset.official, 10) || 75;
@@ -290,7 +315,7 @@ function crowdOpenPanel(box, row, mine) {
   const signedIn = typeof getCurrentUser === 'function' && !!getCurrentUser();
   crowdBusyGuards();
 
-  box.innerHTML = `
+  body.innerHTML = `
     <div class="crowd-panel">
       <div class="crowd-dial-row">
         <input class="crowd-dial" type="range" min="40" max="99" value="${start}"
@@ -371,7 +396,9 @@ function crowdOpenPanel(box, row, mine) {
       if (done.isConnected) done.disabled = false;
       return;
     }
-    const fresh = await crowdFetch(key, season);
-    if (box.isConnected) crowdRenderLine(box, fresh, { ovr, tag });
+    // השורות המאושרות נשלפות שוב יחד עם ההצבר: crowdRenderLine מצייר רק את מה
+    // שנמסר לה, ובלי זה הצבעה אחת הייתה מוחקת מהמסך שורות שכבר אושרו.
+    const [fresh, notes] = await Promise.all([crowdFetch(key, season), crowdNotes(key, season)]);
+    if (box.isConnected) crowdRenderLine(box, fresh, { ovr, tag }, notes);
   });
 }

@@ -316,7 +316,7 @@ function pcList(items) {
 }
 
 /* ── the card ─────────────────────────────────────────────────────────────── */
-function pcHTML(player, slotPos) {
+function pcHTML(player, slotPos, squad) {
   const name = typeof player === 'string' ? player : player.name;
   const classic = typeof classicMode === 'function' && classicMode();
   const f = pcFacts(name);
@@ -447,7 +447,19 @@ function pcHTML(player, slotPos) {
       <div class="pc-note">חבר לצמד באותה הרכב = בונוס לשניהם.</div>
     </div>` : '';
 
-  return head + realBlock + tagBlock + partners + career;
+  /* what the data cannot know */
+  // A crowd rating is about a player IN A SEASON, so with no squad there is no
+  // question to ask and the widget is simply left out. In a classic game the
+  // card never opens at all — this only makes sure nothing is built on that
+  // path either.
+  const crowd = (!classic && squad && typeof crowdBlock === 'function')
+    ? crowdBlock(name, squad.season,
+                 typeof player === 'object' && typeof playerPositions === 'function'
+                   ? playerPositions(player)[0] : null,
+                 typeof player === 'object' ? (player.ovr || 0) : 0)
+    : '';
+
+  return head + realBlock + crowd + tagBlock + partners + career;
 }
 
 /* ── showing it ───────────────────────────────────────────────────────────── */
@@ -464,28 +476,10 @@ function pcEl() {
   return el;
 }
 
-function pcShow(player, anchor, slotPos, modal) {
-  // A classic game is eleven ratings and nothing else. The card exists to
-  // explain chemistry, tags and the history behind them — with all of that
-  // switched off it is a panel that answers a question nobody asked.
-  if (typeof classicMode === 'function' && classicMode()) return;
-  const name = typeof player === 'string' ? player : player && player.name;
-  if (!name) return;
-  clearTimeout(_pcTimer);
-  const el = pcEl();
-  el.innerHTML = (modal ? '<button class="pc-x" aria-label="סגור">✕</button>' : '') +
-    pcHTML(player, slotPos);
-  _pcOpenFor = name;
-  el.classList.toggle('pcard-modal', !!modal);
-  el.style.display = 'block';
-  if (modal) {
-    el.style.left = el.style.top = '';
-    const x = el.querySelector('.pc-x');
-    if (x) x.addEventListener('click', pcHide);
-    pcBackdrop(true);
-    return;
-  }
-  // Anchored: beside the card, on the pitch side, and never off-screen.
+// The anchored card's position: beside the token, on the pitch side, and never
+// off-screen. Called twice — once on the synchronous measurement, and again
+// once the crowd rating has landed and changed the height.
+function pcPosition(el, anchor) {
   const r = anchor.getBoundingClientRect();
   const w = el.offsetWidth, h = el.offsetHeight, pad = 10;
   let left = r.left - w - pad;
@@ -497,6 +491,56 @@ function pcShow(player, anchor, slotPos, modal) {
   el.style.top = top + 'px';
 }
 
+function pcShow(player, anchor, slotPos, modal, squad) {
+  // A classic game is eleven ratings and nothing else. The card exists to
+  // explain chemistry, tags and the history behind them — with all of that
+  // switched off it is a panel that answers a question nobody asked.
+  if (typeof classicMode === 'function' && classicMode()) return;
+  const name = typeof player === 'string' ? player : player && player.name;
+  if (!name) return;
+  clearTimeout(_pcTimer);
+  const el = pcEl();
+  el.innerHTML = (modal ? '<button class="pc-x" aria-label="סגור">✕</button>' : '') +
+    pcHTML(player, slotPos, squad);
+  // Mounted HERE, before the modal branch returns below — a call placed after
+  // the positioning block would never run on touch, and touch is the whole of
+  // mobile.
+  const crowdMounted = (typeof crowdMount === 'function')
+    ? Promise.resolve(crowdMount(el)) : null;
+  _pcOpenFor = name;
+  el.classList.toggle('pcard-modal', !!modal);
+  el.style.display = 'block';
+  if (modal) {
+    el.style.left = el.style.top = '';
+    const x = el.querySelector('.pc-x');
+    // Wrapped, not passed straight through: a listener hands pcHide the Event
+    // as its first argument, which is truthy and would make `force` true by
+    // accident. That happens to be what we want here — which is exactly why it
+    // must be said out loud rather than relied on.
+    if (x) x.addEventListener('click', () => pcHide(true));
+    pcBackdrop(true);
+    return;
+  }
+  // Anchored: beside the card, on the pitch side, and never off-screen.
+  pcPosition(el, anchor);
+  // And again once the crowd rating has landed. The measurement above runs
+  // while the widget is still a "טוען…" skeleton; a request later it fills in,
+  // and in the empty state it also opens the dial — some 150px that arrived
+  // after the card had already been placed. On a bottom-row player that hangs
+  // below the edge of the screen, and the dial is exactly the part that gets
+  // cut off. The empty state is the common one for the first weeks, so the
+  // state we care about most is the one most likely to look broken.
+  //
+  // Only the anchored branch re-measures. A modal is centred in CSS and
+  // measures nothing, so a changing height cannot move it.
+  if (crowdMounted) crowdMounted.then(() => {
+    // The card may have closed, or another player may have taken its place —
+    // repositioning THAT card against THIS anchor would be the bug.
+    if (el.style.display === 'block' && _pcOpenFor === name && anchor.isConnected)
+      pcPosition(el, anchor);
+  });
+}
+
 function pcBackdrop(on) {
   let b = document.getElementById('pcard-bd');
   if (on) {
@@ -504,14 +548,21 @@ function pcBackdrop(on) {
       b = document.createElement('div');
       b.id = 'pcard-bd';
       b.className = 'pcard-bd';
-      b.addEventListener('click', pcHide);
+      b.addEventListener('click', () => pcHide(true));   // explicit, like the ✕
       document.body.appendChild(b);
     }
     b.style.display = 'block';
   } else if (b) b.style.display = 'none';
 }
 
-function pcHide() {
+// force = an explicit close (Escape · the ✕ · the backdrop). Only an IMPLIED
+// close — mouseleave, scroll — is blocked while a vote is in progress: dragging
+// the dial takes the pointer outside the card as a matter of course, and
+// without this the panel is broken in ordinary desktop use. But a lock that
+// also swallows the ✕ turns the card into a cell, which is worse than the bug
+// it prevents, so the three explicit ways out have a door.
+function pcHide(force) {
+  if (!force && typeof crowdBusy === 'function' && crowdBusy()) return;
   clearTimeout(_pcTimer);
   _pcOpenFor = null;
   const el = document.getElementById(PCARD_ID);
@@ -535,6 +586,24 @@ function pcPlayerFor(el) {
   if (idx != null && typeof state !== 'undefined' && state.picks) {
     const pick = state.picks[+idx];
     return (pick && pick.player) || null;
+  }
+  return null;
+}
+
+// pcPlayerFor's brother: which squad did this man come from. The player row
+// itself cannot answer — a player in SQUADS is {name, position, ovr} and the
+// season belongs to the SQUAD, not to the row — and a crowd rating is about a
+// player IN A SEASON, so without this there is nothing to vote on.
+function pcSquadFor(el) {
+  if (el.classList.contains('player-card')) {
+    return (typeof state !== 'undefined' && state.currentSquad) || null;
+  }
+  // A pick is { player, squad } — the squad it was drafted from, which is not
+  // necessarily the one on the board now.
+  const idx = el.dataset ? el.dataset.idx : null;
+  if (idx != null && typeof state !== 'undefined' && state.picks) {
+    const pick = state.picks[+idx];
+    return (pick && pick.squad) || null;
   }
   return null;
 }
@@ -563,7 +632,7 @@ function pcInit() {
     const p = pcPlayerFor(el);
     if (!p) return;
     clearTimeout(_pcTimer);
-    _pcTimer = setTimeout(() => pcShow(p, el, pcSlotOf(el), false), 140);
+    _pcTimer = setTimeout(() => pcShow(p, el, pcSlotOf(el), false, pcSquadFor(el)), 140);
   });
   document.addEventListener('mouseout', ev => {
     if (!pcHasHover()) return;
@@ -596,7 +665,7 @@ function pcInit() {
     clearTimeout(holdTimer);
     holdTimer = setTimeout(() => {
       held = true;
-      pcShow(p, el, pcSlotOf(el), true);
+      pcShow(p, el, pcSlotOf(el), true, pcSquadFor(el));
     }, 420);
   }, { passive: true });
   ['touchmove', 'touchend', 'touchcancel'].forEach(t =>
@@ -616,9 +685,9 @@ function pcInit() {
     ev.preventDefault();
     const el = info.closest('.player-card, .slot-token.filled');
     const p = el && pcPlayerFor(el);
-    if (p) pcShow(p, el, pcSlotOf(el), true);
+    if (p) pcShow(p, el, pcSlotOf(el), true, pcSquadFor(el));
   }, true);
-  document.addEventListener('keydown', ev => { if (ev.key === 'Escape') pcHide(); });
+  document.addEventListener('keydown', ev => { if (ev.key === 'Escape') pcHide(true); });
   // An anchored panel is pinned to a card that moves when the page scrolls, so
   // it closes — but this listener is on capture and therefore also sees the
   // panel's OWN scrolling. Without the first check, reading a long card is

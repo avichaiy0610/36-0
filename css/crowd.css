@@ -63,3 +63,15 @@
 .crowd-note-send:disabled, .crowd-done:disabled { opacity: .55; cursor: default; }
 .crowd-done { align-self: flex-start; border-color: var(--accent); color: var(--accent); }
 .crowd-note-hint { font-size: 11px; color: var(--dim); }
+
+/* השורות שהבעלים אישר. הן ציטוט של אדם, ולכן נטויות ושקטות — הן לא מתחרות
+   בשורת הדירוג שמעליהן. */
+.crowd-notes { margin-top: 6px; display: flex; flex-direction: column; gap: 3px; }
+.crowd-note-row-r { font-size: 11px; color: var(--dim); font-style: italic; }
+
+/* הקישור יושב מחוץ ל-.crowd-body ולכן שורד כל רינדור מחדש של הווידג'ט. */
+.crowd-full {
+  display: inline-block; margin-top: 6px;
+  font-size: 11px; color: var(--dim); text-decoration: none;
+}
+.crowd-full:hover { color: var(--accent); }
