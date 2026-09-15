@@ -35,9 +35,22 @@ is(ctx.crowdShelf('GK').map(t => t.key),
 is(ctx.crowdShelf('GK').length, 10, 'keeper shelf is still ten');
 
 // ── ה-slug ────────────────────────────────────────────────────────────────
-// שלושה מקומות בונים ממנו קישור. מימוש אחד, ובדיקה אחת.
+// crowdSlug חייב להסכים עם slugFor ב-scripts/player_pages.js תו בתו, כי הוא
+// בונה קישור אל תיקייה שהמחולל כבר יצר. הגרסה הראשונה נבנתה מ-crowdKey, ש-
+// **מאחד ושומר** גרשים בעוד המחולל **מוחק** אותם: 475 מתוך 2,724 השמות קיבלו
+// slug אחר, וכל אחד מהם 404 קשה. השמות כאן הם השמות האמיתיים שנפלו.
 is(ctx.crowdSlug('אלון מזרחי'), 'אלון-מזרחי', 'slug joins with a hyphen');
-is(ctx.crowdSlug("ויקטור פאצ’ו"), "ויקטור-פאצ'ו", 'slug normalises first');
+is(ctx.crowdSlug("ויקטור פאצ'ו"), 'ויקטור-פאצו',  'slug drops the geresh, like slugFor');
+is(ctx.crowdSlug("מתי חג'ג'"),   'מתי-חגג',      'slug drops every geresh in the name');
+is(ctx.crowdSlug("ז'אן טלסניקוב"), 'זאן-טלסניקוב', 'slug drops a leading geresh');
+is(ctx.crowdSlug('זוראן צ׳מפרה'), 'זוראן-צמפרה',  'slug drops U+05F3 too');
+// ואלה השניים שמוכיחים למה אסור להרכיב את crowdSlug מ-crowdKey: crowdKey היה
+// מקפל backtick וגרש מתולתל לגרש ישר, ואז שלב המחיקה היה מעלים אותם — בעוד
+// שבדיסק הם קיימים, כי slugFor מעולם לא איחד.
+is(ctx.crowdSlug('ג`בייר בושנאק'), 'ג`בייר-בושנאק', 'slug KEEPS a backtick');
+is(ctx.crowdSlug('אנדרה ז’ראלדש'), 'אנדרה-ז’ראלדש', 'slug KEEPS a curly quote');
+// crowdKey הוא מפתח המסד, לא כתובת, והוא לא זז: הגרש נשאר בו, מאוחד.
+is(ctx.crowdKey("ויקטור פאצ'ו"), "ויקטור פאצ'ו", 'crowdKey still keeps the geresh');
 
 // ── מצב התצוגה ────────────────────────────────────────────────────────────
 // הסף הוא 5. מתחת לזה לא מוצג מספר — רק מונה, שגם משמש כתמריץ.

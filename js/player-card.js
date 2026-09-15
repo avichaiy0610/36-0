@@ -15,6 +15,10 @@
 
 const PCARD_ID = 'pcard';
 let _pcTimer = null, _pcOpenFor = null;
+// The token the open ANCHORED card is pinned to, or null for a modal or a
+// closed card. The crowd widget changes the card's height after it has already
+// been measured, and this is what the re-measure aims at.
+let _pcAnchor = null;
 
 function pcEsc(s) {
   return String(s ?? '').replace(/[&<>"]/g, c =>
@@ -459,7 +463,12 @@ function pcHTML(player, slotPos, squad) {
                  typeof player === 'object' ? (player.ovr || 0) : 0)
     : '';
 
-  return head + realBlock + crowd + tagBlock + partners + career;
+  // Directly under the official rating in the head, because the two numbers
+  // are the same measure and the whole point is to read them against each
+  // other: "דירוג 84 · דירוג קהל ממוצע 82". Placed after במציאות instead, any
+  // player with scorer, assist or title rows gets that whole section wedged
+  // between them, and the comparison stops being one.
+  return head + crowd + realBlock + tagBlock + partners + career;
 }
 
 /* ── showing it ───────────────────────────────────────────────────────────── */
@@ -471,14 +480,29 @@ function pcEl() {
     el.className = 'pcard';
     el.addEventListener('mouseenter', () => clearTimeout(_pcTimer));
     el.addEventListener('mouseleave', () => pcHide());
+    // The crowd widget says when it has changed the card's height: the skeleton
+    // filling in, the dial opening (by itself in the empty state, or because
+    // the reader pressed דרג), and the panel folding back after a vote. The
+    // card was measured and placed before any of that, so a bottom-row player
+    // ends up with the dial cut off below the edge of the screen.
+    //
+    // ONE listener, here, where the element is created — #pcard is a singleton
+    // reused by every card, so a listener added per pcShow would pile up with
+    // the hovers, exactly the leak pcInit's comment is about. It reads
+    // _pcAnchor rather than a captured one, so it is always aiming at the card
+    // that is actually open: no staleness to guard against.
+    el.addEventListener('crowd:resize', () => {
+      if (el.style.display === 'block' && _pcAnchor && _pcAnchor.isConnected)
+        pcPosition(el, _pcAnchor);
+    });
     document.body.appendChild(el);
   }
   return el;
 }
 
 // The anchored card's position: beside the token, on the pitch side, and never
-// off-screen. Called twice — once on the synchronous measurement, and again
-// once the crowd rating has landed and changed the height.
+// off-screen. Called once on the synchronous measurement in pcShow, and then
+// again on every crowd:resize — the card's height is not final when it opens.
 function pcPosition(el, anchor) {
   const r = anchor.getBoundingClientRect();
   const w = el.offsetWidth, h = el.offsetHeight, pad = 10;
@@ -504,10 +528,12 @@ function pcShow(player, anchor, slotPos, modal, squad) {
     pcHTML(player, slotPos, squad);
   // Mounted HERE, before the modal branch returns below — a call placed after
   // the positioning block would never run on touch, and touch is the whole of
-  // mobile.
-  const crowdMounted = (typeof crowdMount === 'function')
-    ? Promise.resolve(crowdMount(el)) : null;
+  // mobile. Nothing is awaited: the widget reports back through crowd:resize,
+  // which also covers the height changes that have no promise behind them.
+  if (typeof crowdMount === 'function') crowdMount(el);
   _pcOpenFor = name;
+  // Set before the branch so a modal cannot leave a previous anchor standing.
+  _pcAnchor = modal ? null : anchor;
   el.classList.toggle('pcard-modal', !!modal);
   el.style.display = 'block';
   if (modal) {
@@ -521,24 +547,11 @@ function pcShow(player, anchor, slotPos, modal, squad) {
     pcBackdrop(true);
     return;
   }
-  // Anchored: beside the card, on the pitch side, and never off-screen.
-  pcPosition(el, anchor);
-  // And again once the crowd rating has landed. The measurement above runs
-  // while the widget is still a "טוען…" skeleton; a request later it fills in,
-  // and in the empty state it also opens the dial — some 150px that arrived
-  // after the card had already been placed. On a bottom-row player that hangs
-  // below the edge of the screen, and the dial is exactly the part that gets
-  // cut off. The empty state is the common one for the first weeks, so the
-  // state we care about most is the one most likely to look broken.
-  //
-  // Only the anchored branch re-measures. A modal is centred in CSS and
+  // Anchored: beside the card, on the pitch side, and never off-screen. Every
+  // later re-measure is driven by crowd:resize, wired once in pcEl. Only the
+  // anchored branch has an anchor at all — a modal is centred in CSS and
   // measures nothing, so a changing height cannot move it.
-  if (crowdMounted) crowdMounted.then(() => {
-    // The card may have closed, or another player may have taken its place —
-    // repositioning THAT card against THIS anchor would be the bug.
-    if (el.style.display === 'block' && _pcOpenFor === name && anchor.isConnected)
-      pcPosition(el, anchor);
-  });
+  pcPosition(el, anchor);
 }
 
 function pcBackdrop(on) {
@@ -565,6 +578,7 @@ function pcHide(force) {
   if (!force && typeof crowdBusy === 'function' && crowdBusy()) return;
   clearTimeout(_pcTimer);
   _pcOpenFor = null;
+  _pcAnchor = null;
   const el = document.getElementById(PCARD_ID);
   if (el) el.style.display = 'none';
   pcBackdrop(false);
@@ -643,7 +657,11 @@ function pcInit() {
     clearTimeout(_pcTimer);
     // long enough to cross the gap between the card and the panel on the way to
     // reading it — a card this tall is meant to be scrolled, not glanced at
-    _pcTimer = setTimeout(pcHide, 300);
+    // Wrapped: pcHide's first argument stopped being decorative when the vote
+    // lock landed. Modern browsers pass nothing, but Gecko historically handed
+    // the callback a lateness number — truthy, and it would force a close in
+    // the middle of a vote. Same discipline as the ✕ and the backdrop.
+    _pcTimer = setTimeout(() => pcHide(), 300);
   });
   // Touch, on the pitch: HOLD a player to open his card.
   //

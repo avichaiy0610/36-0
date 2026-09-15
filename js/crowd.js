@@ -50,9 +50,65 @@ function crowdShelf(pos) {
 /* ── ה-slug של עמוד השחקן ──────────────────────────────────────────────────
    מוגדר כאן, במקום אחד, כי שלושה מקומות צריכים אותו: הקישור מכרטיס השחקן,
    מסך 👥 שחקנים, ו-scripts/player_pages.js שמייצר את התיקיות עצמן. שני
-   מימושים שנפרדים = כל קישור באתר מוביל ל-404. */
+   מימושים שנפרדים = כל קישור באתר מוביל ל-404.
+
+   וזה בדיוק מה שקרה. הגרסה הראשונה כאן נבנתה מ-crowdKey, ש**מאחד** גרשים
+   ו**שומר** אותם; slugFor ב-scripts/player_pages.js **מוחק** אותם. מדידה מול
+   הדאטה: 475 מתוך 2,724 השמות ייצרו slug אחר, וכל אחד מהם 404 קשה — שמות
+   ישראלים רוויים ב-ג' ז' צ' ץ', אז זה הרוב הסביר ולא הזנב. ויקטור פאצ'ו, מתי
+   חג'ג', יניב אברג'יל, ז'אן טלסניקוב, עמיר תורג'מן.
+
+   הכיוון של התיקון אינו שרירותי: 946 כתובות /player/ כבר יושבות ב-sitemap.xml
+   החי והוגשו לגוגל, והן מנוע הרכישה של האתר. הכתובות של המחולל הן הקנוניות,
+   והפונקציה הזאת היא שזזה אליהן — לא להפך.
+
+   מה שכתוב כאן הוא **תעתיק עצמאי** של slugFor(clean(name)) מ-player_pages.js:
+     clean   = String(s || '').replace(/‎|‏/g, '').trim()
+     slugFor = clean(name).replace(/["'׳״.()]/g, '').replace(/\s+/g, '-')
+
+   ובמפורש: לא להרכיב אותו מ-crowdKey, גם לא כקיצור נחמד. crowdKey מקפל גם
+   גרש מתולתל ו-backtick לגרש ישר, ואז שלב המחיקה מעלים אותם — בעוד המחולל
+   שומר אותם בכתובת כי מעולם לא איחד. זה נכשל על שני שמות אמיתיים:
+     ג`בייר בושנאק   דרך crowdKey: גבייר-בושנאק     בדיסק: ג`בייר-בושנאק
+     אנדרה ז’ראלדש   דרך crowdKey: אנדרה-זראלדש     בדיסק: אנדרה-ז’ראלדש
+   וכך גם כל "שיפור" אחר: איחוד גרשים, או הסרת כל טווח סימני הכיווניות במקום
+   LRM ו-RLM בלבד. scripts/sim/crowd_harness.js נועל את זה מול שמות אמיתיים.
+
+   crowdKey לא זז. הוא מפתח המסד וחייב להמשיך להסכים עם pcNorm, כולל הגרש.
+   ששתי הפונקציות ייפרדו כאן זה הדבר הנכון: מפתח וכתובת הם שני דברים. */
 function crowdSlug(name) {
-  return crowdKey(name).replace(/\s+/g, '-');
+  return String(name || '')
+    .replace(/‎|‏/g, '')     // = clean(): LRM ו-RLM בלבד
+    .trim()
+    .replace(/["'׳״.()]/g, '')   // גרש, גרשיים, מרכאות, נקודה, סוגריים
+    .replace(/\s+/g, '-');
+}
+
+/* ── למי בכלל יש עמוד ──────────────────────────────────────────────────────
+   scripts/player_pages.js מייצר עמוד רק לשחקן עם שתי עונות ומעלה, וזה לא
+   שרירותי: קומיט 2f599397 הוציא את העמודים הדקים החוצה אחרי ש-AdSense פסל
+   אותם כ-low value content. עמוד לשחקן של עונה אחת היה מחזיר בדיוק את זה, על
+   ערוץ הרכישה היחיד של האתר.
+
+   מדידה: 2,724 שחקנים, 1,533 זכאים, ולכולם כבר יש עמוד. כלומר אין מה למלא —
+   צריך רק לא לקשר ל-1,191 שמלכתחילה לא אמורים לקבל עמוד. שחקן בלי עמוד פשוט
+   לא מקבל קישור, וזה בלתי נראה.
+
+   הבנייה עצלה בתוך הפונקציה בכוונה: SQUADS לא קיים בהקשר של ה-harness, והפניה
+   אליו ברמה העליונה הייתה הורגת אותו. */
+let _crowdSeasons = null;
+function crowdHasPage(name) {
+  if (typeof SQUADS === 'undefined') return false;
+  if (!_crowdSeasons) {
+    _crowdSeasons = new Map();
+    SQUADS.forEach(sq => sq.players.forEach(p => {
+      const k = crowdKey(p.name);
+      if (!_crowdSeasons.has(k)) _crowdSeasons.set(k, new Set());
+      _crowdSeasons.get(k).add(sq.season);
+    }));
+  }
+  const s = _crowdSeasons.get(crowdKey(name));
+  return !!s && s.size >= 2;
 }
 
 /* ── מצב התצוגה ────────────────────────────────────────────────────────────
@@ -87,6 +143,7 @@ function crowdDisplay(row) {
    תקוע על "טוען". כל פונקציה מחזירה ערך שמיש גם כשהכל נופל. */
 const _crowdCache = new Map();
 const _crowdMine  = new Map();
+const _crowdNotesC = new Map();
 
 function crowdCacheKey(key, season) { return key + '|' + season; }
 
@@ -159,14 +216,24 @@ async function crowdSubmitNote(key, season, body) {
   } catch (e) { return { ok: false, error: 'network' }; }
 }
 
+// ממוטמן מאותה סיבה בדיוק כמו crowdFetch: הכרטיס נפתח בהובר, לפעמים כמה פעמים
+// בשנייה, וקריאה לא ממוטמנת כאן הייתה בקשה שלישית בכל ריחוף. שורה מאושרת
+// משתנה רק דרך מודרציה של הבעלים, אז מטמון לכל חיי העמוד בטוח בדיוק כמו שם.
 async function crowdNotes(key, season) {
+  const ck = crowdCacheKey(key, season);
+  if (_crowdNotesC.has(ck)) return _crowdNotesC.get(ck);
   try {
-    const { data } = await _supabase
+    const { data, error } = await _supabase
       .from('player_notes')
       .select('id, body')
       .eq('player_key', key).eq('season', season).eq('status', 'approved')
       .order('created_at', { ascending: false }).limit(3);
-    return data || [];
+    // בלי לפרק את error, בקשה שנכשלה ורשימה ריקה באמת נראות זהות — ואז ריחוף
+    // אחד בזמן ניתוק היה מקפיא "אין שורות" לכל חיי העמוד. רק הצלחה נשמרת.
+    if (error) return [];
+    const notes = data || [];
+    _crowdNotesC.set(ck, notes);
+    return notes;
   } catch (e) { return []; }
 }
 
@@ -198,14 +265,20 @@ function crowdBlock(name, season, pos, official) {
   //
   // ה-href עובר encodeURIComponent בלבד ולא crowdEsc: הוא כבר בתוך מרכאות
   // כפולות ו-encodeURIComponent מקודד גרשים ממילא.
+  //
+  // והקישור נפלט רק למי שיש לו עמוד. קישור שנפתח בלשונית חדשה אל 404 גרוע
+  // מלא לקשר בכלל, ול-vercel.json אין SPA fallback שיתפוס אותו.
+  const full = crowdHasPage(name)
+    ? `<a class="crowd-full" href="/player/${encodeURIComponent(crowdSlug(name))}/"
+         target="_blank" rel="noopener">העמוד המלא של ${crowdEsc(name)} ↗</a>`
+    : '';
   return `
     <div class="pc-sec crowd" data-key="${crowdEsc(crowdKey(name))}"
          data-name="${crowdEsc(name)}"
          data-season="${crowdEsc(season)}" data-pos="${crowdEsc(pos || '')}"
          data-official="${off || ''}">
       <div class="crowd-body"><div class="crowd-line">טוען…</div></div>
-      <a class="crowd-full" href="/player/${encodeURIComponent(crowdSlug(name))}/"
-         target="_blank" rel="noopener">העמוד המלא של ${crowdEsc(name)} ↗</a>
+      ${full}
     </div>`;
 }
 
@@ -265,6 +338,21 @@ function crowdRenderLine(box, row, mine, notes) {
   // ו-!mine הוא מה שמונע לולאה: אחרי הצבעה שנשמרה ושליפה מחדש שנכשלה, השורה
   // חוזרת למצב ריק — ובלי התנאי הזה הפאנל היה נפתח שוב מיד מעל "אתה 86".
   if (d.state === 'empty' && !mine) crowdOpenPanel(box, row, mine);
+
+  crowdResized(box);
+}
+
+/* ── "הגובה שלי השתנה" ─────────────────────────────────────────────────────
+   הווידג'ט משנה את גובה הכרטיס המארח בארבעה רגעים: כשהשלד מתמלא, כשנפתחת
+   החוגה אוטומטית במצב הריק, כשהמשתמש לוחץ "דרג" בעצמו, וכשהפאנל מתקפל בחזרה
+   לשורה אחרי הצבעה. המארח הוא זה שיודע למדוד ולמקם — הווידג'ט רק אומר מתי.
+
+   אירוע ולא callback, כי המארח כבר מחזיק את האלמנט ואין למי להירשם מראש:
+   הבלוק נוצר כמחרוזת HTML בתוך pcHTML, הרבה לפני שיש ממנו אלמנט. */
+function crowdResized(box) {
+  try {
+    box.dispatchEvent(new CustomEvent('crowd:resize', { bubbles: true }));
+  } catch (e) { /* דפדפן בלי CustomEvent — הכרטיס פשוט לא ימוקם מחדש */ }
 }
 
 /* ── נעילת הסגירה ──────────────────────────────────────────────────────────
@@ -278,6 +366,7 @@ function crowdRenderLine(box, row, mine, notes) {
    שהנעילה שלו תקועה הוא כרטיס שאי אפשר לסגור אותו יותר. לכן כל ענף כאן נשען
    על ה-DOM החי: החוגה שעודה מחוברת, והשדה שבאמת מחזיק את הפוקוס. */
 let _crowdDragEl = null;
+let _crowdKeyDial = null;
 let _crowdGuarded = false;
 
 function crowdBusy() {
@@ -285,13 +374,25 @@ function crowdBusy() {
   if (_crowdDragEl) return true;
   // הקלדה לא צריכה דגל משלה: השאלה "האם הסמן בשדה" נשאלת ישירות מהדפדפן,
   // ותשובה שמגיעה מ-activeElement לא יכולה להישאר תקועה אחרי שהפוקוס עבר.
-  //
-  // החוגה נכללת כאן בגלל המקלדת: Tab אליה וחיצים משנים את הערך בלי שום
-  // pointerdown, כלומר בלי _crowdDragEl — ו-mouseleave אחד היה סוגר את הכרטיס
-  // באמצע הצבעה, בדיוק מה שהנעילה קיימת כדי למנוע.
   const a = document.activeElement;
-  return !!(a && a.classList && a.isConnected &&
-            (a.classList.contains('crowd-note') || a.classList.contains('crowd-dial')));
+  if (!a || !a.classList || !a.isConnected) return false;
+  if (a.classList.contains('crowd-note')) return true;
+  // החוגה היא המקרה העדין. קליק עליה נותן לה פוקוס, והפוקוס שורד את ה-pointerup
+  // — אז "activeElement הוא חוגה" נשאר true הרבה אחרי שהיד ירדה, והכרטיס הופך
+  // לכזה ש-mouseleave וגלילה כבר לא סוגרים. בכרטיס מעוגן אין ✕ ואין רקע (שניהם
+  // נבנים רק בענף המודאלי), כלומר Escape הוא היציאה היחידה, והגלילה החסומה
+  // משאירה אותו נעוץ בקואורדינטות שהעמוד כבר גלל מהן.
+  //
+  // אבל אי אפשר פשוט להוציא את החוגה מכאן: Tab אליה וחיצים משנים את הדירוג בלי
+  // שום pointerdown, ו-mouseleave אחד היה סוגר את הכרטיס באמצע הצבעה במקלדת.
+  // מה שצריך זה המודאליות, לא הפוקוס — ולכן היא נמדדת כאן ולא נשאלת מהדפדפן:
+  // :focus-visible הוא היוריסטיקה של ה-UA, ו-matches() על סלקטור לא נתמך זורק
+  // SyntaxError — מתוך crowdBusy הוא היה מבעבע ל-pcHide, הפונקציה האחת שאסור
+  // לה לזרוק, והופך קוסמטיקה שמתקנת את עצמה לכרטיס שאי אפשר לסגור בכלל.
+  //
+  // a === _crowdKeyDial דורש שהדגל, הפוקוס החי והחיבור ל-DOM יסכימו בו זמנית,
+  // ולכן הוא לא יכול להיתקע גם כש-blur לא נורה על אלמנט שהוסר.
+  return a === _crowdKeyDial;
 }
 
 // רשתות הביטחון, פעם אחת על החלון: אירוע השחרור לא בהכרח חוזר לחוגה שהתחילה
@@ -345,10 +446,15 @@ function crowdOpenPanel(box, row, mine) {
   let tag = (mine && shelf.some(t => t.key === mine.tag)) ? mine.tag : null;
 
   // הכרטיס לא נסגר כל עוד יד על החוגה
-  dial.addEventListener('pointerdown', () => { _crowdDragEl = dial; });
+  dial.addEventListener('pointerdown', () => { _crowdDragEl = dial; _crowdKeyDial = null; });
   ['pointerup', 'pointercancel'].forEach(t =>
     dial.addEventListener(t, () => { _crowdDragEl = null; }));
   dial.addEventListener('input', () => { out.textContent = dial.value; });
+  // מקלדת: החל מהקשה ראשונה על החוגה היא נעולה, ועד שהפוקוס עוזב אותה.
+  // pointerdown מכבה את זה במפורש — עכבר הוא לא מקלדת, ומשם _crowdDragEl
+  // לוקח אחריות, לאורך הגרירה בלבד.
+  dial.addEventListener('keydown', () => { _crowdKeyDial = dial; });
+  dial.addEventListener('blur',    () => { if (_crowdKeyDial === dial) _crowdKeyDial = null; });
 
   box.querySelectorAll('.crowd-chip').forEach(chip => {
     chip.addEventListener('click', () => {
@@ -367,10 +473,12 @@ function crowdOpenPanel(box, row, mine) {
     note.addEventListener('keydown', ev => { if (ev.key === 'Escape') note.blur(); });
     const send = box.querySelector('.crowd-note-send');
     send.addEventListener('click', async () => {
-      const body = note.value.trim();
-      if (body.length < 2 || send.disabled) return;
+      // text ולא body — body כאן הוא המעטפת שכותבים אליה, ובפונקציה שכל עניינה
+      // "לכתוב ל-body ולא ל-box" שם כפול הוא מלכודת
+      const text = note.value.trim();
+      if (text.length < 2 || send.disabled) return;
       send.disabled = true;               // לחיצה כפולה = שתי בקשות על אותה שורה
-      const r = await crowdSubmitNote(key, season, body);
+      const r = await crowdSubmitNote(key, season, text);
       const hint = box.querySelector('.crowd-note-hint');
       // הפאנל עלול להיסגר ולהתרנדר מחדש בזמן ההמתנה
       if (!hint || !hint.isConnected) return;
@@ -387,6 +495,7 @@ function crowdOpenPanel(box, row, mine) {
     if (done.disabled) return;
     done.disabled = true;
     _crowdDragEl = null;
+    _crowdKeyDial = null;   // נשמר — אין יותר הצבעה באוויר שצריך להגן עליה
     const ovr = parseInt(dial.value, 10);
     const r = await crowdVote(key, season, ovr, tag);
     if (!r.ok) {
@@ -401,4 +510,9 @@ function crowdOpenPanel(box, row, mine) {
     const [fresh, notes] = await Promise.all([crowdFetch(key, season), crowdNotes(key, season)]);
     if (box.isConnected) crowdRenderLine(box, fresh, { ovr, tag }, notes);
   });
+
+  // הפאנל גבוה מהשורה בכ-150px, וזה נכון גם כשהמשתמש לחץ "דרג" בעצמו — לא רק
+  // במצב הריק שנפתח לבד. בלי האות הזה כרטיס מעוגן בשורה התחתונה מקבל חוגה
+  // שנחתכת מתחת לקצה המסך, שזה בדיוק הבאג שהמדידה מחדש נועדה לפתור.
+  crowdResized(box);
 }
