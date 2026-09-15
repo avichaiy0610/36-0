@@ -169,3 +169,173 @@ async function crowdNotes(key, season) {
     return data || [];
   } catch (e) { return []; }
 }
+
+/* ── הווידג'ט ──────────────────────────────────────────────────────────────
+   במצב סרק זו שורה אחת. היא מתרחבת רק כשנוגעים בה. הכרטיס כבר צפוף — פאנל
+   שנפתח מעצמו היה הופך אותו למסך. */
+function crowdEsc(s) {
+  return String(s ?? '').replace(/[&<>"]/g, c =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+}
+
+// הווידג'ט נכנס לכרטיס כשלד ריק ומתמלא אסינכרונית. pcHTML הוא סינכרוני
+// ולא ניתן להמתין בתוכו בלי להקפיא את פתיחת הכרטיס.
+function crowdBlock(name, season, pos, official) {
+  if (!name || !season) return '';
+  // הדירוג הרשמי נכתב כמספר ולא כמחרוזת חופשית: הוא נקרא בחזרה עם parseInt,
+  // ומה שלא מספר אין לו מה לעשות בתוך תכונה ב-HTML.
+  const off = parseInt(official, 10);
+  return `
+    <div class="pc-sec crowd" data-key="${crowdEsc(crowdKey(name))}"
+         data-season="${crowdEsc(season)}" data-pos="${crowdEsc(pos || '')}"
+         data-official="${off || ''}">
+      <div class="crowd-line">טוען…</div>
+    </div>`;
+}
+
+// נקרא אחרי שה-innerHTML הוצב. מוצא כל סקשן crowd שעוד לא מולא וממלא אותו.
+async function crowdMount(root) {
+  const box = (root || document).querySelector('.crowd:not([data-ready])');
+  if (!box) return;
+  box.setAttribute('data-ready', '1');
+  const key = box.dataset.key, season = box.dataset.season;
+  const [row, mine] = await Promise.all([crowdFetch(key, season), crowdFetchMine(key, season)]);
+  // הכרטיס עלול להיסגר בזמן ההמתנה — כתיבה לאלמנט מנותק היא בזבוז שקט
+  if (!box.isConnected) return;
+  crowdRenderLine(box, row, mine);
+}
+
+function crowdRenderLine(box, row, mine) {
+  const d = crowdDisplay(row);
+  const tag = row && row.tag_top ? CROWD_TAGS[row.tag_top] : null;
+  let txt;
+  if (d.state === 'shown') {
+    txt = `דירוג קהל ממוצע <span dir="ltr">${d.avg}</span> <span class="crowd-n">⟨${d.n}⟩</span>` +
+          (tag ? ` · <span class="crowd-tag">${tag.icon} ${crowdEsc(tag.label)}</span>` : '');
+  } else if (d.state === 'few') {
+    txt = `עוד ${d.left} הצבעות והדירוג ייחשף`;
+  } else {
+    txt = 'עוד אין דעות עליו — תהיה הראשון';
+  }
+  const you = mine ? `<span class="crowd-you">אתה <span dir="ltr">${mine.ovr}</span></span> · ` : '';
+  box.innerHTML = `<div class="crowd-line">${you}${txt}<button class="crowd-open" type="button">${
+    mine ? 'שנה' : 'דרג'}</button></div>`;
+  box.querySelector('.crowd-open').addEventListener('click', () => crowdOpenPanel(box, row, mine));
+}
+
+/* ── נעילת הסגירה ──────────────────────────────────────────────────────────
+   pcHide נקרא ב-mouseleave של הכרטיס. גרירת החוגה יוצאת מגבולות הכרטיס דרך
+   קבע, ובלי הנעילה הזאת הכרטיס נסגר באמצע ההצבעה — זה לא ליטוש, בלעדיה
+   הפאנל שבור בשימוש רגיל בדסקטופ.
+
+   הנעילה נמדדת מחדש בכל שאלה ולא נשמרת כאמת בפני עצמה. דגל בוליאני שנקבע
+   ב-pointerdown ומתנקה ב-pointerup נתקע על true ברגע ש-pointerup לא מגיע —
+   שחרור מחוץ לחלון, מעבר לחלון אחר באמצע גרירה, פאנל שהוחלף תוך כדי — וכרטיס
+   שהנעילה שלו תקועה הוא כרטיס שאי אפשר לסגור אותו יותר. לכן כל ענף כאן נשען
+   על ה-DOM החי: החוגה שעודה מחוברת, והשדה שבאמת מחזיק את הפוקוס. */
+let _crowdDragEl = null;
+let _crowdGuarded = false;
+
+function crowdBusy() {
+  if (_crowdDragEl && !_crowdDragEl.isConnected) _crowdDragEl = null;   // הפאנל הוחלף מתחת ליד
+  if (_crowdDragEl) return true;
+  // הקלדה לא צריכה דגל משלה: השאלה "האם הסמן בשדה" נשאלת ישירות מהדפדפן,
+  // ותשובה שמגיעה מ-activeElement לא יכולה להישאר תקועה אחרי שהפוקוס עבר.
+  const a = document.activeElement;
+  return !!(a && a.classList && a.classList.contains('crowd-note') && a.isConnected);
+}
+
+// רשתות הביטחון, פעם אחת על החלון: אירוע השחרור לא בהכרח חוזר לחוגה שהתחילה
+// את הגרירה, ולפעמים לא מגיע אליה בכלל.
+function crowdBusyGuards() {
+  if (_crowdGuarded) return;
+  _crowdGuarded = true;
+  ['pointerup', 'pointercancel'].forEach(t =>
+    window.addEventListener(t, () => { _crowdDragEl = null; }, true));
+  window.addEventListener('blur', () => { _crowdDragEl = null; });
+}
+
+function crowdOpenPanel(box, row, mine) {
+  const key = box.dataset.key, season = box.dataset.season;
+  const pos = box.dataset.pos;
+  const official = parseInt(box.dataset.official, 10) || 75;
+  const start = mine ? mine.ovr : official;
+  const shelf = crowdShelf(pos);
+  const signedIn = typeof getCurrentUser === 'function' && !!getCurrentUser();
+  crowdBusyGuards();
+
+  box.innerHTML = `
+    <div class="crowd-panel">
+      <div class="crowd-dial-row">
+        <input class="crowd-dial" type="range" min="40" max="99" value="${start}"
+               aria-label="הדירוג שלך">
+        <output class="crowd-val" dir="ltr">${start}</output>
+      </div>
+      <div class="crowd-dial-note">${row && row.avg_trimmed
+        ? `הקהל יושב על <span dir="ltr">${row.avg_trimmed}</span>` : 'אתה הראשון'}</div>
+      <div class="crowd-shelf">${shelf.map(t =>
+        `<button class="crowd-chip${mine && mine.tag === t.key ? ' on' : ''}"
+                 type="button" data-tag="${crowdEsc(t.key)}">${t.icon} ${crowdEsc(t.label)}</button>`).join('')}</div>
+      ${signedIn
+        ? `<div class="crowd-note-row">
+             <input class="crowd-note" maxlength="80" placeholder="שורה אחת עליו (עד 80 תווים)">
+             <button class="crowd-note-send" type="button">שלח</button>
+           </div>
+           <div class="crowd-note-hint">שורות מוצגות רק אחרי אישור.</div>`
+        : `<div class="crowd-note-hint">התחבר כדי לכתוב עליו שורה.</div>`}
+      <button class="crowd-done" type="button">שמור</button>
+    </div>`;
+
+  const dial = box.querySelector('.crowd-dial');
+  const out  = box.querySelector('.crowd-val');
+  let tag = mine ? mine.tag : null;
+
+  // הכרטיס לא נסגר כל עוד יד על החוגה
+  dial.addEventListener('pointerdown', () => { _crowdDragEl = dial; });
+  ['pointerup', 'pointercancel'].forEach(t =>
+    dial.addEventListener(t, () => { _crowdDragEl = null; }));
+  dial.addEventListener('input', () => { out.textContent = dial.value; });
+
+  box.querySelectorAll('.crowd-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const k = chip.dataset.tag;
+      tag = (tag === k) ? null : k;      // נגיעה שנייה מבטלת
+      box.querySelectorAll('.crowd-chip').forEach(c =>
+        c.classList.toggle('on', c.dataset.tag === tag));
+    });
+  });
+
+  const note = box.querySelector('.crowd-note');
+  if (note) {
+    // Escape בתוך השדה חייב קודם כל לשחרר אותו. כל עוד הסמן כאן הנעילה פעילה
+    // ו-pcHide חוזר בלי לסגור — כלומר המקש שתפקידו לסגור את הכרטיס היה נבלע.
+    // השחרור קורה כאן, לפני שהאירוע מבעבע ל-document ומגיע ל-pcHide.
+    note.addEventListener('keydown', ev => { if (ev.key === 'Escape') note.blur(); });
+    box.querySelector('.crowd-note-send').addEventListener('click', async () => {
+      const body = note.value.trim();
+      if (body.length < 2) return;
+      const r = await crowdSubmitNote(key, season, body);
+      const hint = box.querySelector('.crowd-note-hint');
+      // הפאנל עלול להיסגר ולהתרנדר מחדש בזמן ההמתנה
+      if (!hint || !hint.isConnected) return;
+      hint.textContent = r.ok ? 'נשלח — יוצג אחרי אישור.'
+                        : r.error === 'already today' ? 'כבר כתבת עליו היום.'
+                        : 'לא נשלח, נסה שוב.';
+      if (r.ok) { note.value = ''; note.disabled = true; }
+    });
+  }
+
+  box.querySelector('.crowd-done').addEventListener('click', async () => {
+    _crowdDragEl = null;
+    const ovr = parseInt(dial.value, 10);
+    const r = await crowdVote(key, season, ovr, tag);
+    if (!r.ok) {
+      const dn = box.querySelector('.crowd-dial-note');
+      if (dn) dn.textContent =
+        r.error === 'rate limited' ? 'יותר מדי הצבעות בשעה האחרונה.' : 'לא נשמר, נסה שוב.';
+      return;
+    }
+    const fresh = await crowdFetch(key, season);
+    if (box.isConnected) crowdRenderLine(box, fresh, { ovr, tag });
+  });
+}
