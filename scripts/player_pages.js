@@ -345,9 +345,7 @@ function pageHtml(TEAMS, e) {
   if (F.europe) sentences.push(F.europe.k === 'abroad'
     ? `הוא שיחק בליגת האלופות מחוץ לישראל, ב${esc(F.europe.c)} בעונת ${esc(F.europe.s)}.`
     : `הוא היה בסגל ש${esc(nm(F.europe.c) || F.europe.c)} העלתה לשלב הבתים של ליגת האלופות ב-${esc(F.europe.s)}.`);
-  if (F.attrs) sentences.push(
-    `בשש התכונות שהמשחק גוזר מהנתונים הוא חזק במיוחד ב${ATTR_NAME[F.attrTop]} (${F.attrs[F.attrTop]}) ` +
-    `וחלש יחסית ב${ATTR_NAME[F.attrLow]} (${F.attrs[F.attrLow]}).`);
+  // התכונות לא נכנסות לטקסט. ראה את ההערה מעל attrHtml.
   if (F.duos.length) {
     // "הצמד ... היה עם X, Y ו-Z" is three men in a word that means two. One
     // sentence names the longest partnership; a second, only when there is more
@@ -360,15 +358,30 @@ function pageHtml(TEAMS, e) {
   }
   const intro = `<p class="lede">${sentences.join(' ')}</p>`;
 
-  /* ── the six attributes, as the game computes them ──────────────────────── */
-  // Bars, not a bare row of numbers: the shape of a player is the point, and a
-  // reader takes it in at a glance instead of comparing six two-digit numbers.
-  const attrHtml = !F.attrs ? '' :
-    `<h2>שש התכונות של ${esc(name)}</h2>
-    <p class="note">ממוצע כל עונותיו בליגה. התכונות נגזרות מהנתונים עצמם — בעיטה מטבלת המבקיעים, מסירה מטבלת הבישולים, הגנה ממה שספגה קבוצתו ופיזיות מאורך הקריירה. <a href="/methodology.html">איך זה מחושב</a>.</p>
-    <table class="attrs">${ATTR_KEYS.map(k =>
-      `<tr><td class="ak">${ATTR_NAME[k]}</td><td class="av">${F.attrs[k]}</td>` +
-      `<td class="ab"><i style="width:${Math.max(2, Math.min(100, F.attrs[k]))}%"></i></td></tr>`).join('')}</table>`;
+  /* ── the six attributes: REMOVED from the public pages, deliberately ──────
+     Owner's call, 2026-09-15: "לא להציג נתונים כאלה בדף השחקן!!! הם לא מבוססים
+     וכבר רואים שהם מחורבנים."
+
+     He is right, and the numbers say so themselves. js/attr-data.js was built
+     offline by scripts/build_attrs.js, and its own coverage was measured when
+     it shipped: LEAGUE_SCORERS names 152 players and LEAGUE_ASSISTS 101, about
+     2% of the 9,568 player-seasons. For the other 98% the attribute is inferred
+     from the CLUB's goals and defensive record that season — so a defender at a
+     leaky club reads as a bad defender whatever he did. And מהירות has no
+     source at all; it was flagged ATTR_EST from the day it was written.
+
+     That is defensible inside a game where every player is judged by the same
+     rough rule. It is not defensible on a public page about a named, living
+     footballer, next to real scoring tables, where a reader takes it as a fact
+     about the man.
+
+     These pages print things that actually happened. The replacement for this
+     section is the crowd's rating — people who watched him play — and that is
+     what the crowd-ratings widget below the career table is for.
+
+     The data itself is untouched: ATTR_DATA still drives בונה כדורגלן and the
+     in-game card. Only the public claim is withdrawn. */
+  const attrHtml = '';
 
   // key, how many times, and the seasons it happened in — the evidence is the
   // reason the row is worth printing at all.
