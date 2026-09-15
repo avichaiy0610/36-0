@@ -219,3 +219,25 @@
   font-size: 11px; color: var(--dim); text-decoration: none;
 }
 .crowd-full:hover { color: var(--accent); }
+
+/* ═══ הצעת צמדים ═══════════════════════════════════════════════════════════
+   יושב בתוך סקשן "צמדים" שכבר קיים בכרטיס, ולכן שקט יותר מווידג'ט הדירוג:
+   הוא תוספת לרשימה שכבר שם, לא כותרת משלו. */
+.cd-wrap { margin-top: 6px; }
+.cd-open {
+  background: none; border: 1px dashed var(--border); border-radius: 999px;
+  color: var(--dim); padding: 2px 10px;
+  font: inherit; font-size: 11px; cursor: pointer;
+}
+.cd-open:hover { border-color: var(--accent); color: var(--accent); }
+.cd-note { font-size: 11px; color: var(--dim); margin-bottom: 4px; }
+.cd-shelf { display: flex; flex-wrap: wrap; gap: 4px; }
+.cd-chip {
+  background: var(--surface); color: var(--dim);
+  border: 1px solid var(--border); border-radius: 999px;
+  padding: 3px 8px; font: inherit; font-size: 11px; cursor: pointer;
+}
+.cd-chip:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+/* הוצע כבר — נשאר על המסך כדי שלא תציע שוב, ושקט כדי שלא יתחרה בשאר. */
+.cd-chip.done { border-color: var(--accent); color: var(--accent); opacity: .6; cursor: default; }
+.cd-chip:disabled { cursor: default; }

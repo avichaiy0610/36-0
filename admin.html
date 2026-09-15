@@ -321,6 +321,24 @@
           <thead><tr><th>שחקן</th><th>עונה</th><th>מאת</th><th>הטקסט</th><th></th></tr></thead>
           <tbody id="ca-notes"><tr><td colspan="5">טוען…</td></tr></tbody>
         </table>
+
+      <h3 style="margin-top:26px">🔗 צמדים שהוצעו</h3>
+      <p style="color:#8b949e;font-size:13px">
+        הקהל מציע זוג בלבד — הדרגה מחושבת מהעונות והאליפויות המשותפות, ומוצגת
+        כאן לפני האישור. צמד הוא שינוי איזון: הוא שווה 0.4 עד 1.0 נקודות דירוג.
+        "קבל" רושם אישור בלבד; המשחק משתנה רק כשמריצים
+        <code>node scripts/apply_crowd_duos.js --write</code> ואז
+        <code>node scripts/build_chem_js.js</code>.
+      </p>
+      <div class="ca-wrap">
+      <table class="us-table">
+        <thead><tr>
+          <th>הצמד</th><th>הציעו</th><th>עונות יחד</th><th>אליפויות</th>
+          <th>מה יקרה</th><th></th>
+        </tr></thead>
+        <tbody id="cda-rows"><tr><td colspan="6">טוען…</td></tr></tbody>
+      </table>
+      </div>
       </div>
     </div>
 
@@ -370,7 +388,10 @@
      are the same functions the player card files the votes under — a second
      copy here would miss exactly the names with an apostrophe. -->
 <script src="js/crowd.js?v=8fb571a9"></script>
-<script src="js/crowd-admin.js?v=7c3c820e"></script>
+<!-- chem-data: כדי שתור הצמדים ידע מה כבר במשחק. league_tables כבר
+       נטען מעליו ומשמש לחישוב האליפויות המשותפות. -->
+  <script src="js/chem-data.js?v=e5cdbc98"></script>
+  <script src="js/crowd-admin.js?v=217cacd8"></script>
 <script>
 const statusEl = document.getElementById('status');
 let overrides = {};   // key -> value currently stored in site_texts
@@ -785,6 +806,7 @@ async function init() {
     // is_site_admin() — שני שערים שנפרדים הם סקשן שנפתח למי שהשני חוסם.
     document.getElementById('ca-section').style.display = 'block';
     caInit();
+    cdaInit();
   }
 }
 

@@ -439,7 +439,11 @@ function pcHTML(player, slotPos, squad) {
     </div>` : '';
 
   /* who he played with */
-  const partners = (!classic && f.partners.length) ? `
+  // הסקשן נפתח גם כשאין לו אף צמד, ובלבד שיש למי להציע: שחקן בלי צמדים הוא
+  // בדיוק מי שהכי צריך שמישהו יציע לו אחד, ולפני זה לא הייתה לו שורה בכרטיס
+  // שאפשר לתלות עליה את ההצעה.
+  const duoSuggest = (!classic && typeof cdBlock === 'function') ? cdBlock(name) : '';
+  const partners = (!classic && (f.partners.length || duoSuggest)) ? `
     <div class="pc-sec">
       <div class="pc-sec-t">צמדים</div>
       <div class="pc-duos">${f.partners.slice(0, 6).map(p => {
@@ -448,7 +452,8 @@ function pcHTML(player, slotPos, squad) {
         return `<span class="pc-duo chem-t${p.tier}${inXI ? ' pc-duo-on' : ''}" title="${p.seasons} עונות יחד${p.titles ? ` · ${p.titles} אליפויות` : ''}">${
           inXI ? '🔗 ' : ''}${pcEsc(p.who)}${showR ? ` +${chemFmt(chemBonusOf(p.tier))}` : ''}</span>`;
       }).join('')}</div>
-      <div class="pc-note">חבר לצמד באותה הרכב = בונוס לשניהם.</div>
+      ${f.partners.length ? '<div class="pc-note">חבר לצמד באותה הרכב = בונוס לשניהם.</div>' : ''}
+      ${duoSuggest}
     </div>` : '';
 
   /* what the data cannot know */
@@ -531,6 +536,7 @@ function pcShow(player, anchor, slotPos, modal, squad) {
   // mobile. Nothing is awaited: the widget reports back through crowd:resize,
   // which also covers the height changes that have no promise behind them.
   if (typeof crowdMount === 'function') crowdMount(el);
+  if (typeof cdMount === 'function') cdMount(el);
   _pcOpenFor = name;
   // Set before the branch so a modal cannot leave a previous anchor standing.
   _pcAnchor = modal ? null : anchor;

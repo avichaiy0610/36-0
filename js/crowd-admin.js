@@ -257,3 +257,92 @@ function caInit() {
   caLoadRatings();
   caLoadNotes();
 }
+
+/* ═══ 🔗 צמדים שהוצעו ══════════════════════════════════════════════════════
+   הקהל מציע זוג בלבד. הדרגה שהצמד יקבל מחושבת כאן מהדאטה — אותו כלל בדיוק
+   כמו scripts/build_chemistry.js:109 — ומוצגת לפני האישור ולא אחריו, כי צמד
+   הוא שינוי איזון: CHEM_BONUS נותן 0.4 עד 1.0 נקודות דירוג. */
+
+// זהה ל-tierOf ב-scripts/build_chemistry.js. אם אחד מהם זז, השני חייב לזוז.
+function cdTierOf(seasons, titles) {
+  if (seasons >= 7 || (seasons >= 4 && titles >= 2)) return 3;
+  if (seasons >= 4 || (seasons >= 3 && titles >= 1)) return 2;
+  return 1;
+}
+
+// עונות משותפות ואליפויות משותפות, מ-SQUADS ומהטבלאות. אותה ספירה שהמחולל
+// עושה — צמד נספר פעם אחת לעונה גם אם שיחקו בשני מועדונים.
+let _cdaIdx = null;
+function cdaIndex() {
+  if (_cdaIdx) return _cdaIdx;
+  _cdaIdx = new Map();
+  SQUADS.forEach(sq => sq.players.forEach(p => {
+    const k = crowdKey(p.name);
+    if (!_cdaIdx.has(k)) _cdaIdx.set(k, []);
+    _cdaIdx.get(k).push({ id: sq.id, teamId: sq.teamId, season: sq.season });
+  }));
+  return _cdaIdx;
+}
+
+function cdaTogether(keyA, keyB) {
+  const idx = cdaIndex();
+  const a = idx.get(keyA) || [], b = idx.get(keyB) || [];
+  const bIds = new Set(b.map(x => x.id));
+  const seasons = new Set(), rows = [];
+  a.forEach(x => { if (bIds.has(x.id)) { seasons.add(x.season); rows.push(x); } });
+  let titles = 0;
+  if (typeof LEAGUE_TABLES !== 'undefined') {
+    rows.forEach(r => {
+      const t = LEAGUE_TABLES[r.season];
+      if (t && t[0] && t[0].teamId === r.teamId) titles++;
+    });
+  }
+  return { seasons: seasons.size, titles, rows };
+}
+
+async function cdaLoad() {
+  const body = document.getElementById('cda-rows');
+  if (!body) return;
+  body.innerHTML = '<tr><td colspan="6">טוען…</td></tr>';
+  const { data, error } = await _supabase.rpc('duo_queue');
+  if (error) { body.innerHTML = '<tr><td colspan="6">שגיאה בטעינה</td></tr>'; return; }
+  if (!data || !data.length) { body.innerHTML = '<tr><td colspan="6">אין הצעות פתוחות.</td></tr>'; return; }
+
+  const shipped = (typeof CHEM_PAIRS !== 'undefined') ? CHEM_PAIRS : {};
+  body.innerHTML = data.map(r => {
+    const [ka, kb] = r.pair_key.split('|');
+    const t = cdaTogether(ka, kb);
+    const already = !!shipped[r.pair_key];
+    const tier = t.seasons ? cdTierOf(t.seasons, t.titles) : 0;
+    return `
+    <tr data-key="${caEsc(r.pair_key)}">
+      <td>${caEsc(ka)} + ${caEsc(kb)}</td>
+      <td dir="ltr">${r.n}</td>
+      <td dir="ltr">${t.seasons}</td>
+      <td dir="ltr">${t.titles}</td>
+      <td>${already ? '<span class="ca-alt">כבר במשחק</span>'
+           : !t.seasons ? '<span class="ca-alt">לא חלקו סגל</span>'
+           : `דרגה ${tier} · +${(({1:0.4,2:0.7,3:1})[tier])}`}</td>
+      <td class="ca-act">
+        <button class="cda-ok" type="button"${already || !t.seasons ? ' disabled' : ''}>✅</button>
+        <button class="cda-no" type="button">🗑️</button></td>
+    </tr>`;
+  }).join('');
+}
+
+function cdaInit() {
+  const body = document.getElementById('cda-rows');
+  if (!body) return;
+  body.addEventListener('click', async ev => {
+    const ok = ev.target.classList.contains('cda-ok');
+    const no = ev.target.classList.contains('cda-no');
+    if (!ok && !no) return;
+    const tr = ev.target.closest('tr');
+    if (!tr || !tr.dataset.key) return;
+    caBusy(tr, true);
+    const r = await caCall(ok ? 'approve_duo' : 'dismiss_duo',
+                           { p_pair_key: tr.dataset.key });
+    if (r.ok) tr.remove(); else caFailed(tr, r.msg);
+  });
+  cdaLoad();
+}
