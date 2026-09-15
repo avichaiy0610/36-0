@@ -1,0 +1,49 @@
+name: crowd-telegram
+
+# תור דירוגי הקהל והצמדים, לטלגרם.
+#
+# הדשבורד דורש לפתוח מחשב, ומאז מיגרציית הפרסום הקצב שבו הבעלים מסתכל בו הוא
+# גם הקצב שבו הפיצ'ר נחשף לציבור — שום דירוג לא מוצג לפני שפורסם. אז הכלי
+# שמזיז את זה הוא שלוש לחיצות בטלפון.
+#
+# הלחיצות עצמן לא נקראות כאן: הן מגיעות ל-supabase/functions/challenge-tap,
+# אותו וובהוק שכבר עונה להקשות של האתגרים. בוט אחד יכול להחזיק וובהוק אחד,
+# ולכן זו אותה פונקציה עם ניתוב לפי קידומת — ולא פונקציה שנייה.
+#
+# פעמיים ביום בכוונה. הפריטים לא בורחים לשום מקום, והודעה שמגיעה כל שעה היא
+# הודעה שמפסיקים לקרוא.
+on:
+  schedule:
+    - cron: '0 7,17 * * *'
+  workflow_dispatch:
+    inputs:
+      dry:
+        description: 'יבש — מראה מה היה נשלח, בלי לשלוח ובלי לכתוב כלום'
+        type: boolean
+        default: false
+      batch:
+        description: 'כמה פריטים לשלוח בהרצה (ברירת מחדל 6)'
+        type: string
+        default: ''
+
+# חולק קבוצה עם challenge-engine: שניהם מדברים עם אותו בוט, ושתי הרצות
+# במקביל היו מייצרות שתי סדרות הודעות שמתערבבות בצ'אט אחד.
+concurrency:
+  group: challenge-engine
+  cancel-in-progress: false
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node scripts/crowd_telegram.js ${{ inputs.dry && '--dry' || '' }}
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          TELEGRAM_CHAL_BOT_TOKEN: ${{ secrets.TELEGRAM_CHAL_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          CROWD_TG_BATCH: ${{ inputs.batch }}

@@ -128,7 +128,7 @@ async function caLoadRatings() {
   body.innerHTML = rows.map(r => `
     <tr data-key="${caEsc(r.player_key)}" data-season="${caEsc(r.season)}"
         data-old="${r.official}" data-new="${r.avg_trimmed}">
-      <td>${caEsc(r.player_key)}</td>
+      <td><button class="ca-peek" type="button" title="הצג כל הצבעה בנפרד">▾</button> ${caEsc(r.player_key)}</td>
       <td dir="ltr">${caEsc(r.season)}</td>
       <td>${r.teams.map(caTeamName).map(caEsc).join(' · ')}</td>
       <td dir="ltr"${r.ovrs.length > 1
@@ -198,7 +198,9 @@ async function caCall(fn, args) {
     const { data, error } = await _supabase.rpc(fn, args);
     if (error) return { ok: false, msg: error.message };
     if (data && data.error) return { ok: false, msg: data.error };
-    return { ok: true };
+    // data מוחזר כדי ש-set_vote_excluded יוכל להחזיר את ההצבר החדש באותה
+    // נסיעה. שאר הקוראים מתעלמים ממנו.
+    return { ok: true, data };
   } catch (e) { return { ok: false, msg: 'network' }; }
 }
 
@@ -210,9 +212,15 @@ function caInit() {
     const ok  = ev.target.classList.contains('ca-ok');
     const no  = ev.target.classList.contains('ca-no');
     const pub = ev.target.classList.contains('ca-pub');
-    if (!ok && !no && !pub) return;
+    const peek = ev.target.classList.contains('ca-peek');
+    if (!ok && !no && !pub && !peek) return;
     const tr = ev.target.closest('tr');
     if (!tr || !tr.dataset.key) return;
+
+    // פתיחת פירוט ההצבעות לא משנה כלום ולא נוגעת בשרת מעבר לקריאה, אז היא
+    // לא נועלת את השורה ולא עוברת דרך caBusy.
+    if (peek) { cdaOpenVotes(tr); return; }
+
     caBusy(tr, true);
     const args = { p_player_key: tr.dataset.key, p_season: tr.dataset.season };
 
@@ -345,4 +353,73 @@ function cdaInit() {
     if (r.ok) tr.remove(); else caFailed(tr, r.msg);
   });
   cdaLoad();
+}
+
+/* ═══ פירוט ההצבעות ════════════════════════════════════════════════════════
+   הממוצע הגזום מפיל קיצוניות של התפלגות. הוא לא יודע לזהות כוונה: חמישה
+   מצביעים כנים ואחד שבא לקבור שחקן מייצרים התפלגות שהגזימה לא מבדילה מפיזור
+   רגיל. סטטיסטיקה לא רואה מניע — בן אדם שמסתכל על ההצבעות כן.
+
+   מה שמוצג: המספר, התגית, האם המצביע היה מחובר, ומתי. **לא מי.** לשפוט הצבעה
+   לא דורש שם, ומהרגע שיש פנים הבעלים מודרר אנשים ולא נתונים. */
+
+function cdaVoteRow(v) {
+  const tag = v.tag && CROWD_TAGS[v.tag];
+  return `<div class="cv-row${v.excluded ? ' out' : ''}" data-id="${v.id}">
+    <span class="cv-ovr" dir="ltr">${v.ovr}</span>
+    <span class="cv-tag">${tag ? tag.icon + ' ' + caEsc(tag.label) : '—'}</span>
+    <span class="cv-who">${v.is_user ? '👤 מחובר' : 'אנונימי'}</span>
+    <button class="cv-x" type="button" title="${v.excluded
+      ? 'הוחרגה מהממוצע — לחץ כדי להחזיר' : 'הוצא מהממוצע'}">${v.excluded ? '↩' : '⊘'}</button>
+  </div>`;
+}
+
+async function cdaOpenVotes(tr) {
+  const key = tr.dataset.key, season = tr.dataset.season;
+  let box = tr.nextElementSibling;
+  if (box && box.classList.contains('cv-wrap')) { box.remove(); return; }  // toggle
+
+  box = document.createElement('tr');
+  box.className = 'cv-wrap';
+  box.innerHTML = `<td colspan="9"><div class="cv-body">טוען…</div></td>`;
+  tr.after(box);
+
+  const { data, error } = await _supabase.rpc('crowd_votes_for',
+    { p_player_key: key, p_season: season });
+  const body = box.querySelector('.cv-body');
+  if (error) { body.textContent = 'crowd_votes_for: ' + error.message; return; }
+  if (!data || !data.length) { body.textContent = 'אין הצבעות.'; return; }
+
+  body.innerHTML = `<div class="cv-head">${data.length} הצבעות · ` +
+    `${data.filter(v => !v.excluded).length} נספרות</div>` +
+    data.map(cdaVoteRow).join('');
+
+  body.addEventListener('click', async ev => {
+    if (!ev.target.classList.contains('cv-x')) return;
+    const row = ev.target.closest('.cv-row');
+    const on = !row.classList.contains('out');
+    ev.target.disabled = true;
+    const r = await caCall('set_vote_excluded', { p_id: +row.dataset.id, p_on: on });
+    ev.target.disabled = false;
+    if (!r.ok) { ev.target.title = r.msg || 'לא נשמר'; return; }
+    row.classList.toggle('out', on);
+    ev.target.textContent = on ? '↩' : '⊘';
+    ev.target.title = on ? 'הוחרגה מהממוצע — לחץ כדי להחזיר' : 'הוצא מהממוצע';
+    // השרת מחזיר את ההצבר החדש, אז השורה שמעל מתעדכנת מאותה נסיעה ולא
+    // מטעינה מחדש של כל התור.
+    const d = r.data || {};
+    if (d.avg != null) {
+      const cells = tr.querySelectorAll('td');
+      cells[4].textContent = d.avg;
+      cells[6].textContent = d.n;
+      const official = +tr.dataset.old;
+      const gap = d.avg - official;
+      cells[5].textContent = (gap > 0 ? '+' : '') + gap;
+      cells[5].className = gap > 0 ? 'ca-up' : 'ca-down';
+      tr.dataset.new = d.avg;
+    }
+    const head = body.querySelector('.cv-head');
+    if (head) head.textContent = `${data.length} הצבעות · ` +
+      `${body.querySelectorAll('.cv-row:not(.out)').length} נספרות`;
+  });
 }
