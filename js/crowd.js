@@ -272,11 +272,15 @@ function crowdBlock(name, season, pos, official) {
     ? `<a class="crowd-full" href="/player/${encodeURIComponent(crowdSlug(name))}/"
          target="_blank" rel="noopener">העמוד המלא של ${crowdEsc(name)} ↗</a>`
     : '';
+  // הכותרת יושבת מחוץ ל-.crowd-body יחד עם הקישור, מאותה סיבה — היא צריכה
+  // לשרוד כל רינדור מחדש. וגם: במציאות, תגיות ובליגה כולן נושאות pc-sec-t,
+  // וסקשן בלי כותרת נקרא כשארית של הסקשן שמעליו ולא כדבר בפני עצמו.
   return `
     <div class="pc-sec crowd" data-key="${crowdEsc(crowdKey(name))}"
          data-name="${crowdEsc(name)}"
          data-season="${crowdEsc(season)}" data-pos="${crowdEsc(pos || '')}"
          data-official="${off || ''}">
+      <div class="pc-sec-t">דירוג הקהל</div>
       <div class="crowd-body"><div class="crowd-line">טוען…</div></div>
       ${full}
     </div>`;
@@ -311,10 +315,16 @@ function crowdRenderLine(box, row, mine, notes) {
   const name = box.dataset.name || '';
   let txt;
   if (d.state === 'shown') {
-    txt = `דירוג קהל ממוצע <span dir="ltr">${d.avg}</span> <span class="crowd-n">⟨${d.n}⟩</span>` +
+    // סוגריים רגילים ולא ⟨⟩: בגודל הזה U+27E8 נופל לגליף בצורת סוגר ופשוט
+    // נקרא "(38)", כלומר הבחירה המעוצבת מגיעה למסך כתאונה.
+    txt = `דירוג קהל ממוצע <span dir="ltr">${d.avg}</span> <span class="crowd-n">(${d.n})</span>` +
           (tag ? ` · <span class="crowd-tag">${tag.icon} ${crowdEsc(tag.label)}</span>` : '');
   } else if (d.state === 'few') {
     txt = `עוד ${d.left} הצבעות והדירוג ייחשף`;
+  } else if (mine) {
+    // "אין דעות" אחרי שאתה עצמך הצבעת הוא שקר על המסך. קורה כשההצבעה נשמרה
+    // והשליפה מחדש נכשלה — נדיר, אבל השורה סותרת את עצמה בדיוק שם.
+    txt = 'עוד אין מספיק הצבעות';
   } else {
     // בשמו, לא "עליו". זו הפנייה הראשונה שרוב השחקנים יראו במשך שבועות.
     txt = name ? `עוד אין דעות על ${crowdEsc(name)} — תהיה הראשון`
@@ -327,17 +337,20 @@ function crowdRenderLine(box, row, mine, notes) {
     ? `<div class="crowd-notes">${notes.map(nt =>
         `<div class="crowd-note-row-r">“${crowdEsc(nt.body)}”</div>`).join('')}</div>`
     : '';
-  body.innerHTML = `<div class="crowd-line">${you}${txt}<button class="crowd-open" type="button">${
-    mine ? 'שנה' : 'דרג'}</button></div>${notesHtml}`;
+  // הטקסט עטוף ב-span אחד כדי שהגלישה תקרה בתוכו. בלי זה .crowd-line הוא
+  // flex-wrap עם margin-inline-start:auto על הכפתור, ו"אתה 86 · " שנוסף
+  // בהתחלה דוחף את הכפתור לשורה משלו, נטוש משמאל — וזה המצב הרגיל של כל מי
+  // שכבר הצביע פעם, כלומר המצב הרגיל ברגע שיש לפיצ'ר משתמשים.
+  body.innerHTML = `<div class="crowd-line"><span class="crowd-sum">${you}${txt}</span>` +
+    `<button class="crowd-open" type="button">${mine ? 'שנה' : 'דרג'}</button></div>${notesHtml}`;
   body.querySelector('.crowd-open').addEventListener('click', () => crowdOpenPanel(box, row, mine));
 
-  // במצב הריק השורה לא נושאת מידע, ואין מה לקבור מתחת לפאנל — הבעיה כאן היא
-  // ההפך, להוציא הצבעה ראשונה. במצב shown הפאנל היה מסתיר מספר אמיתי, ולכן
-  // הפתיחה האוטומטית מוגבלת לריק בלבד.
-  //
-  // ו-!mine הוא מה שמונע לולאה: אחרי הצבעה שנשמרה ושליפה מחדש שנכשלה, השורה
-  // חוזרת למצב ריק — ובלי התנאי הזה הפאנל היה נפתח שוב מיד מעל "אתה 86".
-  if (d.state === 'empty' && !mine) crowdOpenPanel(box, row, mine);
+  // אין פתיחה אוטומטית. היא נוסתה ובוטלה אחרי שראו אותה בדפדפן: crowdOpenPanel
+  // כותב לאותו .crowd-body שהשורה הרגע נכתבה אליו, באותו tick — כלומר
+  // "עוד אין דעות על X — תהיה הראשון" התקיים אפס פריימים, ומה שנראה בפועל היה
+  // סליידר זהוב בלי מילה אחת שמסבירה אותו, ובלי דרך לסגור אותו חזרה. בנוסף
+  // הוא קבר את שאר הכרטיס מתחת לקיפול בנייד והקפיץ את הכרטיס ~240px מתחת
+  // לסמן בדסקטופ. השורה עם השם והכפתור היא ההזמנה.
 
   crowdResized(box);
 }

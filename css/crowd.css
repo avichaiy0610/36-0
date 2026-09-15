@@ -8,26 +8,78 @@
    כרטיס לבן, עם שדה טקסט כמעט שחור וטקסט אפור על לבן מתחת לסף הקריאות — כלומר
    בדיוק ה"חרא הלבן" מהצד השני, ובזהב שהמצב הבהיר כבר מסמן כבלתי קריא. */
 
+/* nowrap במכוון. עם flex-wrap הכפתור נופל לשורה משלו ונשאר נטוש בקצה ברגע
+   שהטקסט מתארך — וזה קורה בדיוק למי שכבר הצביע, כלומר במצב הרגיל ברגע שיש
+   לפיצ'ר משתמשים. נמדד בדפדפן, לא נוחש: ב-390px הכפתור ירד שורה גם אחרי
+   שהטקסט נעטף ב-span. בלי wrap הטקסט חייב להתכווץ ולגלוש בתוך עצמו, וזה מה
+   שצריך לקרות. */
 .crowd-line {
-  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  display: flex; align-items: center; gap: 6px; flex-wrap: nowrap;
   font-size: 12px; color: var(--dim); line-height: 1.7;
 }
+/* הטקסט הוא פריט flex אחד שמותר לו להתכווץ, כך שהגלישה קורית בתוך המשפט
+   ולא בינו לבין הכפתור. בלי זה "אתה 86 · " שנוסף למי שכבר הצביע דוחף את
+   הכפתור לשורה משלו, נטוש. */
+.crowd-sum { flex: 1 1 auto; min-width: 0; }
 .crowd-n   { opacity: .65; }
 .crowd-you { color: var(--text); font-weight: 600; }
-.crowd-tag { color: var(--text); }
+/* התגית מוסיפה הערה למספר, אז היא לא יכולה לצעוק חזק ממנו. */
+.crowd-tag { color: var(--dim); }
 
 .crowd-open {
+  flex: 0 0 auto;
   margin-inline-start: auto;
+  display: inline-flex; align-items: center; justify-content: center;
   background: var(--surface2); color: var(--dim);
   border: 1px solid var(--border); border-radius: 999px;
-  padding: 2px 10px; font: inherit; font-size: 11px; cursor: pointer;
+  padding: 2px 12px; font: inherit; font-size: 11px; cursor: pointer;
 }
 .crowd-open:hover { background: var(--hover); color: var(--text); }
+
+/* css/style.css נותן לכל button מינימום 44px גובה מתחת ל-700px — נכון, זה
+   גודל מטרה למגע. אבל pill ברוחב 41px וגובה 44px הוא עיגול שהטקסט נמחץ
+   מתוכו, וכך הכפתור הזה נראה בפועל על כל טלפון: עיגול אפור ריק שנקרא
+   כאווטאר שבור. הריפוי הוא לתת לו רוחב, לא להילחם במינימום. */
+@media (max-width: 700px) {
+  .crowd-open { padding-inline: 18px; }
+}
 
 .crowd-panel { display: flex; flex-direction: column; gap: 8px; }
 
 .crowd-dial-row { display: flex; align-items: center; gap: 10px; }
-.crowd-dial { flex: 1; accent-color: var(--accent); }
+
+/* הפס מצויר כאן ולא מושאר לדפדפן.
+   הניסיון הראשון היה accent-color בלבד, והפס הלא-מלא יצא rgb(59,59,59) —
+   כמעט שחור — גם על כרטיס לבן. גם color-scheme על הפקד לא הזיז אותו: Chrome
+   מתעלם ממנו לטובת ניטרלי קבוע ברגע ש-accent-color מוגדר. נמדד בפיקסלים,
+   לא נוחש. הדרך היחידה שהפס באמת מציית לערכת הצבעים היא לצבוע אותו בעצמנו.
+
+   אין מילוי מצטבר, וזו ויתור מודע: מילוי דורש gradient שמתעדכן מ-JS, והמספר
+   הגדול שליד החוגה כבר אומר את אותו דבר במדויק. */
+.crowd-dial {
+  flex: 1; min-width: 0;
+  -webkit-appearance: none; appearance: none;
+  background: transparent; height: 18px; cursor: pointer;
+}
+.crowd-dial::-webkit-slider-runnable-track {
+  height: 5px; border-radius: 999px; background: var(--surface2);
+  border: 1px solid var(--border);
+}
+.crowd-dial::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 15px; height: 15px; border-radius: 50%;
+  background: var(--accent); border: none; margin-top: -6px;
+}
+.crowd-dial::-moz-range-track {
+  height: 5px; border-radius: 999px; background: var(--surface2);
+  border: 1px solid var(--border);
+}
+.crowd-dial::-moz-range-thumb {
+  width: 15px; height: 15px; border-radius: 50%;
+  background: var(--accent); border: none;
+}
+.crowd-dial:focus-visible::-webkit-slider-thumb { outline: 2px solid var(--text); outline-offset: 2px; }
+.crowd-dial:focus-visible::-moz-range-thumb     { outline: 2px solid var(--text); outline-offset: 2px; }
 .crowd-val {
   min-width: 34px; text-align: center;
   font-weight: 700; font-size: 15px; color: var(--accent);
