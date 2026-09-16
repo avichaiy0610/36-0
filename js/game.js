@@ -508,7 +508,32 @@ function shuffleArr(arr) {
 }
 
 // Returns the OVR to use for a player, respecting peak mode.
+/* מאיזו עונה השחקן הזה. לאובייקט שחקן ב-SQUADS אין שדה עונה — היא תכונה של
+   הסגל — אז מחפשים את הסגל שממנו הוא הגיע: נבחר על המגרש דרך state.picks,
+   ובזמן ההגרלה דרך state.currentSquad. מוחזר null כשאין תשובה, ואז מוד הקהל
+   פשוט לא חל עליו. */
+function seasonOfPlayer(player) {
+  if (!player) return null;
+  if (typeof state !== 'undefined' && state.picks) {
+    for (const pick of state.picks) {
+      if (pick && pick.player === player && pick.squad) return pick.squad.season;
+    }
+  }
+  if (typeof state !== 'undefined' && state.currentSquad &&
+      state.currentSquad.players && state.currentSquad.players.indexOf(player) !== -1) {
+    return state.currentSquad.season;
+  }
+  return null;
+}
+
 function playerOVR(player) {
+  // מוד הקהל מחליף את דירוג העונה בזה שהקהל נתן ושהבעלים אישר. השיא לא מוחלף:
+  // הוא עובדה על הקריירה, לא דעה על עונה אחת. כבוי = crowdOvrFor מחזיר null
+  // ושום דבר כאן לא זז.
+  if (!state.peakMode && typeof crowdOvrFor === 'function') {
+    const c = crowdOvrFor(player && player.name, seasonOfPlayer(player));
+    if (c != null) return c;
+  }
   return state.peakMode ? (player.peak_ovr ?? player.ovr) : player.ovr;
 }
 
