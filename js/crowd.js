@@ -298,7 +298,7 @@ function crowdEsc(s) {
 // משתנים שם ורק שם: הקישור "העמוד המלא" הוא קישור לעצמו, והכותרת הפנימית
 // כפולה כי לעמוד כבר יש <h2> משלו. המארח הוא שיודע את זה, לא הווידג'ט.
 // scripts/player_pages.js הוא הקורא היחיד עם הדגל הזה.
-function crowdBlock(name, season, pos, official, opts) {
+function crowdBlock(name, season, pos, official, opts, peak) {
   if (!name || !season) return '';
   const selfPage = !!(opts && opts.selfPage);
   // הדירוג הרשמי נכתב כמספר ולא כמחרוזת חופשית: הוא נקרא בחזרה עם parseInt,
@@ -328,7 +328,7 @@ function crowdBlock(name, season, pos, official, opts) {
     <div class="pc-sec crowd" data-key="${crowdEsc(crowdKey(name))}"
          data-name="${crowdEsc(name)}"
          data-season="${crowdEsc(season)}" data-pos="${crowdEsc(pos || '')}"
-         data-official="${off || ''}">
+         data-official="${off || ''}" data-peak="${parseInt(peak, 10) || off || ''}">
       ${selfPage ? '' : '<div class="pc-sec-t">דירוג הקהל</div>'}
       <div class="crowd-body"><div class="crowd-line">טוען…</div></div>
       ${full}
@@ -508,19 +508,41 @@ function crowdBusyGuards() {
   window.addEventListener('blur', () => { _crowdDragEl = null; });
 }
 
-function crowdOpenPanel(box, row, mine) {
+/* ── עונה או שיא ───────────────────────────────────────────────────────────
+   שני מספרים שונים, ושניהם קיימים במשחק: ovr הוא מה שהוא היה באותה שנה,
+   peak_ovr הוא מה שהוא היה במיטבו — ומוד השיא משחק את כל הליגה לפי השני.
+   קהל שיכול לדבר רק על עונות בודדות לא יכול לומר כלום על המספר שחצי מהמודים
+   באמת משתמשים בו.
+
+   השיא מתויק תחת season='peak'. זה נראה כמו טריק והוא ההפך: season הוא כבר
+   החצי השני של המפתח בכל מקום — מפתח ראשי, GROUP BY של ההצבר, גייט הפרסום,
+   מתג ההחרגה, תור הדשבורד — אז ערך נפרד זורם דרך כולם נכון ובלי שינוי, ו-
+   'peak' לא יכול להתנגש בעונה אמיתית שתמיד נראית YYYY/YY. */
+function crowdPanelTarget(box) { return box.dataset.target || box.dataset.season; }
+
+function crowdOpenPanel(box, row, mine, targetOverride) {
   // אותה מעטפת פנימית כמו ב-crowdRenderLine, ומאותה סיבה
   const body = box.querySelector('.crowd-body') || box;
-  const key = box.dataset.key, season = box.dataset.season;
+  const key = box.dataset.key;
+  if (targetOverride) box.dataset.target = targetOverride;
+  const season = crowdPanelTarget(box);
+  const isPeak = season === 'peak';
   const pos = box.dataset.pos;
-  const official = parseInt(box.dataset.official, 10) || 75;
+  // השיא מתחיל מ-peak_ovr ולא מדירוג העונה — שני מספרים, שתי נקודות פתיחה.
+  const official = parseInt(isPeak ? box.dataset.peak : box.dataset.official, 10)
+                   || parseInt(box.dataset.official, 10) || 75;
   const start = mine ? mine.ovr : official;
   const shelf = crowdShelf(pos);
   const signedIn = typeof getCurrentUser === 'function' && !!getCurrentUser();
   crowdBusyGuards();
 
+  const seasonLabel = box.dataset.season;
   body.innerHTML = `
     <div class="crowd-panel">
+      <div class="crowd-switch">
+        <button class="crowd-sw${isPeak ? '' : ' on'}" type="button" data-t="season">${crowdEsc(seasonLabel)}</button>
+        <button class="crowd-sw${isPeak ? ' on' : ''}" type="button" data-t="peak">בשיא שלו</button>
+      </div>
       <div class="crowd-dial-row">
         <input class="crowd-dial" type="range" min="40" max="99" value="${start}"
                aria-label="הדירוג שלך">
@@ -541,6 +563,19 @@ function crowdOpenPanel(box, row, mine) {
         : `<div class="crowd-note-hint">התחבר כדי לכתוב עליו שורה.</div>`}
       <button class="crowd-done" type="button">שמור</button>
     </div>`;
+
+  // המעבר בין עונה לשיא טוען את ההצבעה של היעד השני — הן נפרדות לגמרי, ולכן
+  // אי אפשר לצייר מחדש עם אותם נתונים.
+  body.querySelectorAll('.crowd-sw').forEach(sw => {
+    sw.addEventListener('click', async () => {
+      const t = sw.dataset.t === 'peak' ? 'peak' : box.dataset.season;
+      if (t === crowdPanelTarget(box)) return;
+      body.querySelectorAll('.crowd-sw').forEach(x => { x.disabled = true; });
+      const [r2, m2] = await Promise.all([crowdFetch(key, t), crowdFetchMine(key, t)]);
+      if (!box.isConnected) return;
+      crowdOpenPanel(box, r2, m2, t);
+    });
+  });
 
   const dial = box.querySelector('.crowd-dial');
   const out  = box.querySelector('.crowd-val');
@@ -611,7 +646,10 @@ function crowdOpenPanel(box, row, mine) {
     }
     // השורות המאושרות נשלפות שוב יחד עם ההצבר: crowdRenderLine מצייר רק את מה
     // שנמסר לה, ובלי זה הצבעה אחת הייתה מוחקת מהמסך שורות שכבר אושרו.
-    const [fresh, notes] = await Promise.all([crowdFetch(key, season), crowdNotes(key, season)]);
+    // השורה המכווצת מספרת תמיד על עונת הכרטיס, גם אם הרגע דירגת את השיא.
+    delete box.dataset.target;
+    const cardSeason = box.dataset.season;
+    const [fresh, notes] = await Promise.all([crowdFetch(key, cardSeason), crowdNotes(key, cardSeason)]);
     if (box.isConnected) crowdRenderLine(box, fresh, { ovr, tag }, notes);
   });
 

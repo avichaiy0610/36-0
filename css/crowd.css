@@ -278,3 +278,16 @@
    "דרג" הבטיח מספר, והתגיות שמאחורי הכפתור היו בלתי נראות בלי ללחוץ. */
 .crowd-hint { display: block; font-size: 10.5px; color: var(--dim); opacity: .8; margin-top: 2px; }
 .crowd-shelf-t { margin-top: 2px; }
+
+/* המתג בין עונה לשיא. שני מספרים שונים, ולכן שתי הצבעות נפרדות — לא שני
+   מצבי תצוגה של אותו דבר. */
+.crowd-switch { display: flex; gap: 4px; }
+.crowd-sw {
+  flex: 1 1 0; min-width: 0;
+  background: var(--surface); color: var(--dim);
+  border: 1px solid var(--border); border-radius: 6px;
+  padding: 3px 6px; font: inherit; font-size: 11px; cursor: pointer;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.crowd-sw.on { border-color: var(--accent); color: var(--accent); }
+.crowd-sw:disabled { opacity: .5; cursor: default; }

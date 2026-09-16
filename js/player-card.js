@@ -474,7 +474,10 @@ function pcHTML(player, slotPos, squad) {
     ? crowdBlock(name, squad.season,
                  typeof player === 'object' && typeof playerPositions === 'function'
                    ? playerPositions(player)[0] : null,
-                 typeof player === 'object' ? (player.ovr || 0) : 0)
+                 typeof player === 'object' ? (player.ovr || 0) : 0,
+                 null,
+                 // peak_ovr — המספר שמוד השיא משחק לפיו, ודירוג נפרד משלו
+                 typeof player === 'object' ? (player.peak_ovr || player.ovr || 0) : 0)
     : '';
 
   // Directly under the official rating in the head, because the two numbers

@@ -172,7 +172,8 @@ async function caLoadRatings() {
         data-old="${r.official}" data-new="${r.avg_trimmed}"
         data-waiting="${r.gap === null ? 1 : 0}">
       <td>${caEsc(r.player_key)}</td>
-      <td dir="ltr">${caEsc(r.season)}</td>
+      <td${r.season === 'peak' ? '' : ' dir="ltr"'}>${
+        r.season === 'peak' ? '<span class="ca-peak">שיא הקריירה</span>' : caEsc(r.season)}</td>
       <td>${r.teams.map(caTeamName).map(caEsc).join(' · ')}</td>
       <td dir="ltr"${r.ovrs.length > 1
         ? ` title="אותו שם-עונה יושב ביותר מסגל אחד, עם דירוג שונה. המוצג הוא הקרוב ביותר לדירוג הקהל — כלומר הפער הקטן ביותר האפשרי."` : ''}>${r.official}${r.ovrs.length > 1
