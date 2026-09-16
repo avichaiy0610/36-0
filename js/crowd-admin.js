@@ -78,8 +78,12 @@ function caStatus(msg) {
    שבה שתיים. */
 let _caSkip = '';
 function caCount() {
-  const n = document.querySelectorAll('#ca-rows tr[data-key]').length;
-  caStatus(`${n} מחלוקות` + (_caSkip ? ` · ${_caSkip}` : ''));
+  const rows = document.querySelectorAll('#ca-rows tr[data-key]');
+  let waiting = 0;
+  rows.forEach(tr => { if (tr.dataset.waiting === '1') waiting++; });
+  const n = rows.length - waiting;
+  caStatus(`${n} מחלוקות` + (waiting ? ` · ${waiting} ממתינות להצבעות` : '') +
+           (_caSkip ? ` · ${_caSkip}` : ''));
 }
 
 async function caLoadRatings() {
@@ -102,7 +106,17 @@ async function caLoadRatings() {
     // להרבה שורות, המפתח שההצבעות מתויקות תחתיו הפסיק להסכים עם SQUADS, וזה
     // באג שנראה בדיוק כמו "אין מחלוקות".
     if (!rec) { missing++; return null; }
-    if (r.avg_trimmed == null) return null;   // פחות מ-5 הצבעות: אין דירוג קהל
+
+    // שורה בלי דירוג קהל — פחות מחמש הצבעות נספרות — נשארת בתור ולא נופלת.
+    // היא לא ניתנת לאישור, וזה בסדר: היא שם כדי שתדע שמישהו הצביע. תור שריק
+    // כשאין מספיק הצבעות נראה זהה לתור שבור, ובשבועות הראשונים זה המצב הרגיל.
+    if (r.avg_trimmed == null) {
+      return Object.assign({}, r, {
+        official: caOfficial(rec.ovrs, rec.ovrs[0]), gap: null,
+        ovrs: rec.ovrs, teams: rec.teams, weight: -1,
+      });
+    }
+
     const official = caOfficial(rec.ovrs, r.avg_trimmed);
     const gap = r.avg_trimmed - official;
     if (Math.abs(gap) < CA_MIN_GAP) { small++; return null; }
@@ -127,7 +141,8 @@ async function caLoadRatings() {
   // לצידו כדי שיהיה ברור שהמספר לא יחיד.
   body.innerHTML = rows.map(r => `
     <tr data-key="${caEsc(r.player_key)}" data-season="${caEsc(r.season)}"
-        data-old="${r.official}" data-new="${r.avg_trimmed}">
+        data-old="${r.official}" data-new="${r.avg_trimmed}"
+        data-waiting="${r.gap === null ? 1 : 0}">
       <td>${caEsc(r.player_key)}</td>
       <td dir="ltr">${caEsc(r.season)}</td>
       <td>${r.teams.map(caTeamName).map(caEsc).join(' · ')}</td>
@@ -135,14 +150,17 @@ async function caLoadRatings() {
         ? ` title="אותו שם-עונה יושב ביותר מסגל אחד, עם דירוג שונה. המוצג הוא הקרוב ביותר לדירוג הקהל — כלומר הפער הקטן ביותר האפשרי."` : ''}>${r.official}${r.ovrs.length > 1
         ? ` <span class="ca-alt">(${r.ovrs.filter(o => o !== r.official)
              .sort((a, b) => b - a).join('/')})</span>` : ''}</td>
-      <td dir="ltr">${r.avg_trimmed}</td>
-      <td dir="ltr" class="${r.gap > 0 ? 'ca-up' : 'ca-down'}">${r.gap > 0 ? '+' : ''}${r.gap}</td>
+      <td dir="ltr">${r.gap === null ? '—' : r.avg_trimmed}</td>
+      <td dir="ltr" class="${r.gap === null ? 'ca-alt' : r.gap > 0 ? 'ca-up' : 'ca-down'}">${
+        r.gap === null ? `פחות מ-${CROWD_MIN_VOTES}` : (r.gap > 0 ? '+' : '') + r.gap}</td>
       <td><button class="ca-peek" type="button" dir="ltr" title="הצג כל הצבעה בנפרד">${r.n} ▾</button></td>
       <td>${caTagCell(r.tag_top, r.tag_top_n)}</td>
-      <td class="ca-act"><button class="ca-pub${r.published ? ' on' : ''}" type="button"
-            title="${r.published ? 'מוצג לציבור — לחץ כדי להסתיר' : 'מוסתר — לחץ כדי להציג לציבור'}"
+      <td class="ca-act"><button class="ca-pub${r.published ? ' on' : ''}" type="button"${
+            r.gap === null ? ' disabled' : ''}
+            title="${r.gap === null ? 'אין מספיק הצבעות נספרות'
+              : r.published ? 'מוצג לציבור — לחץ כדי להסתיר' : 'מוסתר — לחץ כדי להציג לציבור'}"
             >${r.published ? '👁' : '🚫'}</button>
-          <button class="ca-ok" type="button" title="קבל את הדירוג לדאטה">✅</button>
+          <button class="ca-ok" type="button"${r.gap === null ? ' disabled title="אין מספיק הצבעות נספרות"' : ' title="קבל את הדירוג לדאטה"'}>✅</button>
           <button class="ca-no" type="button" title="הורד מהתור">🗑️</button></td>
     </tr>`).join('');
   caCount();
