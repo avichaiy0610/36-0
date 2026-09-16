@@ -42,6 +42,12 @@ function chemKey(a, b) { return [chemNorm(a), chemNorm(b)].sort().join('|'); }
 
 // [tier, seasons, titles] for a pair, or null
 function chemPair(a, b) {
+  // מוד הקהל: שכבה נפרדת שמוסיפה צמדים ומבטלת צמדים, ולעולם לא נוגעת
+  // ב-chemistry_duos.csv. כבויה = undefined, וממשיכים לרשימה הרגילה.
+  if (typeof crowdDuoFor === 'function') {
+    const c = crowdDuoFor(a, b);
+    if (c !== undefined) return c;          // null = הקהל ביטל את הצמד הזה
+  }
   if (typeof CHEM_PAIRS === 'undefined') return null;
   return CHEM_PAIRS[chemKey(a, b)] || null;
 }
