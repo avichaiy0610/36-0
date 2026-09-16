@@ -349,7 +349,7 @@ async function cdaLoad() {
     <tr data-key="${caEsc(r.pair_key)}" data-drop="${isDrop ? 1 : 0}">
       <td>${isDrop ? '<span class="cda-drop">להוריד</span>' : '<span class="cda-add">להוסיף</span>'} ${
         caEsc(ka)} + ${caEsc(kb)}</td>
-      <td dir="ltr">${r.n}</td>
+      <td><button class="cda-peek" type="button" dir="ltr" title="מי הציע">${r.n} ▾</button></td>
       <td dir="ltr">${t.seasons}</td>
       <td dir="ltr">${t.titles}</td>
       <td>${isDrop
@@ -366,12 +366,36 @@ async function cdaLoad() {
   }).join('');
 }
 
+/* מי הציע את הצמד. אותו דפוס כמו פירוט ההצבעות, ומאותה סיבה: מונה לא מראה
+   דפוס. מי ששווה לזהות הוא מי שמציע עשרים צמדים בערב, וזה בלתי נראה בעמודה
+   שאומרת "1". */
+async function cdaOpenWho(tr) {
+  let box = tr.nextElementSibling;
+  if (box && box.classList.contains('cv-wrap')) { box.remove(); return; }
+  box = document.createElement('tr');
+  box.className = 'cv-wrap';
+  box.innerHTML = '<td colspan="6"><div class="cv-body">טוען…</div></td>';
+  tr.after(box);
+  const { data, error } = await _supabase.rpc('duo_suggesters', { p_pair_key: tr.dataset.key });
+  const b = box.querySelector('.cv-body');
+  if (error) { b.textContent = 'duo_suggesters: ' + error.message; return; }
+  if (!data || !data.length) { b.textContent = 'אין מציעים.'; return; }
+  b.innerHTML = data.map(d =>
+    `<div class="cv-row"><span class="cv-who">${d.is_user ? '👤 ' : ''}${caEsc(d.who)}</span>` +
+    `<span class="cv-tag" dir="ltr">${caEsc(String(d.created_at).slice(0, 10))}</span></div>`).join('');
+}
+
 function cdaInit() {
   const body = document.getElementById('cda-rows');
   if (!body) return;
   body.addEventListener('click', async ev => {
     const ok = ev.target.classList.contains('cda-ok');
     const no = ev.target.classList.contains('cda-no');
+    if (ev.target.classList.contains('cda-peek')) {
+      const tr = ev.target.closest('tr');
+      if (tr && tr.dataset.key) cdaOpenWho(tr);
+      return;
+    }
     if (!ok && !no) return;
     const tr = ev.target.closest('tr');
     if (!tr || !tr.dataset.key) return;
@@ -396,7 +420,7 @@ function cdaVoteRow(v) {
   return `<div class="cv-row${v.excluded ? ' out' : ''}" data-id="${v.id}">
     <span class="cv-ovr" dir="ltr">${v.ovr}</span>
     <span class="cv-tag">${tag ? tag.icon + ' ' + caEsc(tag.label) : '—'}</span>
-    <span class="cv-who">${v.is_user ? '👤 מחובר' : 'אנונימי'}</span>
+    <span class="cv-who">${v.is_user ? '👤 ' : ''}${caEsc(v.who || (v.is_user ? 'מחובר' : 'אנונימי'))}</span>
     <button class="cv-x" type="button" title="${v.excluded
       ? 'הוחרגה מהממוצע — לחץ כדי להחזיר' : 'הוצא מהממוצע'}">${v.excluded ? '↩' : '⊘'}</button>
   </div>`;

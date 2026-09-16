@@ -51,3 +51,30 @@ function crowdDuoFor(a, b) {
   if (CROWD_DUOS_OFF.indexOf(k) !== -1) return null;   // בוטל במפורש
   return CROWD_DUOS[k] || undefined;                    // נוסף, או אין דעה
 }
+
+/* ── מה שהקהל אמר, לקריאה בלבד ─────────────────────────────────────────────
+   הפונקציות למעלה מותנות במוד, כי הן משנות את המשחק. אלה שלמטה לא מותנות
+   בכלום — הן רק מספרות. הבעלים ביקש במפורש שהכרטיס יראה דירוג קהל וצמדי קהל
+   **בכל מוד**, ושרק ההשפעה תהיה מותנית: אדם שמדרג צריך לראות שדעתו נרשמה,
+   גם כשהוא משחק במשחק הרגיל. */
+
+// כל הצמדים שהקהל הוסיף לשחקן הזה, בלי קשר למוד.
+function crowdDuosOf(name) {
+  if (typeof crowdKey !== 'function') return [];
+  const me = crowdKey(name);
+  const out = [];
+  for (const k in CROWD_DUOS) {
+    const parts = k.split('|');
+    if (parts[0] === me) out.push({ who: parts[1], pair: CROWD_DUOS[k] });
+    else if (parts[1] === me) out.push({ who: parts[0], pair: CROWD_DUOS[k] });
+  }
+  return out;
+}
+
+// האם הקהל אמר שצמד קיים הוא שגוי. מוצג כסימון על הצמד ולא כהעלמה שלו:
+// במוד הרגיל הוא עדיין נספר, והכרטיס לא יכול להעמיד פנים שהוא לא שם.
+function crowdDuoCancelled(a, b) {
+  if (typeof crowdKey !== 'function') return false;
+  const x = crowdKey(a), y = crowdKey(b);
+  return CROWD_DUOS_OFF.indexOf(x < y ? x + '|' + y : y + '|' + x) !== -1;
+}

@@ -132,6 +132,13 @@
 }
 .setup-mode-card:hover { border-color: var(--accent); }
 .setup-mode-card:active { transform: scale(.99); }
+
+/* כרטיס שקיים כדי להיקרא ולא כדי להילחץ. עמום מספיק שלא ייקרא כזמין, ברור
+   מספיק שייקרא בכלל — ובלי חץ, כי אין לאן ללכת. */
+.setup-mode-card.smc-soon { opacity: .5; cursor: default; }
+.setup-mode-card.smc-soon:hover { border-color: var(--border); }
+.setup-mode-card.smc-soon:active { transform: none; }
+.smc-new.smc-new-soon { background: var(--border); color: var(--dim); }
 .smc-icon { font-size: 1.7rem; line-height: 1; }
 .smc-body { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; }
 .smc-title { font-size: 1rem; font-weight: 800; display: flex; align-items: center; gap: 6px; }

@@ -257,3 +257,10 @@
 .cd-chip.drop { border-style: dashed; }
 .cd-chip.drop:hover:not(:disabled) { border-color: #f85149; color: #f85149; }
 .cd-chip.drop.done { border-color: #f85149; color: #f85149; }
+
+/* צמדי הקהל בכרטיס. מוצגים בכל מוד ומשפיעים רק במוד הקהל, אז הם צריכים
+   להיראות כמו קבוצה משלהם ולא כמו עוד צמדים רגילים. */
+.pc-duos-crowd { margin-top: 4px; }
+.pc-duo-crowd { border-style: dashed !important; }
+/* צמד שהקהל אמר שהוא שגוי — מסומן, לא מועלם. במשחק הרגיל הוא עדיין נספר. */
+.pc-duo-off { opacity: .5; text-decoration: line-through; }
