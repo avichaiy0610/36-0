@@ -15,6 +15,34 @@
 // בהפרשים של נקודה אחת הוא תור שלא קוראים.
 const CA_MIN_GAP = 2;
 
+/* ── החלטה שאפשר לקחת בחזרה ────────────────────────────────────────────────
+   קודם אישור ודחייה היו דלת חד-כיוונית: השורה נעלמה ולא נשאר מה ללחוץ. זו
+   הצורה הלא נכונה להכרעה שנעשית בשתי שניות בטלפון — וכל שאר הפקדים בפיצ'ר
+   הזה כבר הפיכים (פרסום מתחלף, החרגת הצבעה מתחלפת). השורה נשארת עכשיו ואומרת
+   מה הוחלט. */
+const CA_DECISION = {
+  approved:  { label: 'אושר',  cls: 'ca-dec-ok' },
+  applied:   { label: 'הוחל',  cls: 'ca-dec-ok' },
+  dismissed: { label: 'נדחה',  cls: 'ca-dec-no' },
+};
+
+function caDecisionCell(decision) {
+  const d = CA_DECISION[decision];
+  if (!d) return '';
+  return `<span class="ca-dec ${d.cls}">${d.label}</span>` +
+         `<button class="ca-undo" type="button" title="בטל את ההחלטה והחזר לתור">↩</button>`;
+}
+
+// 'הוחל' פירושו שההחלטה כבר נבנתה לתוך js/crowd-overrides.js, ורק הרצה של
+// build_crowd_overrides יכולה להוציא אותה משם. אומרים את זה במקום להעמיד פנים
+// שהביטול הושלם.
+function caAfterUndo(r) {
+  if (r.data && r.data.rebuild) {
+    caStatus('בוטל. ההחלטה כבר הייתה בתוך המשחק — הרץ node scripts/build_crowd_overrides.js --write כדי להוציא אותה.');
+  }
+}
+
+
 /* ── ההצלבה מול SQUADS ──────────────────────────────────────────────────────
    המפתח נבנה עם crowdKey מ-js/crowd.js, ולא עם נרמול מקומי. ההצבעות תויקו
    תחת המפתח הזה; כל נרמול אחר יפספס בדיוק את השמות עם גרש, שהם מאות בדאטה
@@ -161,7 +189,8 @@ async function caLoadRatings() {
               : r.published ? 'מוצג לציבור — לחץ כדי להסתיר' : 'מוסתר — לחץ כדי להציג לציבור'}"
             >${r.published ? '👁' : '🚫'}</button>
           <button class="ca-ok" type="button"${r.gap === null ? ' disabled title="אין מספיק הצבעות נספרות"' : ' title="קבל את הדירוג לדאטה"'}>✅</button>
-          <button class="ca-no" type="button" title="הורד מהתור">🗑️</button></td>
+          <button class="ca-no" type="button" title="הורד מהתור">🗑️</button>
+          ${caDecisionCell(r.decision)}</td>
     </tr>`).join('');
   caCount();
 }
@@ -239,6 +268,17 @@ function caInit() {
     // לא נועלת את השורה ולא עוברת דרך caBusy.
     if (peek) { cdaOpenVotes(tr); return; }
 
+    if (ev.target.classList.contains('ca-undo')) {
+      caBusy(tr, true);
+      const u = await caCall('undo_rating', args);
+      caBusy(tr, false);
+      if (!u.ok) return caFailed(tr, u.msg);
+      tr.querySelectorAll('.ca-dec, .ca-undo').forEach(x => x.remove());
+      caAfterUndo(u);
+      caCount();
+      return;
+    }
+
     caBusy(tr, true);
     const args = { p_player_key: tr.dataset.key, p_season: tr.dataset.season };
 
@@ -262,7 +302,13 @@ function caInit() {
       ? await caCall('approve_rating',
           Object.assign({ p_old: +tr.dataset.old, p_new: +tr.dataset.new }, args))
       : await caCall('dismiss_rating', args);
-    if (r.ok) { tr.remove(); caCount(); } else caFailed(tr, r.msg);
+    caBusy(tr, false);
+    if (!r.ok) return caFailed(tr, r.msg);
+    // השורה נשארת ומספרת מה הוחלט, במקום להיעלם בלי דרך חזרה.
+    const cell = tr.querySelector('.ca-act');
+    cell.querySelectorAll('.ca-dec, .ca-undo').forEach(x => x.remove());
+    cell.insertAdjacentHTML('beforeend', caDecisionCell(ok ? 'approved' : 'dismissed'));
+    caCount();
   });
 
   document.getElementById('ca-notes').addEventListener('click', async ev => {
@@ -361,7 +407,8 @@ async function cdaLoad() {
       <td class="ca-act">
         <button class="cda-ok" type="button"${
           (isDrop ? !already : (already || !t.seasons)) ? ' disabled' : ''}>✅</button>
-        <button class="cda-no" type="button">🗑️</button></td>
+        <button class="cda-no" type="button">🗑️</button>
+        ${caDecisionCell(r.decision)}</td>
     </tr>`;
   }).join('');
 }
@@ -396,13 +443,28 @@ function cdaInit() {
       if (tr && tr.dataset.key) cdaOpenWho(tr);
       return;
     }
+    if (ev.target.classList.contains('ca-undo')) {
+      const tr = ev.target.closest('tr');
+      if (!tr || !tr.dataset.key) return;
+      caBusy(tr, true);
+      const u = await caCall('undo_duo', { p_pair_key: tr.dataset.key });
+      caBusy(tr, false);
+      if (!u.ok) return caFailed(tr, u.msg);
+      tr.querySelectorAll('.ca-dec, .ca-undo').forEach(x => x.remove());
+      caAfterUndo(u);
+      return;
+    }
     if (!ok && !no) return;
     const tr = ev.target.closest('tr');
     if (!tr || !tr.dataset.key) return;
     caBusy(tr, true);
     const r = await caCall(ok ? 'approve_duo' : 'dismiss_duo',
                            { p_pair_key: tr.dataset.key });
-    if (r.ok) tr.remove(); else caFailed(tr, r.msg);
+    caBusy(tr, false);
+    if (!r.ok) return caFailed(tr, r.msg);
+    const cell = tr.querySelector('.ca-act');
+    cell.querySelectorAll('.ca-dec, .ca-undo').forEach(x => x.remove());
+    cell.insertAdjacentHTML('beforeend', caDecisionCell(ok ? 'approved' : 'dismissed'));
   });
   cdaLoad();
 }

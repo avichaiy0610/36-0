@@ -156,8 +156,11 @@ async function cdSuggest(pairKey) {
    כפתור אחד במנוחה. נפתח לשורת צ'יפים רק כשמבקשים, בדיוק כמו החוגה — הכרטיס
    כבר צפוף ואסור לו לגדול בשביל משהו שרוב הפתיחות לא נוגעות בו. */
 function cdBlock(name) {
-  if (!name || !cdCandidates(name).length) return '';
+  if (!name) return '';
+  // הסקשן נפתח גם כשאין את מי להציע מההרכב: הצמדים שאושרו נשלפים אסינכרונית
+  // ונכנסים ל-.cd-approved, ושדה החיפוש פותח את כל הליגה ממילא.
   return `<div class="cd-wrap" data-name="${crowdEsc(name)}">` +
+         `<div class="cd-approved"></div>` +
          `<button class="cd-open" type="button">＋ הצע צמד</button></div>`;
 }
 
@@ -167,7 +170,30 @@ function cdMount(root) {
     if (!wrap) return;
     wrap.setAttribute('data-ready', '1');
     wrap.querySelector('.cd-open').addEventListener('click', () => cdOpen(wrap));
+    cdFillApproved(wrap);
   } catch (e) { /* הכרטיס לא נפגע */ }
+}
+
+/* צמדי הקהל בכרטיס. מוצגים בכל מוד ומשפיעים רק במוד הקהל — הבעלים ביקש
+   במפורש שמי שהצעתו התקבלה יראה את זה גם כשהוא משחק במשחק הרגיל. */
+async function cdFillApproved(wrap) {
+  const name = wrap.dataset.name;
+  const box = wrap.querySelector('.cd-approved');
+  if (!box) return;
+  const { add, off } = await cdApprovedFor(name);
+  if (!box.isConnected || (!add.length && !off.length)) return;
+
+  const effective = typeof crowdModeOn === 'function' && crowdModeOn();
+  box.innerHTML =
+    `<div class="pc-sec-t cd-approved-t">צמדי הקהל</div>` +
+    `<div class="cd-shelf">${
+      add.map(o => `<span class="cd-chip cd-chip-on">🗳 ${crowdEsc(o)}</span>`).join('') +
+      off.map(o => `<span class="cd-chip cd-chip-off">🚫 ${crowdEsc(o)}</span>`).join('')
+    }</div>` +
+    `<div class="cd-note">${effective
+      ? 'פעילים במוד הזה.'
+      : 'מה שהקהל קבע. במשחק הרגיל הם מוצגים ואינם משפיעים.'}</div>`;
+  if (typeof crowdResized === 'function') crowdResized(wrap);
 }
 
 async function cdOpen(wrap) {
@@ -236,4 +262,46 @@ async function cdOpen(wrap) {
   });
 
   if (typeof crowdResized === 'function') crowdResized(wrap);
+}
+
+/* ── מה שאושר, לתצוגה מיידית ───────────────────────────────────────────────
+   אישור בדשבורד כותב ל-duo_approvals, והכרטיס קרא צמדים רק מ-
+   js/crowd-overrides.js — קובץ סטטי שנוצר רק אחרי הרצת סקריפט וקומיט. כלומר
+   צמד שאושר היה בלתי נראה עד פריסה.
+
+   ההפרדה הנכונה, וזו שכבר הייתה לדירוגים: **תצוגה חיה מהמסד, השפעה מהקובץ
+   הסטטי.** התצוגה יכולה לאחר ולא קורה כלום; ההשפעה חייבת להיות דטרמיניסטית
+   ולעבוד אופליין, ותקלת רשת לא יכולה להזיז תוצאת משחק.
+
+   נשלף פעם אחת לטעינת עמוד. מספר הצמדים המאושרים הוא עשרות, לא אלפים. */
+let _cdApproved = null;
+async function cdApprovedPairs() {
+  if (_cdApproved) return _cdApproved;
+  _cdApproved = new Set();
+  try {
+    const { data, error } = await _supabase
+      .from('crowd_duos_public').select('pair_key').limit(2000);
+    if (!error && data) data.forEach(r => _cdApproved.add(r.pair_key));
+  } catch (e) { /* שקט, כמו כל שאר שכבת הרשת כאן */ }
+  return _cdApproved;
+}
+
+// הצמדים שאושרו לשחקן הזה: המוסיפים בלבד, כי הורדה מסומנת על הצמד הקיים.
+// הדרגה מחושבת כאן מאותו כלל שהמחולל משתמש בו — העונות והאליפויות חיות
+// ב-SQUADS ובטבלאות, לא במסד.
+async function cdApprovedFor(name) {
+  const set = await cdApprovedPairs();
+  if (!set.size) return { add: [], off: [] };
+  const me = crowdKey(name);
+  const add = [], off = [];
+  set.forEach(k => {
+    const drop = k.charAt(0) === '-';
+    const bare = drop ? k.slice(1) : k;
+    const p = bare.split('|');
+    if (p.length !== 2) return;
+    const other = p[0] === me ? p[1] : p[1] === me ? p[0] : null;
+    if (!other) return;
+    (drop ? off : add).push(other);
+  });
+  return { add, off };
 }

@@ -171,6 +171,14 @@
     .ca-down { color: #f85149; font-weight: 800; }
     .ca-act button { background: #21262d; border: 1px solid #30363d; border-radius: 7px; color: #e6edf3; font-size: 14px; padding: 3px 8px; cursor: pointer; }
     .ca-act button:disabled { opacity: .45; cursor: default; }
+    /* ההחלטה נשארת על השורה. אישור ודחייה היו דלת חד-כיוונית — השורה נעלמה
+       ולא נשאר מה ללחוץ — וזו הצורה הלא נכונה להכרעה של שתי שניות בטלפון. */
+    .ca-dec { font-size: 11px; font-weight: 700; margin-inline-start: 6px; }
+    .ca-dec-ok { color: #3fb950; }
+    .ca-dec-no { color: #f85149; }
+    .ca-undo { background: none; border: 0; color: #8b949e; cursor: pointer;
+               font-size: 14px; padding: 0 4px; }
+    .ca-undo:hover { color: #e6edf3; }
     /* פרסום הוא מצב, לא פעולה חד-פעמית — הכפתור נשאר על המסך ומראה איפה
        השחקן הזה עומד: 🚫 מוסתר מהציבור, 👁 מוצג. */
     .ca-act .ca-pub.on { border-color: #2ea043; color: #3fb950; }
@@ -419,7 +427,7 @@
 <!-- chem-data: כדי שתור הצמדים ידע מה כבר במשחק. league_tables כבר
        נטען מעליו ומשמש לחישוב האליפויות המשותפות. -->
   <script src="js/chem-data.js?v=e5cdbc98"></script>
-  <script src="js/crowd-admin.js?v=ea658ae4"></script>
+  <script src="js/crowd-admin.js?v=dc7e6e13"></script>
 <script>
 const statusEl = document.getElementById('status');
 let overrides = {};   // key -> value currently stored in site_texts

@@ -444,22 +444,12 @@ function pcHTML(player, slotPos, squad) {
   // שאפשר לתלות עליה את ההצעה.
   const duoSuggest = (!classic && typeof cdBlock === 'function') ? cdBlock(name) : '';
 
-  /* צמדי הקהל — מוצגים בכל מוד, משפיעים רק במוד הקהל.
-     הבעלים ביקש את זה במפורש, וזה נכון: מי שהציע צמד צריך לראות שההצעה שלו
-     התקבלה, גם כשהוא משחק במשחק הרגיל. ההפרדה היא בין "נראה" ל"משפיע", ולא
-     בין "קיים" ל"לא קיים" — פיצ'ר שנעלם לגמרי מחוץ למוד שלו נראה כאילו לא
-     קרה כלום. */
-  const crowdDuos = (!classic && typeof crowdDuosOf === 'function') ? crowdDuosOf(name) : [];
-  const crowdDuoHtml = crowdDuos.length ? `
-      <div class="pc-duos pc-duos-crowd">${crowdDuos.slice(0, 6).map(d =>
-        `<span class="pc-duo pc-duo-crowd chem-t${d.pair[0]}" title="${d.pair[1]} עונות יחד${
-          d.pair[2] ? ` · ${d.pair[2]} אליפויות` : ''} · לפי הקהל">🗳 ${pcEsc(d.who)}</span>`
-      ).join('')}</div>
-      <div class="pc-note">${(typeof crowdModeOn === 'function' && crowdModeOn())
-        ? 'צמדי הקהל פעילים במוד הזה.'
-        : 'צמדים שהקהל הוסיף. במשחק הרגיל הם מוצגים ואינם משפיעים.'}</div>` : '';
-
-  const partners = (!classic && (f.partners.length || duoSuggest || crowdDuoHtml)) ? `
+  /* צמדי הקהל לא מצוירים כאן. הם נשלפים חי מהמסד ב-cdFillApproved
+     (js/crowd-duos.js) ונכנסים ל-.cd-approved בתוך הסקשן, כי אישור צריך
+     להיראות מיד ולא אחרי בנייה ופריסה. js/crowd-overrides.js נשאר להשפעה
+     בלבד — אותה עובדה מוגשת פעמיים בכוונה: העותק שמוצג רשאי לאחר, העותק
+     שמשפיע על סימולציה לא. */
+  const partners = (!classic && (f.partners.length || duoSuggest)) ? `
     <div class="pc-sec">
       <div class="pc-sec-t">צמדים</div>
       <div class="pc-duos">${f.partners.slice(0, 6).map(p => {
@@ -472,7 +462,6 @@ function pcHTML(player, slotPos, squad) {
           inXI ? '🔗 ' : ''}${pcEsc(p.who)}${showR ? ` +${chemFmt(chemBonusOf(p.tier))}` : ''}</span>`;
       }).join('')}</div>
       ${f.partners.length ? '<div class="pc-note">חבר לצמד באותה הרכב = בונוס לשניהם.</div>' : ''}
-      ${crowdDuoHtml}
       ${duoSuggest}
     </div>` : '';
 
