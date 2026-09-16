@@ -542,6 +542,7 @@ function crowdOpenPanel(box, row, mine, targetOverride) {
       <div class="crowd-switch">
         <button class="crowd-sw${isPeak ? '' : ' on'}" type="button" data-t="season">${crowdEsc(seasonLabel)}</button>
         <button class="crowd-sw${isPeak ? ' on' : ''}" type="button" data-t="peak">בשיא שלו</button>
+        <button class="crowd-sw" type="button" data-t="attrs">שש תכונות</button>
       </div>
       <div class="crowd-dial-row">
         <input class="crowd-dial" type="range" min="40" max="99" value="${start}"
@@ -568,6 +569,7 @@ function crowdOpenPanel(box, row, mine, targetOverride) {
   // אי אפשר לצייר מחדש עם אותם נתונים.
   body.querySelectorAll('.crowd-sw').forEach(sw => {
     sw.addEventListener('click', async () => {
+      if (sw.dataset.t === 'attrs') { crowdOpenAttrs(box); return; }
       const t = sw.dataset.t === 'peak' ? 'peak' : box.dataset.season;
       if (t === crowdPanelTarget(box)) return;
       body.querySelectorAll('.crowd-sw').forEach(x => { x.disabled = true; });
@@ -657,4 +659,112 @@ function crowdOpenPanel(box, row, mine, targetOverride) {
   // במצב הריק שנפתח לבד. בלי האות הזה כרטיס מעוגן בשורה התחתונה מקבל חוגה
   // שנחתכת מתחת לקצה המסך, שזה בדיוק הבאג שהמדידה מחדש נועדה לפתור.
   crowdResized(box);
+}
+
+/* ── שש התכונות ────────────────────────────────────────────────────────────
+   הבעלים הוריד את שש התכונות מעמודי השחקן כי הן לא מבוססות, וצדק: הן נגזרות
+   ברובן מהנתונים של הקבוצה ולא של השחקן. זה תיקן את ההצהרה, לא את הדאטה —
+   הן עדיין מזינות את בונה כדורגלן. הקהל הוא המקור שחסר.
+
+   **שאלה אחת לשחקן, לא לעונה.** "כמה מהיר הוא היה?" היא שאלה שאוהד יכול
+   לענות עליה; "כמה מהיר הוא היה ב-2004/05?" ברובה לא. וגם אריתמטית: שש
+   שאלות לשחקן הן ~16,000 תאים, שש לשחקן-עונה הן 57,000 — ועם סף של חמש
+   הצבעות השני לעולם לא היה מתמלא.
+
+   השמות הם ששת ה-FIFA ולא שמות שהומצאו. זו לא בחירת סגנון: הבעלים דחה את
+   גמר/יצירה/הכרעה/יציבות בבונה כדורגלן וביקש את מה שאוהד כדורגל כבר מכיר. */
+const CROWD_ATTRS = [
+  { k: 'pac', label: 'מהירות' },
+  { k: 'sho', label: 'בעיטה'  },
+  { k: 'pas', label: 'מסירה'  },
+  { k: 'dri', label: 'כדרור'  },
+  { k: 'def', label: 'הגנה'   },
+  { k: 'phy', label: 'פיזיות' },
+];
+
+async function crowdMyAttrs(key) {
+  try {
+    const { data, error } = await _supabase.rpc('my_player_attrs', {
+      p_player_key: key, p_voter: crowdClientId(),
+    });
+    return (!error && data) ? data : {};
+  } catch (e) { return {}; }
+}
+
+async function crowdVoteAttrs(key, attrs) {
+  try {
+    const { data, error } = await _supabase.rpc('vote_attrs', {
+      p_player_key: key, p_attrs: attrs, p_voter: crowdClientId(),
+    });
+    if (error || (data && data.error)) return { ok: false, error: (data && data.error) || 'network' };
+    return { ok: true, n: data && data.n };
+  } catch (e) { return { ok: false, error: 'network' }; }
+}
+
+/* נפתח רק כשמבקשים. שישה סליידרים פתוחים כברירת מחדל היו הופכים כל פתיחת
+   כרטיס למסך טופס, ורוב הפתיחות לא נוגעות בזה בכלל. */
+async function crowdOpenAttrs(box) {
+  const body = box.querySelector('.crowd-body') || box;
+  const key = box.dataset.key;
+  const start = parseInt(box.dataset.peak, 10) || parseInt(box.dataset.official, 10) || 75;
+  const mine = await crowdMyAttrs(key);
+  if (!box.isConnected) return;
+  crowdBusyGuards();
+
+  body.innerHTML = `
+    <div class="crowd-panel">
+      <div class="crowd-dial-note">כמה הוא היה טוב בכל אחד מהם? (על השחקן בכלל, לא על עונה)</div>
+      ${CROWD_ATTRS.map(a => {
+        const v = mine[a.k] != null ? mine[a.k] : start;
+        return `<div class="crowd-attr-row" data-k="${a.k}">
+          <span class="crowd-attr-l">${a.label}</span>
+          <input class="crowd-dial crowd-attr-d" type="range" min="40" max="99"
+                 value="${v}" aria-label="${a.label}"${mine[a.k] != null ? ' data-mine="1"' : ''}>
+          <output class="crowd-val" dir="ltr">${v}</output>
+        </div>`;
+      }).join('')}
+      <div class="crowd-attr-hint">מה שלא תיגע בו לא נשלח.</div>
+      <button class="crowd-done crowd-attr-save" type="button">שמור תכונות</button>
+    </div>`;
+
+  body.querySelectorAll('.crowd-attr-d').forEach(d => {
+    d.addEventListener('pointerdown', () => { _crowdDragEl = d; });
+    d.addEventListener('keydown', () => { _crowdKeyDial = d; });
+    d.addEventListener('blur', () => { if (_crowdKeyDial === d) _crowdKeyDial = null; });
+    d.addEventListener('input', () => {
+      d.dataset.touched = '1';
+      d.parentNode.querySelector('.crowd-val').textContent = d.value;
+    });
+  });
+
+  body.querySelector('.crowd-attr-save').addEventListener('click', async (ev) => {
+    const btn = ev.currentTarget;
+    btn.disabled = true;
+    // רק מה שנגעת בו, או מה שכבר הצבעת עליו קודם. סליידר שלא זז יושב על
+    // המספר של המשחק, ולשלוח אותו זה לומר "אני מסכים" בשם מי שלא אמר כלום.
+    const attrs = {};
+    body.querySelectorAll('.crowd-attr-row').forEach(r => {
+      const d = r.querySelector('.crowd-attr-d');
+      if (d.dataset.touched || d.dataset.mine) attrs[r.dataset.k] = parseInt(d.value, 10);
+    });
+    if (!Object.keys(attrs).length) {
+      const h = body.querySelector('.crowd-attr-hint');
+      if (h) h.textContent = 'לא שינית כלום — הזז סליידר כדי לדרג.';
+      btn.disabled = false;
+      return;
+    }
+    const r = await crowdVoteAttrs(key, attrs);
+    if (!box.isConnected) return;
+    const h = body.querySelector('.crowd-attr-hint');
+    if (!r.ok) {
+      if (h) h.textContent = r.error === 'rate limited'
+        ? 'יותר מדי הצבעות בשעה האחרונה.' : 'לא נשמר, נסה שוב.';
+      btn.disabled = false;
+      return;
+    }
+    if (h) h.textContent = `נשמרו ${r.n}. תודה.`;
+    _crowdDragEl = null; _crowdKeyDial = null;
+  });
+
+  if (typeof crowdResized === 'function') crowdResized(box);
 }

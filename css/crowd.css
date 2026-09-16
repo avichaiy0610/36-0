@@ -291,3 +291,10 @@
 }
 .crowd-sw.on { border-color: var(--accent); color: var(--accent); }
 .crowd-sw:disabled { opacity: .5; cursor: default; }
+
+/* שש התכונות. שורה לכל אחת, שם ומספר משני צידי הסליידר, כדי שאפשר יהיה
+   לסרוק את כולן בבת אחת במקום לקרוא שש שורות נפרדות. */
+.crowd-attr-row { display: flex; align-items: center; gap: 8px; }
+.crowd-attr-l { flex: 0 0 52px; font-size: 11px; color: var(--dim); }
+.crowd-attr-d { flex: 1 1 auto; min-width: 0; }
+.crowd-attr-hint { font-size: 11px; color: var(--dim); }
