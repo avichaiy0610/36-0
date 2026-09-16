@@ -218,11 +218,16 @@ async function collect() {
 
   for (const d of duos) {
     const itemKey = `d|${d.pair_key}`;
-    const [a, b] = String(d.pair_key).split('|');
+    // מפתח שמתחיל ב-"-" הוא הצעה **להוריד** צמד קיים. ההודעה הראשונה הציגה
+    // את המפתח הגולמי, כלומר "-בן ביטון + מיגל ויטור" — והמקף הוא הסימן
+    // היחיד שמבדיל בין הוספה למחיקה. אף אחד לא קורא מקף ככה.
+    const isDrop = String(d.pair_key).charAt(0) === "-";
+    const bare = isDrop ? String(d.pair_key).slice(1) : String(d.pair_key);
+    const [a, b] = bare.split("|");
     out.push({
       kind: 'd', itemKey, id: shortId(itemKey),
       payload: { t: 'd', p: d.pair_key, n: d.n },
-      text: `🔗 <b>${esc(a)}</b> + <b>${esc(b)}</b>\n${d.n} הציעו שהם צמד`,
+      text: (isDrop ? '🚫 <b>להוריד צמד</b>\n' : '🔗 <b>צמד חדש</b>\n') + `${esc(a)} + ${esc(b)}\n` + (isDrop ? `${d.n} אמרו שזה לא צמד` : `${d.n} הציעו שהם צמד`),
       buttons: [[
         { text: '✅ קבל', callback_data: `cw:${shortId(itemKey)}:a` },
         { text: '🗑️ בטל', callback_data: `cw:${shortId(itemKey)}:x` },
@@ -273,6 +278,10 @@ const CROWD_MIN_VOTES = 5;
 
 async function main() {
   const items = await collect();
+  // הסיכום רץ תמיד, ולא רק כשהתור ריק. התור מתמלא מצמדים — להם אין סף —
+  // בזמן שהדירוגים כולם מתחת לחמש הצבעות, וכך הדירוגים היו בלתי נראים
+  // בטלגרם לגמרי: לא כהודעה עם כפתורים ולא כסיכום. שני המסלולים בלתי
+  // תלויים, והסיכום משתיק את עצמו דרך טביעת האצבע.
   if (!items.length) { console.log('אין מה להחליט.'); return digest(); }
 
   let sent = 0, skipped = 0;
@@ -305,6 +314,7 @@ async function main() {
   }
 
   console.log(`נשלחו ${sent} · ממתינים לתשובה ${skipped} · בתור ${items.length}`);
+  await digest();
 }
 
 main().catch(e => { console.error(e.message); process.exit(1); });
