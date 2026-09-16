@@ -530,7 +530,10 @@ function playerOVR(player) {
   // מוד הקהל מחליף את דירוג העונה בזה שהקהל נתן ושהבעלים אישר. השיא לא מוחלף:
   // הוא עובדה על הקריירה, לא דעה על עונה אחת. כבוי = crowdOvrFor מחזיר null
   // ושום דבר כאן לא זז.
-  if (!state.peakMode && typeof crowdOvrFor === 'function') {
+  // crowdModeOn נבדק לפני seasonOfPlayer בכוונה. seasonOfPlayer סורק את
+  // ההרכב, ו-playerOVR נקרא אלפי פעמים בסימולציה — כארגומנט הוא היה רץ בכל
+  // קריאה גם כשהמוד כבוי, כלומר קנס על מסלול חם בשביל פיצ'ר שלא פעיל.
+  if (!state.peakMode && typeof crowdModeOn === 'function' && crowdModeOn()) {
     const c = crowdOvrFor(player && player.name, seasonOfPlayer(player));
     if (c != null) return c;
   }

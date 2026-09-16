@@ -1087,10 +1087,14 @@
   <script src="js/tag-data.js?v=8fb54fa4"></script>
   <script src="js/tags.js?v=ab1e7206"></script>
   <script src="js/chem-data.js?v=e5cdbc98"></script>
-  <script src="js/chemistry.js?v=60e55753"></script>
+  <!-- שכבת הקהל. רדומה לחלוטין: crowdModeOn() נכון רק כש-state.crowdMode
+       דלוק, ואין עדיין מוד שמדליק אותו. נטענת כאן כדי שכשהמוד ייבנה זה
+       יהיה דגל אחד ולא חיווט מחדש. -->
+  <script src="js/crowd-overrides.js?v=c4bb36d4"></script>
+  <script src="js/chemistry.js?v=0b080a52"></script>
   <script src="js/data.js?v=e2436bbd"></script>
   <script src="js/sim-engine.js?v=784ec7b1"></script>
-  <script src="js/game.js?v=7d6f493d"></script>
+  <script src="js/game.js?v=6748177c"></script>
   <script src="js/club-media.js?v=fcf688c0"></script>
   <!-- after club.js and draft-archive.js (its crest and its daMode), and it is
        only ever called from a click or from the end of a season, so career.js
