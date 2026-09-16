@@ -183,11 +183,16 @@ async function caLoadRatings() {
         r.gap === null ? `פחות מ-${CROWD_MIN_VOTES}` : (r.gap > 0 ? '+' : '') + r.gap}</td>
       <td><button class="ca-peek" type="button" dir="ltr" title="הצג כל הצבעה בנפרד">${r.n} ▾</button></td>
       <td>${caTagCell(r.tag_top, r.tag_top_n)}</td>
-      <td class="ca-act"><button class="ca-pub${r.published ? ' on' : ''}" type="button"${
-            r.gap === null ? ' disabled' : ''}
+      <td class="ca-act"><button class="ca-pub${r.show_ovr ? ' on' : ''}" type="button"
+            data-part="ovr"${r.gap === null ? ' disabled' : ''}
             title="${r.gap === null ? 'אין מספיק הצבעות נספרות'
-              : r.published ? 'מוצג לציבור — לחץ כדי להסתיר' : 'מוסתר — לחץ כדי להציג לציבור'}"
-            >${r.published ? '👁' : '🚫'}</button>
+              : r.show_ovr ? 'הדירוג מוצג — לחץ כדי להסתיר' : 'הדירוג מוסתר — לחץ כדי להציג'}"
+            >${r.show_ovr ? '👁' : '🚫'}<span class="ca-part">דירוג</span></button>
+          <button class="ca-pub${r.show_tag ? ' on' : ''}" type="button"
+            data-part="tag"${r.gap === null || !r.tag_top ? ' disabled' : ''}
+            title="${!r.tag_top ? 'אין תגית מובילה'
+              : r.show_tag ? 'התגית מוצגת — לחץ כדי להסתיר' : 'התגית מוסתרת — לחץ כדי להציג'}"
+            >${r.show_tag ? '👁' : '🚫'}<span class="ca-part">תגית</span></button>
           <button class="ca-ok" type="button"${r.gap === null ? ' disabled title="אין מספיק הצבעות נספרות"' : ' title="קבל את הדירוג לדאטה"'}>✅</button>
           <button class="ca-no" type="button" title="הורד מהתור">🗑️</button>
           ${caDecisionCell(r.decision)}</td>
@@ -285,16 +290,23 @@ function caInit() {
     // פרסום הוא החלטה נפרדת מאישור, ולכן הוא לא מוריד את השורה מהתור: אפשר
     // להציג לציבור מספר בלי לקחת אותו לדאטה, ואפשר לקחת אותו לדאטה בלי
     // להציג. הכפתור מתחלף במקום והשורה נשארת.
+    // הדירוג והתגית מתפרסמים בנפרד. המספר הוא ממוצע — הוא זז חלק והקיצוניות
+    // כבר נגזמו; התגית היא רוב יחסי, ובחמש הצבעות שלושה אנשים שמסכימים
+    // מייצרים משפט על אדם ("לא מומש"). מתג אחד כפה לקחת את שניהם או אף אחד.
     if (pub) {
-      const btn = ev.target;
+      const btn = ev.target.closest('.ca-pub');
+      const part = btn.dataset.part;
       const turningOn = !btn.classList.contains('on');
-      const r = await caCall('publish_crowd', Object.assign({ p_on: turningOn }, args));
+      const r = await caCall('publish_crowd_part',
+        Object.assign({ p_what: part, p_on: turningOn }, args));
       caBusy(tr, false);
       if (!r.ok) return caFailed(tr, r.msg);
       btn.classList.toggle('on', turningOn);
-      btn.textContent = turningOn ? '👁' : '🚫';
-      btn.title = turningOn ? 'מוצג לציבור — לחץ כדי להסתיר'
-                            : 'מוסתר — לחץ כדי להציג לציבור';
+      btn.innerHTML = (turningOn ? '👁' : '🚫') +
+        `<span class="ca-part">${part === 'ovr' ? 'דירוג' : 'תגית'}</span>`;
+      const what = part === 'ovr' ? 'הדירוג' : 'התגית';
+      btn.title = turningOn ? `${what} מוצג — לחץ כדי להסתיר`
+                            : `${what} מוסתר — לחץ כדי להציג`;
       return;
     }
 

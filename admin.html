@@ -182,6 +182,7 @@
     /* פרסום הוא מצב, לא פעולה חד-פעמית — הכפתור נשאר על המסך ומראה איפה
        השחקן הזה עומד: 🚫 מוסתר מהציבור, 👁 מוצג. */
     .ca-act .ca-pub.on { border-color: #2ea043; color: #3fb950; }
+    .ca-part { font-size: 10px; margin-inline-start: 3px; opacity: .8; }
     /* הצעה להוריד צמד — נקראת אחרת כדי שאישור בטעות לא יוסיף אותו */
     .cda-drop { color: #f85149; font-weight: 600; }
     /* להוסיף מסומן בדיוק כמו להוריד. קודם רק ההורדה נשאה תווית, וזה הפך את
@@ -423,11 +424,11 @@
      cross-reference with crowdKey() and names its tags out of CROWD_TAGS. Those
      are the same functions the player card files the votes under — a second
      copy here would miss exactly the names with an apostrophe. -->
-<script src="js/crowd.js?v=8fb571a9"></script>
+<script src="js/crowd.js?v=56e57bc3"></script>
 <!-- chem-data: כדי שתור הצמדים ידע מה כבר במשחק. league_tables כבר
        נטען מעליו ומשמש לחישוב האליפויות המשותפות. -->
   <script src="js/chem-data.js?v=e5cdbc98"></script>
-  <script src="js/crowd-admin.js?v=dc7e6e13"></script>
+  <script src="js/crowd-admin.js?v=ff207f3c"></script>
 <script>
 const statusEl = document.getElementById('status');
 let overrides = {};   // key -> value currently stored in site_texts

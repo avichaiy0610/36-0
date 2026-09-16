@@ -233,9 +233,47 @@ async function collect() {
   return out;
 }
 
+/* ── פעילות מתחת לסף ───────────────────────────────────────────────────────
+   שחקן מקבל דירוג, ושום דבר לא קורה בשום מקום עד שמישהו חמישי מצביע עליו.
+   בשבועות הראשונים זה כל השחקנים, כלומר שתיקה מוחלטת — והשתיקה הזאת נראית
+   בדיוק כמו בוט שבור.
+
+   אז כשאין מה להחליט אבל כן הייתה פעילות, נשלחת הודעה אחת מסכמת ולא הודעה
+   לכל הצבעה. בלי כפתורים: אין כאן מה לאשר, רק מה לדעת.
+
+   נשלחת פעם אחת לכל מצב — engine_state שומר את הטביעה של מה שדווח, אז אותה
+   רשימה לא חוזרת פעמיים ורק שינוי אמיתי מייצר הודעה. */
+async function digest() {
+  const rows = await sb('GET',
+    'crowd_ratings_all?select=player_key,season,n&order=n.desc&limit=40');
+  const duos = await sb('GET', 'duo_suggestions?select=pair_key&limit=2000');
+  const duoCount = new Set((duos || []).map(d => d.pair_key)).size;
+  if (!rows || (!rows.length && !duoCount)) { console.log('אין פעילות בכלל.'); return; }
+
+  const sig = rows.map(r => `${r.player_key}|${r.season}|${r.n}`).join(';') + '#' + duoCount;
+  const seen = await stateGet('crowd_digest_sig');
+  if (seen === sig) { console.log('אין פעילות חדשה מאז הדיווח האחרון.'); return; }
+
+  const lines = rows.slice(0, 12).map(r =>
+    `• ${esc(r.player_key)} · ${esc(r.season)} — ${r.n} ${r.n === 1 ? 'הצבעה' : 'הצבעות'}`);
+  const text =
+    '📊 <b>פעילות בדירוגי הקהל</b>\n' +
+    `עוד אין מה לאשר — דירוג נחשף מ-${CROWD_MIN_VOTES} הצבעות.\n\n` +
+    lines.join('\n') +
+    (rows.length > 12 ? `\n… ועוד ${rows.length - 12}` : '') +
+    (duoCount ? `\n\n🔗 ${duoCount} ${duoCount === 1 ? 'צמד שהוצע' : 'צמדים שהוצעו'}` : '');
+
+  if (DRY) { console.log('[יבש · סיכום] ' + text.replace(/\n/g, ' | ').replace(/<[^>]+>/g, '')); return; }
+  const r = await tg('sendMessage', { chat_id: CHAT, text, parse_mode: 'HTML' });
+  if (r && r.ok) { await stateSet('crowd_digest_sig', sig); console.log('נשלח סיכום פעילות.'); }
+  else console.log('⚠ הסיכום לא נשלח: ' + (r && r.description));
+}
+
+const CROWD_MIN_VOTES = 5;
+
 async function main() {
   const items = await collect();
-  if (!items.length) { console.log('התורים ריקים.'); return; }
+  if (!items.length) { console.log('אין מה להחליט.'); return digest(); }
 
   let sent = 0, skipped = 0;
   for (const it of items) {

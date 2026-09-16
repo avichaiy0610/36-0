@@ -411,8 +411,15 @@ function crowdRenderLine(box, row, mine, notes) {
   // flex-wrap עם margin-inline-start:auto על הכפתור, ו"אתה 86 · " שנוסף
   // בהתחלה דוחף את הכפתור לשורה משלו, נטוש משמאל — וזה המצב הרגיל של כל מי
   // שכבר הצביע פעם, כלומר המצב הרגיל ברגע שיש לפיצ'ר משתמשים.
+  /* "דרג" מבטיח מספר, וזה מה שאנשים חשבו שיש שם. מאחורי הכפתור יש גם עשר
+     תגיות — בעיטות נייחות, מנהיג, מהירות — ואי אפשר לדעת את זה בלי ללחוץ.
+     הכפתור אומר עכשיו מה יש מאחוריו, והשורה מוסיפה רמז אחד לשחקן שאף אחד
+     עוד לא נגע בו, כלומר בדיוק מי שצריך את ההזמנה. */
+  const hint = (d.state === 'empty' && !mine)
+    ? '<span class="crowd-hint">דירוג, ותגיות כמו בעיטות נייחות או מהירות</span>' : '';
   body.innerHTML = `<div class="crowd-line"><span class="crowd-sum">${you}${txt}</span>` +
-    `<button class="crowd-open${isNew ? ' crowd-open-new' : ''}" type="button">` +
+    `<button class="crowd-open" type="button">${mine ? 'שנה' : 'דרג ותייג'}</button></div>` +
+    hint + notesHtml;
     `${mine ? 'שנה' : 'דרג'}${newTag}</button></div>${notesHtml}`;
   body.querySelector('.crowd-open').addEventListener('click', () => crowdOpenPanel(box, row, mine));
 
@@ -521,6 +528,7 @@ function crowdOpenPanel(box, row, mine) {
       </div>
       <div class="crowd-dial-note">${row && row.avg_trimmed
         ? `הקהל יושב על <span dir="ltr">${row.avg_trimmed}</span>` : 'אתה הראשון'}</div>
+      <div class="crowd-dial-note crowd-shelf-t">ומה אפיין אותו? (לא חובה)</div>
       <div class="crowd-shelf">${shelf.map(t =>
         `<button class="crowd-chip${mine && mine.tag === t.key ? ' on' : ''}"
                  type="button" data-tag="${crowdEsc(t.key)}">${t.icon} ${crowdEsc(t.label)}</button>`).join('')}</div>

@@ -273,3 +273,8 @@
 }
 .cd-chip-on  { border-color: var(--accent); color: var(--accent); }
 .cd-chip-off { opacity: .55; text-decoration: line-through; }
+
+/* רמז אחד, רק לשחקן שאף אחד לא נגע בו — כלומר בדיוק מי שצריך את ההזמנה.
+   "דרג" הבטיח מספר, והתגיות שמאחורי הכפתור היו בלתי נראות בלי ללחוץ. */
+.crowd-hint { display: block; font-size: 10.5px; color: var(--dim); opacity: .8; margin-top: 2px; }
+.crowd-shelf-t { margin-top: 2px; }
