@@ -347,7 +347,8 @@ async function cdaLoad() {
     const tier = t.seasons ? cdTierOf(t.seasons, t.titles) : 0;
     return `
     <tr data-key="${caEsc(r.pair_key)}" data-drop="${isDrop ? 1 : 0}">
-      <td>${isDrop ? '<span class="cda-drop">להוריד</span> ' : ''}${caEsc(ka)} + ${caEsc(kb)}</td>
+      <td>${isDrop ? '<span class="cda-drop">להוריד</span>' : '<span class="cda-add">להוסיף</span>'} ${
+        caEsc(ka)} + ${caEsc(kb)}</td>
       <td dir="ltr">${r.n}</td>
       <td dir="ltr">${t.seasons}</td>
       <td dir="ltr">${t.titles}</td>

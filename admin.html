@@ -176,6 +176,9 @@
     .ca-act .ca-pub.on { border-color: #2ea043; color: #3fb950; }
     /* הצעה להוריד צמד — נקראת אחרת כדי שאישור בטעות לא יוסיף אותו */
     .cda-drop { color: #f85149; font-weight: 600; }
+    /* להוסיף מסומן בדיוק כמו להוריד. קודם רק ההורדה נשאה תווית, וזה הפך את
+       ההוספה — הרוב — לשורה בלי הקשר: שני שמות וכלום שאומר מה מציעים לעשות. */
+    .cda-add { color: #3fb950; font-weight: 600; }
     /* פירוט ההצבעות: כל הצבעה בשורה, ממוינות לפי הדירוג — טרול מכריז על עצמו
        בקצה של עמודה ממוינת, לא באמצע רשימה כרונולוגית. */
     /* עמודת ההצבעות היא הכפתור: המספר הוא בדיוק מה שרוצים להסתכל בתוכו,
@@ -412,7 +415,7 @@
 <!-- chem-data: כדי שתור הצמדים ידע מה כבר במשחק. league_tables כבר
        נטען מעליו ומשמש לחישוב האליפויות המשותפות. -->
   <script src="js/chem-data.js?v=e5cdbc98"></script>
-  <script src="js/crowd-admin.js?v=08a7fa09"></script>
+  <script src="js/crowd-admin.js?v=ce241af8"></script>
 <script>
 const statusEl = document.getElementById('status');
 let overrides = {};   // key -> value currently stored in site_texts

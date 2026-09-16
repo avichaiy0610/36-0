@@ -1887,6 +1887,11 @@ body {
 
 /* ── Real-time duel (1v1) ─────────────────────────────────────────────────── */
 .nav-beta { font-size: 9px; font-weight: 800; color: #fff; background: var(--accent2); border-radius: 6px; padding: 1px 4px; margin-inline-start: 3px; vertical-align: middle; }
+/* כפתור שקיים כדי להיקרא, לא כדי להילחץ. עמום מספיק שלא ייראה שבור, ברור
+   מספיק שייקרא — מי שמדרג צריך לראות שלדירוג שלו יש יעד. */
+.nav-btn.nav-soon { opacity: .55; cursor: default; }
+.nav-btn.nav-soon:hover { background: transparent; }
+.nav-beta-soon { background: var(--border); color: var(--dim); }
 .duel-slots { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 18px 0; }
 .duel-slot { flex: 1; min-width: 0; background: var(--panel2, #1b2330); border: 1.5px solid var(--border); border-radius: 12px; padding: 16px 10px; text-align: center; transition: border-color .2s, box-shadow .2s; }
 .duel-slot.filled { border-color: var(--accent2); }
