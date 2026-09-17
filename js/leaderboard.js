@@ -187,27 +187,29 @@ async function loadSalaryBoardTab(table) {
   }).join('');
 }
 
+// One row per player, picked on the server (migration 20260917000001). Picking it
+// here, out of the top 200 runs, let the few players who replay the high banners
+// fill all 200 rows — the board showed three names and dropped everyone else.
 async function loadGauntletBoard(table) {
-  const { data: rows, error } = await lbWithClub(prof => _supabase
-    .from('gauntlet_runs')
-    .select('depth, cleared, banner, team_ovr, ended, created_at, ' + prof)
-    .order('banner', { ascending: false })
-    .order('depth', { ascending: false })
-    .order('created_at', { ascending: true })
-    .limit(200));
+  let { data: best, error } = await _supabase.rpc('gauntlet_board', { p_limit: 300 });
+  // only until the migration is live: the old read, flattened to the same shape
+  if (error) {
+    const old = await lbWithClub(prof => _supabase
+      .from('gauntlet_runs')
+      .select('user_id, depth, cleared, banner, team_ovr, ended, created_at, ' + prof)
+      .order('banner', { ascending: false })
+      .order('depth', { ascending: false })
+      .order('created_at', { ascending: true })
+      .limit(1000));
+    const seen = new Set();
+    best = (old.data || []).filter(r => !seen.has(r.user_id) && seen.add(r.user_id))
+      .map(r => ({ ...r, username: r.profiles?.username, club: r.profiles?.club }));
+  }
 
-  if (error || !rows?.length) {
+  if (!best?.length) {
     table.innerHTML = '<div class="page-loading">אין ריצות עדיין — היה הראשון</div>';
     return;
   }
-  // one row per player: his best run, which is the first he appears in
-  const seen = new Set();
-  const best = rows.filter(r => {
-    const who = r.profiles?.username ?? '—';
-    if (seen.has(who)) return false;
-    seen.add(who);
-    return true;
-  });
 
   table.innerHTML = '';
   best.forEach((row, i) => {
@@ -223,10 +225,10 @@ async function loadGauntletBoard(table) {
     el.className = 'lb-row gt-lb-row';
     el.innerHTML = `
       <span class="lb-rank ${rank <= 3 ? 'lb-rank-top' : ''}">${medal}</span>
-      <span class="lb-name">${esc(row.profiles?.username ?? 'אנונימי')}</span>
+      <span class="lb-name">${esc(row.username ?? 'אנונימי')}</span>
       <span class="lb-stat">${row.depth}<small>/8</small></span>
       <span class="lb-sub" dir="rtl">${sub}</span>
-      ${lbClubTag(row.profiles?.club)}`;
+      ${lbClubTag(row.club)}`;
     table.appendChild(el);
   });
 }
