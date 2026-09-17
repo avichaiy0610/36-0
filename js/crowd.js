@@ -262,14 +262,22 @@ async function crowdReportNote(id) {
   } catch (e) { return { ok: false }; }
 }
 
-async function crowdNotes(key, season) {
-  const ck = crowdCacheKey(key, season);
+/* השורות נשלפות **לפי שחקן ולא לפי עונה**, וזה תיקון של באג שנראה כמו החלטת
+   עיצוב. השדה מבקש "שורה אחת עליו", כלומר משפט על אדם: "מספר אחד, קיר בטון
+   ברזילאי" אינו טענה על 2009/10. אבל season הוא חלק מהמפתח בטבלה, ומאז שנוסף
+   מתג השיא הוא נושא את מה שהיה פתוח בזמן הכתיבה — אז שורה שנכתבה על השיא
+   נשמרה תחת 'peak' ואף כרטיס לא ביקש אותה. הבעלים אישר טקסט שלא היה לו מסך.
+
+   season נשאר בטבלה כתיעוד של ההקשר שבו נכתבה השורה; הוא פשוט לא תנאי לקריאה.
+   זו אותה הכרעה בדיוק שהתקבלה על שש התכונות — שאלה על אדם, לא על שנה. */
+async function crowdNotes(key) {
+  const ck = key;
   if (_crowdNotesC.has(ck)) return _crowdNotesC.get(ck);
   try {
     const { data, error } = await _supabase
       .from('player_notes')
       .select('id, body')
-      .eq('player_key', key).eq('season', season).eq('status', 'approved')
+      .eq('player_key', key).eq('status', 'approved')
       .order('created_at', { ascending: false }).limit(3);
     // בלי לפרק את error, בקשה שנכשלה ורשימה ריקה באמת נראות זהות — ואז ריחוף
     // אחד בזמן ניתוק היה מקפיא "אין שורות" לכל חיי העמוד. רק הצלחה נשמרת.
@@ -347,7 +355,7 @@ async function crowdMount(root) {
     // השורות המאושרות נשלפות כאן ולא בפתיחת הפאנל: בלי מסך הן לא קיימות, וכל
     // מסלול המודרציה מוביל לשום מקום — הבעלים מאשר טקסט שאיש לא יראה.
     const [row, mine, notes] = await Promise.all([
-      crowdFetch(key, season), crowdFetchMine(key, season), crowdNotes(key, season),
+      crowdFetch(key, season), crowdFetchMine(key, season), crowdNotes(key),
     ]);
     // הכרטיס עלול להיסגר בזמן ההמתנה — כתיבה לאלמנט מנותק היא בזבוז שקט
     if (!box.isConnected) return;
@@ -651,7 +659,7 @@ function crowdOpenPanel(box, row, mine, targetOverride) {
     // השורה המכווצת מספרת תמיד על עונת הכרטיס, גם אם הרגע דירגת את השיא.
     delete box.dataset.target;
     const cardSeason = box.dataset.season;
-    const [fresh, notes] = await Promise.all([crowdFetch(key, cardSeason), crowdNotes(key, cardSeason)]);
+    const [fresh, notes] = await Promise.all([crowdFetch(key, cardSeason), crowdNotes(key)]);
     if (box.isConnected) crowdRenderLine(box, fresh, { ovr, tag }, notes);
   });
 
