@@ -559,7 +559,8 @@ function pageHtml(TEAMS, e) {
 
     <div class="foot">
       36-0 — משחק דראפט חינמי לחובבי הכדורגל הישראלי · הנתונים למטרות מידע ובידור בלבד ואינם רשמיים ·
-      <a href="/players/">כל השחקנים</a> · <a href="/methodology.html">מתודולוגיה</a> ·
+      <a href="/articles/">מאמרים</a> · <a href="/players/">כל השחקנים</a> ·
+      <a href="/methodology.html">מתודולוגיה</a> ·
       <a href="/how-to-play.html">איך משחקים</a> · <a href="/about.html">אודות</a> · <a href="/">משחק</a>
     </div>
   </div>
@@ -717,7 +718,7 @@ function writeIndex() {
     <div class="chips">${chips}</div>
     <h2>שחקנים (לפי דירוג שיא)</h2>
     <ul class="players">${list}</ul>
-    <div class="foot">36-0 — משחק דראפט חינמי לחובבי הכדורגל הישראלי · הנתונים למטרות מידע ובידור בלבד · <a href="/how-to-play.html">איך משחקים</a> · <a href="/methodology.html">מתודולוגיה</a> · <a href="/about.html">אודות</a> · <a href="/contact.html">צור קשר</a> · <a href="/">משחק</a></div>
+    <div class="foot">36-0 — משחק דראפט חינמי לחובבי הכדורגל הישראלי · הנתונים למטרות מידע ובידור בלבד · <a href="/articles/">מאמרים</a> · <a href="/how-to-play.html">איך משחקים</a> · <a href="/methodology.html">מתודולוגיה</a> · <a href="/about.html">אודות</a> · <a href="/contact.html">צור קשר</a> · <a href="/">משחק</a></div>
   </div>
 </body>
 </html>`;
