@@ -25,8 +25,11 @@ league_tables_raw.json
 build_league_tables.js
 wiki_tables_cache.json
 
-# SEO pages pipeline (local; seo/ output is the deploy artifact)
-build_seo_pages.js
+# build_seo_pages.js was ignored here. It is committed now: it holds no secret
+# (it reads the anon key out of js/config.js, which is committed and shipped),
+# its output goes to team/ in the repo root and not to a seo/ artifact, and
+# being ignored is precisely how it came to carry two bugs nobody could see —
+# the same argument the trophy pipeline note below makes.
 
 # scratch data pulled from the API while debugging
 runs.json

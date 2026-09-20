@@ -703,6 +703,10 @@ function writeIndex() {
     .chips { display: flex; flex-wrap: wrap; gap: 8px; }
     .chip { background: #161b22; border: 1px solid #30363d; border-radius: 50px; padding: 6px 14px; font-size: 13.5px; color: #e6edf3; text-decoration: none; }
     .cta { display: inline-block; background: linear-gradient(135deg,#FFD700,#f0a500); color: #111; font-weight: 900; font-size: 16px; padding: 13px 30px; border-radius: 50px; text-decoration: none; margin: 18px 0; }
+    .intro { max-width: 700px; margin: 18px 0 6px; }
+    .intro p { color: #c2cbd6; font-size: 15px; line-height: 1.9; margin-bottom: 13px; }
+    .intro a { color: #FFD700; } .intro b { color: #fff; } .intro em { color: #e6edf3; font-style: italic; }
+    .note2 { color: #8b949e; font-size: 13.5px; margin: -4px 0 12px; max-width: 640px; line-height: 1.75; }
     .foot { margin-top: 40px; border-top: 1px solid #30363d; padding-top: 16px; font-size: 12px; color: #5a6472; } .foot a { color: #8b949e; }
     @media (max-width:720px){ ul.players{columns:2;} } @media (max-width:460px){ ul.players{columns:1;} }
   </style>
@@ -713,8 +717,32 @@ function writeIndex() {
     <div class="logo"><a href="/"><span dir="ltr">36–0</span></a></div>
     <h1>כל שחקני ליגת העל</h1>
     <p class="sub">${players.length} שחקנים מכל תולדות ליגת העל (1999–2025) — הקריירה, המועדונים והדירוגים.</p>
+
+    <div class="intro">
+      <p>
+        לכל שם ברשימה הזאת יש עמוד משלו: באילו עונות שיחק, באילו מועדונים, ומה
+        הדירוג שרשם בכל אחת מהן. הרשימה מסודרת לפי <b>דירוג השיא</b> — הדירוג הגבוה
+        ביותר שהשחקן רשם באיזושהי עונה — ולכן היא נפתחת בשמות שסביבם מתנהל הוויכוח.
+      </p>
+      <p>
+        שתי הערות שכדאי לדעת לפני שקוראים אותה. ראשית, המאגר מתייחס לכל
+        <em>שחקן-עונה</em> בנפרד: שחקן ב-2004/05 אינו אותו שחקן ב-2011/12, ולכן לאותו
+        אדם יש דירוגים שונים בעונות שונות. שנית, שני שחקנים שונים בעלי אותו שם מופרדים
+        בסיומת מבהירה — "רפי כהן השוער" מול "רפי כהן החלוץ" — כדי ששורה בטבלת המבקיעים
+        לא תיזקף בטעות לאדם הלא נכון.
+      </p>
+      <p>
+        הדירוג עצמו הוא הערכה ולא מדידה, ו<a href="/methodology.html">עמוד
+        המתודולוגיה</a> מפרט בדיוק מאיפה כל מספר מגיע ואיפה בחרנו להעריך.
+        <a href="/articles/kriteryon-hadeirug/">במאמר נפרד</a> פרסנו את ההתפלגות
+        המלאה שלהם: מה נחשב ממוצע, ולמה רק 19 שחקנים חצו אי פעם את ה-90.
+      </p>
+    </div>
+
     <div style="text-align:center"><a class="cta" href="/">בנה את הרכב החלומות שלך ←</a></div>
     <h2>הקבוצות</h2>
+    <p class="note2">31 מועדונים ששיחקו בליגת העל בתקופה הזאת. לכל אחד עמוד עם הרכב כל
+      הזמנים, טבלת העונות והרקע שלו.</p>
     <div class="chips">${chips}</div>
     <h2>שחקנים (לפי דירוג שיא)</h2>
     <ul class="players">${list}</ul>
