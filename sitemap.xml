@@ -36,6 +36,51 @@
     <priority>0.5</priority>
   </url>
   <url>
+    <loc>https://www.36-0.co.il/articles/</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://www.36-0.co.il/articles/eran-zehavi-35/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://www.36-0.co.il/articles/hanodedim/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://www.36-0.co.il/articles/ish-moadon-ehad/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://www.36-0.co.il/articles/kriteryon-hadeirug/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://www.36-0.co.il/articles/malchei-shaarim/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://www.36-0.co.il/articles/mi-shalat/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://www.36-0.co.il/articles/nekudot-lo-mashvot/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
+    <loc>https://www.36-0.co.il/articles/shalosh-hanetzahiyot/</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.9</priority>
+  </url>
+  <url>
     <loc>https://www.36-0.co.il/team/beitar-jerusalem/</loc>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>

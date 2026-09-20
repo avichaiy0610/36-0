@@ -1,0 +1,96 @@
+/* The reading layer. The rest of the site is an app; these pages are text, and
+   they are set like text: one column, long measure, generous leading. */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: #0d1117;
+  color: #e6edf3;
+  font-family: 'Heebo', Arial, sans-serif;
+  direction: rtl;
+  line-height: 1.85;
+  -webkit-text-size-adjust: 100%;
+}
+
+.wrap { max-width: 740px; margin: 0 auto; padding: 32px 20px 90px; }
+.wrap.wide { max-width: 900px; }
+
+.back { display: inline-block; margin-bottom: 18px; color: #8b949e; text-decoration: none; font-size: 14px; }
+.back:hover { color: #FFD700; }
+
+.logo {
+  font-size: 34px; font-weight: 900;
+  background: linear-gradient(135deg, #FFD700, #ff9500 55%, #FFD700);
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+}
+.logo a { text-decoration: none; }
+
+.kicker { color: #8b949e; font-size: 13px; letter-spacing: .04em; margin-top: 22px; }
+
+h1 { font-size: 30px; line-height: 1.35; margin: 8px 0 12px; color: #fff; font-weight: 900; }
+h2 { font-size: 21px; margin: 38px 0 12px; color: #FFD700; font-weight: 800; }
+h3 { font-size: 17px; margin: 26px 0 8px; color: #e6edf3; font-weight: 700; }
+
+p  { color: #c2cbd6; margin-bottom: 16px; }
+a  { color: #FFD700; }
+em { color: #e6edf3; font-style: italic; }
+strong { color: #fff; }
+
+.standfirst { font-size: 18px; color: #a9b4c0; border-right: 3px solid #FFD700; padding-right: 14px; margin: 0 0 8px; }
+.byline { color: #5a6472; font-size: 13px; margin-bottom: 30px; border-bottom: 1px solid #21262d; padding-bottom: 18px; }
+
+ul, ol { color: #c2cbd6; margin: 0 20px 18px 0; }
+li { margin-bottom: 7px; }
+
+/* Tables carry most of the evidence on these pages, so they are readable first
+   and decorative never. On a phone they scroll inside their own box rather than
+   pushing the article sideways. */
+.tablebox { overflow-x: auto; margin: 0 0 20px; -webkit-overflow-scrolling: touch; }
+table { border-collapse: collapse; width: 100%; font-size: 14.5px; min-width: 420px; }
+caption { caption-side: bottom; color: #5a6472; font-size: 12.5px; text-align: right; padding-top: 8px; }
+th, td { padding: 8px 10px; text-align: right; border-bottom: 1px solid #21262d; }
+th { color: #8b949e; font-weight: 700; font-size: 13px; border-bottom: 1px solid #30363d; white-space: nowrap; }
+td.n, th.n { font-variant-numeric: tabular-nums; }
+tbody tr:hover { background: #11161d; }
+.hi td { background: #16202b; }
+
+blockquote {
+  margin: 22px 0; padding: 2px 16px 2px 0;
+  border-right: 3px solid #30363d; color: #a9b4c0; font-size: 17px;
+}
+
+.note {
+  background: #11161d; border: 1px solid #21262d; border-radius: 10px;
+  padding: 14px 16px; margin: 22px 0; font-size: 14.5px; color: #a9b4c0;
+}
+.note b { color: #FFD700; }
+
+.cta {
+  display: inline-block; background: linear-gradient(135deg, #FFD700, #f0a500);
+  color: #111; font-weight: 900; font-size: 16px; padding: 12px 28px;
+  border-radius: 50px; text-decoration: none; margin: 10px 0 4px;
+}
+
+.readnext { margin-top: 44px; border-top: 1px solid #21262d; padding-top: 22px; }
+.readnext h2 { margin-top: 0; }
+
+/* Hub */
+.cards { display: grid; gap: 14px; margin: 24px 0 10px; }
+.card {
+  display: block; background: #11161d; border: 1px solid #21262d; border-radius: 12px;
+  padding: 18px 20px; text-decoration: none; transition: border-color .15s, background .15s;
+}
+.card:hover { border-color: #FFD700; background: #131a22; }
+.card .ct { color: #fff; font-weight: 800; font-size: 18px; display: block; margin-bottom: 5px; }
+.card .cd { color: #8b949e; font-size: 14.5px; display: block; line-height: 1.65; }
+.card .cm { color: #5a6472; font-size: 12.5px; display: block; margin-top: 8px; }
+
+.foot { margin-top: 46px; border-top: 1px solid #30363d; padding-top: 16px; font-size: 12.5px; color: #5a6472; line-height: 2; }
+.foot a { color: #8b949e; text-decoration: none; }
+.foot a:hover { color: #FFD700; }
+
+@media (max-width: 560px) {
+  h1 { font-size: 25px; }
+  h2 { font-size: 19px; }
+  .standfirst { font-size: 16.5px; }
+  .wrap { padding: 24px 16px 70px; }
+}

@@ -476,8 +476,7 @@ function pageHtml(TEAMS, e) {
   <meta name="robots" content="noindex,follow" />` : ''}
   <meta property="og:title" content="${esc(title)}" /><meta property="og:description" content="${esc(desc)}" />
   <meta property="og:type" content="profile" /><meta property="og:url" content="${url}" /><meta property="og:image" content="${SITE}/og-image.png" />
-  <link rel="icon" href="/favicon.ico" sizes="any" />${thin ? '' : `
-  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2000268715013437" crossorigin="anonymous"></script>`}
+  <link rel="icon" href="/favicon.ico" sizes="any" />
   <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;700;800;900&display=swap" rel="stylesheet">
   <script type="application/ld+json">${JSON.stringify(jsonld)}</script>
@@ -608,6 +607,13 @@ function writeSitemap() {
     u(`${SITE}/privacy.html`, 'yearly', '0.2'),
     u(`${SITE}/contact.html`, 'yearly', '0.2'),
     u(`${SITE}/players/`, 'weekly', '0.5'),
+    // The written pages. They are hand-authored, not generated here, but the
+    // sitemap is rebuilt wholesale from disk — so anything this function does
+    // not enumerate is dropped the next time it runs. Reading the directory
+    // means a new article is in the sitemap without touching this file.
+    u(`${SITE}/articles/`, 'weekly', '0.8'),
+    ...dirsIn('articles').filter(s => indexable('articles', s))
+      .map(s => u(`${SITE}/articles/${s}/`, 'monthly', '0.9')),
     ...dirsIn('team').map(id => u(`${SITE}/team/${id}/`, 'monthly', '0.7')),
     ...dirsIn('player').filter(s => indexable('player', s))
       .map(s => u(`${SITE}/player/${encodeURI(s)}/`, 'monthly', '0.6')),
@@ -677,7 +683,6 @@ function writeIndex() {
   <meta property="og:title" content="${esc(title)}" /><meta property="og:description" content="${esc(desc)}" />
   <meta property="og:type" content="website" /><meta property="og:url" content="${url}" /><meta property="og:image" content="${SITE}/og-image.png" />
   <link rel="icon" href="/favicon.ico" sizes="any" />
-  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2000268715013437" crossorigin="anonymous"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;700;800;900&display=swap" rel="stylesheet">
   <style>
