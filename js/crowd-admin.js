@@ -134,14 +134,22 @@ async function caLoadRatings() {
   const { data, error } = await _supabase.rpc('crowd_queue');
   if (error) {
     body.innerHTML = '<tr><td colspan="9">שגיאה בטעינה</td></tr>';
+    const ab = document.getElementById('ca-attrs');
+    if (ab) ab.innerHTML = '<tr><td colspan="6">שגיאה בטעינה</td></tr>';
     _caSkip = '';
     caStatus('crowd_queue: ' + error.message);
     return;
   }
 
+  // התכונות (season='attr:pac'…) יושבות באותו תור אבל הן לא שאלה על עונה ואין
+  // להן דירוג רשמי להצליב — עד עכשיו הן נספרו כאן כ"לא נמצאו בדאטה" ונעלמו.
+  // יש להן טבלה משלהן.
+  const all = data || [];
+  caRenderAttrs(all.filter(r => String(r.season).startsWith('attr:')));
+
   const idx = caIndex();
   let missing = 0, small = 0;
-  const rows = (data || []).map(r => {
+  const rows = all.filter(r => !String(r.season).startsWith('attr:')).map(r => {
     const rec = idx.get(r.player_key + '|' + r.season);
     // שחקן-עונה שכבר לא קיים בדאטה. נספר ומדווח ולא נבלע בשקט: אם זה קורה
     // להרבה שורות, המפתח שההצבעות מתויקות תחתיו הפסיק להסכים עם SQUADS, וזה
@@ -212,6 +220,112 @@ async function caLoadRatings() {
           ${caDecisionCell(r.decision)}</td>
     </tr>`).join('');
   caCount();
+}
+
+/* ── 🎚️ שש התכונות ────────────────────────────────────────────────────────
+   שורה לכל שחקן-תכונה, מקובצות לפי שחקן. "במשחק" הוא הערך של ATTR_DATA בעונה
+   שבה ה-ovr שלו הכי גבוה — התכונות במשחק הן לפי עונה והקהל עונה על האדם, אז
+   אין מספר רשמי אחד; העונה הטובה ביותר היא ההשוואה הקרובה ביותר לשאלה "כמה
+   מהיר הוא היה". אין אישור: לתכונות עוד אין צרכן, ורק הצפייה והחרגת הצבעה
+   בודדת הן החלטות שיש להן משמעות היום. */
+let _caAttrRef = null;
+function caAttrRef(key) {
+  if (!_caAttrRef) {
+    _caAttrRef = new Map();
+    if (typeof attrsOf === 'function') {
+      SQUADS.forEach(sq => sq.players.forEach((p, i) => {
+        const k = crowdKey(p.name);
+        const cur = _caAttrRef.get(k);
+        if (cur && cur.ovr >= p.ovr) return;
+        const a = attrsOf(sq.id, i);
+        if (a) _caAttrRef.set(k, { ovr: p.ovr, season: sq.season, a });
+      }));
+    }
+  }
+  return _caAttrRef.get(key) || null;
+}
+
+function caAttrCells(n, avg, ref) {
+  const gap = (avg == null || ref == null) ? null : avg - ref;
+  return `
+      <td dir="ltr">${avg == null ? '—' : avg}</td>
+      <td dir="ltr" class="${gap === null ? 'ca-alt' : gap > 0 ? 'ca-up' : gap < 0 ? 'ca-down' : ''}">${
+        avg == null ? `פחות מ-${CROWD_MIN_VOTES}` : gap === null ? '—' : (gap > 0 ? '+' : '') + gap}</td>
+      <td><button class="ca-peek" type="button" dir="ltr" title="הצג כל הצבעה בנפרד">${n} ▾</button></td>`;
+}
+
+function caRenderAttrs(list) {
+  const body = document.getElementById('ca-attrs');
+  if (!body) return;
+  if (!list.length) { body.innerHTML = '<tr><td colspan="6">אין הצבעות על תכונות.</td></tr>'; return; }
+
+  // שחקן עם הכי הרבה הצבעות למעלה; בתוכו, סדר התכונות של המשחק.
+  const by = new Map();
+  list.forEach(r => {
+    if (!by.has(r.player_key)) by.set(r.player_key, []);
+    by.get(r.player_key).push(r);
+  });
+  const order = (typeof ATTR_KEYS !== 'undefined') ? ATTR_KEYS
+              : ['pac', 'sho', 'pas', 'dri', 'def', 'phy'];
+  const players = [...by.entries()].sort((a, b) =>
+    b[1].reduce((s, r) => s + r.n, 0) - a[1].reduce((s, r) => s + r.n, 0));
+
+  body.innerHTML = players.map(([key, rows]) => {
+    rows.sort((a, b) => order.indexOf(a.season.slice(5)) - order.indexOf(b.season.slice(5)));
+    const ref = caAttrRef(key);
+    return rows.map((r, i) => {
+      const k = r.season.slice(5);
+      const name = (typeof ATTR_NAME !== 'undefined' && ATTR_NAME[k]) || k;
+      const refV = ref ? ref.a[k] : null;
+      return `
+    <tr data-key="${caEsc(key)}" data-season="${caEsc(r.season)}" data-ref="${refV ?? ''}"
+        class="${i === 0 ? 'ca-attr-first' : ''}">
+      <td>${i === 0 ? caEsc(key) : ''}</td>
+      <td>${caEsc(name)}</td>
+      <td dir="ltr"${ref ? ` title="עונת ${caEsc(ref.season)} (ovr ${ref.ovr})"` : ''}>${refV ?? '—'}</td>
+      ${caAttrCells(r.n, r.avg_trimmed, refV)}
+    </tr>`;
+    }).join('');
+  }).join('');
+}
+
+/* פירוט ההצבעות של תכונה. אותם RPC-ים בדיוק כמו בטבלת הדירוגים — הם מקבלים
+   כל season — אבל השורה בנויה אחרת, ולכן גם העדכון אחרי החרגה. */
+async function caAttrVotes(tr) {
+  let box = tr.nextElementSibling;
+  if (box && box.classList.contains('cv-wrap')) { box.remove(); return; }
+  box = document.createElement('tr');
+  box.className = 'cv-wrap';
+  box.innerHTML = '<td colspan="6"><div class="cv-body">טוען…</div></td>';
+  tr.after(box);
+
+  const { data, error } = await _supabase.rpc('crowd_votes_for',
+    { p_player_key: tr.dataset.key, p_season: tr.dataset.season });
+  const body = box.querySelector('.cv-body');
+  if (error) { body.textContent = 'crowd_votes_for: ' + error.message; return; }
+  if (!data || !data.length) { body.textContent = 'אין הצבעות.'; return; }
+  body.innerHTML = `<div class="cv-head">${data.length} הצבעות · ` +
+    `${data.filter(v => !v.excluded).length} נספרות</div>` + data.map(cdaVoteRow).join('');
+
+  body.addEventListener('click', async ev => {
+    if (!ev.target.classList.contains('cv-x')) return;
+    const row = ev.target.closest('.cv-row');
+    const on = !row.classList.contains('out');
+    ev.target.disabled = true;
+    const r = await caCall('set_vote_excluded', { p_id: +row.dataset.id, p_on: on });
+    ev.target.disabled = false;
+    if (!r.ok) { ev.target.title = r.msg || 'לא נשמר'; return; }
+    row.classList.toggle('out', on);
+    ev.target.textContent = on ? '↩' : '⊘';
+    ev.target.title = on ? 'הוחרגה מהממוצע — לחץ כדי להחזיר' : 'הוצא מהממוצע';
+    // שלושת התאים האחרונים נבנים מחדש מההצבר שהשרת החזיר — כולל המקרה שבו
+    // הוא ירד מתחת לחמש והממוצע נעלם.
+    const d = r.data || {};
+    const cells = tr.querySelectorAll('td');
+    const refV = tr.dataset.ref === '' ? null : +tr.dataset.ref;
+    for (let i = cells.length - 1; i >= 3; i--) cells[i].remove();
+    tr.insertAdjacentHTML('beforeend', caAttrCells(d.n ?? 0, d.avg ?? null, refV));
+  });
 }
 
 async function caLoadNotes() {
@@ -335,6 +449,13 @@ function caInit() {
     cell.querySelectorAll('.ca-dec, .ca-undo').forEach(x => x.remove());
     cell.insertAdjacentHTML('beforeend', caDecisionCell(ok ? 'approved' : 'dismissed'));
     caCount();
+  });
+
+  const attrs = document.getElementById('ca-attrs');
+  if (attrs) attrs.addEventListener('click', ev => {
+    if (!ev.target.classList.contains('ca-peek')) return;
+    const tr = ev.target.closest('tr');
+    if (tr && tr.dataset.key) caAttrVotes(tr);
   });
 
   document.getElementById('ca-notes').addEventListener('click', async ev => {

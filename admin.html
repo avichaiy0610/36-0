@@ -190,6 +190,8 @@
     .cda-add { color: #3fb950; font-weight: 600; }
     /* שיא הקריירה מתויק תחת season=peak — מספר אחר מדירוג העונה. */
     .ca-peak { color: #d29922; font-weight: 600; }
+    /* שש התכונות: קו בין שחקן לשחקן, כי השם כתוב רק בשורה הראשונה שלו */
+    #ca-attrs tr.ca-attr-first td { border-top: 2px solid #30363d; }
     /* פירוט ההצבעות: כל הצבעה בשורה, ממוינות לפי הדירוג — טרול מכריז על עצמו
        בקצה של עמודה ממוינת, לא באמצע רשימה כרונולוגית. */
     /* עמודת ההצבעות היא הכפתור: המספר הוא בדיוק מה שרוצים להסתכל בתוכו,
@@ -351,6 +353,22 @@
         </table>
       </div>
 
+      <h2 style="margin-top:26px">🎚️ שש התכונות</h2>
+      <p class="ca-note">
+        שאלה אחת לשחקן, לא לעונה. "במשחק" הוא המספר שבונה כדורגלן משתמש בו בעונה
+        הכי טובה שלו — להשוואה בלבד. ממוצע הקהל נחשף מ-5 הצבעות; עד אז לחץ על
+        מספר ההצבעות כדי לראות כל אחת ולהחריג אותה. אין כאן "קבל": לתכונות עוד אין
+        צרכן במשחק.
+      </p>
+      <div class="ca-wrap">
+        <table class="us-table">
+          <thead><tr>
+            <th>שחקן</th><th>תכונה</th><th>במשחק</th><th>קהל</th><th>פער</th><th>הצבעות</th>
+          </tr></thead>
+          <tbody id="ca-attrs"><tr><td colspan="6">טוען…</td></tr></tbody>
+        </table>
+      </div>
+
       <h2 style="margin-top:26px">📝 שורות ממתינות לאישור</h2>
       <p class="ca-note">
         שורה לא מוצגת בשום מקום לפני אישור. אלה בני אדם אמיתיים.
@@ -430,7 +448,10 @@
 <!-- chem-data: כדי שתור הצמדים ידע מה כבר במשחק. league_tables כבר
        נטען מעליו ומשמש לחישוב האליפויות המשותפות. -->
   <script src="js/chem-data.js?v=e5cdbc98"></script>
-  <script src="js/crowd-admin.js?v=c6a0b171"></script>
+<!-- attr-data + attrs: ה"במשחק" בטבלת שש התכונות — המספר שבונה כדורגלן משתמש בו. -->
+  <script src="js/attr-data.js?v=8bb8940e"></script>
+  <script src="js/attrs.js?v=aa09fd77"></script>
+  <script src="js/crowd-admin.js?v=817aafac"></script>
 <script>
 const statusEl = document.getElementById('status');
 let overrides = {};   // key -> value currently stored in site_texts
