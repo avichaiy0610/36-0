@@ -301,6 +301,9 @@ body.eu-blue #screen-europe { background: transparent; }
 .eu-badge-fb { display: none; font-size: 15px; }
 .eu-badge-fb.shown { display: inline; }
 .eu-badge img.missing + .eu-badge-fb { display: inline; }
+/* your own club's crest (js/club.js) — drawn SVG or a picked badge, same box */
+.eu-badge-mine > svg, .eu-badge-mine > img { width: 100%; height: 100%; object-fit: contain; }
+.eu-badge-mine.sm { width: 16px; height: 16px; vertical-align: -3px; margin-inline-end: 3px; }
 
 .mr-gw { font-size: 10px; color: var(--eu-dim); font-weight: 700; margin-inline-end: 3px; }
 

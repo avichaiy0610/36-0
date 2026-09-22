@@ -87,6 +87,11 @@ function officialFor(key, season) {
       const k = norm(p.name) + '|' + sq.season;
       if (!_official.has(k)) _official.set(k, []);
       if (!_official.get(k).includes(p.ovr)) _official.get(k).push(p.ovr);
+      // הצבעת שיא מתויקת תחת season='peak'. בלי הרשומה הזאת היא דולגה כ"לא
+      // בדאטה" ואף פעם לא נשלחה. אותו כלל כמו caIndex בדשבורד: peak_ovr, ובהיעדרו
+      // ה-ovr הגבוה ביותר של האדם.
+      const pk = norm(p.name) + '|peak';
+      _official.set(pk, [Math.max((_official.get(pk) || [0])[0], p.peak_ovr ?? p.ovr)]);
     }));
   }
   return _official.get(key + '|' + season) || null;
@@ -188,7 +193,7 @@ async function collect() {
       payload: { t: 'r', k: r.player_key, s: r.season, n: r.n,
                  avg: r.avg_trimmed, old: official, pub: isPub },
       text:
-        `⭐ <b>${esc(r.player_key)}</b> · ${esc(r.season)}\n` +
+        `⭐ <b>${esc(r.player_key)}</b> · ${r.season === 'peak' ? 'שיא הקריירה' : esc(r.season)}\n` +
         `הקהל: <b>${r.avg_trimmed}</b> · ${r.n} הצבעות` +
         (r.tag_top ? `\nתגית מובילה: ${esc(tagLabel(r.tag_top))} (${r.tag_top_n})` : '') +
         (r.published ? '\n👁 כבר מוצג לציבור' : '\n🚫 מוסתר מהציבור'),
@@ -260,7 +265,7 @@ async function digest() {
   if (seen === sig) { console.log('אין פעילות חדשה מאז הדיווח האחרון.'); return; }
 
   const lines = rows.slice(0, 12).map(r =>
-    `• ${esc(r.player_key)} · ${esc(r.season)} — ${r.n} ${r.n === 1 ? 'הצבעה' : 'הצבעות'}`);
+    `• ${esc(r.player_key)} · ${r.season === 'peak' ? 'שיא הקריירה' : esc(r.season)} — ${r.n} ${r.n === 1 ? 'הצבעה' : 'הצבעות'}`);
   const text =
     '📊 <b>פעילות בדירוגי הקהל</b>\n' +
     `עוד אין מה לאשר — דירוג נחשף מ-${CROWD_MIN_VOTES} הצבעות.\n\n` +

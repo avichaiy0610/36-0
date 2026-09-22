@@ -72,6 +72,19 @@ function euBigCrest(cid, flag, name) {
     : mono}</span>`;
 }
 
+// YOUR side. A club you built or picked (js/club.js) is your crest here too —
+// the monogram of your own name read as a club we had no badge for. No club
+// means no crest you chose, so the monogram stays.
+function euMyCrest(big) {
+  const name = myTeamName(euText('eu-you', 'ההרכב שלי'));
+  const club = (typeof clubHas === 'function' && clubHas() &&
+                typeof clubCrestSVG === 'function') ? clubGet() : null;
+  if (club) {
+    return `<span class="eu-badge eu-badge-mine${big ? '' : ' sm'}">${clubCrestSVG(club, big ? 18 : 13)}</span>`;
+  }
+  return big ? euBigCrest(null, '', name) : euMonogram(name, 'eu-mono-sm');
+}
+
 /* ── the backdrop ─────────────────────────────────────────────────────────────
    From the qualifying play-off on, the PAGE changes, not just the card: a fixed
    layer behind everything, holding the blue-to-magenta wash and the big curved
@@ -319,7 +332,7 @@ function euLiveHTML(c, t, leg) {
         <span class="eu-vs">${euText('eu-vs', 'מול')} ${t.club.name}</span>
       </div>
       <div class="eu-live-top">
-        <span class="eu-side">${myTeamName(euText('eu-you', 'ההרכב שלי'))} ${euBigCrest(null, '', myTeamName(euText('eu-you', 'ההרכב שלי')))}</span>
+        <span class="eu-side">${myTeamName(euText('eu-you', 'ההרכב שלי'))} ${euMyCrest(true)}</span>
         <!-- RTL row: your side renders on the right. The scoreline is dir=ltr, so
              its first child is leftmost and must be the OPPONENT's goals, or your
              own score ends up printed beside their name. -->
@@ -509,7 +522,7 @@ function euStandingsHTML(c) {
     const pos = offset + i + 1;
     const cls = pos <= 8 ? 'bye' : pos <= 24 ? 'po' : 'out';
     const name = t.us
-      ? `<span class="lt-name">${myTeamName(euText('eu-you', 'ההרכב שלי'))} <span class="lt-us-badge">#${pos}</span></span>`
+      ? `<span class="lt-name">${euMyCrest(false)} ${myTeamName(euText('eu-you', 'ההרכב שלי'))} <span class="lt-us-badge">#${pos}</span></span>`
       : `<span class="lt-name">${euCrest(t.cid, t.flag, t.name)} ${t.name}</span>`;
     return `<div class="lt-row ${cls}${t.us ? ' lt-us' : ''}">
       <span class="lt-pos">${pos}</span>${name}

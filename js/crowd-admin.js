@@ -65,6 +65,19 @@ function caIndex() {
     if (rec.ovrs.indexOf(p.ovr) === -1) rec.ovrs.push(p.ovr);
     if (rec.teams.indexOf(sq.teamId) === -1) rec.teams.push(sq.teamId);
   }));
+  // הצבעת שיא מתויקת תחת season='peak', ובלי הרשומה הזאת היא לא נמצאה כאן אף
+  // פעם — נספרה כ"לא נמצאו בדאטה" ונבלעה, כלומר מתג "בשיא שלו" אסף הצבעות
+  // שהבעלים לא יכול היה לראות. הרשמי של השיא הוא peak_ovr, ובהיעדרו ה-ovr הגבוה
+  // ביותר של אותו אדם — אותה נפילה שהמשחק עצמו עושה ב-playerOVR.
+  const peaks = new Map();
+  SQUADS.forEach(sq => sq.players.forEach(p => {
+    const k = crowdKey(p.name) + '|peak';
+    let rec = peaks.get(k);
+    if (!rec) peaks.set(k, rec = { best: 0, teams: [] });
+    rec.best = Math.max(rec.best, p.peak_ovr ?? p.ovr);
+    if (rec.teams.indexOf(sq.teamId) === -1) rec.teams.push(sq.teamId);
+  }));
+  peaks.forEach((rec, k) => m.set(k, { ovrs: [rec.best], teams: rec.teams }));
   return (_caIndex = m);
 }
 

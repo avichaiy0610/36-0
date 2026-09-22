@@ -3012,10 +3012,14 @@ function showPreseason(ovr) {
    league table or the cup did. It is the one seat in Europe that the domestic
    season cannot give, take away, or change.
 
-   So it is not weighed against the seat the table handed you: it REPLACES it.
-   A champion who holds the Conference plays the Europa League's league phase,
-   because a guaranteed seat at the table is what the trophy was worth and
-   nothing at home can be allowed to trade it for a qualifying round.
+   It IS weighed against the seat the table handed you, the way UEFA weighs it:
+   a club holds only its highest place, CL > EL > ECL. The holder's seat wins a
+   tie (the Europa League winner who is also champion plays the CL league phase,
+   not its qualifiers) and wins against anything lower. What it may not do is
+   pull a club DOWN a competition. It used to REPLACE the league seat outright,
+   so a champion holding the Conference was sent to the Europa League's league
+   phase instead of the Champions League qualifiers the title had earned. In
+   reality the holder's Europa seat is simply vacated when that happens.
 
    Only a career has a "last season" to read, which is why this is the only mode
    it applies to. The trophy is written when the campaign resolves, and that
@@ -3040,11 +3044,18 @@ function euHolderBerth() {
 function euAllocationFor(rank, table) {
   const LABEL = { ucl: 'ליגת האלופות', uel: 'הליגה האירופית', uecl: 'קונפרנס ליג' };
 
-  // Asked and answered before the table is read at all, because a holder's seat
-  // does not depend on a single thing in it.
+  // The holder's seat against the league's: the higher competition wins, and on
+  // the same competition the holder's (straight to the league phase) does.
   const held = euHolderBerth();
-  if (held) return { tier: held.tier, label: LABEL[held.tier], direct: true, holder: held.from };
+  const league = euLeagueAllocation(rank, table, LABEL);
+  const RANK = { ucl: 3, uel: 2, uecl: 1 };
+  if (held && (!league || RANK[held.tier] >= RANK[league.tier])) {
+    return { tier: held.tier, label: LABEL[held.tier], direct: true, holder: held.from };
+  }
+  return league;
+}
 
+function euLeagueAllocation(rank, table, LABEL) {
   const rows = Array.isArray(table) ? table : null;
   const iWonCup = typeof cupPlayerWon === 'function' && cupPlayerWon();
   const w = typeof cupWinner === 'function' ? cupWinner() : null;
