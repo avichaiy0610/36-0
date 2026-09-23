@@ -3176,6 +3176,7 @@ function showResults() {
   // league, duel, Europe's return, a plain draft) and a node nobody removes is a
   // node that turns up in the next mode — the bug this project keeps re-learning.
   if (typeof crowdXiTipClear === 'function') crowdXiTipClear();
+  if (typeof storyClearEnd === 'function') storyClearEnd();
   // League draft: no personal reveal. Simulate silently, record the season to
   // the league, and send the player back to the (still-locked) league table —
   // the standings are only unveiled once every member has played.
