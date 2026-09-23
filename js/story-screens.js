@@ -20,6 +20,10 @@
     ? `<bdi dir="ltr">${String(Math.round(n / 10) / 100)}</bdi> מיליון`
     : `<bdi dir="ltr">${Math.round(n)}</bdi> אלף`;
   const num = n => `<bdi dir="ltr">${n}</bdi>`;
+  // A score read right to left: YOUR number first (on the right, beside your
+  // name), theirs second. Each number is isolated so the dash between them runs
+  // in the page's direction. A single "0-1" in an LTR run read as 1-0 to us.
+  const score = (mine, theirs) => `<bdi>${mine}</bdi> – <bdi>${theirs}</bdi>`;
   // What you type is whole shekels, with separators: "1,500,000". The owner could
   // not tell what "1500" in a box marked "אלף" meant; nobody misreads a full sum.
   const shekels = k => (Math.round(k) * 1000).toLocaleString('en-US');
@@ -265,10 +269,13 @@
     // the market list: what you can afford first, then the best of what you cannot
     const q = (ctx.q || '').trim();
     const pos = ctx.pos || '';
+    // the broad filter: the engine's own lines (SIM2_LINES), then the exact position
+    const line = ctx.line || '';
+    const inLine = e => !line || SIM2_LINES[line].pos.includes(e.player.position);
     const askOf = e => storyAsk(run, ch, e, valueOf(e));
     const found = storyMarketPool(run, ch)
       .filter(e => (!q || e.player.name.includes(q) || clubName(e.squad.teamId).includes(q)) &&
-                   (!pos || e.player.position === pos))
+                   inLine(e) && (!pos || e.player.position === pos))
       .sort((a, b) => b.player.ovr - a.player.ovr);
     // One list, by rating, highest first. "רק מה שבתקציב" (on by default) hides
     // whoever you cannot afford or cannot have; the old split — affordable first,
@@ -390,7 +397,9 @@
       <div class="st-row">
         <input id="st-q" placeholder="חיפוש שחקן או מועדון" value="${esc(q)}">
         <label class="st-chk"><input type="checkbox" id="st-afford"${onlyAfford ? ' checked' : ''}> רק מה שבתקציב</label>
-        <select id="st-pos"><option value="">כל העמדות</option>${positions.map(p =>
+        <select id="st-line"><option value="">כל הקווים</option>${[['gk', 'שוערים'], ['def', 'הגנה'], ['mid', 'קישור'], ['atk', 'התקפה']]
+          .map(([k, l]) => `<option value="${k}"${k === line ? ' selected' : ''}>${l}</option>`).join('')}</select>
+        <select id="st-pos"><option value="">כל העמדות</option>${positions.filter(p => !line || SIM2_LINES[line].pos.includes(p)).map(p =>
           `<option value="${p}"${p === pos ? ' selected' : ''}>${esc(posHe(p))}</option>`).join('')}</select>
       </div>
       <div class="st-list">${marketHTML}</div>
@@ -489,6 +498,7 @@
     const qEl = byId('st-q');
     qEl.onchange = () => redraw({ q: qEl.value, msg: '', open: null });
     byId('st-pos').onchange = ev => redraw({ pos: ev.target.value, msg: '', open: null });
+    byId('st-line').onchange = ev => redraw({ line: ev.target.value, pos: '', msg: '', open: null });
     byId('st-afford').onchange = ev => redraw({ afford: ev.target.checked, msg: '', open: null });
     byId('st-done').onclick = ctx.onDone;
   }
@@ -570,7 +580,7 @@
   function euLegLine(us, leg, oppName) {
     const sc = (leg.scorers || []).map(s => `${esc(s.n)} ${s.min}'`).join(' · ');
     return `<div class="eu-leg ${leg.gf > leg.ga ? 'w' : leg.gf < leg.ga ? 'l' : 'd'}">
-      <b>${esc(us)} <bdi dir="ltr">${leg.gf}-${leg.ga}</bdi> ${esc(oppName)}</b>
+      <b>${esc(us)} ${score(leg.gf, leg.ga)} ${esc(oppName)}</b>
       <span>${venue({}, leg.home)} · ${esc(TACTICS[leg.tactic] ? TACTICS[leg.tactic].label : '')}</span>
       ${sc ? `<em>⚽ ${sc}</em>` : ''}</div>`;
   }
@@ -617,9 +627,9 @@
       if (L.closed && L.closed.kind === 'tie') {
         const c = L.closed;
         const how = c.how === 'away' ? ' (שערי חוץ)' : c.how === 'et' ? ' (אחרי הארכה)' : c.how === 'pens'
-          ? ` (בפנדלים <bdi dir="ltr">${c.pens.gf}-${c.pens.ga}</bdi>)` : '';
+          ? ` (בפנדלים ${score(c.pens.gf, c.pens.ga)})` : '';
         lastHTML += `<div class="eu-verdict ${c.won ? 'ok' : 'out'}">${c.won ? 'עליתם!' : 'הודחתם.'}
-          סיכום <bdi dir="ltr">${c.agg.gf}-${c.agg.ga}</bdi>${how}</div>
+          סיכום ${score(c.agg.gf, c.agg.ga)}${how}</div>
           <div class="st-note">במציאות: ${esc(r.real)}</div>`;
       }
       if (L.closed && L.closed.kind === 'group') {
@@ -720,7 +730,7 @@
       }).join('')}</ul>
       <div class="st-vs">${r.eu ? `
         <div><i>אתם</i><b>${r.eu.champion ? 'זכייה בגביע!' : 'עד ' + esc(storyEuRoundLabel(ch, r.eu.reached))}${r.eu.group
-          ? ` · ${r.eu.group.pts} נק׳ בבית, <bdi dir="ltr">${r.eu.group.gf}-${r.eu.group.ga}</bdi>` : ''}</b></div>
+          ? ` · ${r.eu.group.pts} נק׳ בבית, שערים ${score(r.eu.group.gf, r.eu.group.ga)}` : ''}</b></div>
         <div><i>המציאות</i><b>${esc(realTextOf(ch))}</b></div>` : `
         <div><i>אתם</i><b>מקום ${r.rank} · ${num(r.points)} נק׳</b></div>
         <div><i>המציאות</i><b>מקום ${real ? real.pos : '?'} · ${real ? real.pts : '?'} נק׳</b></div>`}
