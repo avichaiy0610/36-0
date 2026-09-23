@@ -230,6 +230,7 @@ const STORY_CHAPTERS = [
            'ונעצרה רק ברבע הגמר מול מילאן. הפעם אפשר להמשיך: אחרי מילאן מחכה דורטמונד, ' +
            'והגמר נערך באצטדיון של פיינורד ברוטרדם.',
     europe: {
+      tier: 'uel',                     // the UEFA Cup wears what its successor, the Europa League, wears
       awayGoals: true,
       window: 'r4',                    // the winter break, before the last 16
       realOut: 'qf',
@@ -273,6 +274,7 @@ const STORY_CHAPTERS = [
            'את מנצ\'סטר יונייטד ואת אולימפיאקוס 0:3, וסיימה שלישית בבית עם לברקוזן. ' +
            'שלישית זה מה שהיה. שתיים הראשונות עולות.',
     europe: {
+      tier: 'ucl',
       awayGoals: true,
       window: 'group',                 // the deadline between the qualifiers and the group
       realOut: 'group',
@@ -314,6 +316,7 @@ const STORY_CHAPTERS = [
            'ובבית עם באיירן מינכן, יובנטוס ובורדו הפסידה בכל ששת המשחקים: ' +
            'אפס נקודות, אפס שערים. הפעם צריך יותר מנקודה של כבוד.',
     europe: {
+      tier: 'ucl',
       awayGoals: true,
       window: 'group',
       realOut: 'group',
@@ -380,6 +383,7 @@ const STORY_CHAPTERS = [
            'ובבית עם יובנטוס, באיירן מינכן ואייאקס ניצחה את אייאקס 2-1 והוציאה 1-1 מיובנטוס. ' +
            '4 נקודות ומקום רביעי. מקום שלישי היה שולח אותה לגביע אופ"א.',
     europe: {
+      tier: 'ucl',
       awayGoals: true,
       window: 'group',
       realOut: 'group',
