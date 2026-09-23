@@ -29,7 +29,7 @@ const EXPORTS = ['state', 'SQUADS', 'LEAGUE_TABLES', 'FORMATIONS', 'formationSlo
   'STORY_RULES', 'STORY_CHAPTERS', 'storyChapter', 'storyValueOfOvr', 'storyPrevSeason',
   'storySummerValue', 'storyPerfBonus', 'storyJanValue', 'storySellPrice', 'storyBuyPrice',
   'storyIsRival', 'storyReal', 'storyHomeSquad', 'storyNewRun', 'storyOwned', 'storyMarketPool',
-  'storyBuy', 'storySell', 'storyOpponents', 'storyBestXI', 'storyStars', 'storyScore',
+  'storyBuy', 'storySell', 'storyOpponents', 'storyBestXI', 'storyStars', 'storyScore', 'storyCoreNames', 'storyResolveOvr', 'storyResult',
   'storyApplyXI', 'storyXiOvr', 'storyStatsFor', 'storyMergeStats', 'storySimulateFn',
   'storySeasonPrepare', 'storySeasonResim', 'storyOppForSim'];
 
@@ -165,12 +165,41 @@ if (require.main === module) {
     assert.strictEqual(new Set(xi.map(p => p.player.name)).size, 11);
     assert.strictEqual(xi[0].player.position, 'GK');
   });
-  t('stars and score', () => {
+  t('stars are graded, and keepCore reads the real opening eleven', () => {
     const r = G.storyReal(ch);
-    assert.deepStrictEqual(G.storyStars(ch, { rank: 1, points: r.pts + 1, budget: ch.budget }), [true, true, true]);
-    assert.deepStrictEqual(G.storyStars(ch, { rank: 2, points: r.pts, budget: ch.budget - 1 }), [false, false, false]);
-    assert.strictEqual(G.storyScore(ch, { rank: 1, points: r.pts + 5, budget: 10 }),
-      (G.storyStars(ch, { rank: 1, points: r.pts + 5, budget: 10 }).filter(Boolean).length) * 1000 + 100 + 100);
+    assert.deepStrictEqual(G.storyStars(ch, { rank: 1, points: r.pts + 1, budget: 0, sold: [] }), [true, true, true]);
+    assert.deepStrictEqual(G.storyStars(ch, { rank: 2, points: r.pts + 9, budget: 0, sold: [] }), [false, false, false]);
+    assert.deepStrictEqual(G.storyStars(ch, { rank: 1, points: r.pts, budget: 0, sold: [] }), [true, false, false]);
+    assert.deepStrictEqual(G.storyStars(ch, { rank: 1, points: r.pts + 1, budget: 0, sold: ['לא קיים'] }), [true, true, true]);
+    assert.deepStrictEqual(G.storyStars(ch, { rank: 1, points: r.pts + 1, budget: 0, sold: [G.storyCoreNames(ch)[0]] }), [true, true, false]);
+  });
+  t('score', () => {
+    const r = G.storyReal(ch);
+    const res = { rank: 1, points: r.pts + 5, budget: 10, sold: [] };
+    assert.strictEqual(G.storyScore(ch, res), 3000 + 100 + 100);
+  });
+  t('margin and maxBuys stars, from storyResult', () => {
+    const ks = G.storyChapter('ks-2011');
+    const run = G.storyNewRun(ks, 1);
+    run.budget = 100;
+    const table = [{ us: true, pts: 80 }, { us: false, w: 23, d: 5, l: 9 }];   // 74 pts: margin 6
+    let res = G.storyResult(run, table, 1, 80);
+    assert.strictEqual(res.margin, 6);
+    assert.deepStrictEqual(G.storyStars(ks, res), [true, true, true]);
+    G.storyMarketPool(run, ks).slice(0, 4).forEach(e => G.storyBuy(run, ks, e, 1));   // the summer's four
+    assert.deepStrictEqual(G.storyStars(ks, G.storyResult(run, table, 1, 80)), [true, true, true]);
+    run.phase = 'jan';
+    G.storyBuy(run, ks, G.storyMarketPool(run, ks)[0], 1);                               // a fifth
+    assert.deepStrictEqual(G.storyStars(ks, G.storyResult(run, table, 1, 80)), [true, true, false]);
+    const tight = [{ us: true, pts: 80 }, { us: false, pts: 77 }];
+    assert.deepStrictEqual(G.storyStars(ks, G.storyResult(run, tight, 1, 80)), [true, false, false]);
+  });
+  t('ks-2011 is the live chapter: 16 clubs, real champion on 73', () => {
+    const ks = G.storyChapter('ks-2011');
+    assert.ok(ks && !ks.hidden);
+    assert.deepStrictEqual(Object.values(G.storyReal(ks)), [1, 73, 16]);
+    assert.strictEqual(G.storyOpponents(ks, G.storyNewRun(ks, 1), 'summer').length, 15);
+    assert.strictEqual(G.storyCoreNames(ks).length, 11);
   });
 
   if (process.argv.includes('--season')) require('./story_test_season.js')(G, t);

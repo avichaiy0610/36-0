@@ -198,18 +198,51 @@ function storyBestXI(entries, slots) {
   return picks;
 }
 
-// res: { rank, points, budget } — budget is what is left at the end.
+// The real opening eleven: the best XI of the real squad in the default shape.
+// "Keep the core" is judged against these names, whatever shape you later play.
+function storyCoreNames(ch) {
+  const home = storyHomeSquad(ch);
+  const entries = home.players.map(p => ({ player: p, squad: home }));
+  return storyBestXI(entries, formationSlots('4-3-3', 'bal')).filter(Boolean).map(e => e.player.name);
+}
+
+// res: { rank, points, margin, budget, sold: [names], boughtTeams: [teamIds] }
+//   margin — your points minus the best other club's; budget — what is left.
+// GRADED: a star counts only if the one before it does.
 function storyStars(ch, res) {
   const real = storyReal(ch);
-  return ch.stars.map(s => {
+  const raw = ch.stars.map(s => {
     if (s.type === 'rank') return res.rank <= s.max;
     if (s.type === 'beatPoints') return !!real && res.points > real.pts;
-    if (s.type === 'profit') return res.budget >= ch.budget;
+    if (s.type === 'margin') return res.rank === 1 && (res.margin || 0) >= s.min;
+    if (s.type === 'noBuyFrom') return !(res.boughtTeams || []).some(t => s.teams.includes(t));
+    if (s.type === 'maxBuys') return (res.boughtTeams || []).length <= s.n;
+    if (s.type === 'keepCore') {
+      const core = new Set(storyCoreNames(ch));
+      return !(res.sold || []).some(n => core.has(n));
+    }
     return false;
   });
+  return raw.map((ok, i) => raw.slice(0, i + 1).every(Boolean));
 }
 function storyScore(ch, res) {
   const real = storyReal(ch);
   const stars = storyStars(ch, res).filter(Boolean).length;
   return stars * 1000 + (real ? (res.points - real.pts) * 20 : 0) + Math.round(res.budget * 10);
 }
+
+// The facts storyStars needs from a finished run and its league table.
+function storyResult(run, table, rank, points) {
+  const us = table.find(r => r.us);
+  const others = table.filter(r => !r.us).map(r => r.pts ?? (r.w * 3 + r.d));
+  const usPts = us ? (us.pts ?? (us.w * 3 + us.d)) : points;
+  return {
+    rank, points, budget: run.budget,
+    margin: usPts - Math.max(...others),
+    sold: run.sold.map(s => s.name),
+    boughtTeams: run.bought.map(b => (SQUADS.find(s => s.id === b.squadId) || {}).teamId),
+  };
+}
+
+// A signing's rating, from his reference — for reports and the calibration.
+function storyResolveOvr(ref) { const e = storyResolve(ref); return e ? e.player.ovr : 0; }
