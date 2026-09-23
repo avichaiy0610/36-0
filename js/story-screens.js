@@ -332,6 +332,10 @@
       <div class="st-list">${marketHTML}</div>
       <button class="st-b go st-go" id="st-done">${jan ? 'להמשיך את העונה' : 'לפתיחת העונה'}</button>`;
 
+    // Scoped on purpose: January renders into an overlay while the summer market
+    // is still in the (hidden) story screen with the same ids, and a page-wide
+    // lookup finds the summer copy first — "להמשיך את העונה" did nothing.
+    const byId = id => ctx.host.querySelector('#' + id);
     const redraw = extra => renderMarket({ ...ctx, ...extra });
     // "Not enough budget" alone read as nothing happening; say what there is.
     const blockedMsg = why => /תקציב/.test(why)
@@ -376,15 +380,15 @@
       redraw({ open: ctx.open === k ? null : k, talkMsg: '', msg: '', amt: null });
     });
     $('[data-quick]').forEach(b => b.onclick = () => {
-      const inp = document.getElementById('st-amt');
+      const inp = byId('st-amt');
       if (inp) { inp.value = shekels(Number(b.dataset.quick)); inp.dispatchEvent(new Event('blur')); }
     });
-    const amt = document.getElementById('st-amt');
-    if (amt) wireAmount(amt, document.getElementById('st-amt-say'));
+    const amt = byId('st-amt');
+    if (amt) wireAmount(amt, byId('st-amt-say'));
     $('[data-bid-amt]').forEach(inp => wireAmount(inp, ctx.host.querySelector(`[data-bid-say="${inp.dataset.bidAmt}"]`)));
     $('[data-offer]').forEach(b => b.onclick = () => {
       const e = byKey(b.dataset.offer);
-      const amount = parseK(document.getElementById('st-amt').value);
+      const amount = parseK(byId('st-amt').value);
       const r = storyOffer(run, ch, e, valueOf(e), amount);
       saved();
       const club = esc(clubName(e.squad.teamId));
@@ -406,21 +410,21 @@
         ? { open: null, msg: `סגרנו! ${esc(e.player.name)} הצטרף ב-${money(r.price)} ₪` }
         : { talkMsg: blockedMsg(r.why) });
     });
-    document.getElementById('st-form').onchange = ev => {
+    byId('st-form').onchange = ev => {
       run.formationId = ev.target.value;
       if (!formationTactical(run.formationId)) run.tactic = 'bal';
       saved();
       redraw({ msg: '' });
     };
-    document.getElementById('st-tac').onchange = ev => {
+    byId('st-tac').onchange = ev => {
       run.tactic = ev.target.value;
       saved();
       redraw({ msg: '' });
     };
-    const qEl = document.getElementById('st-q');
+    const qEl = byId('st-q');
     qEl.onchange = () => redraw({ q: qEl.value, msg: '', open: null });
-    document.getElementById('st-pos').onchange = ev => redraw({ pos: ev.target.value, msg: '', open: null });
-    document.getElementById('st-done').onclick = ctx.onDone;
+    byId('st-pos').onchange = ev => redraw({ pos: ev.target.value, msg: '', open: null });
+    byId('st-done').onclick = ctx.onDone;
   }
 
   function storyShowMarket() {
