@@ -403,12 +403,14 @@ if (require.main === module) {
     assert.ok(after[0] && after[0].player.name !== benchGk.player.name);
     assert.deepStrictEqual(G.storyPickXI(owned, slots, {}).map(e => e.player.name), auto.map(e => e.player.name));
   });
-  t('the achievements migration knows every chapter', () => {
-    const sql = fs.readFileSync(path.join(ROOT, 'supabase/migrations/20260923000002_story_achievements.sql'), 'utf8');
+  t('the achievements and board migrations know every chapter', () => {
+    for (const mig of ['20260923000002_story_achievements.sql', '20260923000003_story_board.sql']) {
+    const sql = fs.readFileSync(path.join(ROOT, 'supabase/migrations/' + mig), 'utf8');
     const known = (sql.match(/v_known\s+text\[\]\s+:=\s+ARRAY\[([^\]]*)\]/) || [])[1] || '';
     const ids = known.split(',').map(s => s.trim().replace(/^'|'$/g, '')).filter(Boolean).sort();
     assert.deepStrictEqual(ids, G.STORY_CHAPTERS.map(c => c.id).sort(),
-      'a chapter was added or renamed: add it to v_known in a new migration');
+      mig + ': a chapter was added or renamed: add it to v_known in a new migration');
+    }
   });
   t('a signing at 85% of the first price or less is a bargain', () => {
     let hit = false;

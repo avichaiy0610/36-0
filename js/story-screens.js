@@ -126,6 +126,14 @@
 .st-amt{width:96px;background:var(--surface);color:var(--text);border:1px solid var(--border);
   border-radius:8px;padding:7px;font-family:inherit;font-size:14px}
 .st-unit{font-size:13px;color:var(--dim)}
+.st-board{width:100%;border-collapse:collapse;font-size:13px;margin:4px 0 10px}
+.st-board th{color:var(--dim);font-weight:400;text-align:right;padding:4px}
+.st-board td{padding:5px 4px;border-top:1px solid var(--border);text-align:right}
+.st-board .st-stars{font-size:12px;letter-spacing:0}
+.st-board tr.me td{color:var(--accent);font-weight:700}
+.st-board tr.gap td{color:var(--dim);text-align:center;border-top:none}
+.st-rank{margin:6px 0;font-size:15px}
+.st-end-board{text-align:right;margin:8px 0 12px}
 .st-hurt{color:#f85149}
 .st-tag.no{color:#f85149;border-color:#f8514966}
 .st-chk{display:flex;align-items:center;gap:5px;font-size:13px;color:var(--dim);white-space:nowrap}
@@ -204,6 +212,36 @@
     });
   }
 
+  /* ── the board ─────────────────────────────────────────────────────────── */
+  // Each player's best run in the chapter (story_board). Signed out or offline:
+  // a quiet line instead — a board never blocks a chapter.
+  async function storyFillBoard(el, ch, limit, mine) {
+    if (!el || typeof _supabase === 'undefined') return;
+    el.innerHTML = '<p class="st-note">טוען את לוח השיאים…</p>';
+    try {
+      if (global._storySubmit) await global._storySubmit;
+      const { data, error } = await _supabase.rpc('story_board', { p_chapter: ch.id, p_limit: 200 });
+      if (error) throw error;
+      const rows = data || [];
+      const me = typeof getCurrentUser === 'function' && getCurrentUser() ? getCurrentUser().id : null;
+      const myRow = me ? rows.find(r => r.user_id === me) : null;
+      if (!rows.length) {
+        el.innerHTML = '<p class="st-note">עוד אין תוצאות בלוח של הפרק הזה. הראשון שיסיים יהיה במקום הראשון.</p>';
+        return;
+      }
+      const line = r => `<tr class="${r.user_id === me ? 'me' : ''}"><td>${r.rank}</td><td>${esc(r.username || 'שחקן')}</td>
+        <td>${starsHTML([r.stars >= 1, r.stars >= 2, r.stars >= 3])}</td><td>${num(r.score)}</td></tr>`;
+      const top = rows.slice(0, limit);
+      const extra = myRow && myRow.rank > limit ? '<tr class="gap"><td colspan="4">…</td></tr>' + line(myRow) : '';
+      el.innerHTML = `${mine && myRow ? `<p class="st-rank">המקום שלך בלוח: <b>${myRow.rank}</b> מתוך ${rows.length}</p>` : ''}
+        ${mine && !me ? '<p class="st-note">התחברו כדי להיכנס ללוח השיאים של הפרק.</p>' : ''}
+        <table class="st-board"><tr><th>#</th><th>שחקן</th><th>כוכבים</th><th>ניקוד</th></tr>
+        ${top.map(line).join('')}${extra}</table>`;
+    } catch (e) {
+      el.innerHTML = '<p class="st-note">לוח השיאים לא זמין כרגע.</p>';
+    }
+  }
+
   function storyShowIntro(chId) {
     const ch = storyChapter(chId);
     const run = storyRun();
@@ -221,10 +259,13 @@
           עד ${storyRules(ch).buys.summer} רכישות בקיץ ו-${storyRules(ch).buys.jan} בינואר ·
           סגל של ${storyRules(ch).minSquad} שחקנים לפחות</p>
       </div>
+      <div class="st-h">🏆 לוח השיאים של הפרק</div>
+      <div id="st-board-intro"></div>
       <button class="st-b go st-go" id="st-begin">${live ? 'להמשיך את הקיץ' : 'להתחיל את הפרק'}</button>
       <button class="st-b st-go" id="st-hub">חזרה לפרקים</button>`;
     document.getElementById('st-begin').onclick = () => live ? storyShowMarket('summer') : storyStart(ch.id);
     document.getElementById('st-hub').onclick = storyShowHub;
+    storyFillBoard(document.getElementById('st-board-intro'), ch, 10, false);
   }
 
   /* ── the market (both windows) ───────────────────────────────────────────── */
@@ -754,12 +795,14 @@
       </div>
       <p style="margin:0 0 4px">תקציב בסוף: <b>${money(r.budget)}</b> (פתיחה: ${money(ch.budget)})</p>
       <p style="margin:0 0 12px">ניקוד: <b>${num(r.score)}</b>${best ? ` · השיא שלך: <b>${num(best.score)}</b>` : ''}</p>
+      <div class="st-end-board" id="st-end-board"></div>
       <div style="display:flex;gap:8px">
         <button class="st-b go" id="st-again" style="flex:1">לשחק שוב</button>
         <button class="st-b" id="st-chapters" style="flex:1">לפרקים</button>
       </div></div>`;
     document.getElementById('st-again').onclick = () => storyStart(ch.id);
     document.getElementById('st-chapters').onclick = storyExit;
+    storyFillBoard(box.querySelector('#st-end-board'), ch, 5, true);
   }
 
   // Any season that is NOT a chapter must not show the last chapter's verdict.
