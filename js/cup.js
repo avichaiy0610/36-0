@@ -457,6 +457,184 @@
     after.parentNode.appendChild(b);
   }
 
+  /* ── אלוף האלופים ───────────────────────────────────────────────────────────
+     Israel's Super Cup: the champion against the cup holder. When the champion
+     did the double, the league runner-up takes the other seat — the real rule
+     (Maccabi Tel Aviv v Ironi Kiryat Shmona, 2015).
+
+     In reality it opens the NEXT season, in July. Here it closes this one, from
+     the results screen, for the same reason the European Super Cup does: a new
+     season clears the save, and with it the XI that earned the ticket. It lives
+     inside the cup's own save (`_run.super`), so it is cleared with the cup.
+
+     One match, neutral ground, level after ninety goes straight to penalties —
+     no extra time since 2016/17. The cup's levelling applies: it is a one-off
+     Israeli final, and you are the big club in it. */
+  function superOpponent(rank, table) {
+    const rows = Array.isArray(table) ? table : [];
+    const iChamp = rank === 1;
+    const iCup = cupPlayerWon();
+    if (!iChamp && !iCup) return null;
+    let name, role;
+    if (iChamp && iCup) {
+      const r = rows[1];
+      if (!r) return null;
+      name = r.name; role = 'סגנית האלופה';
+    } else if (iChamp) {
+      const w = _run.champion;
+      if (!w || w.us) return null;
+      return { club: { ...w }, role: 'מחזיקת הגביע', mine: 'אלופת המדינה' };
+    } else {
+      const r = rows[0];
+      if (!r || r.us) return null;
+      name = r.name; role = 'אלופת המדינה';
+    }
+    // The club's line ratings, from the cup's own field — the thirteen the season
+    // was played against all entered the cup at the first round.
+    const all = _run.rounds[0].ties.flatMap(t => [t.a, t.b]);
+    let club = all.find(c => !c.us && c.name === name);
+    if (!club) {
+      const top = all.filter(c => !c.us && c.tier === 0);
+      const ovr = top.length ? Math.round(Math.max(...top.map(c => c.ovr))) : 80;
+      club = { id: 'isc-opp', name, tier: 0, ovr, ...cupLines(ovr) };
+    }
+    return { club: { ...club }, role, mine: iChamp ? (iCup ? 'בעלת הדאבל' : 'אלופת המדינה') : 'מחזיקת הגביע' };
+  }
+
+  function superPlay(s) {
+    if (s.played) return s;
+    const me = myLineRatings();
+    const mine = { us: true, ovr: me.ovr, atk: me.atk, mid: me.mid, def: me.def, gk: me.gk, cs: me.cs };
+    const [A, B] = cupLevelled(mine, s.club);
+    const a = simShrinkLines(A), b = simShrinkLines(B);
+    s.gf = simDrawGoals(simExpectedGoals(a, b, false));
+    s.ga = simDrawGoals(simExpectedGoals(b, a, false), A.cs);
+    s.pens = null;
+    if (s.gf === s.ga) {
+      const m = 3 + (Math.random() < 0.5 ? 1 : 0);
+      s.pens = { gf: m, ga: m === 4 ? 3 : 4 };
+    }
+    s.won = s.pens ? s.pens.gf > s.pens.ga : s.gf > s.ga;
+    const stub = { gf: s.gf, ga: s.ga };
+    try { simulatePlayerStats([stub]); } catch (e) {}
+    s.scorers = stub.scorers || [];
+    s.played = true;
+    if (typeof crRecordIsraelSuper === 'function' && state && state.career &&
+        typeof crHasRun === 'function' && crHasRun()) {
+      crRecordIsraelSuper(state.career.year, s.won);
+    }
+    cupSave();
+    return s;
+  }
+
+  function superShow() {
+    const s = _run && _run.super;
+    if (!s) return;
+    const art = typeof trophySVG === 'function' ? trophySVG('isc', { size: 56 }) : '🛡️';
+    if (!s.played) {
+      frame(`
+        <div class="cup-kicker">🛡️ אלוף האלופים</div>
+        <div class="cup-super-art">${art}</div>
+        <div class="cup-top">
+          <span class="cup-side">${myTeamName(siteTextOr('cup-you', 'ההרכב שלי'))}<i>${s.mine}</i></span>
+          <span class="cup-vs">מול</span>
+          <span class="cup-side">${s.club.name}<i>${s.role}</i></span>
+        </div>
+        <p class="cup-note">${siteTextOr('isc-rules', 'משחק אחד, מגרש ניטרלי. תיקו אחרי 90 דקות - ישר לפנדלים.')}</p>
+        <div class="cup-btns"><button class="cup-b" id="cup-go">לשריקת הפתיחה ←</button></div>`);
+      const b = document.getElementById('cup-go');
+      if (b) b.onclick = () => { superPlay(s); superShowMatch(s); };
+      return;
+    }
+    superShowMatch(s, true);
+  }
+
+  function superShowMatch(s, instant) {
+    const used = new Set();
+    const minute = () => { let m; do { m = 1 + Math.floor(Math.random() * 90); } while (used.has(m)); used.add(m); return m; };
+    const ev = [];
+    const named = (s.scorers || []).slice(0, s.gf);
+    named.forEach(x => { used.add(x.min); ev.push({ min: x.min, side: 'me', name: x.n }); });
+    // a goal with no name still has to reach the clock, or the scoreline lies
+    const mineName = myTeamName(siteTextOr('cup-you', 'ההרכב שלי'));
+    for (let k = named.length; k < s.gf; k++) ev.push({ min: minute(), side: 'me', name: mineName });
+    for (let k = 0; k < s.ga; k++) ev.push({ min: minute(), side: 'them', name: s.club.name });
+    ev.sort((a, b) => a.min - b.min);
+
+    frame(`
+      <div class="cup-kicker">🛡️ אלוף האלופים</div>
+      <div class="cup-top">
+        <span class="cup-side">${myTeamName(siteTextOr('cup-you', 'ההרכב שלי'))}</span>
+        <span class="cup-score" dir="ltr"><b id="cup-them">0</b> – <b id="cup-me">0</b></span>
+        <span class="cup-side">${s.club.name}<i>${s.role}</i></span>
+      </div>
+      <div class="cup-clock"><span id="cup-min">0</span>' · מגרש ניטרלי</div>
+      <div class="cup-bar"><span id="cup-bar"></span></div>
+      <div class="cup-feed" id="cup-feed"></div>
+      <div class="cup-btns"><button class="cup-b" id="cup-go">⏩ דלג לסוף</button></div>`);
+
+    const done = () => {
+      const b = document.getElementById('cup-go');
+      if (!b) return;
+      const box = document.querySelector('.cup-box');
+      if (box) box.classList.add(s.won ? 'won' : 'lost');
+      const verdict = document.createElement('div');
+      verdict.className = 'cup-verdict ' + (s.won ? 'won' : 'lost');
+      // winner's number first, and the verdict above already says whose it is
+      const pens = s.pens ? ` <span>בפנדלים <bdi dir="ltr">${Math.max(s.pens.gf, s.pens.ga)}-${Math.min(s.pens.gf, s.pens.ga)}</bdi></span>` : '';
+      const art = s.won && typeof trophySVG === 'function'
+        ? `<div class="cup-super-art">${trophySVG('isc', { size: 56 })}</div>` : '';
+      verdict.innerHTML = art + (s.won ? '🛡️ זכית באלוף האלופים!' : `❌ ${s.club.name} לקחה את אלוף האלופים`) + pens;
+      b.parentNode.insertBefore(verdict, b);
+      b.textContent = 'סגור';
+      b.onclick = () => { close(); superSubmit(s); superMount(); };
+    };
+    cupClock(ev, s.gf, s.ga, done);
+    const b = document.getElementById('cup-go');
+    if (b) b.onclick = () => cupSkip(ev, done);
+    if (instant) cupSkip(ev, done);
+  }
+
+  // The badge, once per match, after the result has been seen.
+  async function superSubmit(s) {
+    if (!s.played || s.submitted) return;
+    s.submitted = true;
+    cupSave();
+    if (typeof track === 'function') track('finish', 'draft', s.won ? 'isc-won' : 'isc-lost');
+    if (!s.won || typeof getCurrentUser !== 'function' || !getCurrentUser()) return;
+    try {
+      const r = await _supabase.rpc('submit_israel_super', { p: { won: true } });
+      const got = (r && r.data && r.data.achievements) || [];
+      if (got.length && typeof showAchievementToasts === 'function') showAchievementToasts(got);
+    } catch (e) {}
+  }
+
+  // The way in, on the results screen beside the cup's own link. Only for the
+  // champion or the cup holder, and only once the final has been played.
+  let _superAfter = null;
+  function superMount(after, rank, table) {
+    if (after) _superAfter = after;
+    const old = document.getElementById('isc-open');
+    if (old) old.remove();
+    if (!_superAfter || !cupState() || !_run.champion) return;
+    if (!_run.super && typeof rank === 'number') {
+      const o = superOpponent(rank, table);
+      if (!o) return;
+      _run.super = { ...o, played: false };
+      cupSave();
+    }
+    const s = _run.super;
+    if (!s) return;
+    const b = document.createElement('button');
+    b.id = 'isc-open';
+    b.className = 'cup-open-link cup-super-link' + (s.played ? '' : ' live');
+    b.textContent = !s.played ? `🛡️ אלוף האלופים מול ${s.club.name} ←`
+      : s.won ? '🛡️ זכית באלוף האלופים - לצפייה במשחק'
+      : `🛡️ אלוף האלופים · ${s.club.name}`;
+    b.onclick = superShow;
+    _superAfter.parentNode.appendChild(b);
+  }
+
   /* ── achievements ──────────────────────────────────────────────────────────
      Sent once, from wireEuropeButton, because that is the first moment both
      halves of the story are known: who won the cup, and where the league
@@ -534,6 +712,7 @@
 
   global.cupShowBracket = cupShowBracket;
   global.cupMountButton = cupMountButton;
+  global.cupSuperMount  = superMount;
   global.cupSkipRound = cupSkipRound;
   global.cupFinish    = cupFinish;
   global.cupSubmit    = cupSubmit;

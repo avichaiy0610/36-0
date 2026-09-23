@@ -1,12 +1,14 @@
-Source photographs for the five trophies.
+Source photographs for the seven trophies.
 
-Name them exactly: league, cup, ucl, uel, uecl  (.png .jpg .jpeg .webp)
+Name them exactly: league, cup, ucl, uel, uecl, usc, isc  (.png .jpg .jpeg .webp)
 
   league  צלחת האליפות
   cup     גביע המדינה
   ucl     ליגת האלופות
   uel     הליגה האירופית
   uecl    קונפרנס ליג
+  usc     הסופר-קאפ האירופי
+  isc     אלוף האלופים
 
 Then:  python scripts/build_trophies.py
        node scripts/stamp_assets.js

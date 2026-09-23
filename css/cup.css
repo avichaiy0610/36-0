@@ -122,3 +122,13 @@
 .cup-br-row.me .cup-br-l { color: var(--dim); font-weight: 400; }
 .cup-br-row.me .cup-br-w { color: var(--text); }
 .cup-br-d { color: var(--dim); flex-shrink: 0; }
+
+/* ── אלוף האלופים ─────────────────────────────────────────────────────────── */
+.cup-super-art { display: flex; justify-content: center; line-height: 0; margin: 6px 0 4px; }
+.cup-super-art .trophy { margin: 0 auto; }
+/* Not yet played: the one link on the row that is an invitation, not a record */
+.cup-super-link.live {
+  color: var(--accent); border-style: solid;
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+}
+.cup-vs { font-size: 14px; font-weight: 800; color: var(--dim); align-self: center; }

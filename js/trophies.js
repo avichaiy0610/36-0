@@ -16,6 +16,10 @@
 //                            knot of intertwined figures, on a round plinth.
 //   uecl    קונפרנס ליג      an hourglass woven from vertical strands, open
 //                            enough at the waist to see through.
+//   usc     הסופר-קאפ        a tall open U of a bowl, pinched into a twisted
+//                            ribbon of a stem that sweeps out into an arched foot.
+//   isc     אלוף האלופים     a squat two-handled cup on a tall stepped plinth —
+//                            Israel's Super Cup, champion against cup holder.
 //
 // ── WHY THEY LOOK LIKE METAL ────────────────────────────────────────────────
 // The first two attempts drew correct shapes that still read as plastic, and the
@@ -43,6 +47,8 @@
     ucl:    { he: 'ליגת האלופות',   short: 'אלופות' },
     uel:    { he: 'הליגה האירופית', short: 'אירופית' },
     uecl:   { he: 'קונפרנס ליג',    short: 'קונפרנס' },
+    usc:    { he: 'הסופר-קאפ האירופי', short: 'סופר-קאפ' },
+    isc:    { he: 'אלוף האלופים',    short: 'אלוף האלופים' },
   };
 
   // The chrome band. Stops are deliberately uneven and hard — a smooth ramp
@@ -262,6 +268,63 @@
       <path d="M10.2 50.6h27.6" stroke="${s}" stroke-width="2.4" stroke-linecap="round"/>
       <path d="M10.2 50.6h27.6" stroke="${d ? '#5a626f' : '#e9eff6'}" stroke-width=".8" stroke-linecap="round"/>
       <path d="M10.2 55.2h27.6" stroke="${s}" stroke-width="1.9" stroke-linecap="round"/>`;
+    },
+
+    /* ── אלוף האלופים ──────────────────────────────────────────────────────── */
+    isc: (G, T, s, d) => {
+      const lt = d ? '#5f6774' : '#ffffff';
+      return `
+      <!-- the bowl: wide, shallow, rolled rim -->
+      <path d="M12.4 9.6h23.2q-.4 10.6-5.2 15.4-2.6 2.6-6.4 2.6t-6.4-2.6q-4.8-4.8-5.2-15.4z"
+            fill="url(#${G})" stroke="${s}" stroke-width=".85" stroke-linejoin="round"/>
+      <ellipse cx="24" cy="9.6" rx="11.6" ry="2.2" fill="url(#${T})" stroke="${s}" stroke-width=".75"/>
+      <ellipse cx="24" cy="9.8" rx="9.4" ry="1.4" fill="${d ? '#2b303a' : '#8794a5'}" opacity=".75"/>
+      <path d="M15 13.4q.6 7 4 10.4" fill="none" stroke="${lt}" stroke-width=".9" stroke-linecap="round" opacity=".85"/>
+      <!-- a star on the bowl: the champion of champions -->
+      <path d="M24 14.6l1.3 2.7 3 .4-2.2 2 .6 3-2.7-1.5-2.7 1.5.6-3-2.2-2 3-.4z"
+            fill="url(#${T})" stroke="${s}" stroke-width=".5"/>
+      <!-- the handles, loops from the rim to the waist -->
+      <path d="M12.8 11.6q-5.4-.4-5.6 4 0 4.2 6.8 6.4" fill="none" stroke="${s}" stroke-width="2.4" stroke-linecap="round"/>
+      <path d="M12.8 11.6q-4.4-.2-4.6 3.6" fill="none" stroke="${lt}" stroke-width=".8" stroke-linecap="round" opacity=".8"/>
+      <path d="M35.2 11.6q5.4-.4 5.6 4 0 4.2-6.8 6.4" fill="none" stroke="${s}" stroke-width="2.4" stroke-linecap="round"/>
+      <path d="M35.2 11.6q4.4-.2 4.6 3.6" fill="none" stroke="${lt}" stroke-width=".8" stroke-linecap="round" opacity=".8"/>
+      <!-- stem and knop -->
+      <path d="M22.6 27.4h2.8v4.4h-2.8z" fill="url(#${G})" stroke="${s}" stroke-width=".7"/>
+      <ellipse cx="24" cy="32.4" rx="3.6" ry="1.5" fill="url(#${T})" stroke="${s}" stroke-width=".7"/>
+      <path d="M21.4 33.4h5.2l1.6 4.2h-8.4z" fill="url(#${G})" stroke="${s}" stroke-width=".75"/>
+      <!-- the stepped plinth, with its plaque -->
+      <path d="M15.6 37.6h16.8v3H15.6z" fill="url(#${T})" stroke="${s}" stroke-width=".75"/>
+      <path d="M13.8 40.6h20.4v11H13.8z" fill="${d ? '#2a2f38' : '#3b4250'}" stroke="${s}" stroke-width=".85"/>
+      <path d="M18.4 43.6h11.2v5H18.4z" fill="url(#${G})" stroke="${s}" stroke-width=".6"/>
+      <path d="M12.4 51.6h23.2v4.4H12.4z" fill="url(#${T})" stroke="${s}" stroke-width=".8"/>`;
+    },
+
+    /* ── הסופר-קאפ האירופי ─────────────────────────────────────────────────── */
+    usc: (G, T, s, d) => {
+      const lt = d ? '#5f6774' : '#ffffff';
+      return `
+      <!-- the open U: an outer wall and the inner one you can see into -->
+      <path d="M13.2 4.2q-1.4 14.2 4 22.4 2.6 3.8 6.8 4.6 4.2-.8 6.8-4.6 5.4-8.2 4-22.4h-3.4
+               q.9 12.6-3.2 18.8-1.8 2.8-4.2 3.2-2.4-.4-4.2-3.2-4.1-6.2-3.2-18.8z"
+            fill="url(#${G})" stroke="${s}" stroke-width=".85" stroke-linejoin="round"/>
+      <path d="M15.2 5.4q-.6 12.2 3.6 18.8" fill="none" stroke="${lt}" stroke-width=".9"
+            stroke-linecap="round" opacity=".85"/>
+      <ellipse cx="14.9" cy="4.2" rx="1.75" ry=".7" fill="url(#${T})" stroke="${s}" stroke-width=".55"/>
+      <ellipse cx="33.1" cy="4.2" rx="1.75" ry=".7" fill="url(#${T})" stroke="${s}" stroke-width=".55"/>
+      <!-- the twisted ribbon of a stem -->
+      <path d="M24 31.2q-3.6 2.6-.6 5.4 3.4 2.8-.2 5.8" fill="none" stroke="${s}" stroke-width="2.6"
+            stroke-linecap="round"/>
+      <path d="M24 31.2q3.6 2.6.6 5.4-3.4 2.8.2 5.8" fill="none" stroke="${s}" stroke-width="2.6"
+            stroke-linecap="round"/>
+      <path d="M24 31.2q-3.6 2.6-.6 5.4 3.4 2.8-.2 5.8" fill="none" stroke="${lt}" stroke-width=".9"
+            stroke-linecap="round" opacity=".85"/>
+      <path d="M24 31.2q3.6 2.6.6 5.4-3.4 2.8.2 5.8" fill="none" stroke="url(#${T})" stroke-width="1.1"
+            stroke-linecap="round"/>
+      <!-- the arched foot it sweeps into -->
+      <path d="M23.6 42.4q-7.4 1.2-12.6 8.2-1.2 1.8.8 2.2h23.8q2 -.4.8-2.2-5.2-7-12.8-8.2z"
+            fill="url(#${G})" stroke="${s}" stroke-width=".85" stroke-linejoin="round"/>
+      <path d="M14.2 50q4.4-5 9.8-5.6" fill="none" stroke="${lt}" stroke-width=".8" stroke-linecap="round" opacity=".8"/>
+      <path d="M10.4 52.8h27.2v3.6H10.4z" fill="url(#${T})" stroke="${s}" stroke-width=".8"/>`;
     },
   };
 

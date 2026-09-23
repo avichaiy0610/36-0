@@ -3142,6 +3142,8 @@ function wireEuropeButton(rank, table) {
   // The cup's own way in, beside Europe's. Skipping a round should cost the
   // drama, not the record — the bracket is always there to open.
   if (typeof cupMountButton === 'function') cupMountButton(btn);
+  // אלוף האלופים: the champion against the cup holder (the runner-up on a double)
+  if (typeof cupSuperMount === 'function') cupSuperMount(btn, rank, table);
   const alloc = euAllocationFor(rank, table);
   const inEurope = !!alloc;
   btn.style.display = '';
