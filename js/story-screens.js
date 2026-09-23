@@ -20,6 +20,26 @@
     ? `<bdi dir="ltr">${String(Math.round(n / 10) / 100)}</bdi> מיליון`
     : `<bdi dir="ltr">${Math.round(n)}</bdi> אלף`;
   const num = n => `<bdi dir="ltr">${n}</bdi>`;
+  // What you type is whole shekels, with separators: "1,500,000". The owner could
+  // not tell what "1500" in a box marked "אלף" meant; nobody misreads a full sum.
+  const shekels = k => (Math.round(k) * 1000).toLocaleString('en-US');
+  const parseK = str => Math.round((Number(String(str).replace(/[^\d]/g, '')) || 0) / 1000);
+  const amountBox = (attr, k) => `<span class="st-amtw"><input class="st-amt" ${attr} type="text"
+    inputmode="numeric" dir="ltr" value="${shekels(k)}"><span class="st-unit">₪</span></span>`;
+  // Keeps the box readable as you type, and says the sum back in words.
+  function wireAmount(inp, sayEl) {
+    const sync = () => {
+      const k = parseK(inp.value);
+      inp.value = k ? shekels(k) : '';
+      if (sayEl) sayEl.innerHTML = k ? `ההצעה שלך: <b>${money(k)} ₪</b>` : '';
+    };
+    inp.addEventListener('input', () => {
+      const k = parseK(inp.value);
+      if (sayEl) sayEl.innerHTML = k ? `ההצעה שלך: <b>${money(k)} ₪</b>` : '';
+    });
+    inp.addEventListener('blur', sync);
+    sync();
+  }
   const clubName = id => (typeof TEAMS !== 'undefined' && TEAMS[id] && TEAMS[id].name) || id;
   const posHe = p => (typeof POS_HE !== 'undefined' && POS_HE[p]) || p;
 
@@ -90,7 +110,10 @@
 .st-say{font-size:14px;margin:0 0 4px}
 .st-amt{width:96px;background:var(--surface);color:var(--text);border:1px solid var(--border);
   border-radius:8px;padding:7px;font-family:inherit;font-size:14px}
-.st-unit{font-size:12px;color:var(--dim)}
+.st-unit{font-size:13px;color:var(--dim)}
+.st-amtw{display:inline-flex;align-items:center;gap:5px}
+.st-amt{width:130px}
+.st-amtsay{font-size:13px;color:var(--dim);min-height:18px;margin-top:4px}
 `;
     document.head.appendChild(s);
   }
@@ -210,13 +233,18 @@
       <div class="st-h">הצעות על השחקנים שלך</div>
       <div class="st-list">${bids.map(o => `
         <div class="st-bid">
-          <div><b>${esc(storyBidderName(o.club))}</b> מציעה <b>${money(o.amount)}</b> על ${esc(o.name)}
-            ${o.unsolicited ? '<span class="st-tag">פנייה יזומה</span>' : ''}</div>
+          <div><b>${esc(storyBidderName(o.club))}</b> מציעה <b>${money(o.amount)} ₪</b> על ${esc(o.name)}
+            ${o.unsolicited ? '<span class="st-tag">פנייה יזומה</span>' : ''}
+            ${o.round ? `<span class="st-tag">נשארו ${STORY_RULES.bidRounds - o.round} בקשות</span>` : ''}</div>
           <div class="st-btns">
-            <button class="st-b go" data-bid-ok="${esc(o.id)}">לקבל</button>
-            <button class="st-b" data-bid-more="${esc(o.id)}"${o.asked ? ' disabled' : ''}>לבקש ${money(storyK(o.amount * 1.15))}</button>
+            <button class="st-b go" data-bid-ok="${esc(o.id)}">לקבל ${money(o.amount)} ₪</button>
             <button class="st-b" data-bid-no="${esc(o.id)}">לדחות</button>
-          </div></div>`).join('')}</div>` : '';
+          </div>
+          <div class="st-btns">
+            ${amountBox(`data-bid-amt="${esc(o.id)}"`, storyK(o.amount * 1.15))}
+            <button class="st-b" data-bid-more="${esc(o.id)}">לבקש את הסכום</button>
+          </div>
+          <div class="st-amtsay" data-bid-say="${esc(o.id)}"></div></div>`).join('')}</div>` : '';
 
     // ── the squad, by position
     const squadHTML = STORY_GROUPS.map(g => {
@@ -243,17 +271,17 @@
       const dflt = storyK(t.ask * 0.85);
       return `<div class="st-talk">
         ${lastLine}
-        <div class="st-say">${esc(clubName(e.squad.teamId))} ${t.round ? 'עומדת על' : 'מבקשת'} <b>${money(t.ask)}</b>
+        <div class="st-say">${esc(clubName(e.squad.teamId))} ${t.round ? 'עומדת על' : 'מבקשת'} <b>${money(t.ask)} ₪</b>
           ${t.closed ? '' : `· נשארו ${roundsLeft} הצעות`}</div>
         ${t.closed && !t.lastCounter ? '' : `
         <div class="st-btns">
-          ${t.closed ? '' : `<input class="st-amt" id="st-amt" type="number" inputmode="numeric" step="10" min="10" value="${dflt}">
-          <span class="st-unit">אלף ₪</span>
+          ${t.closed ? '' : `${amountBox('id="st-amt"', dflt)}
           <button class="st-b go" data-offer="${esc(keyOf(e))}">להגיש הצעה</button>`}
-          ${t.lastCounter ? `<button class="st-b go" data-take="${esc(keyOf(e))}">לקבל ${money(t.ask)}</button>` : ''}
+          ${t.lastCounter ? `<button class="st-b go" data-take="${esc(keyOf(e))}">לקבל ${money(t.ask)} ₪</button>` : ''}
         </div>
-        ${t.closed ? '' : `<div class="st-btns st-quick">
-          ${[0.7, 0.8, 0.9].map(f => `<button class="st-b" data-quick="${storyK(t.ask * f)}">${money(storyK(t.ask * f))}</button>`).join('')}
+        ${t.closed ? '' : `<div class="st-amtsay" id="st-amt-say"></div>
+        <div class="st-btns st-quick">
+          ${[0.7, 0.8, 0.9].map(f => `<button class="st-b" data-quick="${storyK(t.ask * f)}">${Math.round(f * 100)}% · ${money(storyK(t.ask * f))}</button>`).join('')}
         </div>`}`}
       </div>`;
     };
@@ -277,7 +305,7 @@
       <p class="st-kick">${jan ? 'חלון ההעברות של ינואר' : 'חלון ההעברות של הקיץ'} · ${esc(clubName(ch.teamId))} ${esc(ch.season)}</p>
       ${jan ? `<p class="st-note">הערך של השחקנים שלך מתעדכן לפי מה שעשו בחצי העונה, ומי שהופיע מושך הצעות.</p>` : ''}
       <div class="st-bar">
-        <div class="st-chip"><i>תקציב</i><b>${money(run.budget)}</b></div>
+        <div class="st-chip"><i>תקציב</i><b>${money(run.budget)} ₪</b></div>
         <div class="st-chip"><i>רכישות שנשארו</i><b>${left}</b></div>
         <div class="st-chip"><i>סגל</i><b>${run.own.length}</b></div>
         <div class="st-chip"><i>דירוג ההרכב</i><b>${storyXiOvr(run)}</b></div>
@@ -318,7 +346,7 @@
       const o = bids.find(x => x.id === b.dataset.bidOk);
       const why = storyAcceptBid(run, o.id);
       saved();
-      redraw({ msg: why ? esc(why) : `${esc(o.name)} נמכר ל${esc(storyBidderName(o.club))} ב-${money(o.amount)}` });
+      redraw({ msg: why ? esc(why) : `${esc(o.name)} נמכר ל${esc(storyBidderName(o.club))} ב-${money(o.amount)} ₪` });
     });
     $('[data-bid-no]').forEach(b => b.onclick = () => {
       storyRejectBid(run, b.dataset.bidNo);
@@ -327,12 +355,14 @@
     });
     $('[data-bid-more]').forEach(b => b.onclick = () => {
       const o = bids.find(x => x.id === b.dataset.bidMore);
-      const want = storyK(o.amount * 1.15);
-      const r = storyPushBid(run, o.id, want);
+      const inp = ctx.host.querySelector(`[data-bid-amt="${o.id}"]`);
+      const club = esc(storyBidderName(o.club));
+      const r = storyPushBid(run, o.id, parseK(inp && inp.value));
       saved();
-      redraw({ msg: r === 'accept' ? `${esc(storyBidderName(o.club))} הסכימה: ${esc(o.name)} נמכר ב-${money(want)}`
-        : r === 'walk' ? `${esc(storyBidderName(o.club))} ירדה מהעסקה`
-        : esc(r) });
+      redraw({ msg: r.kind === 'accept' ? `${club} הסכימה: ${esc(o.name)} נמכר ב-${money(r.amount)} ₪`
+        : r.kind === 'counter' ? `${club}: "לא בסכום הזה. אנחנו מעלים ל-${money(r.amount)} ₪."`
+        : r.kind === 'walk' ? `${club} ירדה מהעסקה`
+        : esc(r.why) });
     });
     $('[data-talk]').forEach(b => b.onclick = () => {
       const k = b.dataset.talk;
@@ -340,18 +370,21 @@
     });
     $('[data-quick]').forEach(b => b.onclick = () => {
       const inp = document.getElementById('st-amt');
-      if (inp) inp.value = b.dataset.quick;
+      if (inp) { inp.value = shekels(Number(b.dataset.quick)); inp.dispatchEvent(new Event('blur')); }
     });
+    const amt = document.getElementById('st-amt');
+    if (amt) wireAmount(amt, document.getElementById('st-amt-say'));
+    $('[data-bid-amt]').forEach(inp => wireAmount(inp, ctx.host.querySelector(`[data-bid-say="${inp.dataset.bidAmt}"]`)));
     $('[data-offer]').forEach(b => b.onclick = () => {
       const e = byKey(b.dataset.offer);
-      const amount = Number(document.getElementById('st-amt').value) || 0;
+      const amount = parseK(document.getElementById('st-amt').value);
       const r = storyOffer(run, ch, e, valueOf(e), amount);
       saved();
       const club = esc(clubName(e.squad.teamId));
       if (r.kind === 'accept') {
-        redraw({ open: null, msg: `סגרנו! ${esc(e.player.name)} הצטרף ב-${money(r.price)}` });
+        redraw({ open: null, msg: `סגרנו! ${esc(e.player.name)} הצטרף ב-${money(r.price)} ₪` });
       } else if (r.kind === 'counter') {
-        redraw({ talkMsg: `${club}: "בשביל ${money(r.counter)} הוא שלך."` });
+        redraw({ talkMsg: `${club}: "בשביל ${money(r.counter)} ₪ הוא שלך."` });
       } else if (r.kind === 'reject') {
         redraw({ talkMsg: r.left > 0 ? `${club} דחתה את ההצעה.` : `${club} דחתה, והפסיקה לענות.` });
       } else {
@@ -363,7 +396,7 @@
       const r = storyTakeCounter(run, ch, e, valueOf(e));
       saved();
       redraw(r.kind === 'accept'
-        ? { open: null, msg: `סגרנו! ${esc(e.player.name)} הצטרף ב-${money(r.price)}` }
+        ? { open: null, msg: `סגרנו! ${esc(e.player.name)} הצטרף ב-${money(r.price)} ₪` }
         : { talkMsg: esc(r.why) });
     });
     document.getElementById('st-form').onchange = ev => {

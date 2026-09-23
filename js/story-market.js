@@ -284,7 +284,8 @@ function storyAsk(run, ch, e, value) {
   const rival = storyIsRival(ch, e.squad.teamId);
   const key = storyClubRank(e) <= 3;
   const notForSale = rival && key && storyPrevPos(e.squad.teamId, ch.season) <= 3;
-  const ask = storyK(value * (rival ? STORY_RULES.rivalMarkup : 1) * (key ? STORY_RULES.keyMarkup : 1));
+  const ask = Math.min(STORY_RULES.maxAsk,
+    storyK(value * (rival ? STORY_RULES.rivalMarkup : 1) * (key ? STORY_RULES.keyMarkup : 1)));
   return { ask, notForSale, rival, key };
 }
 
@@ -419,20 +420,35 @@ function storyRejectBid(run, id) {
   run.offers = run.offers.filter(x => x.id !== id);
 }
 
-// Ask a bidder for more. Once per bid. Up to 10-25% over their bid they pay
-// (and the deal is done); above that they walk. Returns 'accept' | 'walk' | reason.
+// Name your price to a bidder — the selling side of a negotiation. Each bidder
+// has a ceiling (10-30% over his opening bid, a seeded draw he never shows):
+//   at or under it          → 'accept', sold at your price
+//   up to 30% over it       → 'counter', he raises his bid part of the way
+//   further than that, or your last round → 'walk', the bid is gone
+// Returns { kind, amount? } or { kind: 'blocked', why }.
 function storyPushBid(run, id, amount) {
   const o = run.offers.find(x => x.id === id);
-  if (!o || o.window !== run.phase) return 'ההצעה כבר לא בתוקף';
-  if (o.asked) return 'כבר ביקשת יותר ממנו';
-  o.asked = true;
-  const give = 1.1 + 0.15 * storyRand(run, 'push', id);
-  if (storyK(amount) <= o.amount * give) {
-    o.amount = storyK(amount);
-    return storyAcceptBid(run, id) || 'accept';
+  if (!o || o.window !== run.phase) return { kind: 'blocked', why: 'ההצעה כבר לא בתוקף' };
+  amount = storyK(amount);
+  if (amount <= o.amount) {                                   // asking less than he offers: take it
+    const why = storyAcceptBid(run, id);
+    return why ? { kind: 'blocked', why } : { kind: 'accept', amount: o.amount };
+  }
+  o.opening = o.opening || o.amount;
+  o.round = (o.round || 0) + 1;
+  const max = storyK(o.opening * (1.1 + 0.2 * storyRand(run, 'ceiling', id)));
+  if (amount <= max) {
+    o.amount = amount;
+    const why = storyAcceptBid(run, id);
+    return why ? { kind: 'blocked', why } : { kind: 'accept', amount };
+  }
+  if (amount <= max * 1.3 && o.round < STORY_RULES.bidRounds) {
+    const u = storyRand(run, 'raise', id, o.round);
+    o.amount = Math.min(max, storyK(o.amount + (max - o.amount) * (0.4 + 0.4 * u)));
+    return { kind: 'counter', amount: o.amount, left: STORY_RULES.bidRounds - o.round };
   }
   storyRejectBid(run, id);
-  return 'walk';
+  return { kind: 'walk' };
 }
 
 /* ── positions ───────────────────────────────────────────────────────────────

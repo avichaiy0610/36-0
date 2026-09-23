@@ -73,7 +73,7 @@ if (require.main === module) {
   t('reputation premium: last season top scorer is dearer in summer', () => {
     // מאור בוזגלו was 3rd scorer and top assister of 2014/15 (LEAGUE_SCORERS/ASSISTS)
     const p = { name: 'מאור בוזגלו', ovr: 84, position: 'LW' };
-    assert.strictEqual(G.storySummerValue(p, '2015/16'), 1250);
+    assert.strictEqual(G.storySummerValue(p, '2015/16'), 1150);
     assert.strictEqual(G.storySummerValue({ name: 'אף אחד', ovr: 84 }, '2015/16'), 1000);
   });
   t('performance bonus: a 79 striker with 11 goals is valued like an 84', () => {
@@ -134,7 +134,7 @@ if (require.main === module) {
     const a = G.storyAsk(run, ks, e, 1000);
     assert.deepStrictEqual([a.ask, a.rival, a.key, a.notForSale], [1000, false, false, false]);
     const k = pick(run, e => !G.storyIsRival(ks, e.squad.teamId) && G.storyClubRank(e) === 1);
-    assert.strictEqual(G.storyAsk(run, ks, k, 1000).ask, 1300);
+    assert.strictEqual(G.storyAsk(run, ks, k, 1000).ask, 1150);
   });
   t('a top rival will not sell one of its three best', () => {
     // 2010/11: maccabi-haifa were champions — above KS, top three
@@ -203,14 +203,37 @@ if (require.main === module) {
     assert.ok(!G.storyOwned(run).some(x => x.player.name === e.player.name));
     assert.strictEqual(G.storyLiveOffers(run).length, 0);
   });
-  t('pushing a bid: a little more is paid, too much and they walk, and only once', () => {
+  t('naming your price to a bidder: a little more is paid, too much and he walks', () => {
     const run = G.storyNewRun(ks, 5);
     const [e1, e2] = G.storyOwned(run).slice(4, 6);
     const b1 = G.storyListPlayer(run, ks, e1, 1000)[0];
-    assert.strictEqual(G.storyPushBid(run, b1.id, b1.amount * 1.05), 'accept');
+    const want = G.storyK(b1.amount * 1.05);                  // read before: the push updates the bid
+    const r1 = G.storyPushBid(run, b1.id, want);
+    assert.strictEqual(r1.kind, 'accept');
+    assert.strictEqual(run.budget, ks.budget + want);
     const b2 = G.storyListPlayer(run, ks, e2, 1000)[0];
-    assert.strictEqual(G.storyPushBid(run, b2.id, b2.amount * 2), 'walk');
+    assert.strictEqual(G.storyPushBid(run, b2.id, b2.amount * 3).kind, 'walk');
     assert.ok(!G.storyLiveOffers(run).some(o => o.id === b2.id));
+  });
+  t('a bidder can raise his bid, never above what he will pay, and stops after three rounds', () => {
+    let seen = false;
+    for (let seed = 1; seed < 80 && !seen; seed++) {
+      const run = G.storyNewRun(ks, seed);
+      const e = G.storyOwned(run)[6];
+      const b = G.storyListPlayer(run, ks, e, 1000)[0];
+      const opening = b.amount;
+      const r = G.storyPushBid(run, b.id, opening * 1.45);
+      if (r.kind !== 'counter') continue;
+      seen = true;
+      assert.ok(r.amount > opening && r.amount <= opening * 1.3 + 10);
+      assert.strictEqual(G.storyLiveOffers(run).find(o => o.id === b.id).amount, r.amount);
+    }
+    assert.ok(seen, 'no counter in 80 seeds at 45% over the bid');
+  });
+  t('no asking price above the ceiling, however the markups stack', () => {
+    const run = G.storyNewRun(ks, 3);
+    const e = G.storyMarketPool(run, ks).sort((a, b) => b.player.ovr - a.player.ovr)[0];
+    assert.ok(G.storyAsk(run, ks, e, 99999).ask <= G.STORY_RULES.maxAsk);
   });
   t('unsolicited bids come once per window, only for the courted', () => {
     const run = G.storyNewRun(ks, 5);

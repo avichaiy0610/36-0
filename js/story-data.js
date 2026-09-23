@@ -15,9 +15,14 @@
  */
 const STORY_RULES = {
   sellRate: 0.85,         // the centre of what clubs bid for your players
-  rivalMarkup: 1.5,       // a club that finished above you will not strengthen you cheaply
-  keyMarkup: 1.3,         // one of the selling club's own three best
-  repPremium: 1.25,       // last season's top scorers / assisters, summer only
+  rivalMarkup: 1.25,      // a club that finished above you will not strengthen you cheaply
+  keyMarkup: 1.15,        // one of the selling club's own three best
+  repPremium: 1.15,       // last season's top scorers / assisters, summer only
+  // No asking price above this, whatever stacks. The markups used to multiply:
+  // a rival's best player with a reputation was asked at 6.1 million, against
+  // the owner's ceiling of "about 2.5 million for the dearest player".
+  maxAsk: 3000,
+  bidRounds: 3,           // times you can name a price to a bidder before he walks
   buys: { summer: 4, jan: 2 },
   talkRounds: 3,          // offers per player per window before the club stops answering
   minSquad: 16,
@@ -66,7 +71,7 @@ const STORY_CHAPTERS = [
     season: '2011/12',
     title: 'הנס מהצפון',
     level: 'hard',
-    budget: 3500,
+    budget: 4000,
     intro: 'עירוני קריית שמונה, מועדון מהקצה הצפוני של המדינה, עם הסגל הרביעי בכוחו בליגה. ' +
            'הפועל תל אביב, מכבי תל אביב ומכבי חיפה חזקות ממנה על הנייר, והקופה קטנה. ' +
            'במציאות היא זכתה באליפות הראשונה והיחידה בתולדותיה, בפער של 14 נקודות.',
@@ -77,9 +82,12 @@ const STORY_CHAPTERS = [
     // the big four" was tried first and bound nobody (the rival markup already
     // sends the market elsewhere); a cap of 2 or 3 measured under the 2% floor.
     //
-    // Measured 2026-09-23 on the Israeli price scale, 2000 runs at 3,500 (story_calibrate.js,
-    // bot pays asking prices and sells by best bid):
-    //   ⭐ 21.4%   ⭐⭐ 6.8%   ⭐⭐⭐ 4.7%   — inside the 'hard' bands of spec §7.
+    // Measured 2026-09-23 on the Israeli price scale with the 3-million ask ceiling,
+    // 1500 runs at 4,000 (story_calibrate.js; bot pays asking prices, sells by best bid):
+    //   ⭐ 18.9%   ⭐⭐ 5.8%   ⭐⭐⭐ 2.7%
+    // ⭐⭐ and ⭐⭐⭐ sit in the 'hard' bands of spec §7; ⭐ is a point under 20%.
+    // It plateaus here: 4,000, 4,500 and 5,000 measure the same, because the
+    // limit is now the six signings and who will sell, not the money.
     stars: [
       { type: 'rank', max: 1, label: 'אליפות' },
       { type: 'margin', min: 5, label: 'אליפות בפער של 5 נקודות לפחות' },

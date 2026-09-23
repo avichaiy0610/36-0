@@ -149,7 +149,7 @@ if (DETAIL) {
   process.exit(0);
 }
 console.log(`${ch.id} · ${ch.title} · level ${ch.level} · ${N} runs`);
-const budgets = SWEEP ? [1000, 1500, 2000, 2500, 3000, 4000] : [ch.budget];
+const budgets = SWEEP ? [4000, 4500, 5000] : [ch.budget];
 for (const b of budgets) {
   const [s1, s2, s3] = measure(b);
   console.log(`budget ${String(b).padStart(3)}  ⭐ ${s1.padStart(6)}  ⭐⭐ ${s2.padStart(6)}  ⭐⭐⭐ ${s3.padStart(6)}`);
