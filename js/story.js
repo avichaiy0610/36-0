@@ -7,8 +7,11 @@
  * tested in Node; this file only moves between them. Screens are in
  * js/story-screens.js.
  *
- * No track() calls: 'story' is not yet on the allow-list track() enforces, and
- * an unknown mode is dropped in silence (scripts/check_track_contract.js).
+ * Usage (js/track.js, mode 'story' — allowed since migration 20260923000001):
+ *   open      the chapter hub                     (storyShowHub)
+ *   progress  '<chapter>|start'                   a chapter begun
+ *   finish    '<chapter>|<stars>'                 a chapter ended, 0-3 stars
+ * admin.html's "📖 מצב סיפור" reads these back through usage_detail.
  */
 (function (global) {
   'use strict';
@@ -37,6 +40,7 @@
     if (!ch) return;
     _run = storyNewRun(ch, (Math.random() * 4294967296) >>> 0);
     storySave();
+    storyTrack('progress', ch.id + '|start');
     // A draft or season left in storage belongs to some other mode.
     if (typeof clearDraftState === 'function') clearDraftState();
     storyShowMarket('summer');
@@ -126,6 +130,11 @@
     best[ch.id] = { stars: b.stars.map((s, i) => s || stars[i]),
                     score: b.score == null ? run.result.score : Math.max(b.score, run.result.score) };
     save(BEST_KEY, best);
+    storyTrack('finish', ch.id + '|' + stars.filter(Boolean).length);
+  }
+
+  function storyTrack(event, detail) {
+    if (typeof track === 'function') track(event, 'story', detail);
   }
 
   // Called by oppTeamsForState() while a chapter is on.
@@ -189,6 +198,7 @@
         score: b.score == null ? run.result.score : Math.max(b.score, run.result.score),
       };
       save(BEST_KEY, best);
+      storyTrack('finish', ch.id + '|' + stars.filter(Boolean).length);
     }
   }
 
@@ -206,7 +216,7 @@
 
   Object.assign(global, {
     storyRun, storySave, storyBest, storyStart, storyEnterSeason, storyOppForState,
-    storyEuAct, storyEuWindowClose,
+    storyEuAct, storyEuWindowClose, storyTrack,
     storyPrepare, storyOpen, storyOnSeasonEnd, storyRenderLast, storyExit,
   });
 })(typeof window !== 'undefined' ? window : globalThis);

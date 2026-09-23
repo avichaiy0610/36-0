@@ -165,6 +165,7 @@
   function storyShowHub() {
     ensureStyle();
     showScreen('story');
+    if (typeof storyTrack === 'function') storyTrack('open');
     const back = document.getElementById('story-back');
     if (back) back.onclick = () => showScreen('setup');
     const best = storyBest();

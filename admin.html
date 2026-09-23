@@ -254,6 +254,7 @@
 <body>
 <div class="wrap">
   <h1>⚙️ ניהול טקסטים — 36-0</h1>
+  <div class="sub"><a href="admin-story.html" style="color:#FFD700">📖 מצב סיפור: מי נכנס ומי סיים כל פרק ←</a></div>
   <div class="sub">כל טקסט באתר מופיע כאן עם הערך הנוכחי שלו. ערוך ולחץ שמור — השינוי חל על כל הגולשים אחרי רענון. הכתיבה מוגנת ב-RLS: רק חשבון המנהל יכול לשמור.</div>
 
   <div id="login-box">
@@ -281,6 +282,19 @@
         <span id="usage-status" class="chal-status"></span>
       </div>
       <div id="usage-out"></div>
+    </div>
+
+    <div id="story-section" style="display:none">
+      <h2>📖 מצב סיפור</h2>
+      <div class="chal-note">
+        לכל פרק בנפרד: כמה אנשים נכנסו, כמה סיימו, ואיזה כוכבים. אותו טווח ימים כמו "מה משחקים".
+        יש לזה גם עמוד משלו: <a href="admin-story.html" style="color:#FFD700">admin-story.html ←</a>
+      </div>
+      <div class="us-controls">
+        <button id="story-refresh" class="seo-btn ghost">↻ רענן</button>
+        <span id="story-status" class="chal-status"></span>
+      </div>
+      <div id="story-out"></div>
     </div>
 
     <div id="hist-section" style="display:none">
@@ -430,7 +444,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/config.js?v=3dd47ca1"></script>
 <script src="js/supabase-client.js?v=e9102a02"></script>
-<script src="js/text-catalog.js?v=9326302b"></script>
+<script src="js/text-catalog.js?v=a2e67b38"></script>
 <!-- the challenge editor derives each challenge's automatic conditions with the
      exact same code the game uses (game.js provides FORMATIONS + era range and
      skips all its UI wiring on this page) -->
@@ -438,6 +452,8 @@
 <script src="js/sim-engine.js?v=784ec7b1"></script>
 <script src="js/game.js?v=30c3029a"></script>
 <script src="js/player_nats.js?v=a527d5f3"></script>
+<script src="js/story-data.js?v=45851023"></script>
+<script src="js/story-admin.js?v=109615d1"></script>
 <script src="js/league_tables.js?v=7b63e16c"></script>
 <script src="js/challenges.js?v=b1acda28"></script>
 <!-- crowd.js comes first and is not optional: crowd-admin.js builds its
@@ -856,6 +872,8 @@ async function init() {
   // real squads/tables viewer — admin account only
   if (session.user && session.user.email === 'avichaiy0610@outlook.com') {
     document.getElementById('usage-section').style.display = 'block';
+    document.getElementById('story-section').style.display = 'block';
+    initStoryAdmin();
     initUsage();
     document.getElementById('hist-section').style.display = 'block';
     initHistViewer();
@@ -877,7 +895,7 @@ const US_MODES = {
   draft: 'דראפט', challenge: 'אתגר', career: 'קריירה', minigame: 'משחקונים',
   gauntlet: 'גאונטלט', europe: 'אירופה', duel: 'דו-קרב', league: 'ליגות',
   salarycap: 'תקרת שכר', install: 'התקנת אפליקציה', january: 'חלון החורף',
-  entry: 'מאיפה הגיעו',
+  entry: 'מאיפה הגיעו', story: 'מצב סיפור',
 };
 
 function initUsage() {
@@ -974,6 +992,16 @@ function usDetailHTML(rows) {
     <div class="us-wrap"><table class="us-table">
       <thead><tr><th>מוד</th><th>פירוט</th><th>אירוע</th><th>אנשים</th><th>פעמים</th></tr></thead>
       <tbody>${body}</tbody></table></div>`;
+}
+
+/* ─── מצב סיפור (admin only) ──────────────────────────────────────────────── */
+// The table lives in js/story-admin.js; admin-story.html shows it on its own.
+function initStoryAdmin() {
+  const load = () => storyAdminLoad(document.getElementById('story-out'), document.getElementById('story-status'),
+    Number(document.getElementById('usage-days').value) || 30);
+  document.getElementById('story-refresh').onclick = load;
+  document.getElementById('usage-days').addEventListener('change', load);
+  load();
 }
 
 /* ─── Real squads + league tables viewer (admin only) ─────────────────────── */

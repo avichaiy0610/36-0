@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title>36-0 · מצב סיפור · ניהול</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+  <!-- Only מצב סיפור: who went into each chapter and who finished it.
+       js/story-admin.js does the work; admin.html shows the same table. -->
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #0d1117; color: #e6edf3; font-family: 'Heebo', Arial, 'Arial Hebrew', sans-serif; direction: rtl; padding: 24px 16px 60px; }
+    .wrap { max-width: 1000px; margin: 0 auto; }
+    h1 { font-size: 22px; margin-bottom: 4px; color: #FFD700; }
+    .sub { color: #8b949e; font-size: 13px; margin-bottom: 18px; }
+    .sub a { color: #FFD700; }
+    #login-box { text-align: center; padding: 60px 0; }
+    #login-box button { background: #FFD700; color: #000; border: none; border-radius: 8px; padding: 10px 24px; font-weight: 700; cursor: pointer; font-family: inherit; }
+    .us-controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+    .tp-select { background: #21262d; color: #e6edf3; border: 1px solid #30363d; border-radius: 8px; padding: 7px 10px; font-family: inherit; }
+    .seo-btn { background: #21262d; color: #e6edf3; border: none; border-radius: 8px; padding: 9px 20px; font-family: inherit; font-weight: 800; cursor: pointer; }
+    .chal-note { font-size: 12px; color: #8b949e; margin: 4px 0 12px; line-height: 1.6; }
+    .chal-status { font-size: 12.5px; min-height: 16px; }
+    .chal-status.err { color: #f85149; }
+    .us-h3 { font-size: 14px; font-weight: 700; margin: 10px 0 8px; }
+    .us-wrap { overflow-x: auto; background: #161b22; border: 1px solid #30363d; border-radius: 10px; margin-bottom: 12px; }
+    .us-table { width: 100%; border-collapse: collapse; font-size: 13px; white-space: nowrap; }
+    .us-table th, .us-table td { padding: 8px 10px; text-align: center; border-bottom: 1px solid #21262d; }
+    .us-table th { background: #0d1117; color: #8b949e; font-size: 12px; font-weight: 700; position: sticky; top: 0; }
+    .us-table td:first-child, .us-table th:first-child { text-align: start; font-weight: 700; }
+    .us-table tr:last-child td { border-bottom: none; }
+    .us-table .us-zero { color: #484f58; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <h1>📖 מצב סיפור</h1>
+  <div class="sub">כמה אנשים נכנסו לכל פרק וכמה סיימו אותו. <a href="admin.html">← לפאנל הניהול הראשי</a></div>
+
+  <div id="login-box">
+    <p style="margin-bottom:16px">צריך להתחבר עם חשבון המנהל (ההתחברות נעשית באתר הרגיל)</p>
+    <button onclick="location.href='index.html'">לך לאתר והתחבר שם ←</button>
+  </div>
+
+  <div id="story-page" style="display:none">
+    <div class="us-controls">
+      <label>טווח</label>
+      <select id="st-days" class="tp-select">
+        <option value="1">היום</option>
+        <option value="7">7 ימים</option>
+        <option value="30" selected>30 ימים</option>
+        <option value="90">90 ימים</option>
+        <option value="365">שנה</option>
+      </select>
+      <button id="st-refresh" class="seo-btn">↻ רענן</button>
+      <span id="st-status" class="chal-status"></span>
+    </div>
+    <div id="st-out"></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js?v=3dd47ca1"></script>
+<script src="js/supabase-client.js?v=e9102a02"></script>
+<script src="js/data.js?v=e2436bbd"></script>
+<script src="js/story-data.js?v=45851023"></script>
+<script src="js/story-admin.js?v=109615d1"></script>
+<script>
+(async function () {
+  const { data: { session } } = await _supabase.auth.getSession();
+  if (!session) return;
+  // The server decides who is an admin (usage_detail checks is_site_admin());
+  // anyone else gets 'forbidden' in the status line and no numbers.
+  document.getElementById('login-box').style.display = 'none';
+  document.getElementById('story-page').style.display = 'block';
+  const load = () => storyAdminLoad(document.getElementById('st-out'), document.getElementById('st-status'),
+    Number(document.getElementById('st-days').value) || 30);
+  document.getElementById('st-refresh').onclick = load;
+  document.getElementById('st-days').onchange = load;
+  load();
+})();
+</script>
+</body>
+</html>

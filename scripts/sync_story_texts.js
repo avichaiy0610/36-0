@@ -35,13 +35,22 @@ const file = path.join(__dirname, '..', 'js', 'text-catalog.js');
 let src = fs.readFileSync(file, 'utf8');
 const crlf = src.includes('\r\n');
 if (crlf) src = src.replace(/\r\n/g, '\n');
-// drop every existing story row (prefix sm- — "story-" is the season-summary screen's), then append the current set
-const before = src;
-src = src.replace(/,\n \{"key":"sm-[^\n]*\}(?=,?\n)/g, '');
-const removed = (before.match(/"key":"sm-/g) || []).length;
+// Drop every existing story row (prefix sm- — "story-" is the season-summary
+// screen's), then append the current set. Line by line, not by pattern: our rows
+// are one line each, but they can sit anywhere — scripts/sync_whatsnew_texts.js
+// appends after them — and a pattern keyed to the separator before a row missed
+// the one that had become the last before someone else's (it left a duplicate).
+const lines = src.split('\n');
+const isOurs = l => /^ \{"key":"sm-/.test(l);
+const removed = lines.filter(isOurs).length;
+const kept = lines.filter(l => !isOurs(l));
+const end = kept.lastIndexOf('];');
+// the row before "];" must not end in a comma, and every row before it must
+kept[end - 1] = kept[end - 1].replace(/,\s*$/, '');
 const rows = want.map(w => ' ' + JSON.stringify({ key: w.key, screen: SCREEN, label: w.label, selector: 'virtual', def: w.def }));
-const at = src.lastIndexOf('\n];');
-src = src.slice(0, at) + ',\n' + rows.join(',\n') + src.slice(at);
+kept[end - 1] += ',';
+kept.splice(end, 0, rows.join(',\n'));
+src = kept.join('\n');
 if (crlf) src = src.replace(/\n/g, '\r\n');
 fs.writeFileSync(file, src, 'utf8');
 console.log(`מצב סיפור: ${want.length} מפתחות בקטלוג (${removed} ישנים הוחלפו)`);
