@@ -103,7 +103,8 @@ const EXPORTS = ['state', 'SQUADS', 'LEAGUE_TABLES', 'FORMATIONS', 'formationSlo
 
 function load() {
   return new Function(STUB + MULBERRY + FILES.map(read).join('\n') +
-    `;return {${EXPORTS.join(',')}};`)();
+    // typeof, so a name a later task defines loads as undefined instead of throwing
+    `;return {${EXPORTS.map(k => `${k}: typeof ${k} !== 'undefined' ? ${k} : undefined`).join(',')}};`)();
 }
 module.exports = { load };
 
