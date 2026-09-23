@@ -3556,6 +3556,10 @@ function animateResults(ovr) {
     document.getElementById('tier-box').classList.add('visible');
     const sec = document.getElementById('res-stats-section');
     if (sec) sec.classList.add('visible');
+    // A chapter's verdict is RECORDED in bindSeason, which runs at the January
+    // seam, but shown only here — drawing it there gave the ending away with
+    // half the fixtures still to reveal.
+    if (state.story && typeof storyRenderLast === 'function') storyRenderLast();
     scrollPageTop();
   }
 

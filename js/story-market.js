@@ -33,15 +33,18 @@ function storyPrevSeason(season) {
 // Scraped names carry stray direction marks ('יוסי אבוקסיס‎'); the tables do not.
 function storyNameKey(n) { return String(n || '').replace(/[\u200e\u200f\u202a-\u202e]/g, '').trim(); }
 
+// The site does not load js/league_tables.js; it loads the generated sliver in
+// js/story-facts.js (scripts/build_story_facts.js). Both come from one source.
+function storyTable(season) {
+  return (typeof STORY_FACTS !== 'undefined' && STORY_FACTS.tables[season]) || [];
+}
+
 const _storyRepCache = {};
 function storyRepNames(season) {
   if (_storyRepCache[season]) return _storyRepCache[season];
   const prev = storyPrevSeason(season);
-  const out = new Set();
-  const add = src => ((src && src[prev]) || []).forEach(r => out.add(storyNameKey(r.name)));
-  add(typeof LEAGUE_SCORERS !== 'undefined' ? LEAGUE_SCORERS : null);
-  add(typeof LEAGUE_ASSISTS !== 'undefined' ? LEAGUE_ASSISTS : null);
-  return (_storyRepCache[season] = out);
+  const names = (typeof STORY_FACTS !== 'undefined' && STORY_FACTS.reps[prev]) || [];
+  return (_storyRepCache[season] = new Set(names.map(storyNameKey)));
 }
 
 function storySummerValue(player, season) {
@@ -72,8 +75,7 @@ function storySellPrice(value) { return storyRound1(value * STORY_RULES.sellRate
 function storyBuyPrice(value, rival) { return storyRound1(value * (rival ? STORY_RULES.rivalMarkup : 1)); }
 
 function storyPrevPos(teamId, season) {
-  const t = (typeof LEAGUE_TABLES !== 'undefined' && LEAGUE_TABLES[storyPrevSeason(season)]) || [];
-  const r = t.find(x => x.teamId === teamId);
+  const r = storyTable(storyPrevSeason(season)).find(x => x.teamId === teamId);
   return r ? r.pos : Infinity;              // promoted last summer: below everyone
 }
 function storyIsRival(ch, sellerTeamId) {
@@ -81,7 +83,7 @@ function storyIsRival(ch, sellerTeamId) {
 }
 
 function storyReal(ch) {
-  const t = (typeof LEAGUE_TABLES !== 'undefined' && LEAGUE_TABLES[ch.season]) || [];
+  const t = storyTable(ch.season);
   const r = t.find(x => x.teamId === ch.teamId);
   return r ? { pos: r.pos, pts: r.pts, n: t.length } : null;
 }

@@ -107,7 +107,9 @@
   }
 
   // Called from bindSeason. Runs again for a restored season, so it is idempotent:
-  // the verdict is written once, and only re-rendered after that.
+  // the verdict is written once. It is NOT drawn here — bindSeason runs at the
+  // January seam, before the second half is revealed; storyRenderLast draws it
+  // once the reveal is over (game.js revealSummary).
   function storyOnSeasonEnd(res) {
     const run = storyRun();
     const ch = run && storyChapter(run.chapterId);
@@ -127,7 +129,12 @@
       };
       save(BEST_KEY, best);
     }
-    storyRenderEnd(ch, run.result);
+  }
+
+  function storyRenderLast() {
+    const run = storyRun();
+    const ch = run && storyChapter(run.chapterId);
+    if (ch && run.result) storyRenderEnd(ch, run.result);
   }
 
   function storyExit() {
@@ -138,6 +145,6 @@
 
   Object.assign(global, {
     storyRun, storySave, storyBest, storyStart, storyEnterSeason, storyOppForState,
-    storyPrepare, storyOpen, storyOnSeasonEnd, storyExit,
+    storyPrepare, storyOpen, storyOnSeasonEnd, storyRenderLast, storyExit,
   });
 })(typeof window !== 'undefined' ? window : globalThis);

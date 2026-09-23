@@ -12,7 +12,10 @@
 
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g,
     c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-  const money = n => `₪${(Math.round(n * 10) / 10).toFixed(1)}מ׳`;
+  // "3.6 מ׳" — the shekel sign glued to a number flips around it in RTL
+  // ("מ׳3.6₪"), and a budget screen already says what currency it is in.
+  const money = n => `<bdi dir="ltr">${String(Math.round(n * 10) / 10)}</bdi> מ׳`;
+  const num = n => `<bdi dir="ltr">${n}</bdi>`;
   const clubName = id => (typeof TEAMS !== 'undefined' && TEAMS[id] && TEAMS[id].name) || id;
   const posHe = p => (typeof POS_HE !== 'undefined' && POS_HE[p]) || p;
 
@@ -94,7 +97,7 @@
         return `<button class="st-card" data-ch="${ch.id}">
           <h3>${esc(clubName(ch.teamId))} ${esc(ch.season)}: ${esc(ch.title)}</h3>
           <div class="st-meta">במציאות: מקום ${real ? real.pos : '?'}, ${real ? real.pts : '?'} נק׳
-            ${b ? ` · השיא שלך: ${b.score}` : ''}${live ? ' · <b style="color:var(--accent)">בתהליך</b>' : ''}</div>
+            ${b ? ` · השיא שלך: ${num(b.score)}` : ''}${live ? ' · <b style="color:var(--accent)">בתהליך</b>' : ''}</div>
           ${starsHTML(b && b.stars)}
         </button>`;
       }).join('')}</div>`;
@@ -138,10 +141,16 @@
     const owned = storyOwned(run).sort((a, b) => b.player.ovr - a.player.ovr);
     const q = (ctx.q || '').trim();
     const pos = ctx.pos || '';
-    const pool = storyMarketPool(run, ch)
+    // What you can afford first, then the best of what you cannot. A plain top-40
+    // by rating showed a small budget nothing but disabled buttons — the whole
+    // list above the money, and no way to find the signing that fits it.
+    const priceOf = e => storyBuyPrice(valueOf(e), storyIsRival(ch, e.squad.teamId));
+    const found = storyMarketPool(run, ch)
       .filter(e => (!q || e.player.name.includes(q) || clubName(e.squad.teamId).includes(q)) &&
                    (!pos || e.player.position === pos))
-      .sort((a, b) => b.player.ovr - a.player.ovr).slice(0, 40);
+      .sort((a, b) => b.player.ovr - a.player.ovr);
+    const fits = e => priceOf(e) <= run.budget + 1e-9;
+    const pool = [...found.filter(fits).slice(0, 25), ...found.filter(e => !fits(e)).slice(0, 15)];
     const left = STORY_RULES.buys[ctx.window] - run.buys[ctx.window];
     const tactical = formationTactical(run.formationId);
     const positions = [...new Set(storyMarketPool(run, ch).map(e => e.player.position))].sort();
@@ -152,7 +161,7 @@
       ${jan ? `<p style="margin:0 0 10px;color:var(--dim);font-size:13px">המחירים של השחקנים שלך
         מתעדכנים לפי מה שעשו בחצי העונה.</p>` : ''}
       <div class="st-bar">
-        <div class="st-chip"><i>תקציב</i><b dir="ltr">${money(run.budget)}</b></div>
+        <div class="st-chip"><i>תקציב</i><b>${money(run.budget)}</b></div>
         <div class="st-chip"><i>רכישות שנשארו</i><b>${left}</b></div>
         <div class="st-chip"><i>סגל</i><b>${run.own.length}</b></div>
         <div class="st-chip"><i>דירוג ההרכב</i><b>${storyXiOvr(run)}</b></div>
@@ -259,14 +268,18 @@
     box.innerHTML = `<div class="st-end">
       <p style="margin:0 0 4px;color:var(--dim);font-size:13px">${esc(clubName(ch.teamId))} ${esc(ch.season)}: ${esc(ch.title)}</p>
       ${starsHTML(r.stars)}
-      <ul class="st-goals" style="text-align:right">${ch.stars.map((s, i) =>
-        `<li>${r.stars[i] ? '✅' : '❌'} ${esc(s.label)}</li>`).join('')}</ul>
+      <ul class="st-goals" style="text-align:right">${ch.stars.map((s, i) => {
+        // Graded: the first star missed is ❌, the ones after it are locked, not failed.
+        const miss = r.stars.indexOf(false);
+        const mark = r.stars[i] ? '✅' : (i === miss ? '❌' : '🔒');
+        return `<li>${mark} ${esc(s.label)}</li>`;
+      }).join('')}</ul>
       <div class="st-vs">
-        <div><i>אתם</i><b>מקום ${r.rank} · ${r.points} נק׳</b></div>
+        <div><i>אתם</i><b>מקום ${r.rank} · ${num(r.points)} נק׳</b></div>
         <div><i>המציאות</i><b>מקום ${real ? real.pos : '?'} · ${real ? real.pts : '?'} נק׳</b></div>
       </div>
-      <p style="margin:0 0 4px">תקציב בסוף: <b dir="ltr">${money(r.budget)}</b> (פתיחה: ${money(ch.budget)})</p>
-      <p style="margin:0 0 12px">ניקוד: <b>${r.score}</b>${best ? ` · השיא שלך: <b>${best.score}</b>` : ''}</p>
+      <p style="margin:0 0 4px">תקציב בסוף: <b>${money(r.budget)}</b> (פתיחה: ${money(ch.budget)})</p>
+      <p style="margin:0 0 12px">ניקוד: <b>${num(r.score)}</b>${best ? ` · השיא שלך: <b>${num(best.score)}</b>` : ''}</p>
       <div style="display:flex;gap:8px">
         <button class="st-b go" id="st-again" style="flex:1">לשחק שוב</button>
         <button class="st-b" id="st-chapters" style="flex:1">לפרקים</button>

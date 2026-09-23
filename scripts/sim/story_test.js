@@ -22,7 +22,7 @@ function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;var t=Math.imul(a
 t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
 `;
 const FILES = ['js/data.js', 'js/league_tables.js', 'js/sim-engine.js', 'js/game.js',
-  'js/league-sim.js', 'js/story-data.js', 'js/story-market.js', 'js/story-season.js'];
+  'js/league-sim.js', 'js/story-facts.js', 'js/story-data.js', 'js/story-market.js', 'js/story-season.js'];
 const EXPORTS = ['state', 'SQUADS', 'LEAGUE_TABLES', 'FORMATIONS', 'formationSlots',
   'simTeamsForSeason', 'withSeededRandom', 'generateMatches', 'generateLeagueTable',
   'seasonFormat', 'myLineRatings', 'teamOVR', 'simulatePlayerStats', 'SIM_ENGINE_CURRENT',
@@ -193,6 +193,14 @@ if (require.main === module) {
     assert.deepStrictEqual(G.storyStars(ks, G.storyResult(run, table, 1, 80)), [true, true, false]);
     const tight = [{ us: true, pts: 80 }, { us: false, pts: 77 }];
     assert.deepStrictEqual(G.storyStars(ks, G.storyResult(run, tight, 1, 80)), [true, false, false]);
+  });
+  t('js/story-facts.js covers every chapter (else: node scripts/build_story_facts.js)', () => {
+    for (const c of G.STORY_CHAPTERS) {
+      const r = G.storyReal(c);
+      assert.ok(r, c.id + ' has no real table row');
+      const t = G.LEAGUE_TABLES[c.season].find(x => x.teamId === c.teamId);
+      assert.deepStrictEqual([r.pos, r.pts], [t.pos, t.pts]);
+    }
   });
   t('ks-2011 is the live chapter: 16 clubs, real champion on 73', () => {
     const ks = G.storyChapter('ks-2011');

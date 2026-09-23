@@ -9,8 +9,8 @@
  *
  * Stars are GRADED: ⭐⭐ counts only with ⭐, and ⭐⭐⭐ only with ⭐⭐.
  *
- * The real finish is deliberately NOT written here. It is read from
- * LEAGUE_TABLES (storyReal), so the "you vs. reality" line can never disagree
+ * The real finish is deliberately NOT written here. It is read from the tables
+ * (storyReal, via js/story-facts.js — regenerate it after adding a chapter), so the "you vs. reality" line can never disagree
  * with the table the rest of the site shows.
  */
 const STORY_RULES = {
