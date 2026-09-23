@@ -92,12 +92,43 @@ function buyUpgrades(run, priceFor, honor) {
   }
 }
 
+// A European chapter: the campaign instead of a season. Tactics the way a
+// sensible player picks them: balanced unless the tie says otherwise — attack
+// when behind on aggregate, defend a lead.
+function euTactic(run) {
+  const round = G.storyEuRound(ch, run);
+  const legs = (run.eu.cur && run.eu.cur.legs) || [];
+  if (round.kind !== 'tie' || legs.length !== 1) return 'bal';
+  const d = legs[0].gf - legs[0].ga;
+  return d < 0 ? 'att' : d > 0 ? 'def' : 'bal';
+}
+function playEurope(run, honor) {
+  G.storyEuStart(run);
+  Object.assign(G.state, { story: { chapterId: ch.id }, peakMode: false, classic: false, coach: null });
+  for (let guard = 0; guard < 40 && !G.storyEuOver(ch, run); guard++) {
+    if (G.storyEuWindowDue(ch, run)) {
+      run.phase = 'jan';
+      const st = n => run.eu.stats[n] || null;
+      sellBench(run, e => G.storyJanValue(e.player, st(e.player.name)), honor);
+      buyUpgrades(run, e => G.storyValueOfOvr(e.player.ovr), honor);
+      run.eu.windowDone = true;
+      run.phase = 'europe';
+      continue;
+    }
+    G.storyEuPlay(ch, run, euTactic(run));
+  }
+  const res = { budget: run.budget, eu: G.storyEuResult(ch, run), sold: run.sold.map(s => s.name),
+                boughtTeams: run.bought.map(b => (G.SQUADS.find(s => s.id === b.squadId) || {}).teamId) };
+  return G.storyStars(ch, res);
+}
+
 function playOnce(budget, seed, honor) {
   const run = G.storyNewRun(ch, seed);
   run.budget = budget;
   const summerValue = e => G.storySummerValue(e.player, ch.season);
   sellBench(run, summerValue, honor);
   buyUpgrades(run, summerValue, honor);
+  if (ch.kind === 'europe') return playEurope(run, honor);
 
   G.storyRivalShop(run, ch, 'summer');          // the rivals move after your window
   run.phase = 'season';

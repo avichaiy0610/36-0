@@ -22,7 +22,7 @@ function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;var t=Math.imul(a
 t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
 `;
 const FILES = ['js/data.js', 'js/league_tables.js', 'js/sim-engine.js', 'js/game.js',
-  'js/league-sim.js', 'js/story-facts.js', 'js/story-data.js', 'js/story-market.js', 'js/story-season.js'];
+  'js/league-sim.js', 'js/story-facts.js', 'js/story-data.js', 'js/story-market.js', 'js/story-season.js', 'js/story-europe.js'];
 const EXPORTS = ['state', 'SQUADS', 'LEAGUE_TABLES', 'FORMATIONS', 'formationSlots',
   'simTeamsForSeason', 'withSeededRandom', 'generateMatches', 'generateLeagueTable',
   'seasonFormat', 'myLineRatings', 'teamOVR', 'simulatePlayerStats', 'SIM_ENGINE_CURRENT',
@@ -33,7 +33,9 @@ const EXPORTS = ['state', 'SQUADS', 'LEAGUE_TABLES', 'FORMATIONS', 'formationSlo
   'storyIsRival', 'storyReal', 'storyHomeSquad', 'storyNewRun', 'storyOwned', 'storyMarketPool',
   'storyBuy', 'storySell', 'storyOpponents', 'storyBestXI', 'storyStars', 'storyScore', 'storyCoreNames', 'storyResolveOvr', 'storyResult',
   'storyApplyXI', 'storyXiOvr', 'storyStatsFor', 'storyMergeStats', 'storySimulateFn',
-  'storySeasonPrepare', 'storySeasonResim', 'storyOppForSim'];
+  'storySeasonPrepare', 'storySeasonResim', 'storyOppForSim',
+  'storyEuStart', 'storyEuPlay', 'storyEuCloseTie', 'storyEuNeed', 'storyEuResult', 'storyEuRealReach',
+  'storyEuWindowDue', 'storyEuOver', 'storyEuRound', 'storyEuLiveTable', 'storyJanValue'];
 
 function load() {
   return new Function(STUB + MULBERRY + FILES.map(read).join('\n') +
@@ -271,6 +273,83 @@ if (require.main === module) {
     const made = G.storyRivalShop(run, b7, 'summer');
     assert.ok(!made.some(b => b.name === star.player.name));
   });
+  // ── Europe ─────────────────────────────────────────────────────────────────
+  const euSet = (c, run) => {
+    Object.assign(G.state, { story: { chapterId: c.id }, peakMode: false, classic: false, coach: null });
+    G.storyApplyXI(run);
+  };
+  t('europe chapters: rounds are well formed, stars point at real rounds', () => {
+    for (const c of G.STORY_CHAPTERS.filter(c => c.kind === 'europe')) {
+      const ids = c.europe.rounds.map(r => r.id);
+      assert.ok(ids.includes(c.europe.window), c.id + ' window');
+      assert.ok(ids.includes(c.europe.realOut), c.id + ' realOut');
+      c.stars.filter(s => s.type === 'euReach').forEach(s => assert.ok(ids.includes(s.round), c.id + ' ' + s.round));
+      c.europe.rounds.filter(r => r.kind === 'group').forEach(r => {
+        assert.strictEqual(r.fixtures.length, 6);
+        [0, 1, 2].forEach(k => assert.strictEqual(r.fixtures.filter(f => f[0] === k).length, 2));
+        [0, 1, 2].forEach(k => assert.deepStrictEqual(r.fixtures.filter(f => f[0] === k).map(f => f[1]).sort(), [false, true]));
+      });
+      assert.ok(G.storyHomeSquad(c), c.id + ' squad');
+    }
+  });
+  t('a tie: two legs, then closed, and the same choices replay the same way', () => {
+    const c = G.storyChapter('hta-2001');
+    const play = () => {
+      const run = G.storyNewRun(c, 31); G.storyEuStart(run); euSet(c, run);
+      const a = G.storyEuPlay(c, run, 'bal');
+      const b = G.storyEuPlay(c, run, 'att');
+      return { run, a, b };
+    };
+    const x = play(), y = play();
+    assert.ok(!x.a.closed && x.b.closed);
+    assert.deepStrictEqual([x.a.leg.gf, x.a.leg.ga, x.b.leg.gf, x.b.leg.ga], [y.a.leg.gf, y.a.leg.ga, y.b.leg.gf, y.b.leg.ga]);
+    assert.strictEqual(x.a.leg.home, true);                    // q: firstHome
+    assert.strictEqual(x.b.leg.home, false);
+    assert.ok(x.run.eu.at === 1 || x.run.eu.out);
+  });
+  t('away goals decide a level tie, then extra time and penalties', () => {
+    const c = G.storyChapter('hta-2001');
+    const run = G.storyNewRun(c, 5);
+    const round = c.europe.rounds[0];
+    // 1-2 at home, 1-0 away: 2-2, but their two away goals beat our one
+    const r = G.storyEuCloseTie(c, run, round, [{ gf: 1, ga: 2, home: true }, { gf: 1, ga: 0, home: false }]);
+    assert.deepStrictEqual([r.agg.gf, r.agg.ga, r.how, r.won], [2, 2, 'away', false]);
+    // 1-1 and 1-1: level on away goals too, so extra time, then penalties
+    const s = G.storyEuCloseTie(c, run, round, [{ gf: 1, ga: 1, home: true }, { gf: 1, ga: 1, home: false }]);
+    assert.ok(['et', 'pens'].includes(s.how));
+    assert.strictEqual(s.won, s.pens ? s.pens.gf > s.pens.ga : s.agg.gf > s.agg.ga);
+  });
+  t('the need line reads the tie', () => {
+    const c = G.storyChapter('hta-2001');
+    const r = c.europe.rounds[2];
+    assert.ok(/מובילים/.test(G.storyEuNeed(c, r, [{ gf: 2, ga: 0, home: true }])));
+    assert.ok(/פיגור/.test(G.storyEuNeed(c, r, [{ gf: 0, ga: 1, home: false }])));
+    assert.strictEqual(G.storyEuNeed(c, r, []), '');
+  });
+  t('a group: six matchdays, a full table, a position', () => {
+    const c = G.storyChapter('haifa-2009');
+    const run = G.storyNewRun(c, 12); G.storyEuStart(run); euSet(c, run);
+    run.eu.at = c.europe.rounds.findIndex(r => r.kind === 'group');
+    let last;
+    for (let i = 0; i < 6; i++) last = G.storyEuPlay(c, run, 'bal');
+    assert.ok(last.closed && last.closed.kind === 'group');
+    const tb = last.closed.table;
+    assert.strictEqual(tb.length, 4);
+    tb.forEach(r => assert.strictEqual(r.p, 6));
+    assert.strictEqual(tb.reduce((s, r) => s + r.gf, 0), tb.reduce((s, r) => s + r.ga, 0));
+    const res = { budget: 0, eu: G.storyEuResult(c, run), sold: [], boughtTeams: [] };
+    const st = G.storyStars(c, res);
+    assert.strictEqual(st[0], last.closed.pts >= 3);
+  });
+  t('europe stars: reach counts rounds entered', () => {
+    const c = G.storyChapter('hta-2001');
+    const idx = id => c.europe.rounds.findIndex(r => r.id === id);
+    const res = reached => ({ budget: 0, sold: [], boughtTeams: [], eu: { reached, group: null, champion: false } });
+    assert.deepStrictEqual(G.storyStars(c, res(idx('qf'))), [true, false, false]);
+    assert.deepStrictEqual(G.storyStars(c, res(idx('final'))), [true, true, true]);
+    assert.deepStrictEqual(G.storyStars(c, res(idx('r4'))), [false, false, false]);
+    assert.strictEqual(G.storyEuRealReach(c), idx('qf'));
+  });
   t('position groups and what a shape needs', () => {
     assert.strictEqual(G.storyGroupOf('CAM'), 'cm');
     assert.strictEqual(G.storyGroupOf('RW'), 'wg');
@@ -331,8 +410,8 @@ if (require.main === module) {
   });
   t('score', () => {
     const r = G.storyReal(ch);
-    const res = { rank: 1, points: r.pts + 5, margin: 10, budget: 10000, sold: [], boughtTeams: [] };   // 10 million
-    assert.strictEqual(G.storyScore(ch, res), 3000 + 100 + 100);
+    const res = { rank: 1, points: r.pts + 17, margin: 10, budget: 10000, sold: [], boughtTeams: [] };   // 100 pts, 10 million
+    assert.strictEqual(G.storyScore(ch, res), 3000 + 17 * 20 + 100);
   });
   t('margin and maxBuys stars, from storyResult', () => {
     const ks = G.storyChapter('ks-2011');
@@ -351,7 +430,7 @@ if (require.main === module) {
     assert.deepStrictEqual(G.storyStars(ks, G.storyResult(run, tight, 1, 80)), [true, false, false]);
   });
   t('js/story-facts.js covers every chapter (else: node scripts/build_story_facts.js)', () => {
-    for (const c of G.STORY_CHAPTERS) {
+    for (const c of G.STORY_CHAPTERS.filter(c => c.kind !== 'europe')) {
       const r = G.storyReal(c);
       assert.ok(r, c.id + ' has no real table row');
       const t = G.LEAGUE_TABLES[c.season].find(x => x.teamId === c.teamId);

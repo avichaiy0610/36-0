@@ -51,8 +51,28 @@
     if (!ch) return;
     // The rivals shop at the end of summer, from whatever your window left.
     storyRivalShop(run, ch, 'summer');
+    storyResetState(ch);
+    if (ch.kind === 'europe') {
+      // No league season: the campaign is the chapter.
+      if (!run.eu) storyEuStart(run);
+      run.phase = 'europe';
+      storySave();
+      storyApplyXI(run);
+      storyShowEurope();
+      return;
+    }
     run.phase = 'season';
     storySave();
+    storyApplyXI(run);
+    state.usedPlayerKeys = new Set(state.picks.filter(Boolean).map(p => p.player.name));
+    state.currentRound = state.slots.length;               // "drafted" — restore resumes at the season
+    saveDraftState();
+    showPreseason(teamOVR());
+  }
+
+  // Every other mode's field switched off — `state` is shared, and a field
+  // nobody sets is a field that carries over.
+  function storyResetState(ch) {
     const year = parseInt(ch.season, 10);
     Object.assign(state, {
       story: { chapterId: ch.id },
@@ -66,11 +86,46 @@
       selectedPlayer: null, selectedSlotIdx: null,
       isAnimating: false, awaitingSlotPick: false, moveMode: false, movingFromIdx: null,
     });
-    storyApplyXI(run);
-    state.usedPlayerKeys = new Set(state.picks.filter(Boolean).map(p => p.player.name));
-    state.currentRound = state.slots.length;               // "drafted" — restore resumes at the season
-    saveDraftState();
-    showPreseason(teamOVR());
+  }
+
+  /* ── Europe ─────────────────────────────────────────────────────────────── */
+  // Play the next match with `tactic`, save, and finish the chapter if that
+  // was the last one. Returns what storyEuPlay returned.
+  function storyEuAct(tactic) {
+    const run = storyRun();
+    const ch = run && storyChapter(run.chapterId);
+    if (!ch || !run.eu || storyEuOver(ch, run)) return null;
+    storyResetState(ch);
+    const out = storyEuPlay(ch, run, tactic);
+    if (storyEuOver(ch, run)) storyEuFinish(ch, run);
+    storySave();
+    return out;
+  }
+
+  // The January-style window of a European chapter: the market, then back.
+  function storyEuWindowClose() {
+    const run = storyRun();
+    if (!run || !run.eu) return;
+    run.eu.windowDone = true;
+    run.phase = 'europe';
+    storySave();
+  }
+
+  function storyEuFinish(ch, run) {
+    if (run.phase === 'done') return;
+    const res = { budget: run.budget, eu: storyEuResult(ch, run), sold: run.sold.map(s => s.name),
+                  boughtTeams: run.bought.map(b => (SQUADS.find(s => s.id === b.squadId) || {}).teamId) };
+    const stars = storyStars(ch, res);
+    const g = res.eu.group;
+    run.result = { budget: run.budget, stars, score: storyScore(ch, res),
+                   eu: { reached: res.eu.reached, champion: res.eu.champion,
+                         group: g ? { pos: g.pos, pts: g.pts, gf: g.gf, ga: g.ga } : null } };
+    run.phase = 'done';
+    const best = storyBest();
+    const b = best[ch.id] || { stars: [false, false, false], score: null };
+    best[ch.id] = { stars: b.stars.map((s, i) => s || stars[i]),
+                    score: b.score == null ? run.result.score : Math.max(b.score, run.result.score) };
+    save(BEST_KEY, best);
   }
 
   // Called by oppTeamsForState() while a chapter is on.
@@ -151,6 +206,7 @@
 
   Object.assign(global, {
     storyRun, storySave, storyBest, storyStart, storyEnterSeason, storyOppForState,
+    storyEuAct, storyEuWindowClose,
     storyPrepare, storyOpen, storyOnSeasonEnd, storyRenderLast, storyExit,
   });
 })(typeof window !== 'undefined' ? window : globalThis);

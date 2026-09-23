@@ -299,6 +299,14 @@ function storyStars(ch, res) {
   const raw = ch.stars.map(s => {
     if (s.type === 'rank') return res.rank <= s.max;
     if (s.type === 'survive') return res.rank <= storySafeRank(ch);
+    if (s.type === 'points') return res.points >= s.min;
+    if (s.type === 'points') return res.points >= s.min;
+    // Europe: how far the campaign went, and what the group gave
+    if (s.type === 'euReach') return !!res.eu && storyEuReachedRound(ch, res, s.round);
+    if (s.type === 'euChampion') return !!res.eu && res.eu.champion;
+    if (s.type === 'euGroupPos') return !!(res.eu && res.eu.group) && res.eu.group.pos <= s.max;
+    if (s.type === 'euGroupGoals') return !!(res.eu && res.eu.group) && res.eu.group.gf >= s.min;
+    if (s.type === 'euGroupPoints') return !!(res.eu && res.eu.group) && res.eu.group.pts >= s.min;
     if (s.type === 'beatPoints') return !!real && res.points > real.pts;
     if (s.type === 'margin') return res.rank === 1 && (res.margin || 0) >= s.min;
     if (s.type === 'noBuyFrom') return !(res.boughtTeams || []).some(t => s.teams.includes(t));
@@ -312,6 +320,11 @@ function storyStars(ch, res) {
   return raw.map((ok, i) => raw.slice(0, i + 1).every(Boolean));
 }
 function storyScore(ch, res) {
+  if (res.eu) {
+    // Europe: 300 a round beyond (or short of) how far the real campaign went
+    const stars = storyStars(ch, res).filter(Boolean).length;
+    return stars * 1000 + (res.eu.reached - storyEuRealReach(ch)) * 300 + Math.round(res.budget / 100);
+  }
   const real = storyReal(ch);
   const stars = storyStars(ch, res).filter(Boolean).length;
   // budget is thousands of ₪: 10 points per million left over

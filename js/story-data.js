@@ -47,23 +47,24 @@ const STORY_VALUE_TIERS = [
 const STORY_CHAPTERS = [
   {
     id: 'b7-2015',
-    hidden: true,       // favourites wait for the owner's call: 97% titles even with rivals shopping
     // With its real squad B7 won 85% of titles before a single transfer, so its
     // rivals shop too (rivalBudget, js/story-market.js storyRivalShop) — the
     // owner turned down an opening debt as unreal.
     teamId: 'hapoel-beersheba',
     season: '2015/16',
     title: '40 שנה אחרי',
-    level: 'normal',
+    level: 'easy',
     budget: 2000,
     rivalBudget: 3000,
+    // One of the two easy chapters, on the owner's word ("שיהיו שניים קלים יחסית").
+    // 800 runs at 2,000, 2026-09-23: title 97%; margin p50 10; points p75 99.
     intro: 'הפועל באר שבע לא זכתה באליפות מאז 1976. על הנייר זה הסגל הכי חזק בליגה, ' +
            'אבל מכבי תל אביב צמודה אליו, והיריבות קונות: מכבי ת"א, עירוני קריית שמונה ' +
            'ובית"ר ירושלים יחתימו אחרי שהחלון שלך ייסגר.',
     stars: [
       { type: 'rank', max: 1, label: 'אליפות' },
-      { type: 'margin', min: 5, label: 'אליפות בפער של 5 נקודות לפחות' },
-      { type: 'maxBuys', n: 4, label: 'עם 4 רכישות לכל היותר בכל העונה' },
+      { type: 'margin', min: 10, label: 'אליפות בפער של 10 נקודות לפחות' },
+      { type: 'points', min: 100, label: '100 נקודות' },
     ],
   },
   {
@@ -163,20 +164,210 @@ const STORY_CHAPTERS = [
   // ── the favourites: their rivals use the market too ──────────────────────
   {
     id: 'haifa-2020',
-    hidden: true,       // same as b7-2015
     teamId: 'maccabi-haifa',
     season: '2020/21',
     title: 'סוף העשור השחור',
-    level: 'normal',
+    level: 'easy',
     budget: 3000,
     rivalBudget: 3000,
+    // The other easy chapter. 800 runs at 2,000: title 96%; margin p50 11; points p90 101.
     intro: 'מכבי חיפה לא זכתה באליפות מאז 2010/11. ב-2020/21 היא סיימה ראשונה עם 79 נקודות, ' +
            '4 מעל מכבי תל אביב. על הנייר זה הסגל החזק בליגה, אבל הפעם גם היריבות קונות: ' +
            'מכבי ת"א, בית"ר ירושלים והפועל באר שבע יחתימו אחרי שהחלון שלך ייסגר.',
     stars: [
       { type: 'rank', max: 1, label: 'אליפות' },
+      { type: 'margin', min: 10, label: 'אליפות בפער של 10 נקודות לפחות' },
+      { type: 'points', min: 100, label: '100 נקודות' },
+    ],
+  },
+  // ── Europe ────────────────────────────────────────────────────────────────
+  // The real campaigns, every opponent and score checked 2026-09-23 against
+  // en.wikipedia ("Hapoel Tel Aviv F.C. in European football", "Maccabi Haifa
+  // F.C. in European football", "2002 UEFA Cup final") and he.wikipedia (the two
+  // clubs' pages). The order of legs is not claimed — `real` says home and away.
+  // Ratings sit on js/europe-data.js's scale, where 99 is Europe's elite.
+  {
+    id: 'hta-2001',
+    kind: 'europe',
+    teamId: 'hapoel-tlv',
+    season: '2001/02',
+    comp: 'גביע אופ"א',
+    title: 'הלילות של בלומפילד',
+    level: 'hardest',
+    budget: 1500,
+    // 400 runs, 2026-09-23: ⭐ 13-16%  ⭐⭐ 5.5-8.5%  ⭐⭐⭐ 3-4.5%. Five ties to the
+    // quarter-final, three of them near coin flips even with the European night —
+    // the real run was that rare. Money barely moves it: 1,000 to 4,000 are within noise.
+    intro: 'גביע אופ"א 2001/02. הפועל תל אביב הדיחה את צ\'לסי, את לוקומוטיב מוסקבה ואת פארמה, ' +
+           'ונעצרה רק ברבע הגמר מול מילאן. הפעם אפשר להמשיך: אחרי מילאן מחכה דורטמונד, ' +
+           'והגמר נערך באצטדיון של פיינורד ברוטרדם.',
+    europe: {
+      awayGoals: true,
+      window: 'r4',                    // the winter break, before the last 16
+      realOut: 'qf',
+      realText: 'הודחה ברבע הגמר',
+      rounds: [
+        { id: 'q',   label: 'הסיבוב המוקדם', kind: 'tie', firstHome: true,
+          club: { name: 'אררט ירוואן', flag: '🇦🇲', ovr: 74 }, real: 'בבית 3-0, בחוץ 2-0' },
+        { id: 'r1',  label: 'הסיבוב הראשון', kind: 'tie', ko: true, firstHome: false,
+          club: { name: 'גזיאנטפספור', flag: '🇹🇷', ovr: 81 }, real: 'בבית 1-0, בחוץ 1-1' },
+        { id: 'r2',  label: 'הסיבוב השני', kind: 'tie', ko: true, firstHome: true,
+          club: { name: 'צ\'לסי', crest: 'eu-chelsea', flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿', ovr: 93 }, real: 'בבית 2-0, בחוץ 1-1' },
+        { id: 'r3',  label: 'הסיבוב השלישי', kind: 'tie', ko: true, firstHome: false,
+          club: { name: 'לוקומוטיב מוסקבה', flag: '🇷🇺', ovr: 89 }, real: 'בבית 2-1, בחוץ 1-0' },
+        { id: 'r4',  label: 'שמינית הגמר', kind: 'tie', ko: true, firstHome: true,
+          club: { name: 'פארמה', flag: '🇮🇹', ovr: 91 }, real: 'בבית 0-0, בחוץ 2-1' },
+        { id: 'qf',  label: 'רבע הגמר', kind: 'tie', ko: true, firstHome: true,
+          club: { name: 'מילאן', crest: 'eu-milan', flag: '🇮🇹', ovr: 96 }, real: 'בבית 1-0, בחוץ 0-2. ההדחה.' },
+        { id: 'sf',  label: 'חצי הגמר', kind: 'tie', ko: true, firstHome: false,
+          club: { name: 'בורוסיה דורטמונד', crest: 'eu-dortmund', flag: '🇩🇪', ovr: 94 }, real: 'במציאות דורטמונד הדיחה את מילאן' },
+        { id: 'final', label: 'הגמר', kind: 'tie', ko: true, oneLeg: true, home: false,
+          club: { name: 'פיינורד', crest: 'eu-feyenoord', flag: '🇳🇱', ovr: 90 }, real: 'במציאות פיינורד ניצחה את דורטמונד 3-2, בבית שלה' },
+      ],
+    },
+    stars: [
+      { type: 'euReach', round: 'qf', label: 'להגיע לרבע הגמר' },
+      { type: 'euReach', round: 'sf', label: 'להגיע לחצי הגמר' },
+      { type: 'euReach', round: 'final', label: 'להגיע לגמר' },
+    ],
+  },
+  {
+    id: 'haifa-2002',
+    kind: 'europe',
+    teamId: 'maccabi-haifa',
+    season: '2002/03',
+    comp: 'ליגת האלופות',
+    title: 'הערב שבו מנצ\'סטר נפלה',
+    level: 'hard',
+    budget: 2000,
+    // 800-1200 runs, 2026-09-23: ⭐ 33.0%  ⭐⭐ 4.8%  ⭐⭐⭐ 2.8%. No European night in a group.
+    intro: 'ליגת האלופות 2002/03: הקבוצה הישראלית הראשונה בשלב הבתים. מכבי חיפה ניצחה ' +
+           'את מנצ\'סטר יונייטד ואת אולימפיאקוס 0:3, וסיימה שלישית בבית עם לברקוזן. ' +
+           'שלישית זה מה שהיה. שתיים הראשונות עולות.',
+    europe: {
+      awayGoals: true,
+      window: 'group',                 // the deadline between the qualifiers and the group
+      realOut: 'group',
+      realText: 'סיימה שלישית בבית, 7 נקודות',
+      rounds: [
+        { id: 'q2', label: 'סיבוב המוקדמות השני', kind: 'tie', firstHome: true,
+          club: { name: 'בלשינה בוברויסק', flag: '🇧🇾', ovr: 72 }, real: 'בבית 4-0, בחוץ 1-0' },
+        { id: 'q3', label: 'סיבוב המוקדמות השלישי', kind: 'tie', firstHome: true,
+          club: { name: 'שטורם גראץ', crest: 'eu-sturm', flag: '🇦🇹', ovr: 84 }, real: 'בבית 2-0, בחוץ 3-3' },
+        { id: 'group', label: 'שלב הבתים', kind: 'group', advance: 2,
+          clubs: [{ name: 'מנצ\'סטר יונייטד', flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿', ovr: 97 },
+                  { name: 'אולימפיאקוס', crest: 'eu-olympiacos', flag: '🇬🇷', ovr: 89 },
+                  { name: 'באייר לברקוזן', crest: 'eu-leverkusen', flag: '🇩🇪', ovr: 94 }],
+          fixtures: [[0, false], [1, true], [2, true], [2, false], [0, true], [1, false]],
+          real: 'מנצ\'סטר: 2-5 בחוץ, 3-0 בבית · אולימפיאקוס: 3-0 בבית, 3-3 בחוץ · לברקוזן: 0-2 בבית, 1-2 בחוץ' },
+      ],
+    },
+    stars: [
+      { type: 'euGroupPos', max: 3, label: 'לסיים שלישית בבית, כמו במציאות' },
+      { type: 'euGroupPos', max: 2, label: 'לעלות מהבית' },
+      { type: 'euGroupPoints', min: 9, label: 'לעלות מהבית עם 9 נקודות ומעלה' },
+    ],
+  },
+  {
+    id: 'haifa-2009',
+    kind: 'europe',
+    teamId: 'maccabi-haifa',
+    season: '2009/10',
+    comp: 'ליגת האלופות',
+    title: 'אפס ואפס',
+    level: 'hard',
+    budget: 2500,
+    // 1200 runs, 2026-09-23: ⭐ 23.9%  ⭐⭐ 7.3%  ⭐⭐⭐ 2.1%. "Score a goal" (48%) and "a point"
+    // (42%) were measured first and were far too easy: the real zero was a freak.
+    intro: 'ליגת האלופות 2009/10. מכבי חיפה עברה את גלנטורן, את אקטובה ואת זלצבורג, ' +
+           'ובבית עם באיירן מינכן, יובנטוס ובורדו הפסידה בכל ששת המשחקים: ' +
+           'אפס נקודות, אפס שערים. הפעם צריך יותר מנקודה של כבוד.',
+    europe: {
+      awayGoals: true,
+      window: 'group',
+      realOut: 'group',
+      realText: '0 נקודות ו-0 שערים בשלב הבתים',
+      rounds: [
+        { id: 'q2', label: 'סיבוב המוקדמות השני', kind: 'tie', firstHome: true,
+          club: { name: 'גלנטורן', flag: '🇬🇧', ovr: 70 }, real: 'בבית 6-0, בחוץ 4-0' },
+        { id: 'q3', label: 'סיבוב המוקדמות השלישי', kind: 'tie', firstHome: false,
+          club: { name: 'אקטובה', flag: '🇰🇿', ovr: 78 }, real: 'בחוץ 0-0, בבית 4-3' },
+        { id: 'po', label: 'סיבוב הפלייאוף', kind: 'tie', firstHome: false,
+          club: { name: 'רד בול זלצבורג', crest: 'eu-salzburg', flag: '🇦🇹', ovr: 86 }, real: 'בחוץ 2-1, בבית 3-0' },
+        { id: 'group', label: 'שלב הבתים', kind: 'group', advance: 2,
+          clubs: [{ name: 'באיירן מינכן', crest: 'eu-bayern', flag: '🇩🇪', ovr: 97 },
+                  { name: 'יובנטוס', crest: 'eu-juventus', flag: '🇮🇹', ovr: 95 },
+                  { name: 'בורדו', flag: '🇫🇷', ovr: 93 }],
+          fixtures: [[0, true], [2, false], [1, false], [1, true], [0, false], [2, true]],
+          real: 'באיירן: 0-3 בבית, 0-1 בחוץ · יובנטוס: 0-1 בחוץ, 0-1 בבית · בורדו: 0-1 בחוץ, 0-1 בבית' },
+      ],
+    },
+    stars: [
+      { type: 'euGroupPoints', min: 3, label: 'לנצח משחק בבית' },
+      { type: 'euGroupPoints', min: 5, label: '5 נקודות בבית' },
+      { type: 'euGroupPoints', min: 7, label: '7 נקודות בבית' },
+    ],
+  },
+  // ── Maccabi Tel Aviv (the owner: "הגזמנו קצת עם מכבי חיפה") ────────────────
+  {
+    id: 'mta-2002',
+    teamId: 'maccabi-tlv',
+    season: '2002/03',
+    title: 'על חוט השערה',
+    level: 'normal',
+    budget: 500,
+    // Measured 2026-09-23: with no market at all it is 24%; three signings took it
+    // to 54%, one per window to 42% — the XI (84) is four points off Haifa (88),
+    // so one good signing closes half the gap. Hence 'normal', one signing a
+    // window, and the top star is winning it with the squad as it was.
+    rules: { buys: { summer: 1, jan: 1 }, minSquad: 24 },
+    // 800 runs at 500: ⭐ 41.9%  ⭐⭐ 12.3%  ⭐⭐⭐ 5.3%.
+    intro: 'מכבי תל אביב זכתה באליפות 2002/03 בשוויון נקודות עם מכבי חיפה, 69 כל אחת, ' +
+           'והפועל תל אביב שתי נקודות מאחור. על הנייר זה היה רק הסגל השלישי בליגה, ' +
+           'אחרי חיפה והפועל. ניר קלינגר, בעונתו הראשונה כמאמן ראשי.',
+    stars: [
+      { type: 'rank', max: 1, label: 'אליפות' },
       { type: 'margin', min: 5, label: 'אליפות בפער של 5 נקודות לפחות' },
-      { type: 'maxBuys', n: 4, label: 'עם 4 רכישות לכל היותר בכל העונה' },
+      { type: 'maxBuys', n: 0, label: 'בלי אף רכישה: עם הסגל של אז' },
+    ],
+  },
+  {
+    id: 'mta-2004',
+    kind: 'europe',
+    teamId: 'maccabi-tlv',
+    season: '2004/05',
+    comp: 'ליגת האלופות',
+    title: 'הלילה מול אייאקס',
+    level: 'hard',
+    budget: 2000,
+    // 1000 runs, 2026-09-23: ⭐ 26.6%  ⭐⭐ 3.4%  ⭐⭐⭐ 1.9% ('hard', leaning harder). The real
+    // 4 points came out at 1% — the 2004/05 squad finished 8th at home — so the real
+    // tally is ⭐⭐, not ⭐.
+    intro: 'ליגת האלופות 2004/05. מכבי תל אביב עברה את HJK הלסינקי ואת פאוק, ' +
+           'ובבית עם יובנטוס, באיירן מינכן ואייאקס ניצחה את אייאקס 2-1 והוציאה 1-1 מיובנטוס. ' +
+           '4 נקודות ומקום רביעי. מקום שלישי היה שולח אותה לגביע אופ"א.',
+    europe: {
+      awayGoals: true,
+      window: 'group',
+      realOut: 'group',
+      realText: 'סיימה רביעית בבית, 4 נקודות',
+      rounds: [
+        { id: 'q2', label: 'סיבוב המוקדמות השני', kind: 'tie', firstHome: true,
+          club: { name: 'HJK הלסינקי', crest: 'eu-hjk', flag: '🇫🇮', ovr: 74 }, real: 'בבית 1-0, בחוץ 0-0' },
+        { id: 'q3', label: 'סיבוב המוקדמות השלישי', kind: 'tie', firstHome: true,
+          club: { name: 'פאוק', crest: 'eu-paok', flag: '🇬🇷', ovr: 84 }, real: 'בבית 1-0, בחוץ 3-0' },
+        { id: 'group', label: 'שלב הבתים', kind: 'group', advance: 2,
+          clubs: [{ name: 'יובנטוס', crest: 'eu-juventus', flag: '🇮🇹', ovr: 97 },
+                  { name: 'באיירן מינכן', crest: 'eu-bayern', flag: '🇩🇪', ovr: 96 },
+                  { name: 'אייאקס', crest: 'eu-ajax', flag: '🇳🇱', ovr: 88 }],
+          fixtures: [[2, true], [0, false], [1, true], [1, false], [2, false], [0, true]],
+          real: 'יובנטוס: 1-1 בבית, 0-1 בחוץ · באיירן: 0-1 בבית, 1-5 בחוץ · אייאקס: 2-1 בבית, 0-3 בחוץ' },
+      ],
+    },
+    stars: [
+      { type: 'euGroupPoints', min: 1, label: 'לגרוף נקודה בבית' },
+      { type: 'euGroupPoints', min: 4, label: '4 נקודות, כמו במציאות' },
+      { type: 'euGroupPos', max: 3, label: 'מקום שלישי: כרטיס לגביע אופ"א' },
     ],
   },
 ];
