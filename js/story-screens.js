@@ -608,7 +608,12 @@
     if (view.last && view.last.closed) {
       const L = view.last, r = L.round;
       const oppName = r.kind === 'tie' ? r.club.name : (L.leg.opp || '');
-      lastHTML = `<div class="eu-card last">${euLegLine(us, L.leg, oppName)}`;
+      // A finished tie shows BOTH legs, then the aggregate. Showing only the leg just
+      // played read as "0-0, so how is it 1-0?" — the first leg was off screen.
+      const legs = L.closed.kind === 'tie' ? L.closed.legs : [L.leg];
+      const head = L.closed.kind === 'tie'
+        ? `<h3>${oppMark(r.club)} ${esc(r.club.name)} · ${esc(r.label)}</h3>` : '';
+      lastHTML = `<div class="eu-card last">${head}${legs.map(l => euLegLine(us, l, oppName)).join('')}`;
       if (L.closed && L.closed.kind === 'tie') {
         const c = L.closed;
         const how = c.how === 'away' ? ' (שערי חוץ)' : c.how === 'et' ? ' (אחרי הארכה)' : c.how === 'pens'
