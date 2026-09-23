@@ -640,7 +640,15 @@
     }
 
     let main = '';
-    if (over) {
+    // A round just closed: stop on its result. The next round opens only when you
+    // say so — otherwise the next tap on the same button played its first match
+    // with the last round's tactic before you had even seen the opponent.
+    const pause = !over && view.last && view.last.closed;
+    if (pause) {
+      const next = storyEuWindowDue(ch, run) ? 'חלון ההעברות' : storyEuRound(ch, run).label;
+      // 'ל' swallows the article: 'לסיבוב הראשון', 'לגמר', not 'להסיבוב'
+      main = `<button class="st-b go st-go" id="eu-next">להמשיך ל${esc(next.replace(/^ה/, ''))} ←</button>`;
+    } else if (over) {
       main = `<div id="st-eu-end"></div>`;
     } else if (storyEuWindowDue(ch, run)) {
       main = `<div class="eu-card"><h3>חלון ההעברות</h3>
@@ -675,10 +683,17 @@
       // who misses the next match, and the eleven that will play it
       const when = storyEuWhen(run, r);
       const hurtEu = new Set(storyInjured(run, when).map(e => e.player.name));
+      // Name the starters who miss it; the bench is only a count — a list of five
+      // names read as a disaster when four of them would not have played anyway.
+      const wouldStart = new Set(storyPickXI(storyOwned(run), formationSlots(run.formationId, run.tactic), run.xi)
+        .filter(Boolean).map(e => e.player.name));
+      const outXI = [...hurtEu].filter(n => wouldStart.has(n));
+      const outBench = hurtEu.size - outXI.length;
       const lu = storyLineup(run, when);
       view.lu = lu;
       main = `<div class="eu-card">${body}
-        ${hurtEu.size ? `<p class="st-hurt">🩹 לא ישחקו במשחק הזה: ${[...hurtEu].map(esc).join(', ')}</p>` : ''}
+        ${outXI.length ? `<p class="st-hurt">🩹 פצועים מההרכב, לא ישחקו במשחק הזה: ${outXI.map(esc).join(', ')}</p>` : ''}
+        ${outBench ? `<p class="st-note">🩹 ${outBench === 1 ? 'שחקן ספסל אחד פצוע' : outBench + ' שחקני ספסל פצועים'}</p>` : ''}
         ${lineupHTML(run, lu, hurtEu)}
         <div class="eu-tac">${TACTIC_KEYS.map(k => `<button class="st-b${k === tac ? ' go' : ''}" data-tac="${k}">
           ${esc(TACTICS[k].label)}<small>${tacticTrade(k) || 'בלי שינוי'}</small></button>`).join('')}</div>
@@ -696,6 +711,8 @@
     root().querySelectorAll('[data-tac]').forEach(b => b.onclick = () =>
       storyShowEurope({ ...view, tactic: b.dataset.tac }));
     const play = byId('eu-play');
+    const nextBtn = byId('eu-next');
+    if (nextBtn) nextBtn.onclick = () => storyShowEurope({ tactic: 'bal' });
     if (play) play.onclick = () => {
       const out = storyEuAct(view.tactic || 'bal');
       storyShowEurope({ last: out, tactic: view.tactic || 'bal' });
