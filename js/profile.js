@@ -61,9 +61,11 @@ async function showProfile() {
 const PF_TROPHY_KEYS = {
   league: null,          // counted, not badged
   cup:  'cup_win',
+  isc:  'isc_win',
   ucl:  'eu_bigears',
   uel:  'eu_uel',
   uecl: 'eu_uecl',
+  usc:  'eu_super',
 };
 
 function honoursHTML(s, held) {
@@ -71,7 +73,7 @@ function honoursHTML(s, held) {
   const has = k => !!held[k];
   const times = k => held[k] || 0;
   const titles = Number(s.titles || 0);
-  const cells = ['league', 'cup', 'ucl', 'uel', 'uecl'].map(kind => {
+  const cells = ['league', 'cup', 'isc', 'ucl', 'uel', 'uecl', 'usc'].map(kind => {
     const key = PF_TROPHY_KEYS[kind];
     const won = kind === 'league' ? titles > 0 : has(key);
     const n = kind === 'league' ? titles : times(key);
@@ -93,17 +95,17 @@ function honoursHTML(s, held) {
   if (has('cup_double')) extras.push('👑 דאבל');
   if (has('eu_treble'))  extras.push('🌍 שלושת המפעלים');
   if (has('cr_dynasty')) extras.push('🏰 שושלת');
-  const kinds = ['cup', 'ucl', 'uel', 'uecl'].filter(k => has(PF_TROPHY_KEYS[k])).length + (titles ? 1 : 0);
-  const total = titles + ['cup', 'ucl', 'uel', 'uecl'].reduce((a, k) => a + times(PF_TROPHY_KEYS[k]), 0);
+  const kinds = ['cup', 'isc', 'ucl', 'uel', 'uecl', 'usc'].filter(k => has(PF_TROPHY_KEYS[k])).length + (titles ? 1 : 0);
+  const total = titles + ['cup', 'isc', 'ucl', 'uel', 'uecl', 'usc'].reduce((a, k) => a + times(PF_TROPHY_KEYS[k]), 0);
 
   return `
     <div class="pf-card">
       <div class="pf-card-title">🏛 ארון התארים</div>
       <div class="pf-hon-case"><div class="pf-hon-row">${cells}</div></div>
       <div class="pf-sub pf-hon-sub">${
-        kinds ? `${total} ${total === 1 ? 'תואר' : 'תארים'} · ${kinds} מתוך 5 המפעלים`
+        kinds ? `${total} ${total === 1 ? 'תואר' : 'תארים'} · ${kinds} מתוך 7 המפעלים`
                 + (extras.length ? ' · ' + extras.map(profEsc).join(' · ') : '')
-              : 'המדפים ריקים. יש חמישה למלא.'
+              : 'המדפים ריקים. יש שבעה למלא.'
       }</div>
       <p class="pf-note pf-hon-note">✓ = הורם, בלי מונה. גביעים שנזכו לפני שהספירה נכנסה מופיעים ככה.</p>
     </div>`;

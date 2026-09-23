@@ -53,6 +53,16 @@
   --eu-canvas: radial-gradient(120% 60% at 50% 0%, #0d3325 0%, #06170f 55%, transparent 100%);
 }
 
+/* The Super Cup: a cooler, cleaner blue than the Champions League — no
+   magenta anywhere, so it never reads as a fourth Champions League night. */
+.eu-seq[data-eu-blue="1"][data-eu-tier="usc"] {
+  --eu-card:   #0b1a3a;
+  --eu-edge:   #24508f;
+  --eu-glow:   #1f7ae0;
+  --eu-glow2:  #4fb0ff;
+  --eu-canvas: radial-gradient(120% 60% at 50% 0%, #143068 0%, #081530 55%, transparent 100%);
+}
+
 [data-theme="light"] .eu-seq[data-eu-blue="1"] {
   --eu-card:   #f2f6ff;
   --eu-edge:   #b9cdf0;
@@ -378,3 +388,18 @@ body.eu-blue #screen-europe { background: transparent; }
 .eu-badge > .eu-mono:only-child,
 .eu-mini-crest.missing + .eu-mono,
 .eu-badge img.missing + .eu-mono { display: inline-flex; }
+
+/* ── the Super Cup ────────────────────────────────────────────────────────── */
+.eu-usc-pre, .eu-seq[data-eu-tier="usc"] .eu-trophy, .eu-seq[data-eu-tier="usc"] .lost { text-align: center; }
+.eu-usc-art { line-height: 0; margin: 4px 0 2px; animation: eu-rise .8s ease;
+  filter: drop-shadow(0 0 18px color-mix(in srgb, var(--eu-glow) 55%, transparent)); }
+/* img.trophy is display:block site-wide, so text-align cannot centre it */
+.eu-usc-art .trophy { margin: 0 auto; }
+.eu-usc-vs {
+  display: flex; align-items: center; justify-content: center; gap: 12px;
+  flex-wrap: wrap; margin: 12px 0 6px; font-weight: 800;
+}
+.eu-usc-vs .eu-side { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; }
+.eu-usc-vs .eu-side i { font-style: normal; font-size: 11px; font-weight: 600; color: var(--eu-dim); }
+.eu-usc-vs > b { color: var(--eu-glow2); font-size: 13px; }
+.eu-usc-vs > b.eu-usc-sc { font-size: 22px; font-weight: 900; color: var(--eu-ink); white-space: nowrap; }

@@ -161,7 +161,7 @@ function crArchiveRun(run, reason) {
 function crLifetimeHonours() {
   const runs = crArchive().slice();
   if (crHasRun() && !crRun().archived) runs.push(crRun());
-  const tot = { league: 0, cup: 0, ucl: 0, uel: 0, uecl: 0, doubles: 0, careers: runs.length, seasons: 0 };
+  const tot = { league: 0, cup: 0, isc: 0, ucl: 0, uel: 0, uecl: 0, usc: 0, doubles: 0, careers: runs.length, seasons: 0 };
   runs.forEach(r => {
     const n = crHonours(r);
     Object.keys(tot).forEach(k => { if (n[k] != null) tot[k] += n[k]; });
@@ -1028,6 +1028,28 @@ function crRecordEuTrophy(year, tier, won) {
   crSave();
 }
 
+// The Super Cup is the very last thing a season can hand out — played after the
+// European final, by the same frozen XI — so it lands on the same row as the
+// trophy that bought the ticket. Only a win is worth a shelf; a loss is kept as
+// false so the row can still say the night happened.
+function crRecordSuperCup(year, won) {
+  const h = crSeasonRow(year);
+  if (!h) return;
+  if (h.usc === !!won) return;
+  h.usc = !!won;
+  crSave();
+}
+
+// אלוף האלופים — champion against cup holder, played from the results screen
+// once the cup final is in. Same shape as the European Super Cup's record.
+function crRecordIsraelSuper(year, won) {
+  const h = crSeasonRow(year);
+  if (!h) return;
+  if (h.isc === !!won) return;
+  h.isc = !!won;
+  crSave();
+}
+
 // The winter window, kept per season. Written from the seam in game.js, where
 // both futures are still in hand — so the row can say not only what you did but
 // what the other door was worth.
@@ -1042,16 +1064,18 @@ function crRecordJanuary(year, jan) {
 // Five competitions hand out silverware now, and until this the history could
 // only say where you FINISHED. A dynasty that won three State Cups and a
 // Conference League showed a league position and a flag.
-const CR_HONOUR_ORDER = ['league', 'cup', 'ucl', 'uel', 'uecl'];
+const CR_HONOUR_ORDER = ['league', 'cup', 'isc', 'ucl', 'uel', 'uecl', 'usc'];
 
 function crHonours(run) {
   const h = (run || crRun()).history || [];
   return {
     league: h.filter(x => x.champion).length,
     cup:    h.filter(x => x.cupWon).length,
+    isc:    h.filter(x => x.isc === true).length,
     ucl:    h.filter(x => x.euTrophy === 'ucl').length,
     uel:    h.filter(x => x.euTrophy === 'uel').length,
     uecl:   h.filter(x => x.euTrophy === 'uecl').length,
+    usc:    h.filter(x => x.usc === true).length,
     doubles: h.filter(x => x.champion && x.cupWon).length,
   };
 }
@@ -1104,7 +1128,7 @@ function crSetupHonoursHTML() {
   const sub = t.careers
     ? `<b>${total}</b> ${total === 1 ? 'תואר' : 'תארים'} ב-${t.careers} ${t.careers === 1 ? 'קריירה' : 'קריירות'} · ${t.seasons} עונות`
       + (t.doubles ? ` · ${t.doubles} דאבל` : '')
-    : 'חמישה מפעלים, חמישה מדפים ריקים. עשר עונות במועדון אחד כדי למלא אותם.';
+    : 'שבעה מפעלים, שבעה מדפים ריקים. עשר עונות במועדון אחד כדי למלא אותם.';
   return crHonoursHTML(null, { counts: t, sub, title: 'ארון התארים — כל הקריירות' });
 }
 
@@ -1161,7 +1185,9 @@ function crTimelineHTML(run) {
     const tro = [];
     if (x.champion) tro.push(trophySVG('league', { size: 13 }));
     if (x.cupWon)   tro.push(trophySVG('cup', { size: 13 }));
+    if (x.isc === true) tro.push(trophySVG('isc', { size: 13 }));
     if (x.euTrophy) tro.push(trophySVG(x.euTrophy, { size: 13 }));
+    if (x.usc === true) tro.push(trophySVG('usc', { size: 13 }));
     let clubs = '';
     if (Array.isArray(x.xi)) {
       const set = new Set(x.xi.filter(Boolean).map(p => (bySquad.get(p.squadId) || {}).teamId).filter(Boolean));
@@ -1211,12 +1237,12 @@ function crPastHTML(opts) {
       : '';
   }
   const tot = crLifetimeHonours();
-  const totalTro = ['league', 'cup', 'ucl', 'uel', 'uecl'].reduce((s, k) => s + tot[k], 0);
+  const totalTro = CR_HONOUR_ORDER.reduce((s, k) => s + tot[k], 0);
   // newest at the top, but numbered by when it was STARTED — so "קריירה 1" is
   // the first dynasty you ever ran and its number never moves
   const rows = list.map((r, idx) => ({ r, no: idx + 1 })).reverse().map(({ r, no }) => {
     const n = crHonours(r);
-    const icons = ['league', 'cup', 'ucl', 'uel', 'uecl']
+    const icons = CR_HONOUR_ORDER
       .filter(k => n[k])
       .map(k => `${trophySVG(k, { size: 16 })}${n[k] > 1 ? `<i>×${n[k]}</i>` : ''}`).join('');
     const last = r.history[r.history.length - 1];
@@ -1298,7 +1324,9 @@ function crSeasonTrophies(h) {
   const out = [];
   if (h.champion) out.push(trophySVG('league', { size: 17 }));
   if (h.cupWon)   out.push(trophySVG('cup',    { size: 17 }));
+  if (h.isc === true) out.push(trophySVG('isc', { size: 17 }));
   if (h.euTrophy) out.push(trophySVG(h.euTrophy, { size: 17 }));
+  if (h.usc === true) out.push(trophySVG('usc', { size: 17 }));
   return out.length ? `<span class="cr-row-tro">${out.join('')}</span>` : '';
 }
 

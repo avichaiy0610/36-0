@@ -223,6 +223,51 @@ const EU_ART = {
       <use href="#eu-rib"/>
     </svg>`;
   },
+
+  // The Super Cup: curtains of light falling straight down on deep navy, the
+  // brightest of them gathered at the centre where the trophy stands. Pure blue
+  // and silver — no magenta, so it never reads as a fourth Champions League.
+  // Seeded, not random, so the curtain is the same every time you see it.
+  usc: () => {
+    let seed = 7;
+    const rnd = () => (seed = (seed * 9301 + 49297) % 233280) / 233280;
+    const rays = [];
+    for (let i = 0; i < 26; i++) {
+      const x = -10 + i * 16.5 + rnd() * 10;
+      const w = 5 + rnd() * 18;
+      const top = 120 + rnd() * 320;
+      const near = 1 - Math.min(1, Math.abs(x - 200) / 230);    // brighter toward the middle
+      const op = (0.18 + near * 0.55 + rnd() * 0.15).toFixed(2);
+      rays.push(`<rect x="${x.toFixed(1)}" y="${top.toFixed(0)}" width="${w.toFixed(1)}"
+                       height="${(800 - top).toFixed(0)}" rx="${(w / 2).toFixed(1)}" opacity="${op}"/>`);
+    }
+    return `
+    <svg viewBox="0 0 400 800" preserveAspectRatio="xMidYMid slice">
+      <defs>
+        <radialGradient id="eu-wash" cx=".5" cy=".38" r=".75">
+          <stop offset="0" stop-color="#14306e"/><stop offset=".55" stop-color="#0a1c46"/>
+          <stop offset="1" stop-color="#02060f"/>
+        </radialGradient>
+        <linearGradient id="eu-ray" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#3fa9ff" stop-opacity="0"/>
+          <stop offset=".45" stop-color="#2f8cff" stop-opacity=".55"/>
+          <stop offset=".8" stop-color="#5cc2ff" stop-opacity=".9"/>
+          <stop offset="1" stop-color="#1b5fd1" stop-opacity=".5"/>
+        </linearGradient>
+        <radialGradient id="eu-floor" cx=".5" cy=".42" r=".45">
+          <stop offset="0" stop-color="#8fd3ff" stop-opacity=".35"/>
+          <stop offset="1" stop-color="#000" stop-opacity="0"/>
+        </radialGradient>
+        <filter id="eu-soft" x="-50%" y="-10%" width="200%" height="120%">
+          <feGaussianBlur stdDeviation="6 14"/></filter>
+        <g id="eu-rays" fill="url(#eu-ray)">${rays.join('')}</g>
+      </defs>
+      <rect width="400" height="800" fill="url(#eu-wash)"/>
+      <use href="#eu-rays" filter="url(#eu-soft)"/>
+      <use href="#eu-rays" filter="url(#eu-soft)" opacity=".5" transform="translate(6 0)"/>
+      <ellipse cx="200" cy="330" rx="220" ry="260" fill="url(#eu-floor)"/>
+    </svg>`;
+  },
 };
 
 /* ── the frame ────────────────────────────────────────────────────────────── */
@@ -233,6 +278,7 @@ const EU_ART = {
 // screen turns Champions League blue, through one attribute and a palette of CSS
 // variables. No selector is written twice.
 function euStageOf(c) {
+  if (typeof euUscView === 'function' && euUscView(c)) return 'usc';
   if (c.view === 'out')    return c.outAt || 'q1';
   if (c.view === 'trophy') return 'final';
   if (c.cur)               return c.cur.roundId;
@@ -252,7 +298,7 @@ function euStageOf(c) {
 // at the play-off, which is the gate to the league phase. Dressing the Europa
 // League and the Conference from their first whistle was tried and rejected —
 // it spent the reveal on a first qualifying round nobody remembers.
-const EU_BLUE_FROM = ['po', 'league', 'ko-po', 'r16', 'qf', 'sf', 'final'];
+const EU_BLUE_FROM = ['po', 'league', 'ko-po', 'r16', 'qf', 'sf', 'final', 'usc'];
 function euDressed(c) { return EU_BLUE_FROM.includes(euStageOf(c)); }
 
 // How far through the whole campaign we are. Four qualifying ties, the league
@@ -271,6 +317,7 @@ function euProgress(c) {
 
 function euStageLabel(c) {
   const id = euStageOf(c);
+  if (id === 'usc') return EU_USC.short;
   const q = euQualRounds(c).find(r => r.id === id);
   if (q) return q.round;
   const k = EU_KO.find(x => x.id === id);
@@ -283,6 +330,7 @@ function euStageLabel(c) {
 // "נעצרת ב", so the competition is what completes the sentence:
 //   הגמר → הגמר של הליגה האירופית · שמינית הגמר → שמינית הגמר של הקונפרנס ליג
 function euRoundName(c, t) {
+  if (t.kind === 'usc') return EU_USC.name;
   const long = t.roundLong || t.round;
   return `${long} ${euText('eu-of', 'של')} ${euTier(c).name}`;
 }
@@ -291,14 +339,16 @@ function euShell(c, body, cta) {
   const id = euStageOf(c);
   const pct = Math.round(euProgress(c) * 100);
   const speed = euSpeed();
-  const live = c.view === 'tie';
+  const live = c.view === 'tie' || c.view === 'usc-live';
+  // The Super Cup is its own night, with its own colour, after the campaign
+  const usc = id === 'usc';
   return `
-    <div class="eu-seq" data-eu-stage="${id}" data-eu-tier="${c.tier || 'ucl'}"
+    <div class="eu-seq" data-eu-stage="${id}" data-eu-tier="${usc ? 'usc' : (c.tier || 'ucl')}"
          data-eu-blue="${euDressed(c) ? '1' : '0'}">
       <div class="eu-top">
         <div class="eu-top-l">
           <div class="eu-kicker">${euText('eu-kicker', 'המסע האירופי')}</div>
-          <div class="eu-title">${euTier(c).name}</div>
+          <div class="eu-title">${usc ? EU_USC.name : euTier(c).name}</div>
         </div>
         <div class="eu-top-r">
           ${live ? `<button class="eu-chip" id="eu-speed">${speed}x</button>` : ''}
@@ -352,7 +402,7 @@ function euLiveHTML(c, t, leg) {
 // mechanic he cannot draft for, so the knockout screens name it and say how many
 // of his own eleven have really been here.
 function euCapsNoteHTML(c, t) {
-  if (t.kind !== 'ko') return '';
+  if (t.kind !== 'ko' && t.kind !== 'usc') return '';
   const n = c.caps || 0;
   const body = n
     ? `${euText('eu-caps-a', 'בהרכב שלך')} <b>${n}</b> ${euText('eu-caps-b', n === 1
@@ -657,6 +707,10 @@ function euRender() {
   const c = _euCampaign, body = document.getElementById('eu-body');
   if (!c || !body) return;
   euStopClock();
+  if (typeof euUscView === 'function' && euUscView(c)) {
+    euBackdrop('usc');
+    return euUscRender(c, body);
+  }
   euBackdrop(euDressed(c) ? (c.tier || 'ucl') : null);
 
   let html = '', cta = '';
@@ -728,8 +782,14 @@ function euRender() {
     onNext = euLeave;
   } else if (c.view === 'trophy') {
     html = euTrophyHTML(c);
-    cta = euCta(euText('eu-back', '← חזרה לתוצאות העונה'));
-    onNext = euLeave;
+    // Career only: the Champions League and Europa League winners meet once more
+    if (typeof euUscEligible === 'function' && euUscEligible(c)) {
+      cta = euCta(euText('eu-usc-go', 'לסופר-קאפ האירופי →'));
+      onNext = () => { euUscBegin(c); euRender(); };
+    } else {
+      cta = euCta(euText('eu-back', '← חזרה לתוצאות העונה'));
+      onNext = euLeave;
+    }
   }
 
   body.innerHTML = euShell(c, html, cta) + euAdminBlock();
