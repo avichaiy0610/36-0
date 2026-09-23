@@ -35,7 +35,7 @@
      salary cap keeps it: a cup run costs nothing and signs nobody. */
   function cupEligible() {
     if (typeof state === 'undefined' || !state) return false;
-    if (state.challenge || state.league || state.gauntlet) return false;
+    if (state.challenge || state.league || state.gauntlet || state.story) return false;
     if (!Array.isArray(state.picks) || state.picks.some(p => !p)) return false;
     return true;
   }

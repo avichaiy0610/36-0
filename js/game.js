@@ -459,6 +459,9 @@ function formatLabel(spec) {
 // The opponents for the CURRENT run. null oppSeason = latest, so squad-data
 // updates roll the default league forward automatically.
 function oppTeamsForState() {
+  // A story chapter plays the real season WITHOUT your club in it, and with the
+  // players you bought taken out of their squads (js/story-season.js).
+  if (state.story && typeof storyOppForState === 'function') return storyOppForState();
   return simTeamsForSeason(state.oppSeason ?? LATEST_SEASON_YEAR, specForState().teams - 1);
 }
 
@@ -491,6 +494,7 @@ const state = {
   coachOn: true, coach: null,                                  // the drawn manager for this season, and whether one is offered at all
   deck: null, mgw: null,                                       // a fixed squad deck (כדורדל) + which daily it belongs to
   challenge: null, challengeDeck: null, challengeReqs: null,   // { period, key } + missions for challenge runs
+  story: null,                                                 // { chapterId } while a מצב סיפור chapter is being played
 };
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
@@ -751,7 +755,7 @@ function myLineRatings(ovrAt) {
   // the gauntlet without any of them knowing a manager exists.
   const cEdge = typeof coachEdge === 'function' ? coachEdge() : 0;
   const cClean = typeof coachCleanMult === 'function' ? coachCleanMult() : 1;
-  return {
+  const out = {
     ovr,
     atk: line(SIM2_LINES.atk.pos) + t.atk + tagAtkBoost() + win + cEdge,
     mid: line(SIM2_LINES.mid.pos) + win + cEdge,
@@ -759,6 +763,9 @@ function myLineRatings(ovrAt) {
     gk:  line(SIM2_LINES.gk.pos) + win + cEdge,
     cs:  tagCleanBoost() * cClean,
   };
+  // מצב סיפור only: the bench's share of the minutes (js/story-season.js).
+  // state.story is null in every other mode, so nothing else changes.
+  return (state && state.story && typeof storyDepthAdjust === 'function') ? storyDepthAdjust(out) : out;
 }
 
 function pickWeightedIdx(weights) {
@@ -1232,6 +1239,7 @@ function beginDraftWithState(style) {
   // wants something else has to say so.
   state.classic = !!(style && style.classic);
   state.tactic  = tacticOf(style && style.tactic);
+  state.story   = null;       // every draft path goes through here; a chapter never does
 
   const rerolls = { easy:3, normal:1, hard:0 };
   state.teamRerollsLeft   = rerolls[state.difficulty] ?? 1;
@@ -1278,6 +1286,7 @@ function saveDraftState() {
       deckIds: state.deck ? state.deck.map(sq => sq.id) : null,
       challenge: state.challenge || null,
       challengeReqs: state.challengeReqs || null,
+      story: state.story || null,
       difficulty: state.difficulty,
       showRatings: state.showRatings,
       draftMode: state.draftMode,
@@ -1391,6 +1400,7 @@ function restoreDraftState() {
     mgw: d.mgw ?? null,
     deck: Array.isArray(d.deckIds) ? d.deckIds.map(id => bySquadId.get(id)).filter(Boolean) : null,
     challenge: d.challenge ?? null,
+    story: d.story ?? null,
     difficulty: d.difficulty, showRatings: d.showRatings,
     draftMode: d.draftMode, peakMode: d.peakMode,
     // A save from before managers existed carries neither field. It restores
@@ -3121,6 +3131,7 @@ function heLamed(name) {
 function wireEuropeButton(rank, table) {
   const btn = document.getElementById('btn-europe');
   if (!btn) return;
+  if (state.story) { btn.style.display = 'none'; return; }   // a chapter ends at its own verdict
   if (typeof euStart !== 'function' || typeof rank !== 'number') {
     btn.style.display = 'none';
     return;
@@ -3168,6 +3179,7 @@ function showResults() {
   // league, duel, Europe's return, a plain draft) and a node nobody removes is a
   // node that turns up in the next mode — the bug this project keeps re-learning.
   if (typeof crowdXiTipClear === 'function') crowdXiTipClear();
+  if (typeof storyClearEnd === 'function') storyClearEnd();
   // League draft: no personal reveal. Simulate silently, record the season to
   // the league, and send the player back to the (still-locked) league table —
   // the standings are only unveiled once every member has played.
@@ -3284,7 +3296,11 @@ function animateResults(ovr) {
     // identical in each — and the reveal pauses at the seam to ask which one
     // this is going to be. We open on `stay`, which is true of the first half
     // either way; a gamble swaps the rest in at the moment of the decision.
-    janPair = (typeof janPrepare === 'function') ? janPrepare(simulate) : null;
+    // A story chapter brings its own window: a whole market rather than one
+    // gamble, replayed from one seed once it closes (js/story-season.js). It uses
+    // the same seam, so the reveal below does not need to know which it is.
+    janPair = (state.story && typeof storyPrepare === 'function') ? storyPrepare(simulate)
+      : (typeof janPrepare === 'function') ? janPrepare(simulate) : null;
     if (janPair) {
       season = janPair.stay;
     } else {
@@ -3366,6 +3382,16 @@ function animateResults(ovr) {
     const clrBox = document.getElementById('clr-broken-box');
     if (clrBox) clrBox.innerHTML = '';
     if (!consequences) return;
+    // A chapter's season is judged against the real one, and nothing else about
+    // it is an ordinary season: no career, no archive, no club records — the
+    // squad was never yours to draft.
+    if (state.story) {
+      if (typeof storyOnSeasonEnd === 'function') {
+        storyOnSeasonEnd({ rank: myRank, n: leagueTable.length, points: wins * 3 + draws,
+                           gf: gfTotal, ga: gaTotal, table: leagueTable });
+      }
+      return;
+    }
     // A career season is an ordinary season plus a consequence. This runs for
     // restored seasons too (a refresh must not lose the result), so recording it
     // is idempotent on the career's side.
@@ -3533,6 +3559,10 @@ function animateResults(ovr) {
     document.getElementById('tier-box').classList.add('visible');
     const sec = document.getElementById('res-stats-section');
     if (sec) sec.classList.add('visible');
+    // A chapter's verdict is RECORDED in bindSeason, which runs at the January
+    // seam, but shown only here — drawing it there gave the ending away with
+    // half the fixtures still to reveal.
+    if (state.story && typeof storyRenderLast === 'function') storyRenderLast();
     scrollPageTop();
   }
 
@@ -3627,7 +3657,8 @@ function animateResults(ovr) {
     };
     if (s.kind === 'jan') {
       if (janSkip) janSkip.remove();
-      janOpen(janPair, { wins: rw, draws: rd, losses: rl }, (chosen) => {
+      const opener = janPair.story ? storyOpen : janOpen;
+      opener(janPair, { wins: rw, draws: rd, losses: rl }, (chosen) => {
         // Re-bind before anything else reads the season: from here the table, the
         // finish, the stats and the career consequence all belong to this future.
         bindSeason(chosen);
@@ -4341,6 +4372,7 @@ function restartGame() {
     oppSeason: oppSeasonChoice === 'random' ? resolveOppSeason('random') : oppSeason,
     challenge: null, challengeDeck: null, challengeReqs: null,
     career: null,          // "new game" leaves the career; the run itself stays in storage
+    story: null,           // "new game" leaves the chapter; the run itself stays in storage
     coach: null,           // a new eleven is appointed its own manager, or none
     deck: null, mgw: null,
     slots:[], picks:[], currentRound:0,
@@ -4485,6 +4517,8 @@ function setupSaveSection() {
   const saveSection = document.getElementById('save-result-section');
   const loginPrompt = document.getElementById('save-login-prompt');
   if (!saveSection || !loginPrompt) return;
+  // A chapter is scored against its own start, not against free drafts.
+  if (state.story) { saveSection.style.display = 'none'; loginPrompt.style.display = 'none'; return; }
 
   // Reviewing a league/duel season — nothing to save (it isn't a fresh single-player draft).
   if (window._leagueReviewMode || window._duelReviewMode) { saveSection.style.display = 'none'; loginPrompt.style.display = 'none'; return; }

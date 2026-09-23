@@ -360,6 +360,15 @@
         <span class="smc-arrow">←</span>
       </button>
 
+      <button class="setup-mode-card" id="setup-story-card">
+        <span class="smc-icon">📖</span>
+        <span class="smc-body">
+          <span class="smc-title">מצב סיפור <span class="smc-new">חדש</span></span>
+          <span class="smc-sub">עונות אמיתיות מההיסטוריה. הסגל והקופה של אז, ואתה מנסה לעקוף את המציאות</span>
+        </span>
+        <span class="smc-arrow">←</span>
+      </button>
+
       <button class="setup-mode-card" id="setup-salary-card">
         <span class="smc-icon">💰</span>
         <span class="smc-body">
@@ -810,6 +819,8 @@
 
         <!-- What this season did to the club's all-time records (js/club-records.js).
              Empty and hidden unless a record actually fell. -->
+        <!-- A story chapter's verdict (js/story-screens.js). Empty outside a chapter. -->
+        <div id="story-end-box"></div>
         <div id="clr-broken-box"></div>
 
         <!-- Player Stats Table -->
@@ -1006,6 +1017,17 @@
     </div>
   </div>
 
+  <!-- ══ STORY (js/story.js, js/story-screens.js) ═════════════════════════════ -->
+  <div id="screen-story" class="screen screen-page">
+    <div class="page-inner">
+      <div class="page-header">
+        <button class="back-btn" id="story-back">→ חזרה</button>
+        <h2 class="page-title">📖 מצב סיפור</h2>
+      </div>
+      <div id="story-root"></div>
+    </div>
+  </div>
+
   <!-- ══ MINI GAMES ════════════════════════════════════════════════════════════ -->
   <div id="screen-minigames" class="screen screen-page">
     <div class="page-inner">
@@ -1171,7 +1193,7 @@
   <script src="js/chemistry.js?v=0b080a52"></script>
   <script src="js/data.js?v=e2436bbd"></script>
   <script src="js/sim-engine.js?v=784ec7b1"></script>
-  <script src="js/game.js?v=4b3f13fe"></script>
+  <script src="js/game.js?v=384eee10"></script>
   <script src="js/club-media.js?v=fcf688c0"></script>
   <!-- after club.js and draft-archive.js (its crest and its daMode), and it is
        only ever called from a click or from the end of a season, so career.js
@@ -1182,8 +1204,8 @@
   <script src="js/europe.js?v=53abf49a"></script>
   <script src="js/europe-screens.js?v=9f63ec25"></script>
   <script src="js/cup-data.js?v=c72c5a27"></script>
-  <script src="js/cup.js?v=5e262220"></script>
-  <script src="js/whatsnew.js?v=d996d806"></script>
+  <script src="js/cup.js?v=d853c43a"></script>
+  <script src="js/whatsnew.js?v=78b83297"></script>
   <script src="js/europe-admin.js?v=19ab9628"></script>
   <script src="js/season-admin.js?v=1f37a0db"></script>
   <script src="js/league-sim.js?v=178f8a92"></script>
@@ -1211,9 +1233,16 @@
   <script src="js/theme.js?v=061d5509"></script>
   <script src="js/nav-drawer.js?v=d459aa88"></script>
   <script src="js/salary.js?v=e7056dfe"></script>
-  <script src="js/january.js?v=9ab8d74b"></script>
+  <script src="js/january.js?v=b54f7225"></script>
   <script src="js/coach-data.js?v=ba8934e1"></script>
   <script src="js/coach.js?v=d1b4fd16"></script>
+  <script src="js/story-facts.js?v=86be98a3"></script>
+  <script src="js/story-data.js?v=5b156ca4"></script>
+  <script src="js/story-market.js?v=1f44c75c"></script>
+  <script src="js/story-season.js?v=b595d2be"></script>
+  <script src="js/story-europe.js?v=7ff616bb"></script>
+  <script src="js/story.js?v=861816b3"></script>
+  <script src="js/story-screens.js?v=66325acb"></script>
   <script src="js/install.js?v=6b792604"></script>
 </body>
 </html>

@@ -23,7 +23,7 @@ const path = require('path');
 const crypto = require('crypto');
 
 const BASE = path.join(__dirname, '..');
-const PAGES = ['index.html', 'admin.html', 'contact.html'];
+const PAGES = ['index.html', 'admin.html', 'admin-story.html', 'contact.html'];
 
 // src="js/x.js" / href="css/x.css", with or without a stamp already on it
 const REF = /((?:src|href)=")((?:js|css)\/[A-Za-z0-9_.\-]+\.(?:js|css))(\?v=[A-Za-z0-9]+)?(")/g;
