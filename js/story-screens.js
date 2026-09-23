@@ -151,6 +151,14 @@
 .eu-step.out{color:#f85149;border-color:#f8514966}
 .eu-step.now{color:var(--accent);border-color:var(--accent);font-weight:700}
 .eu-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px;margin:0 0 12px}
+#screen-story{z-index:1}
+body.eu-blue #screen-story{background:transparent}
+#story-root[data-eu="ucl"] .eu-card,#story-root[data-eu="ucl"] .lu,#story-root[data-eu="ucl"] .eu-step{
+  background:color-mix(in srgb,#101c33 82%,transparent);border-color:#1d3a63;backdrop-filter:blur(6px)}
+#story-root[data-eu="ucl"] .eu-step.now,#story-root[data-eu="ucl"] .eu-card.last{border-color:#4da3ff}
+#story-root[data-eu="uel"] .eu-card,#story-root[data-eu="uel"] .lu,#story-root[data-eu="uel"] .eu-step{
+  background:color-mix(in srgb,#241407 82%,transparent);border-color:#613414;backdrop-filter:blur(6px)}
+#story-root[data-eu="uel"] .eu-step.now,#story-root[data-eu="uel"] .eu-card.last{border-color:#ffb45c}
 .eu-card.last{border-color:var(--accent)}
 .eu-card h3{margin:0 0 10px;font-size:17px}
 .eu-leg{background:var(--panel);border:1px solid var(--border);border-radius:9px;padding:8px 10px;margin:0 0 6px}
@@ -634,7 +642,10 @@
 
   function storyShowEurope(view) {
     ensureStyle();
-    showScreen('story');
+    // showScreen takes the European backdrop down; calling it on every re-render
+    // made the night fade in again at each click. Only when arriving.
+    const scr = document.getElementById('screen-story');
+    if (!scr || !scr.classList.contains('active')) showScreen('story');
     const back = document.getElementById('story-back');
     if (back) back.onclick = storyShowHub;
     const run = storyRun();
@@ -644,6 +655,15 @@
     const us = clubName(ch.teamId);
     const rounds = ch.europe.rounds;
     const over = storyEuOver(ch, run);
+    // The competition's own night (js/europe-screens.js euBackdrop): off for the
+    // qualifiers, on from the group stage or the knockout rounds — the same
+    // "you have arrived" moment the ordinary Europe mode keeps it for. A
+    // finished campaign keeps the dress of the round it ended in.
+    const shown = over ? rounds[Math.min(run.eu.at, rounds.length - 1)] : storyEuRound(ch, run);
+    const dressed = !!shown && (shown.kind === 'group' || !!shown.ko);
+    const tier = ch.europe.tier || 'ucl';
+    if (typeof euBackdrop === 'function') euBackdrop(dressed ? tier : null);
+    root().setAttribute('data-eu', dressed ? tier : '');
     const doneById = id => run.eu.done.find(d => d.id === id);
 
     const road = rounds.map((r, i) => {
