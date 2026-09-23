@@ -20,6 +20,10 @@ const SWEEP = process.argv.includes('--sweep');
 // among the runs that won ⭐ — so a star's condition is chosen from data.
 const DETAIL = process.argv.includes('--detail');
 const ch = G.storyChapter(id);
+// RULES='{"buys":{"summer":2,"jan":1},"minSquad":20}' tries chapter rules before
+// they are written into js/story-data.js; RB=3000 does the same for rivalBudget.
+if (ch && process.env.RULES) ch.rules = JSON.parse(process.env.RULES);
+if (ch && process.env.RB) ch.rivalBudget = Number(process.env.RB);
 if (!ch) { console.log('no chapter ' + id); process.exit(1); }
 
 const setUp = run => {
@@ -40,7 +44,7 @@ function sellBench(run, priceOf, honor) {
   const bench = G.storyOwned(run).filter(e => !xi.has(e.squad.id + '|' + e.player.name))
     .sort((a, b) => priceOf(b) - priceOf(a));
   for (const e of bench) {
-    if (run.own.length <= G.STORY_RULES.minSquad) break;
+    if (run.own.length <= G.storyRules(ch).minSquad) break;
     if (keep && keep.has(e.player.name)) continue;
     // Selling is by bids now: list him, take the best bid on the table.
     const bids = G.storyListPlayer(run, ch, e, priceOf(e));
@@ -95,6 +99,7 @@ function playOnce(budget, seed, honor) {
   sellBench(run, summerValue, honor);
   buyUpgrades(run, summerValue, honor);
 
+  G.storyRivalShop(run, ch, 'summer');          // the rivals move after your window
   run.phase = 'season';
   setUp(run);
   const pair = G.storySeasonPrepare(G.storySimulateFn(ch, run), run, ch);
@@ -105,7 +110,8 @@ function playOnce(budget, seed, honor) {
   const before = JSON.stringify(run.own);
   sellBench(run, janValue, honor);
   buyUpgrades(run, e => G.storyValueOfOvr(e.player.ovr), honor);
-  const season = JSON.stringify(run.own) === before ? pair.stay : G.storySeasonResim(pair, run, ch);
+  const rivalJan = G.storyRivalShop(run, ch, 'jan');
+  const season = (JSON.stringify(run.own) === before && !rivalJan.length) ? pair.stay : G.storySeasonResim(pair, run, ch);
 
   const pts = season.matches.reduce((s, m) => s + (m.outcome === 'W' ? 3 : m.outcome === 'D' ? 1 : 0), 0);
   const rank = season.leagueTable.findIndex(r => r.us) + 1;
@@ -143,13 +149,13 @@ if (DETAIL) {
   const real = G.storyReal(ch);
   console.log(`${ch.id} budget ${b}: ⭐ in ${won.length}/${N}. real: ${real.pts} pts`);
   const q = (k, p) => { const a = won.map(r => r[k]).sort((x, y) => x - y); return a[Math.min(a.length - 1, Math.floor(a.length * p))]; };
-  for (const k of ['pts', 'margin', 'gd', 'ga', 'l', 'spent', 'nBought', 'maxBought']) {
+  for (const k of ['rank', 'pts', 'margin', 'gd', 'ga', 'l', 'spent', 'nBought', 'maxBought']) {
     console.log(k.padEnd(10), [0.1, 0.25, 0.5, 0.75, 0.9].map(p => String(q(k, p)).padStart(6)).join(''));
   }
   process.exit(0);
 }
 console.log(`${ch.id} · ${ch.title} · level ${ch.level} · ${N} runs`);
-const budgets = SWEEP ? [4000, 4500, 5000] : [ch.budget];
+const budgets = SWEEP ? (process.env.B ? process.env.B.split(',').map(Number) : [1000, 1500, 2000, 2500, 3000]) : [ch.budget];
 for (const b of budgets) {
   const [s1, s2, s3] = measure(b);
   console.log(`budget ${String(b).padStart(3)}  ⭐ ${s1.padStart(6)}  ⭐⭐ ${s2.padStart(6)}  ⭐⭐⭐ ${s3.padStart(6)}`);

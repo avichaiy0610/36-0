@@ -49,6 +49,8 @@
     const run = storyRun();
     const ch = run && storyChapter(run.chapterId);
     if (!ch) return;
+    // The rivals shop at the end of summer, from whatever your window left.
+    storyRivalShop(run, ch, 'summer');
     run.phase = 'season';
     storySave();
     const year = parseInt(ch.season, 10);
@@ -98,9 +100,11 @@
     storyShowJanuary(pair, tally, draft, () => {
       const changed = JSON.stringify([draft.own, draft.formationId, draft.tactic]) !==
                       JSON.stringify([run.own, run.formationId, run.tactic]);
-      Object.assign(run, draft, { phase: 'season' });
+      Object.assign(run, draft, { phase: 'jan' });
+      const rivalJan = storyRivalShop(run, ch, 'jan');
+      run.phase = 'season';
       storySave();
-      if (!changed) { onChosen(pair.stay); return; }
+      if (!changed && !rivalJan.length) { onChosen(pair.stay); return; }
       const season = storySeasonResim(pair, run, ch);
       saveDraftState();
       if (typeof buildResultsPitch === 'function') buildResultsPitch();

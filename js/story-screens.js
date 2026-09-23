@@ -163,7 +163,8 @@
         <ul class="st-goals">${ch.stars.map((s, i) =>
           `<li>${'★'.repeat(i + 1)} ${esc(s.label)}${s.type === 'beatPoints' && real ? ` (${real.pts})` : ''}</li>`).join('')}</ul>
         <p class="st-meta" style="color:var(--dim);margin:10px 0 0">תקציב פתיחה: ${money(ch.budget)} ·
-          עד ${STORY_RULES.buys.summer} רכישות בקיץ ו-${STORY_RULES.buys.jan} בינואר</p>
+          עד ${storyRules(ch).buys.summer} רכישות בקיץ ו-${storyRules(ch).buys.jan} בינואר ·
+          סגל של ${storyRules(ch).minSquad} שחקנים לפחות</p>
       </div>
       <button class="st-b go st-go" id="st-begin">${live ? 'להמשיך את הקיץ' : 'להתחיל את הפרק'}</button>
       <button class="st-b st-go" id="st-hub">חזרה לפרקים</button>`;
@@ -202,7 +203,7 @@
     const slots = formationSlots(run.formationId, run.tactic);
     const xiNames = new Set(storyBestXI(owned, slots).filter(Boolean).map(e => e.player.name));
     const needs = storyGroupNeeds(slots);
-    const left = STORY_RULES.buys[ctx.window] - run.buys[ctx.window];
+    const left = storyRules(ch).buys[ctx.window] - run.buys[ctx.window];
     const tactical = formationTactical(run.formationId);
     const bids = storyLiveOffers(run);
 

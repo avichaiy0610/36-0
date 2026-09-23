@@ -17,6 +17,16 @@
  */
 
 function storyChapter(id) { return STORY_CHAPTERS.find(c => c.id === id) || null; }
+
+// The rules a chapter plays by: STORY_RULES with the chapter's own `rules` on
+// top. A small club gets fewer signings and a bigger minimum squad — without
+// them six cheap signings, funded by selling the bench, turned a relegation
+// squad into a mid-table one (Netanya 2015/16 survived 100% at a 1-million budget).
+function storyRules(chOrRun) {
+  const ch = chOrRun && chOrRun.stars ? chOrRun : storyChapter(chOrRun && chOrRun.chapterId);
+  const own = (ch && ch.rules) || {};
+  return { ...STORY_RULES, ...own, buys: { ...STORY_RULES.buys, ...(own.buys || {}) } };
+}
 // Money is in thousands of ₪, kept to the nearest 10,000.
 function storyK(n) { return Math.round(n / 10) * 10; }
 
@@ -97,6 +107,13 @@ function storyReal(ch) {
   return r ? { pos: r.pos, pts: r.pts, n: t.length } : null;
 }
 
+// The lowest finish that stays up that season (clubs minus the relegated).
+function storySafeRank(ch) {
+  const n = storyTable(ch.season).length;
+  const d = (typeof STORY_FACTS !== 'undefined' && STORY_FACTS.drop && STORY_FACTS.drop[ch.season]) || 2;
+  return n - d;
+}
+
 function storySeasonSquads(season) { return SQUADS.filter(s => s.season === season); }
 function storyHomeSquad(ch) {
   return SQUADS.find(s => s.teamId === ch.teamId && s.season === ch.season) || null;
@@ -126,7 +143,7 @@ function storyOwned(run) { return run.own.map(storyResolve).filter(Boolean); }
 // Everyone who played in the league that season, bar your own club and anyone
 // already signed (a signing who was sold on has left the league).
 function storyMarketPool(run, ch) {
-  const taken = new Set(run.bought.map(storyRefKey));
+  const taken = new Set([...run.bought, ...(run.rivalBuys || [])].map(storyRefKey));
   const out = [];
   for (const sq of storySeasonSquads(ch.season)) {
     if (sq.teamId === ch.teamId) continue;
@@ -140,7 +157,7 @@ function storyMarketPool(run, ch) {
 function storyBuyBlock(run, price) {
   const w = run.phase;
   if (w !== 'summer' && w !== 'jan') return 'החלון סגור';
-  if (run.buys[w] >= STORY_RULES.buys[w]) return 'נגמרו הרכישות בחלון הזה';
+  if (run.buys[w] >= storyRules(run).buys[w]) return 'נגמרו הרכישות בחלון הזה';
   if (price > run.budget + 1e-9) return 'אין מספיק תקציב';
   return null;
 }
@@ -158,7 +175,8 @@ function storyBuy(run, ch, entry, price) {
 
 function storySellBlock(run) {
   if (run.phase !== 'summer' && run.phase !== 'jan') return 'החלון סגור';
-  if (run.own.length <= STORY_RULES.minSquad) return `הסגל לא יכול לרדת מתחת ל-${STORY_RULES.minSquad}`;
+  const min = storyRules(run).minSquad;
+  if (run.own.length <= min) return `הסגל לא יכול לרדת מתחת ל-${min}`;
   return null;
 }
 function storySell(run, entry, price) {
@@ -186,15 +204,67 @@ function storyClubRating(teamId, players) {
     ...simLineRatingsForSquad(players, ovr),
   };
 }
-// upTo: 'summer' — only summer signings have left their clubs (the first half),
-//       'all'    — January signings too (the second half).
+// A club's squad as the run has left it: minus whoever you and the rivals took
+// from it, plus whoever it signed itself.
+// upTo: 'summer' — only summer moves have happened (the first half),
+//       'all'    — January's too (the second half).
+function storyClubPlayers(ch, run, teamId, upTo) {
+  const inWindow = b => upTo === 'all' || b.window === 'summer';
+  const rivals = (run.rivalBuys || []).filter(inWindow);
+  const gone = new Set([...run.bought.filter(inWindow), ...rivals].map(storyRefKey));
+  const sq = storySeasonSquads(ch.season).find(s => s.teamId === teamId);
+  const own = sq ? sq.players.filter(p => !gone.has(sq.id + '|' + p.name)) : [];
+  const signed = rivals.filter(b => b.teamId === teamId).map(storyResolve).filter(Boolean).map(e => e.player);
+  return [...own, ...signed];
+}
 function storyOpponents(ch, run, upTo) {
-  const gone = new Set(run.bought
-    .filter(b => upTo === 'all' || b.window === 'summer').map(storyRefKey));
   return storySeasonSquads(ch.season)
     .filter(sq => sq.teamId !== ch.teamId)
-    .map(sq => storyClubRating(sq.teamId, sq.players.filter(p => !gone.has(sq.id + '|' + p.name))))
+    .map(sq => storyClubRating(sq.teamId, storyClubPlayers(ch, run, sq.teamId, upTo)))
     .sort((a, b) => b.ovr - a.ovr);
+}
+
+/* ── rivals who shop ─────────────────────────────────────────────────────────
+ * A favourite's chapter was easy because its rivals stood still: B7 2015/16 won
+ * the title 85% of the time before a single transfer. The owner turned down an
+ * opening debt as unreal ("זה אמור להיות בהתאם למציאות"); what is real is that
+ * the clubs chasing you also buy. When a chapter sets `rivalBudget`, last
+ * season's top three (bar you) each spend it on the biggest upgrades they can
+ * afford — three signings at the end of summer, one in January — from whoever
+ * is still on the market after YOUR window. Deterministic: no draw at all, the
+ * best affordable upgrade wins, so the same run always sees the same moves. */
+function storyRivalClubs(ch) {
+  const here = new Set(storySeasonSquads(ch.season).map(s => s.teamId));
+  return storyTable(storyPrevSeason(ch.season))
+    .filter(r => r.teamId !== ch.teamId && here.has(r.teamId))
+    .sort((a, b) => a.pos - b.pos).slice(0, 3).map(r => r.teamId);
+}
+function storyRivalShop(run, ch, window) {
+  if (!ch.rivalBudget) return [];
+  run.rivalBuys = run.rivalBuys || [];
+  if (run.rivalBuys.some(b => b.window === window)) return [];     // once per window
+  const n = window === 'summer' ? 3 : 1;
+  const mine = new Set(run.own.map(storyRefKey));
+  const made = [];
+  for (const teamId of storyRivalClubs(ch)) {
+    let budget = window === 'summer' ? ch.rivalBudget : storyK(ch.rivalBudget / 3);
+    for (let i = 0; i < n; i++) {
+      const squad = storyClubPlayers(ch, run, teamId, 'all');
+      const floor = [...squad].sort((a, b) => b.ovr - a.ovr).slice(0, 11).pop();
+      const pick = storyMarketPool(run, ch)
+        .filter(e => e.squad.teamId !== teamId && !mine.has(storyEntryKey(e)) &&
+                     e.player.ovr > (floor ? floor.ovr : 0) && storyValueOfOvr(e.player.ovr) <= budget)
+        .sort((a, b) => b.player.ovr - a.player.ovr || storyValueOfOvr(a.player.ovr) - storyValueOfOvr(b.player.ovr) ||
+                        storyEntryKey(a).localeCompare(storyEntryKey(b)))[0];
+      if (!pick) break;
+      const price = storyValueOfOvr(pick.player.ovr);
+      const b = { teamId, squadId: pick.squad.id, name: pick.player.name, from: pick.squad.teamId, window, price };
+      run.rivalBuys.push(b);
+      made.push(b);
+      budget -= price;
+    }
+  }
+  return made;
 }
 
 // The eleven that start: scarcest slot first, best natural fit, and only then
@@ -228,6 +298,7 @@ function storyStars(ch, res) {
   const real = storyReal(ch);
   const raw = ch.stars.map(s => {
     if (s.type === 'rank') return res.rank <= s.max;
+    if (s.type === 'survive') return res.rank <= storySafeRank(ch);
     if (s.type === 'beatPoints') return !!real && res.points > real.pts;
     if (s.type === 'margin') return res.rank === 1 && (res.margin || 0) >= s.min;
     if (s.type === 'noBuyFrom') return !(res.boughtTeams || []).some(t => s.teams.includes(t));

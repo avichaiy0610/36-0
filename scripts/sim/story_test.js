@@ -29,7 +29,7 @@ const EXPORTS = ['state', 'SQUADS', 'LEAGUE_TABLES', 'FORMATIONS', 'formationSlo
   'STORY_RULES', 'STORY_CHAPTERS', 'storyChapter', 'storyValueOfOvr', 'storyPrevSeason',
   'storySummerValue', 'storyPerfBonus', 'storyJanValue', 'storyK', 'storyAsk', 'storyTalk', 'storyClubRank',
   'storyOffer', 'storyTakeCounter', 'storyListPlayer', 'storyCourt', 'storyLiveOffers', 'storyAcceptBid',
-  'storyRejectBid', 'storyPushBid', 'storyGroupOf', 'storyGroupNeeds',
+  'storyRejectBid', 'storyPushBid', 'storyGroupOf', 'storyGroupNeeds', 'storyRivalClubs', 'storyRivalShop', 'storyRules',
   'storyIsRival', 'storyReal', 'storyHomeSquad', 'storyNewRun', 'storyOwned', 'storyMarketPool',
   'storyBuy', 'storySell', 'storyOpponents', 'storyBestXI', 'storyStars', 'storyScore', 'storyCoreNames', 'storyResolveOvr', 'storyResult',
   'storyApplyXI', 'storyXiOvr', 'storyStatsFor', 'storyMergeStats', 'storySimulateFn',
@@ -243,6 +243,34 @@ if (require.main === module) {
     assert.ok(made.length === 1 && made[0].unsolicited && made[0].name === owned[0].player.name);
     assert.deepStrictEqual(G.storyCourt(run, ks, owned, () => 1000, () => true), []);
   });
+  t('rivals who shop: last season\'s top three, after your window, once per window', () => {
+    const b7 = Object.assign({}, G.storyChapter('b7-2015'), { rivalBudget: 3000 });
+    assert.deepStrictEqual(G.storyRivalClubs(b7).length, 3);
+    assert.ok(!G.storyRivalClubs(b7).includes('hapoel-beersheba'));
+    const run = G.storyNewRun(b7, 9);
+    const before = G.storyOpponents(b7, run, 'summer').find(o => o.teamId === 'maccabi-tlv');
+    const made = G.storyRivalShop(run, b7, 'summer');
+    assert.ok(made.length > 0 && made.length <= 9);
+    made.forEach(b => assert.ok(!G.storyMarketPool(run, b7).some(e => e.squad.id === b.squadId && e.player.name === b.name)));
+    const after = G.storyOpponents(b7, run, 'summer').find(o => o.teamId === 'maccabi-tlv');
+    assert.ok(after.atk + after.mid + after.def + after.gk >= before.atk + before.mid + before.def + before.gk);
+    assert.deepStrictEqual(G.storyRivalShop(run, b7, 'summer'), []);
+    const spent = t => made.filter(b => b.teamId === t).reduce((a, b) => a + b.price, 0);
+    G.storyRivalClubs(b7).forEach(t => assert.ok(spent(t) <= 3000));
+  });
+  t('a chapter without rivalBudget has rivals who stand still', () => {
+    const run = G.storyNewRun(ks, 9);
+    assert.deepStrictEqual(G.storyRivalShop(run, ks, 'summer'), []);
+  });
+  t('a player you signed first is not there for a rival', () => {
+    const b7 = Object.assign({}, G.storyChapter('b7-2015'), { rivalBudget: 99999 });
+    const run = G.storyNewRun(b7, 9);
+    run.budget = 99999;
+    const star = G.storyMarketPool(run, b7).sort((a, b) => b.player.ovr - a.player.ovr)[0];
+    G.storyBuy(run, b7, star, 1);
+    const made = G.storyRivalShop(run, b7, 'summer');
+    assert.ok(!made.some(b => b.name === star.player.name));
+  });
   t('position groups and what a shape needs', () => {
     assert.strictEqual(G.storyGroupOf('CAM'), 'cm');
     assert.strictEqual(G.storyGroupOf('RW'), 'wg');
@@ -291,6 +319,9 @@ if (require.main === module) {
     assert.strictEqual(xi[0].player.position, 'GK');
   });
   t('stars are graded, and keepCore reads the real opening eleven', () => {
+    // a chapter built for the test: the graded rule and keepCore, on B7's squad
+    const ch = Object.assign({}, G.storyChapter('b7-2015'), { stars: [
+      { type: 'rank', max: 1 }, { type: 'beatPoints' }, { type: 'keepCore' }] });
     const r = G.storyReal(ch);
     assert.deepStrictEqual(G.storyStars(ch, { rank: 1, points: r.pts + 1, budget: 0, sold: [] }), [true, true, true]);
     assert.deepStrictEqual(G.storyStars(ch, { rank: 2, points: r.pts + 9, budget: 0, sold: [] }), [false, false, false]);
@@ -300,7 +331,7 @@ if (require.main === module) {
   });
   t('score', () => {
     const r = G.storyReal(ch);
-    const res = { rank: 1, points: r.pts + 5, budget: 10000, sold: [] };   // 10 million
+    const res = { rank: 1, points: r.pts + 5, margin: 10, budget: 10000, sold: [], boughtTeams: [] };   // 10 million
     assert.strictEqual(G.storyScore(ch, res), 3000 + 100 + 100);
   });
   t('margin and maxBuys stars, from storyResult', () => {
