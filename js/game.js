@@ -3384,7 +3384,7 @@ function animateResults(ovr) {
     if (state.story) {
       if (typeof storyOnSeasonEnd === 'function') {
         storyOnSeasonEnd({ rank: myRank, n: leagueTable.length, points: wins * 3 + draws,
-                           gf: gfTotal, ga: gaTotal });
+                           gf: gfTotal, ga: gaTotal, table: leagueTable });
       }
       return;
     }
