@@ -268,7 +268,10 @@
       const lastLine = ctx.talkMsg && ctx.open === keyOf(e) ? `<div class="st-say">${ctx.talkMsg}</div>` : '';
       if (t.nfs) return `<div class="st-talk"><div class="st-say">${esc(clubName(e.squad.teamId))}: "הוא לא למכירה. לא משנה כמה."</div></div>`;
       const roundsLeft = STORY_RULES.talkRounds - t.round;
-      const dflt = storyK(t.ask * 0.85);
+      // What you last typed survives the redraw that every answer causes. It used
+      // to snap back to 85% of the ask, so an offer the club refused — or one the
+      // budget blocked — looked like the box had simply reset itself.
+      const dflt = ctx.amt != null ? ctx.amt : storyK(t.ask * 0.85);
       return `<div class="st-talk">
         ${lastLine}
         <div class="st-say">${esc(clubName(e.squad.teamId))} ${t.round ? 'עומדת על' : 'מבקשת'} <b>${money(t.ask)} ₪</b>
@@ -330,6 +333,10 @@
       <button class="st-b go st-go" id="st-done">${jan ? 'להמשיך את העונה' : 'לפתיחת העונה'}</button>`;
 
     const redraw = extra => renderMarket({ ...ctx, ...extra });
+    // "Not enough budget" alone read as nothing happening; say what there is.
+    const blockedMsg = why => /תקציב/.test(why)
+      ? `${esc(why)}: יש לך ${money(run.budget)} ₪. ההצעה לא נשלחה.`
+      : esc(why);
     const saved = () => { if (ctx.persist) ctx.persist(); };
     const byKey = k => [...owned, ...pool].find(e => keyOf(e) === k);
     const $ = sel => ctx.host.querySelectorAll(sel);
@@ -366,7 +373,7 @@
     });
     $('[data-talk]').forEach(b => b.onclick = () => {
       const k = b.dataset.talk;
-      redraw({ open: ctx.open === k ? null : k, talkMsg: '', msg: '' });
+      redraw({ open: ctx.open === k ? null : k, talkMsg: '', msg: '', amt: null });
     });
     $('[data-quick]').forEach(b => b.onclick = () => {
       const inp = document.getElementById('st-amt');
@@ -384,11 +391,11 @@
       if (r.kind === 'accept') {
         redraw({ open: null, msg: `סגרנו! ${esc(e.player.name)} הצטרף ב-${money(r.price)} ₪` });
       } else if (r.kind === 'counter') {
-        redraw({ talkMsg: `${club}: "בשביל ${money(r.counter)} ₪ הוא שלך."` });
+        redraw({ amt: amount, talkMsg: `${club}: "בשביל ${money(r.counter)} ₪ הוא שלך."` });
       } else if (r.kind === 'reject') {
-        redraw({ talkMsg: r.left > 0 ? `${club} דחתה את ההצעה.` : `${club} דחתה, והפסיקה לענות.` });
+        redraw({ amt: amount, talkMsg: r.left > 0 ? `${club} דחתה את ההצעה של ${money(amount)} ₪.` : `${club} דחתה, והפסיקה לענות.` });
       } else {
-        redraw({ talkMsg: esc(r.why) });
+        redraw({ amt: amount, talkMsg: blockedMsg(r.why) });
       }
     });
     $('[data-take]').forEach(b => b.onclick = () => {
@@ -397,7 +404,7 @@
       saved();
       redraw(r.kind === 'accept'
         ? { open: null, msg: `סגרנו! ${esc(e.player.name)} הצטרף ב-${money(r.price)} ₪` }
-        : { talkMsg: esc(r.why) });
+        : { talkMsg: blockedMsg(r.why) });
     });
     document.getElementById('st-form').onchange = ev => {
       run.formationId = ev.target.value;
