@@ -14,7 +14,11 @@
     c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   // "3.6 מ׳" — the shekel sign glued to a number flips around it in RTL
   // ("מ׳3.6₪"), and a budget screen already says what currency it is in.
-  const money = n => `<bdi dir="ltr">${String(Math.round(n * 10) / 10)}</bdi> מ׳`;
+  // Money is thousands of ₪: 2500 → "2.5 מיליון", 350 → "350 אלף". No shekel sign —
+  // glued to a number it flips around it in RTL, and the screen says what it is in.
+  const money = n => n >= 1000
+    ? `<bdi dir="ltr">${String(Math.round(n / 10) / 100)}</bdi> מיליון`
+    : `<bdi dir="ltr">${Math.round(n)}</bdi> אלף`;
   const num = n => `<bdi dir="ltr">${n}</bdi>`;
   const clubName = id => (typeof TEAMS !== 'undefined' && TEAMS[id] && TEAMS[id].name) || id;
   const posHe = p => (typeof POS_HE !== 'undefined' && POS_HE[p]) || p;
@@ -69,6 +73,24 @@
 .st-vs{display:flex;gap:8px;margin:12px 0}
 .st-vs div{flex:1;background:var(--panel);border:1px solid var(--border);border-radius:9px;padding:8px}
 .st-vs i{display:block;font-style:normal;font-size:11px;color:var(--dim)}
+.st-kick{color:var(--accent);margin:0 0 6px;font-weight:600}
+.st-note{margin:0 0 10px;color:var(--dim);font-size:13px}
+.st-group{margin:0 0 10px}
+.st-gh{font-size:13px;color:var(--dim);margin:10px 0 5px}
+.st-gh b{color:var(--text);font-size:14px}
+.st-short{color:#f85149;font-weight:700}
+.st-empty{color:var(--dim);font-size:13px;padding:4px 2px}
+.st-tag{display:inline-block;font-size:11px;border:1px solid var(--border);border-radius:6px;
+  padding:0 5px;margin-inline-start:4px;color:var(--accent)}
+.st-bid{background:var(--surface);border:1px solid var(--accent);border-radius:9px;padding:9px 10px;font-size:14px}
+.st-btns{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:7px}
+.st-quick .st-b{font-size:12px;padding:5px 8px}
+.st-talk{background:var(--panel);border:1px solid var(--border);border-top:none;
+  border-radius:0 0 9px 9px;margin:-4px 0 0;padding:10px}
+.st-say{font-size:14px;margin:0 0 4px}
+.st-amt{width:96px;background:var(--surface);color:var(--text);border:1px solid var(--border);
+  border-radius:8px;padding:7px;font-family:inherit;font-size:14px}
+.st-unit{font-size:12px;color:var(--dim)}
 `;
     document.head.appendChild(s);
   }
@@ -127,39 +149,133 @@
   }
 
   /* ── the market (both windows) ───────────────────────────────────────────── */
-  // ctx: { run, ch, window: 'summer'|'jan', statOf(name) → stats|null, host, onDone }
+  // ctx: { run, ch, window: 'summer'|'jan', statOf(name) → stats|null, host, persist?, onDone,
+  //        q, pos — the market filters; open — the player being negotiated; msg }
+  //
+  // Nothing here has a price tag. Buying is a negotiation with the selling club
+  // (storyOffer); selling is putting a player on the market and answering the
+  // bids that come (storyListPlayer / storyCourt). The squad is grouped by
+  // position with a count against what the shape needs.
   function renderMarket(ctx) {
     const { run, ch } = ctx;
     const jan = ctx.window === 'jan';
+    const keyOf = e => e.squad.id + '|' + e.player.name;
+    const ownKeys = new Set(run.own.map(r => r.squadId + '|' + r.name));
+    const mine = e => ownKeys.has(keyOf(e));
+    // Your own players are priced by what they did (January); everyone else by name.
     const valueOf = e => jan
-      ? (e.squad.teamId === ch.teamId || run.own.some(r => r.squadId === e.squad.id && r.name === e.player.name)
-          ? storyJanValue(e.player, ctx.statOf(e.player.name))
-          : storyValueOfOvr(e.player.ovr))
+      ? (mine(e) ? storyJanValue(e.player, ctx.statOf(e.player.name)) : storyValueOfOvr(e.player.ovr))
       : storySummerValue(e.player, ch.season);
-    const xiNames = new Set(storyBestXI(storyOwned(run), formationSlots(run.formationId, run.tactic))
-      .filter(Boolean).map(e => e.player.name));
     const owned = storyOwned(run).sort((a, b) => b.player.ovr - a.player.ovr);
+
+    // Clubs come for the men who are making news: January's performers, and in
+    // summer the ones who arrived with last season's goals behind them.
+    const courted = e => jan
+      ? storyPerfBonus(e.player.position, ctx.statOf(e.player.name)) >= 3
+      : storySummerValue(e.player, ch.season) > storyValueOfOvr(e.player.ovr);
+    const fresh = storyCourt(run, ch, owned, valueOf, courted);
+    if (fresh.length && ctx.persist) ctx.persist();
+
+    const slots = formationSlots(run.formationId, run.tactic);
+    const xiNames = new Set(storyBestXI(owned, slots).filter(Boolean).map(e => e.player.name));
+    const needs = storyGroupNeeds(slots);
+    const left = STORY_RULES.buys[ctx.window] - run.buys[ctx.window];
+    const tactical = formationTactical(run.formationId);
+    const bids = storyLiveOffers(run);
+
+    // the market list: what you can afford first, then the best of what you cannot
     const q = (ctx.q || '').trim();
     const pos = ctx.pos || '';
-    // What you can afford first, then the best of what you cannot. A plain top-40
-    // by rating showed a small budget nothing but disabled buttons — the whole
-    // list above the money, and no way to find the signing that fits it.
-    const priceOf = e => storyBuyPrice(valueOf(e), storyIsRival(ch, e.squad.teamId));
+    const askOf = e => storyAsk(run, ch, e, valueOf(e));
     const found = storyMarketPool(run, ch)
       .filter(e => (!q || e.player.name.includes(q) || clubName(e.squad.teamId).includes(q)) &&
                    (!pos || e.player.position === pos))
       .sort((a, b) => b.player.ovr - a.player.ovr);
-    const fits = e => priceOf(e) <= run.budget + 1e-9;
+    const fits = e => { const a = askOf(e); return !a.notForSale && a.ask <= run.budget; };
     const pool = [...found.filter(fits).slice(0, 25), ...found.filter(e => !fits(e)).slice(0, 15)];
-    const left = STORY_RULES.buys[ctx.window] - run.buys[ctx.window];
-    const tactical = formationTactical(run.formationId);
     const positions = [...new Set(storyMarketPool(run, ch).map(e => e.player.position))].sort();
 
+    const statLine = e => {
+      const st = jan ? ctx.statOf(e.player.name) : null;
+      return st ? ` · ${st.goals} ש׳ ${st.assists} ב׳${st.cs ? ` ${st.cs} נקיים` : ''}` : '';
+    };
+    const playerRow = (e, right) => `
+      <div class="st-p${xiNames.has(e.player.name) ? ' xi' : ''}">
+        <span class="o">${e.player.ovr}</span>
+        <span class="n"><b>${esc(e.player.name)}</b><em>${esc(posHe(e.player.position))}${statLine(e)}</em></span>
+        ${right}</div>`;
+
+    // ── bids on your players
+    const bidsHTML = bids.length ? `
+      <div class="st-h">הצעות על השחקנים שלך</div>
+      <div class="st-list">${bids.map(o => `
+        <div class="st-bid">
+          <div><b>${esc(storyBidderName(o.club))}</b> מציעה <b>${money(o.amount)}</b> על ${esc(o.name)}
+            ${o.unsolicited ? '<span class="st-tag">פנייה יזומה</span>' : ''}</div>
+          <div class="st-btns">
+            <button class="st-b go" data-bid-ok="${esc(o.id)}">לקבל</button>
+            <button class="st-b" data-bid-more="${esc(o.id)}"${o.asked ? ' disabled' : ''}>לבקש ${money(storyK(o.amount * 1.15))}</button>
+            <button class="st-b" data-bid-no="${esc(o.id)}">לדחות</button>
+          </div></div>`).join('')}</div>` : '';
+
+    // ── the squad, by position
+    const squadHTML = STORY_GROUPS.map(g => {
+      const inG = owned.filter(e => storyGroupOf(e.player.position) === g.id);
+      const need = needs[g.id];
+      const short = inG.length < need;
+      return `<div class="st-group">
+        <div class="st-gh"><b>${g.label}</b> <span>${inG.length} בסגל</span>
+          ${need ? `<span class="${short ? 'st-short' : ''}">· המערך צריך ${need}</span>` : ''}</div>
+        <div class="st-list">${inG.map(e => {
+          const n = bids.filter(o => o.squadId === e.squad.id && o.name === e.player.name).length;
+          return playerRow(e, n
+            ? `<span class="st-tag">${n === 1 ? 'הצעה אחת' : n + ' הצעות'} ↑</span>`
+            : `<button class="st-b" data-list="${esc(keyOf(e))}">להציע למכירה</button>`);
+        }).join('') || '<div class="st-empty">אין</div>'}</div></div>`;
+    }).join('');
+
+    // ── the market, and the one negotiation that is open
+    const talkHTML = e => {
+      const t = storyTalk(run, ch, e, valueOf(e));
+      const lastLine = ctx.talkMsg && ctx.open === keyOf(e) ? `<div class="st-say">${ctx.talkMsg}</div>` : '';
+      if (t.nfs) return `<div class="st-talk"><div class="st-say">${esc(clubName(e.squad.teamId))}: "הוא לא למכירה. לא משנה כמה."</div></div>`;
+      const roundsLeft = STORY_RULES.talkRounds - t.round;
+      const dflt = storyK(t.ask * 0.85);
+      return `<div class="st-talk">
+        ${lastLine}
+        <div class="st-say">${esc(clubName(e.squad.teamId))} ${t.round ? 'עומדת על' : 'מבקשת'} <b>${money(t.ask)}</b>
+          ${t.closed ? '' : `· נשארו ${roundsLeft} הצעות`}</div>
+        ${t.closed && !t.lastCounter ? '' : `
+        <div class="st-btns">
+          ${t.closed ? '' : `<input class="st-amt" id="st-amt" type="number" inputmode="numeric" step="10" min="10" value="${dflt}">
+          <span class="st-unit">אלף ₪</span>
+          <button class="st-b go" data-offer="${esc(keyOf(e))}">להגיש הצעה</button>`}
+          ${t.lastCounter ? `<button class="st-b go" data-take="${esc(keyOf(e))}">לקבל ${money(t.ask)}</button>` : ''}
+        </div>
+        ${t.closed ? '' : `<div class="st-btns st-quick">
+          ${[0.7, 0.8, 0.9].map(f => `<button class="st-b" data-quick="${storyK(t.ask * f)}">${money(storyK(t.ask * f))}</button>`).join('')}
+        </div>`}`}
+      </div>`;
+    };
+    const marketHTML = pool.map(e => {
+      const a = askOf(e);
+      const tags = [a.rival ? 'יריבה' : '', a.key ? 'שחקן מפתח' : '', a.notForSale ? 'לא למכירה' : '']
+        .filter(Boolean).map(s => `<span class="st-tag">${s}</span>`).join('');
+      const k = keyOf(e);
+      const open = ctx.open === k;
+      return `<div class="st-mkt">
+        <div class="st-p">
+          <span class="o">${e.player.ovr}</span>
+          <span class="n"><b>${esc(e.player.name)}</b><em>${esc(posHe(e.player.position))} ·
+            ${esc(clubName(e.squad.teamId))} ${tags}</em></span>
+          <button class="st-b" data-talk="${esc(k)}"${a.notForSale || left <= 0 ? ' disabled' : ''}>
+            ${open ? 'לסגור' : 'מו״מ'}</button>
+        </div>${open ? talkHTML(e) : ''}</div>`;
+    }).join('');
+
     ctx.host.innerHTML = `
-      <p class="jan-kicker" style="color:var(--accent);margin:0 0 6px;font-weight:600">
-        ${jan ? 'חלון ההעברות של ינואר' : 'חלון ההעברות של הקיץ'} · ${esc(clubName(ch.teamId))} ${esc(ch.season)}</p>
-      ${jan ? `<p style="margin:0 0 10px;color:var(--dim);font-size:13px">המחירים של השחקנים שלך
-        מתעדכנים לפי מה שעשו בחצי העונה.</p>` : ''}
+      <p class="st-kick">${jan ? 'חלון ההעברות של ינואר' : 'חלון ההעברות של הקיץ'} · ${esc(clubName(ch.teamId))} ${esc(ch.season)}</p>
+      ${jan ? `<p class="st-note">הערך של השחקנים שלך מתעדכן לפי מה שעשו בחצי העונה, ומי שהופיע מושך הצעות.</p>` : ''}
       <div class="st-bar">
         <div class="st-chip"><i>תקציב</i><b>${money(run.budget)}</b></div>
         <div class="st-chip"><i>רכישות שנשארו</i><b>${left}</b></div>
@@ -172,62 +288,98 @@
         <select id="st-tac"${tactical ? '' : ' disabled'}>${TACTIC_KEYS.map(k =>
           `<option value="${k}"${k === run.tactic ? ' selected' : ''}>${esc(TACTICS[k].label)}</option>`).join('')}</select>
       </div>
-      <div class="st-msg" id="st-msg">${esc(ctx.msg || '')}</div>
+      <div class="st-msg" id="st-msg">${ctx.msg || ''}</div>
+      ${bidsHTML}
       <div class="st-h">הסגל שלך. ההרכב (במסגרת צהובה) נבחר אוטומטית מהטובים לכל עמדה</div>
-      <div class="st-list">${owned.map((e, i) => {
-        const price = storySellPrice(valueOf(e));
-        const st = jan ? ctx.statOf(e.player.name) : null;
-        const line = st ? ` · ${st.goals} ש׳ ${st.assists} ב׳${st.cs ? ` ${st.cs} נקיים` : ''}` : '';
-        return `<div class="st-p${xiNames.has(e.player.name) ? ' xi' : ''}">
-          <span class="o">${e.player.ovr}</span>
-          <span class="n"><b>${esc(e.player.name)}</b><em>${esc(posHe(e.player.position))}${line}</em></span>
-          <button class="st-b" data-sell="${i}">מכור ${money(price)}</button></div>`;
-      }).join('')}</div>
-      <div class="st-h">השוק</div>
+      ${squadHTML}
+      <div class="st-h">השוק. לחץ "מו״מ" כדי לפתוח משא ומתן עם המועדון</div>
       <div class="st-row">
         <input id="st-q" placeholder="חיפוש שחקן או מועדון" value="${esc(q)}">
         <select id="st-pos"><option value="">כל העמדות</option>${positions.map(p =>
           `<option value="${p}"${p === pos ? ' selected' : ''}>${esc(posHe(p))}</option>`).join('')}</select>
       </div>
-      <div class="st-list">${pool.map((e, i) => {
-        const rival = storyIsRival(ch, e.squad.teamId);
-        const price = storyBuyPrice(valueOf(e), rival);
-        const can = left > 0 && price <= run.budget + 1e-9;
-        return `<div class="st-p">
-          <span class="o">${e.player.ovr}</span>
-          <span class="n"><b>${esc(e.player.name)}</b><em>${esc(posHe(e.player.position))} ·
-            ${esc(clubName(e.squad.teamId))}${rival ? ' · יריבה +50%' : ''}</em></span>
-          <button class="st-b" data-buy="${i}"${can ? '' : ' disabled'}>קנה ${money(price)}</button></div>`;
-      }).join('')}</div>
+      <div class="st-list">${marketHTML}</div>
       <button class="st-b go st-go" id="st-done">${jan ? 'להמשיך את העונה' : 'לפתיחת העונה'}</button>`;
 
-    const redraw = msg => renderMarket({ ...ctx, msg });
-    ctx.host.querySelectorAll('[data-sell]').forEach(b => b.onclick = () => {
-      const e = owned[+b.dataset.sell];
-      const why = storySell(run, e, storySellPrice(valueOf(e)));
-      if (!why && ctx.persist) ctx.persist();
-      redraw(why || `${e.player.name} נמכר`);
+    const redraw = extra => renderMarket({ ...ctx, ...extra });
+    const saved = () => { if (ctx.persist) ctx.persist(); };
+    const byKey = k => [...owned, ...pool].find(e => keyOf(e) === k);
+    const $ = sel => ctx.host.querySelectorAll(sel);
+
+    $('[data-list]').forEach(b => b.onclick = () => {
+      const e = byKey(b.dataset.list);
+      const made = storyListPlayer(run, ch, e, valueOf(e));
+      saved();
+      redraw({ msg: made.length
+        ? `${esc(e.player.name)} בשוק: ${made.length === 1 ? 'הגיעה הצעה אחת' : `הגיעו ${made.length} הצעות`}`
+        : `אף מועדון לא הציע על ${esc(e.player.name)}` });
     });
-    ctx.host.querySelectorAll('[data-buy]').forEach(b => b.onclick = () => {
-      const e = pool[+b.dataset.buy];
-      const why = storyBuy(run, ch, e, storyBuyPrice(valueOf(e), storyIsRival(ch, e.squad.teamId)));
-      if (!why && ctx.persist) ctx.persist();
-      redraw(why || `${e.player.name} הצטרף`);
+    $('[data-bid-ok]').forEach(b => b.onclick = () => {
+      const o = bids.find(x => x.id === b.dataset.bidOk);
+      const why = storyAcceptBid(run, o.id);
+      saved();
+      redraw({ msg: why ? esc(why) : `${esc(o.name)} נמכר ל${esc(storyBidderName(o.club))} ב-${money(o.amount)}` });
+    });
+    $('[data-bid-no]').forEach(b => b.onclick = () => {
+      storyRejectBid(run, b.dataset.bidNo);
+      saved();
+      redraw({ msg: 'ההצעה נדחתה' });
+    });
+    $('[data-bid-more]').forEach(b => b.onclick = () => {
+      const o = bids.find(x => x.id === b.dataset.bidMore);
+      const want = storyK(o.amount * 1.15);
+      const r = storyPushBid(run, o.id, want);
+      saved();
+      redraw({ msg: r === 'accept' ? `${esc(storyBidderName(o.club))} הסכימה: ${esc(o.name)} נמכר ב-${money(want)}`
+        : r === 'walk' ? `${esc(storyBidderName(o.club))} ירדה מהעסקה`
+        : esc(r) });
+    });
+    $('[data-talk]').forEach(b => b.onclick = () => {
+      const k = b.dataset.talk;
+      redraw({ open: ctx.open === k ? null : k, talkMsg: '', msg: '' });
+    });
+    $('[data-quick]').forEach(b => b.onclick = () => {
+      const inp = document.getElementById('st-amt');
+      if (inp) inp.value = b.dataset.quick;
+    });
+    $('[data-offer]').forEach(b => b.onclick = () => {
+      const e = byKey(b.dataset.offer);
+      const amount = Number(document.getElementById('st-amt').value) || 0;
+      const r = storyOffer(run, ch, e, valueOf(e), amount);
+      saved();
+      const club = esc(clubName(e.squad.teamId));
+      if (r.kind === 'accept') {
+        redraw({ open: null, msg: `סגרנו! ${esc(e.player.name)} הצטרף ב-${money(r.price)}` });
+      } else if (r.kind === 'counter') {
+        redraw({ talkMsg: `${club}: "בשביל ${money(r.counter)} הוא שלך."` });
+      } else if (r.kind === 'reject') {
+        redraw({ talkMsg: r.left > 0 ? `${club} דחתה את ההצעה.` : `${club} דחתה, והפסיקה לענות.` });
+      } else {
+        redraw({ talkMsg: esc(r.why) });
+      }
+    });
+    $('[data-take]').forEach(b => b.onclick = () => {
+      const e = byKey(b.dataset.take);
+      const r = storyTakeCounter(run, ch, e, valueOf(e));
+      saved();
+      redraw(r.kind === 'accept'
+        ? { open: null, msg: `סגרנו! ${esc(e.player.name)} הצטרף ב-${money(r.price)}` }
+        : { talkMsg: esc(r.why) });
     });
     document.getElementById('st-form').onchange = ev => {
       run.formationId = ev.target.value;
       if (!formationTactical(run.formationId)) run.tactic = 'bal';
-      if (ctx.persist) ctx.persist();
-      redraw('');
+      saved();
+      redraw({ msg: '' });
     };
     document.getElementById('st-tac').onchange = ev => {
       run.tactic = ev.target.value;
-      if (ctx.persist) ctx.persist();
-      redraw('');
+      saved();
+      redraw({ msg: '' });
     };
     const qEl = document.getElementById('st-q');
-    qEl.onchange = () => renderMarket({ ...ctx, q: qEl.value, msg: '' });
-    document.getElementById('st-pos').onchange = ev => renderMarket({ ...ctx, pos: ev.target.value, msg: '' });
+    qEl.onchange = () => redraw({ q: qEl.value, msg: '', open: null });
+    document.getElementById('st-pos').onchange = ev => redraw({ pos: ev.target.value, msg: '', open: null });
     document.getElementById('st-done').onclick = ctx.onDone;
   }
 

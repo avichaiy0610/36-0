@@ -17,7 +17,18 @@
  */
 
 function storyChapter(id) { return STORY_CHAPTERS.find(c => c.id === id) || null; }
-function storyRound1(n) { return Math.round(n * 10) / 10; }
+// Money is in thousands of ₪, kept to the nearest 10,000.
+function storyK(n) { return Math.round(n / 10) * 10; }
+
+// A seeded draw per (run, what, …): the same offer to the same club on the same
+// run always gets the same answer, so reloading cannot grind a negotiation.
+function storyRand(run, ...parts) {
+  let h = 2166136261 >>> 0;
+  const str = run.seed + '|' + parts.join('|');
+  for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
+  h = Math.imul(h ^ (h >>> 15), 1 | h); h ^= h + Math.imul(h ^ (h >>> 7), 61 | h);
+  return ((h ^ (h >>> 14)) >>> 0) / 4294967296;
+}
 
 function storyValueOfOvr(ovr) {
   const n = Number(ovr) || 0;
@@ -49,7 +60,7 @@ function storyRepNames(season) {
 
 function storySummerValue(player, season) {
   const base = storyValueOfOvr(player.ovr);
-  return storyRound1(storyRepNames(season).has(storyNameKey(player.name))
+  return storyK(storyRepNames(season).has(storyNameKey(player.name))
     ? base * STORY_RULES.repPremium : base);
 }
 
@@ -71,8 +82,6 @@ function storyJanValue(player, stats) {
   return storyValueOfOvr((Number(player.ovr) || 0) + storyPerfBonus(player.position, stats));
 }
 
-function storySellPrice(value) { return storyRound1(value * STORY_RULES.sellRate); }
-function storyBuyPrice(value, rival) { return storyRound1(value * (rival ? STORY_RULES.rivalMarkup : 1)); }
 
 function storyPrevPos(teamId, season) {
   const r = storyTable(storyPrevSeason(season)).find(x => x.teamId === teamId);
@@ -101,6 +110,9 @@ function storyNewRun(ch, seed) {
     formationId: '4-3-3', tactic: 'bal',
     own: home.players.map(p => ({ squadId: home.id, name: p.name })),
     bought: [], sold: [], buys: { summer: 0, jan: 0 },
+    talks: {},        // 'phase|squadId|name' → { ask, round, closed }
+    offers: [],       // bids on your players: { id, squadId, name, club, amount, window, asked, unsolicited }
+    courted: {},      // phase → true once that window's unsolicited bids were made
   };
 }
 
@@ -137,7 +149,7 @@ function storyBuy(run, ch, entry, price) {
   const why = storyBuyBlock(run, price);
   if (why) return why;
   const ref = { squadId: entry.squad.id, name: entry.player.name };
-  run.budget = storyRound1(run.budget - price);
+  run.budget = storyK(run.budget - price);
   run.own.push(ref);
   run.bought.push({ ...ref, window: run.phase, price });
   run.buys[run.phase]++;
@@ -157,7 +169,8 @@ function storySell(run, entry, price) {
   if (i < 0) return 'השחקן לא בסגל';
   run.own.splice(i, 1);
   run.sold.push({ squadId: entry.squad.id, name: entry.player.name, window: run.phase, price });
-  run.budget = storyRound1(run.budget + price);
+  run.offers = (run.offers || []).filter(o => o.squadId + '|' + o.name !== k);   // he is gone: so are the bids
+  run.budget = storyK(run.budget + price);
   return null;
 }
 
@@ -230,7 +243,8 @@ function storyStars(ch, res) {
 function storyScore(ch, res) {
   const real = storyReal(ch);
   const stars = storyStars(ch, res).filter(Boolean).length;
-  return stars * 1000 + (real ? (res.points - real.pts) * 20 : 0) + Math.round(res.budget * 10);
+  // budget is thousands of ₪: 10 points per million left over
+  return stars * 1000 + (real ? (res.points - real.pts) * 20 : 0) + Math.round(res.budget / 100);
 }
 
 // The facts storyStars needs from a finished run and its league table.
@@ -248,3 +262,195 @@ function storyResult(run, table, rank, points) {
 
 // A signing's rating, from his reference — for reports and the calibration.
 function storyResolveOvr(ref) { const e = storyResolve(ref); return e ? e.player.ovr : 0; }
+
+/* ── negotiation: buying ─────────────────────────────────────────────────────
+ * A signing is a conversation with the selling club, not a price tag. The club
+ * names its price; you offer; it accepts, counters or walks away. Three offers
+ * per player per window, and a rival will not sell you one of its three best at
+ * all. Every answer is a seeded draw (storyRand), so it cannot be re-rolled. */
+
+function storyEntryKey(e) { return e.squad.id + '|' + e.player.name; }
+function storyTalkKey(run, e) { return run.phase + '|' + storyEntryKey(e); }
+
+// Where a player stands in his own club's squad, by rating (1 = its best).
+function storyClubRank(e) {
+  return [...e.squad.players].sort((a, b) => b.ovr - a.ovr).findIndex(p => p.name === e.player.name) + 1;
+}
+
+// The selling club's opening position. `value` is the player's market value in
+// the current window (summer: rating + reputation; January: the same list price,
+// performance counts only for YOUR players).
+function storyAsk(run, ch, e, value) {
+  const rival = storyIsRival(ch, e.squad.teamId);
+  const key = storyClubRank(e) <= 3;
+  const notForSale = rival && key && storyPrevPos(e.squad.teamId, ch.season) <= 3;
+  const ask = storyK(value * (rival ? STORY_RULES.rivalMarkup : 1) * (key ? STORY_RULES.keyMarkup : 1));
+  return { ask, notForSale, rival, key };
+}
+
+function storyTalk(run, ch, e, value) {
+  const k = storyTalkKey(run, e);
+  if (!run.talks[k]) {
+    const a = storyAsk(run, ch, e, value);
+    run.talks[k] = { ask: a.ask, round: 0, closed: a.notForSale, nfs: a.notForSale };
+  }
+  return run.talks[k];
+}
+
+// Make an offer. Returns { kind, price?, counter?, left, why? }:
+//   'accept'  — done at `price` (the player is yours, the money gone)
+//   'counter' — the club names `counter`; it is now its asking price
+//   'reject'  — no; `left` offers remain (0 = the club has stopped answering)
+//   'blocked' — the offer could not be made (`why`: budget, window, limit, closed)
+function storyOffer(run, ch, e, value, amount) {
+  const talk = storyTalk(run, ch, e, value);
+  if (talk.nfs) return { kind: 'blocked', why: 'המועדון לא מוכר אותו', left: 0 };
+  if (talk.closed) return { kind: 'blocked', why: 'המועדון הפסיק לענות', left: 0 };
+  const block = storyBuyBlock(run, amount);
+  if (block) return { kind: 'blocked', why: block, left: STORY_RULES.talkRounds - talk.round };
+  amount = storyK(amount);
+  talk.round++;
+  const left = STORY_RULES.talkRounds - talk.round;
+  const r = amount / talk.ask;
+  const u = storyRand(run, 'offer', storyTalkKey(run, e), talk.round);
+  const u2 = storyRand(run, 'meet', storyTalkKey(run, e), talk.round);
+  let out;
+  if (r >= 1) {
+    out = { kind: 'accept', price: amount };
+  } else if (r >= 0.8) {
+    // close: sometimes a yes, otherwise they meet you part of the way
+    if (u < (r - 0.8) / 0.2 * 0.6) out = { kind: 'accept', price: amount };
+    else out = { kind: 'counter', counter: storyK(talk.ask - (talk.ask - amount) * (0.3 + 0.3 * u2)) };
+  } else if (r >= 0.6) {
+    // low: they barely move, and sometimes they are offended
+    if (u < 0.3) out = { kind: 'reject' };
+    else out = { kind: 'counter', counter: storyK(talk.ask * (0.95 + 0.05 * u2)) };
+  } else {
+    out = { kind: 'reject' };                                  // not a serious offer
+  }
+  if (out.kind === 'counter') talk.ask = Math.max(out.counter, amount);
+  talk.lastCounter = out.kind === 'counter';     // a counter can be taken even after the last round
+  if (out.kind === 'accept') {
+    storyBuy(run, ch, e, out.price);
+    talk.closed = true;
+  } else if (left <= 0) {
+    talk.closed = true;
+  }
+  return { ...out, left: out.kind === 'accept' ? 0 : left };
+}
+
+// Take the club's last counter as it stands.
+function storyTakeCounter(run, ch, e, value) {
+  const talk = storyTalk(run, ch, e, value);
+  if (talk.nfs || !talk.lastCounter) return { kind: 'blocked', why: 'אין הצעה נגדית על השולחן' };
+  const why = storyBuyBlock(run, talk.ask);
+  if (why) return { kind: 'blocked', why };
+  storyBuy(run, ch, e, talk.ask);
+  talk.closed = true;
+  talk.lastCounter = false;
+  return { kind: 'accept', price: talk.ask };
+}
+
+/* ── offers: selling ─────────────────────────────────────────────────────────
+ * You do not sell a player, you put him on the market and see who bids — or a
+ * club comes for someone you never offered. Each bid can be taken, turned down,
+ * or pushed once for more, and pushing too hard makes the club walk. */
+
+const STORY_ABROAD = 'abroad';
+
+function storyBidderName(club) {
+  if (club === STORY_ABROAD) return 'מועדון מחו״ל';
+  return ((typeof TEAMS !== 'undefined' && TEAMS[club]) || { name: club }).name;
+}
+
+function storyMakeBids(run, ch, e, value, n, lo, span, unsolicited) {
+  const clubs = storySeasonSquads(ch.season).map(s => s.teamId).filter(t => t !== ch.teamId);
+  const k = storyEntryKey(e);
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const u = storyRand(run, 'bid', run.phase, k, i);
+    const uc = storyRand(run, 'bidder', run.phase, k, i);
+    const club = uc < 0.2 ? STORY_ABROAD : clubs[Math.floor(uc * clubs.length) % clubs.length];
+    if (out.some(o => o.club === club)) continue;              // one bid per club
+    out.push({ id: `${run.phase}|${k}|${i}`, squadId: e.squad.id, name: e.player.name, club,
+               amount: storyK(value * (lo + span * u)), window: run.phase, asked: false, unsolicited });
+  }
+  return out;
+}
+
+// Put a player on the market: one to three bids arrive, at 65-110% of his value.
+function storyListPlayer(run, ch, e, value) {
+  const k = storyEntryKey(e);
+  if (run.offers.some(o => o.window === run.phase && o.squadId + '|' + o.name === k)) return [];
+  const n = 1 + Math.floor(storyRand(run, 'bids', run.phase, k) * 3);
+  const bids = storyMakeBids(run, ch, e, value, n, 0.65, 0.45, false);
+  run.offers.push(...bids);
+  return bids;
+}
+
+// Bids you did not ask for, once per window: for the men who have been
+// performing (January) or who arrived with a reputation (summer).
+function storyCourt(run, ch, entries, valueOf, isCourted) {
+  if (run.courted[run.phase]) return [];
+  run.courted[run.phase] = true;
+  const made = [];
+  for (const e of entries) {
+    if (!isCourted(e)) continue;
+    const bids = storyMakeBids(run, ch, e, valueOf(e), 1, 0.9, 0.35, true);
+    run.offers.push(...bids);
+    made.push(...bids);
+  }
+  return made;
+}
+
+function storyLiveOffers(run) { return run.offers.filter(o => o.window === run.phase); }
+
+function storyAcceptBid(run, id) {
+  const o = run.offers.find(x => x.id === id);
+  if (!o || o.window !== run.phase) return 'ההצעה כבר לא בתוקף';
+  const e = storyResolve(o);
+  if (!e) return 'השחקן לא בסגל';
+  const why = storySell(run, e, o.amount);
+  if (why) return why;
+  return null;
+}
+
+function storyRejectBid(run, id) {
+  run.offers = run.offers.filter(x => x.id !== id);
+}
+
+// Ask a bidder for more. Once per bid. Up to 10-25% over their bid they pay
+// (and the deal is done); above that they walk. Returns 'accept' | 'walk' | reason.
+function storyPushBid(run, id, amount) {
+  const o = run.offers.find(x => x.id === id);
+  if (!o || o.window !== run.phase) return 'ההצעה כבר לא בתוקף';
+  if (o.asked) return 'כבר ביקשת יותר ממנו';
+  o.asked = true;
+  const give = 1.1 + 0.15 * storyRand(run, 'push', id);
+  if (storyK(amount) <= o.amount * give) {
+    o.amount = storyK(amount);
+    return storyAcceptBid(run, id) || 'accept';
+  }
+  storyRejectBid(run, id);
+  return 'walk';
+}
+
+/* ── positions ───────────────────────────────────────────────────────────────
+ * The squad is shown in position groups with a count on each, next to what the
+ * chosen shape needs — so a gap is visible before the season, not after it. */
+const STORY_GROUPS = [
+  { id: 'gk', label: 'שוערים', pos: ['GK'] },
+  { id: 'cb', label: 'בלמים',  pos: ['CB'] },
+  { id: 'fb', label: 'מגנים',  pos: ['RB', 'LB'] },
+  { id: 'cm', label: 'קשרים',  pos: ['CDM', 'CM', 'CAM'] },
+  { id: 'wg', label: 'כנפיים', pos: ['LM', 'RM', 'LW', 'RW'] },
+  { id: 'st', label: 'חלוצים', pos: ['ST', 'CF'] },
+];
+function storyGroupOf(pos) { return (STORY_GROUPS.find(g => g.pos.includes(pos)) || STORY_GROUPS[3]).id; }
+// How many of each group the shape fields: { gk: 1, cb: 2, … }
+function storyGroupNeeds(slots) {
+  const out = {};
+  STORY_GROUPS.forEach(g => { out[g.id] = 0; });
+  slots.forEach(s => { out[storyGroupOf(slotFitPos(s))]++; });
+  return out;
+}

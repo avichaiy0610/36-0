@@ -42,7 +42,11 @@ function sellBench(run, priceOf, honor) {
   for (const e of bench) {
     if (run.own.length <= G.STORY_RULES.minSquad) break;
     if (keep && keep.has(e.player.name)) continue;
-    G.storySell(run, e, G.storySellPrice(priceOf(e)));
+    // Selling is by bids now: list him, take the best bid on the table.
+    const bids = G.storyListPlayer(run, ch, e, priceOf(e));
+    if (!bids.length) continue;
+    const top = bids.reduce((a, b) => (b.amount > a.amount ? b : a));
+    G.storyAcceptBid(run, top.id);
   }
 }
 
@@ -63,7 +67,11 @@ function buyUpgrades(run, priceFor, honor) {
       .filter(e => !(honor && S3.type === 'noBuyFrom' && S3.teams.includes(e.squad.teamId)))
       .sort((a, b) => b.player.ovr - a.player.ovr).slice(0, 60);
     for (const e of cands) {
-      const price = priceFor(e);
+      // Buying is a negotiation now; the bot pays the asking price (a good
+      // negotiator does better, so this errs towards "harder", as intended).
+      const a = G.storyAsk(run, ch, e, priceFor(e));
+      if (a.notForSale) continue;
+      const price = a.ask;
       if (price > run.budget) continue;
       run.own.push({ squadId: e.squad.id, name: e.player.name });
       const gain = xiStrength(run) - base;
@@ -71,10 +79,12 @@ function buyUpgrades(run, priceFor, honor) {
       // Value per shekel, even under a cap on signings. "Biggest upgrade first" was
       // tried for the capped profile and did far worse (0.6% against 4.7% on KS):
       // it spends the budget on one star and has nothing left for the others.
-      const score = gain / Math.max(price, 0.5);
+      const score = gain / Math.max(price, 50);
       if (gain > 0 && (!best || score > best.score)) best = { e, price, score };
     }
-    if (!best || G.storyBuy(run, ch, best.e, best.price)) return;
+    if (!best) return;
+    const r = G.storyOffer(run, ch, best.e, priceFor(best.e), best.price);
+    if (r.kind !== 'accept') return;
   }
 }
 
@@ -83,7 +93,7 @@ function playOnce(budget, seed, honor) {
   run.budget = budget;
   const summerValue = e => G.storySummerValue(e.player, ch.season);
   sellBench(run, summerValue, honor);
-  buyUpgrades(run, e => G.storyBuyPrice(summerValue(e), G.storyIsRival(ch, e.squad.teamId)), honor);
+  buyUpgrades(run, summerValue, honor);
 
   run.phase = 'season';
   setUp(run);
@@ -94,7 +104,7 @@ function playOnce(budget, seed, honor) {
   const janValue = e => G.storyJanValue(e.player, statOf(e.player.name));
   const before = JSON.stringify(run.own);
   sellBench(run, janValue, honor);
-  buyUpgrades(run, e => G.storyBuyPrice(G.storyValueOfOvr(e.player.ovr), G.storyIsRival(ch, e.squad.teamId)), honor);
+  buyUpgrades(run, e => G.storyValueOfOvr(e.player.ovr), honor);
   const season = JSON.stringify(run.own) === before ? pair.stay : G.storySeasonResim(pair, run, ch);
 
   const pts = season.matches.reduce((s, m) => s + (m.outcome === 'W' ? 3 : m.outcome === 'D' ? 1 : 0), 0);
@@ -139,7 +149,7 @@ if (DETAIL) {
   process.exit(0);
 }
 console.log(`${ch.id} · ${ch.title} · level ${ch.level} · ${N} runs`);
-const budgets = SWEEP ? [18, 20, 22, 24] : [ch.budget];
+const budgets = SWEEP ? [1000, 1500, 2000, 2500, 3000, 4000] : [ch.budget];
 for (const b of budgets) {
   const [s1, s2, s3] = measure(b);
   console.log(`budget ${String(b).padStart(3)}  ⭐ ${s1.padStart(6)}  ⭐⭐ ${s2.padStart(6)}  ⭐⭐⭐ ${s3.padStart(6)}`);

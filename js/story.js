@@ -24,6 +24,8 @@
     if (!_run) {
       const r = load(RUN_KEY);
       _run = (r && r.v === 1 && storyChapter(r.chapterId)) ? r : null;
+      // A run saved before negotiations existed has none of their fields.
+      if (_run) { _run.talks = _run.talks || {}; _run.offers = _run.offers || []; _run.courted = _run.courted || {}; }
     }
     return _run;
   }

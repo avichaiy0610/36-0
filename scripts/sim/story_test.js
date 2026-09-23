@@ -27,7 +27,9 @@ const EXPORTS = ['state', 'SQUADS', 'LEAGUE_TABLES', 'FORMATIONS', 'formationSlo
   'simTeamsForSeason', 'withSeededRandom', 'generateMatches', 'generateLeagueTable',
   'seasonFormat', 'myLineRatings', 'teamOVR', 'simulatePlayerStats', 'SIM_ENGINE_CURRENT',
   'STORY_RULES', 'STORY_CHAPTERS', 'storyChapter', 'storyValueOfOvr', 'storyPrevSeason',
-  'storySummerValue', 'storyPerfBonus', 'storyJanValue', 'storySellPrice', 'storyBuyPrice',
+  'storySummerValue', 'storyPerfBonus', 'storyJanValue', 'storyK', 'storyAsk', 'storyTalk', 'storyClubRank',
+  'storyOffer', 'storyTakeCounter', 'storyListPlayer', 'storyCourt', 'storyLiveOffers', 'storyAcceptBid',
+  'storyRejectBid', 'storyPushBid', 'storyGroupOf', 'storyGroupNeeds',
   'storyIsRival', 'storyReal', 'storyHomeSquad', 'storyNewRun', 'storyOwned', 'storyMarketPool',
   'storyBuy', 'storySell', 'storyOpponents', 'storyBestXI', 'storyStars', 'storyScore', 'storyCoreNames', 'storyResolveOvr', 'storyResult',
   'storyApplyXI', 'storyXiOvr', 'storyStatsFor', 'storyMergeStats', 'storySimulateFn',
@@ -61,29 +63,25 @@ if (require.main === module) {
     assert.strictEqual(G.storyPrevSeason('2015/16'), '2014/15');
     assert.strictEqual(G.storyPrevSeason('2000/01'), '1999/00');
   });
-  t('value tiers', () => {
-    assert.strictEqual(G.storyValueOfOvr(90), 14);
-    assert.strictEqual(G.storyValueOfOvr(84), 7);
-    assert.strictEqual(G.storyValueOfOvr(79), 1.2);
-    assert.strictEqual(G.storyValueOfOvr(60), 0.5);
+  t('value tiers, in thousands of ₪ (the dearest player costs 2.5 million)', () => {
+    assert.strictEqual(G.storyValueOfOvr(90), 2500);
+    assert.strictEqual(G.storyValueOfOvr(84), 1000);
+    assert.strictEqual(G.storyValueOfOvr(79), 180);
+    assert.strictEqual(G.storyValueOfOvr(60), 80);
+    assert.strictEqual(G.storyK(1234), 1230);
   });
   t('reputation premium: last season top scorer is dearer in summer', () => {
     // מאור בוזגלו was 3rd scorer and top assister of 2014/15 (LEAGUE_SCORERS/ASSISTS)
     const p = { name: 'מאור בוזגלו', ovr: 84, position: 'LW' };
-    assert.strictEqual(G.storySummerValue(p, '2015/16'), 8.8);         // 7 × 1.25 → 8.75 → 8.8
-    assert.strictEqual(G.storySummerValue({ name: 'אף אחד', ovr: 84 }, '2015/16'), 7);
+    assert.strictEqual(G.storySummerValue(p, '2015/16'), 1250);
+    assert.strictEqual(G.storySummerValue({ name: 'אף אחד', ovr: 84 }, '2015/16'), 1000);
   });
   t('performance bonus: a 79 striker with 11 goals is valued like an 84', () => {
     assert.strictEqual(G.storyPerfBonus('ST', { goals: 11, assists: 0, cs: 0 }), 5);
-    assert.strictEqual(G.storyJanValue({ ovr: 79, position: 'ST' }, { goals: 11, assists: 0, cs: 0 }), 7);
+    assert.strictEqual(G.storyJanValue({ ovr: 79, position: 'ST' }, { goals: 11, assists: 0, cs: 0 }), 1000);
     assert.strictEqual(G.storyPerfBonus('ST', { goals: 0, assists: 0, cs: 0 }), -2);
     assert.strictEqual(G.storyPerfBonus('CB', { goals: 0, assists: 0, cs: 10 }), 4);
     assert.strictEqual(G.storyPerfBonus('GK', null), 0);
-  });
-  t('prices', () => {
-    assert.strictEqual(G.storySellPrice(7), 5.6);
-    assert.strictEqual(G.storyBuyPrice(7, false), 7);
-    assert.strictEqual(G.storyBuyPrice(7, true), 10.5);
   });
   t('rival = finished above you last season', () => {
     // 2014/15: maccabi-tlv 1st, hapoel-beersheba 3rd
@@ -99,31 +97,135 @@ if (require.main === module) {
   });
   t('buy moves a player in, charges, and removes him from the pool', () => {
     const run = G.storyNewRun(ch, 1);
-    run.budget = 50;
+    run.budget = 5000;
     const pool = G.storyMarketPool(run, ch);
     const e = pool[0];
-    assert.strictEqual(G.storyBuy(run, ch, e, 7), null);
-    assert.strictEqual(run.budget, 43);
+    assert.strictEqual(G.storyBuy(run, ch, e, 700), null);
+    assert.strictEqual(run.budget, 4300);
     assert.strictEqual(run.buys.summer, 1);
     assert.ok(G.storyOwned(run).some(x => x.player.name === e.player.name));
     assert.ok(!G.storyMarketPool(run, ch).some(x => x.squad.id === e.squad.id && x.player.name === e.player.name));
   });
   t('buy is refused over budget and over the window limit', () => {
     const run = G.storyNewRun(ch, 1);
-    run.budget = 3;
+    run.budget = 300;
     const pool = G.storyMarketPool(run, ch);
-    assert.strictEqual(G.storyBuy(run, ch, pool[0], 4), 'אין מספיק תקציב');
-    run.budget = 100;
-    for (let i = 0; i < 4; i++) assert.strictEqual(G.storyBuy(run, ch, pool[i], 1), null);
-    assert.strictEqual(G.storyBuy(run, ch, pool[5], 1), 'נגמרו הרכישות בחלון הזה');
+    assert.strictEqual(G.storyBuy(run, ch, pool[0], 400), 'אין מספיק תקציב');
+    run.budget = 10000;
+    for (let i = 0; i < 4; i++) assert.strictEqual(G.storyBuy(run, ch, pool[i], 100), null);
+    assert.strictEqual(G.storyBuy(run, ch, pool[5], 100), 'נגמרו הרכישות בחלון הזה');
   });
   t('sell credits and respects the minimum squad', () => {
     const run = G.storyNewRun(ch, 1);
     const owned = G.storyOwned(run);
-    assert.strictEqual(G.storySell(run, owned[0], 2.5), null);
-    assert.strictEqual(run.budget, G.storyChapter('b7-2015').budget + 2.5);
+    assert.strictEqual(G.storySell(run, owned[0], 250), null);
+    assert.strictEqual(run.budget, ch.budget + 250);
     while (run.own.length > G.STORY_RULES.minSquad) G.storySell(run, G.storyOwned(run)[0], 0);
     assert.ok(/מתחת/.test(G.storySell(run, G.storyOwned(run)[0], 0)));
+  });
+
+  // ── negotiation ────────────────────────────────────────────────────────────
+  const ks = G.storyChapter('ks-2011');
+  const pick = (run, pred) => G.storyMarketPool(run, ks).filter(pred)
+    .sort((a, b) => b.player.ovr - a.player.ovr)[0];
+  t('the asking price: rival ×1.5, one of the club\'s three best ×1.3', () => {
+    const run = G.storyNewRun(ks, 3);
+    const e = pick(run, e => !G.storyIsRival(ks, e.squad.teamId) && G.storyClubRank(e) > 3);
+    const a = G.storyAsk(run, ks, e, 1000);
+    assert.deepStrictEqual([a.ask, a.rival, a.key, a.notForSale], [1000, false, false, false]);
+    const k = pick(run, e => !G.storyIsRival(ks, e.squad.teamId) && G.storyClubRank(e) === 1);
+    assert.strictEqual(G.storyAsk(run, ks, k, 1000).ask, 1300);
+  });
+  t('a top rival will not sell one of its three best', () => {
+    // 2010/11: maccabi-haifa were champions — above KS, top three
+    const run = G.storyNewRun(ks, 3);
+    const e = pick(run, e => e.squad.teamId === 'maccabi-haifa' && G.storyClubRank(e) === 1);
+    assert.strictEqual(G.storyAsk(run, ks, e, 1000).notForSale, true);
+    const r = G.storyOffer(run, ks, e, 1000, 99999);
+    assert.strictEqual(r.kind, 'blocked');
+    assert.strictEqual(run.own.length, G.storyHomeSquad(ks).players.length);
+  });
+  t('offering the asking price buys him at that price', () => {
+    const run = G.storyNewRun(ks, 3);
+    run.budget = 5000;
+    const e = pick(run, e => !G.storyIsRival(ks, e.squad.teamId) && G.storyClubRank(e) > 3);
+    const ask = G.storyTalk(run, ks, e, 600).ask;
+    const r = G.storyOffer(run, ks, e, 600, ask);
+    assert.deepStrictEqual([r.kind, r.price], ['accept', ask]);
+    assert.strictEqual(run.budget, 5000 - ask);
+    assert.ok(G.storyOwned(run).some(x => x.player.name === e.player.name));
+  });
+  t('an insulting offer is refused; three refusals close the talk', () => {
+    const run = G.storyNewRun(ks, 3);
+    run.budget = 5000;
+    const e = pick(run, e => !G.storyIsRival(ks, e.squad.teamId) && G.storyClubRank(e) > 3);
+    for (let i = 0; i < 3; i++) assert.strictEqual(G.storyOffer(run, ks, e, 600, 100).kind, 'reject');
+    assert.strictEqual(G.storyOffer(run, ks, e, 600, 600).kind, 'blocked');
+  });
+  t('a counter is never below your offer, and can be taken', () => {
+    let found = false;
+    for (let seed = 1; seed < 60 && !found; seed++) {
+      const run = G.storyNewRun(ks, seed);
+      run.budget = 5000;
+      const e = pick(run, e => !G.storyIsRival(ks, e.squad.teamId) && G.storyClubRank(e) > 3);
+      const r = G.storyOffer(run, ks, e, 600, 540);
+      if (r.kind !== 'counter') continue;
+      found = true;
+      assert.ok(r.counter >= 540 && r.counter <= 600);
+      const t2 = G.storyTakeCounter(run, ks, e, 600);
+      assert.deepStrictEqual([t2.kind, t2.price], ['accept', G.storyTalk(run, ks, e, 600).ask]);
+    }
+    assert.ok(found, 'no counter in 60 seeds at 90% of the ask');
+  });
+  t('the same offer on the same run always gets the same answer', () => {
+    const a = G.storyNewRun(ks, 77), b = G.storyNewRun(ks, 77);
+    a.budget = b.budget = 5000;
+    const e = pick(a, e => !G.storyIsRival(ks, e.squad.teamId) && G.storyClubRank(e) > 3);
+    assert.deepStrictEqual(G.storyOffer(a, ks, e, 600, 500), G.storyOffer(b, ks, e, 600, 500));
+  });
+
+  // ── bids on your players ───────────────────────────────────────────────────
+  t('listing a player brings 1-3 bids, one per club, at 65-110% of value', () => {
+    const run = G.storyNewRun(ks, 5);
+    const e = G.storyOwned(run)[3];
+    const bids = G.storyListPlayer(run, ks, e, 1000);
+    assert.ok(bids.length >= 1 && bids.length <= 3);
+    assert.strictEqual(new Set(bids.map(b => b.club)).size, bids.length);
+    bids.forEach(b => assert.ok(b.amount >= 650 && b.amount <= 1100));
+    assert.deepStrictEqual(G.storyListPlayer(run, ks, e, 1000), []);          // once per window
+  });
+  t('accepting a bid sells him and clears his other bids', () => {
+    const run = G.storyNewRun(ks, 5);
+    const e = G.storyOwned(run)[3];
+    const bids = G.storyListPlayer(run, ks, e, 1000);
+    assert.strictEqual(G.storyAcceptBid(run, bids[0].id), null);
+    assert.strictEqual(run.budget, ks.budget + bids[0].amount);
+    assert.ok(!G.storyOwned(run).some(x => x.player.name === e.player.name));
+    assert.strictEqual(G.storyLiveOffers(run).length, 0);
+  });
+  t('pushing a bid: a little more is paid, too much and they walk, and only once', () => {
+    const run = G.storyNewRun(ks, 5);
+    const [e1, e2] = G.storyOwned(run).slice(4, 6);
+    const b1 = G.storyListPlayer(run, ks, e1, 1000)[0];
+    assert.strictEqual(G.storyPushBid(run, b1.id, b1.amount * 1.05), 'accept');
+    const b2 = G.storyListPlayer(run, ks, e2, 1000)[0];
+    assert.strictEqual(G.storyPushBid(run, b2.id, b2.amount * 2), 'walk');
+    assert.ok(!G.storyLiveOffers(run).some(o => o.id === b2.id));
+  });
+  t('unsolicited bids come once per window, only for the courted', () => {
+    const run = G.storyNewRun(ks, 5);
+    const owned = G.storyOwned(run);
+    const courted = new Set([owned[0].player.name]);
+    const made = G.storyCourt(run, ks, owned, () => 1000, e => courted.has(e.player.name));
+    assert.ok(made.length === 1 && made[0].unsolicited && made[0].name === owned[0].player.name);
+    assert.deepStrictEqual(G.storyCourt(run, ks, owned, () => 1000, () => true), []);
+  });
+  t('position groups and what a shape needs', () => {
+    assert.strictEqual(G.storyGroupOf('CAM'), 'cm');
+    assert.strictEqual(G.storyGroupOf('RW'), 'wg');
+    const need = G.storyGroupNeeds(G.formationSlots('4-3-3', 'bal'));
+    assert.strictEqual(Object.values(need).reduce((a, b) => a + b, 0), 11);
+    assert.strictEqual(need.gk, 1);
   });
   t('opponents: the 13 other clubs, rated exactly like simTeamsForSeason', () => {
     const run = G.storyNewRun(ch, 1);
@@ -175,7 +277,7 @@ if (require.main === module) {
   });
   t('score', () => {
     const r = G.storyReal(ch);
-    const res = { rank: 1, points: r.pts + 5, budget: 10, sold: [] };
+    const res = { rank: 1, points: r.pts + 5, budget: 10000, sold: [] };   // 10 million
     assert.strictEqual(G.storyScore(ch, res), 3000 + 100 + 100);
   });
   t('margin and maxBuys stars, from storyResult', () => {

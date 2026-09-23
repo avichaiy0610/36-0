@@ -3,7 +3,7 @@
  * Data only: what a chapter IS, never how it plays. See
  * docs/superpowers/specs/2026-09-23-story-mode-design.md.
  *
- * `budget` is millions of ₪ and is SET BY scripts/sim/story_calibrate.js, never
+ * Money is in THOUSANDS of ₪ throughout (2500 = 2.5 מיליון). `budget` is SET BY scripts/sim/story_calibrate.js, never
  * by feel — the owner's one standing rule for this mode is that it has to be
  * hard, and a number chosen by eye is a number nobody measured.
  *
@@ -14,23 +14,29 @@
  * with the table the rest of the site shows.
  */
 const STORY_RULES = {
-  sellRate: 0.8,          // a sale fetches 80% of value — the friction that stops churn
+  sellRate: 0.85,         // the centre of what clubs bid for your players
   rivalMarkup: 1.5,       // a club that finished above you will not strengthen you cheaply
+  keyMarkup: 1.3,         // one of the selling club's own three best
   repPremium: 1.25,       // last season's top scorers / assisters, summer only
   buys: { summer: 4, jan: 2 },
+  talkRounds: 3,          // offers per player per window before the club stops answering
   minSquad: 16,
 };
 
-// ₪M by rating. A step curve, like the salary cap's (js/salary.js), because a
-// price is something the player has to hold in their head while deciding.
+// Thousands of ₪ by rating. Israeli football's own scale: the league's transfer
+// record between two Israeli clubs is about €2M, and only ~40 deals in its whole
+// history reached €1M (checked 2026-09-23 — ice.co.il, walla, Transfermarkt via
+// asoccer). The owner set the ceiling: the dearest player in the league costs
+// about 2.5 million. A step curve, like the salary cap's, so a price is a thing
+// you can hold in your head.
 const STORY_VALUE_TIERS = [
-  { min: 88, v: 14 },
-  { min: 86, v: 10 },
-  { min: 84, v: 7 },
-  { min: 82, v: 4.5 },
-  { min: 80, v: 2.5 },
-  { min: 78, v: 1.2 },
-  { min: 0,  v: 0.5 },
+  { min: 88, v: 2500 },
+  { min: 86, v: 1600 },
+  { min: 84, v: 1000 },
+  { min: 82, v: 600 },
+  { min: 80, v: 350 },
+  { min: 78, v: 180 },
+  { min: 0,  v: 80 },
 ];
 
 const STORY_CHAPTERS = [
@@ -45,7 +51,7 @@ const STORY_CHAPTERS = [
     season: '2015/16',
     title: '40 שנה אחרי',
     level: 'normal',
-    budget: 8,
+    budget: 800,
     intro: 'הפועל באר שבע לא זכתה באליפות מאז 1976. על הנייר זה הסגל הכי חזק בליגה, ' +
            'אבל מכבי תל אביב צמודה אליו והקופה כמעט ריקה.',
     stars: [
@@ -60,7 +66,7 @@ const STORY_CHAPTERS = [
     season: '2011/12',
     title: 'הנס מהצפון',
     level: 'hard',
-    budget: 22,
+    budget: 3500,
     intro: 'עירוני קריית שמונה, מועדון מהקצה הצפוני של המדינה, עם הסגל הרביעי בכוחו בליגה. ' +
            'הפועל תל אביב, מכבי תל אביב ומכבי חיפה חזקות ממנה על הנייר, והקופה קטנה. ' +
            'במציאות היא זכתה באליפות הראשונה והיחידה בתולדותיה, בפער של 14 נקודות.',
@@ -71,8 +77,9 @@ const STORY_CHAPTERS = [
     // the big four" was tried first and bound nobody (the rival markup already
     // sends the market elsewhere); a cap of 2 or 3 measured under the 2% floor.
     //
-    // Measured 2026-09-23, 4000 runs at budget 22 (story_calibrate.js):
-    //   ⭐ 21.7%   ⭐⭐ 6.2%   ⭐⭐⭐ 4.2%   — inside the 'hard' bands of spec §7.
+    // Measured 2026-09-23 on the Israeli price scale, 2000 runs at 3,500 (story_calibrate.js,
+    // bot pays asking prices and sells by best bid):
+    //   ⭐ 21.4%   ⭐⭐ 6.8%   ⭐⭐⭐ 4.7%   — inside the 'hard' bands of spec §7.
     stars: [
       { type: 'rank', max: 1, label: 'אליפות' },
       { type: 'margin', min: 5, label: 'אליפות בפער של 5 נקודות לפחות' },
