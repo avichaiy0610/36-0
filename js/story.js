@@ -61,13 +61,12 @@
       if (!run.eu) storyEuStart(run);
       run.phase = 'europe';
       storySave();
-      storyApplyXI(run);
       storyShowEurope();
       return;
     }
     run.phase = 'season';
     storySave();
-    storyApplyXI(run);
+    storyApplyXI(run, 'h1');                     // the first half's XI: who is fit then
     state.usedPlayerKeys = new Set(state.picks.filter(Boolean).map(p => p.player.name));
     state.currentRound = state.slots.length;               // "drafted" — restore resumes at the season
     saveDraftState();
@@ -131,6 +130,25 @@
                     score: b.score == null ? run.result.score : Math.max(b.score, run.result.score) };
     save(BEST_KEY, best);
     storyTrack('finish', ch.id + '|' + stars.filter(Boolean).length);
+    storyAward(ch, run, stars);
+  }
+
+  // Achievements (migration 20260923000002): signed-in players only, once per
+  // finished chapter; the server clamps everything and returns only new badges.
+  function storyAward(ch, run, stars) {
+    try {
+      if (typeof getCurrentUser !== 'function' || !getCurrentUser() || typeof _supabase === 'undefined') return;
+      const best = storyBest();
+      const starred = STORY_CHAPTERS.filter(c => best[c.id] && best[c.id].stars && best[c.id].stars[0]).length;
+      _supabase.rpc('award_story_achievements', { p: {
+        chapter: ch.id, stars: stars.filter(Boolean).length,
+        champion: !!(run.result && run.result.eu && run.result.eu.champion),
+        bargain: !!run.bargain, starred,
+      } }).then(({ data }) => {
+        const fresh = (data && data.achievements) || [];
+        if (fresh.length && typeof showAchievementToasts === 'function') showAchievementToasts(fresh);
+      }, () => {});
+    } catch (e) { /* an award never breaks a chapter */ }
   }
 
   function storyTrack(event, detail) {
@@ -199,6 +217,7 @@
       };
       save(BEST_KEY, best);
       storyTrack('finish', ch.id + '|' + stars.filter(Boolean).length);
+      storyAward(ch, run, stars);
     }
   }
 

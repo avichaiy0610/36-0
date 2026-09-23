@@ -28,6 +28,27 @@ const STORY_RULES = {
   minSquad: 16,
 };
 
+// Rivalries: a player from the other side costs more, a club symbol of theirs
+// will not come at all, and even an ordinary one may say no. City derbies plus
+// the great inter-city rivalries. Pairs, order does not matter — edit freely.
+const STORY_RIVALRIES = [
+  ['maccabi-tlv', 'hapoel-tlv'],          // the Tel Aviv derby
+  ['maccabi-haifa', 'hapoel-haifa'],      // the Haifa derby
+  ['beitar-jerusalem', 'hapoel-jerusalem'],
+  ['maccabi-pt', 'hapoel-pt'],            // Petah Tikva
+  ['maccabi-tlv', 'maccabi-haifa'],
+  ['maccabi-tlv', 'beitar-jerusalem'],
+  ['hapoel-tlv', 'beitar-jerusalem'],
+  ['hapoel-beersheba', 'maccabi-haifa'],
+];
+const STORY_RIVAL_RULES = {
+  markup: 1.4,          // on top of everything else
+  cap: 3500,            // a rival's man may pass the usual ceiling
+  refuse: 0.3,          // chance an ordinary player will not cross over
+  symbolSeasons: 5,     // seasons at the club, by our squads, that make a symbol
+  symbolMarkup: 1.2,    // a symbol of a club that is NOT your rival: loyalty costs
+};
+
 // Thousands of ₪ by rating. Israeli football's own scale: the league's transfer
 // record between two Israeli clubs is about €2M, and only ~40 deals in its whole
 // history reached €1M (checked 2026-09-23 — ice.co.il, walla, Transfermarkt via
@@ -72,8 +93,10 @@ const STORY_CHAPTERS = [
     teamId: 'ironi-ks',
     season: '2011/12',
     title: 'הנס מהצפון',
-    level: 'hard',
-    budget: 2500,
+    level: 'hardest',
+    budget: 3500,
+    // After squad depth (substitutes + injuries, 2026-09-23) re-measured, 400-600 runs:
+    //   3,500 → ⭐ 10.3%  ⭐⭐ 3.5%  ⭐⭐⭐ 2.3%. 20% would take 6 million — not this club.
     intro: 'עירוני קריית שמונה, מועדון מהקצה הצפוני של המדינה, עם הסגל הרביעי בכוחו בליגה. ' +
            'הפועל תל אביב, מכבי תל אביב ומכבי חיפה חזקות ממנה על הנייר, והקופה קטנה. ' +
            'במציאות היא זכתה באליפות הראשונה והיחידה בתולדותיה, בפער של 14 נקודות.',
@@ -105,8 +128,10 @@ const STORY_CHAPTERS = [
     teamId: 'maccabi-netanya',
     season: '2007/08',
     title: 'הסוס השחור',
-    level: 'normal',
+    level: 'hard',
     budget: 1500,
+    // After squad depth (substitutes + injuries, 2026-09-23) re-measured, 400-600 runs:
+    //   ⭐ 20.8%  ⭐⭐ 4.0%  ⭐⭐⭐ 2.5%, flat from 1,500 to 3,500.
     // 400 runs, 2026-09-23: ⭐ 40.3%  ⭐⭐ 9.5%  ⭐⭐⭐ 6.3% — flat from 1,000 up:
     // selling the bench pays for the signings, so money is not the limit here.
     intro: 'מכבי נתניה סיימה את 2007/08 במקום השני, עם הסגל הרביעי בכוחו בליגה של 12 קבוצות. ' +
@@ -148,7 +173,10 @@ const STORY_CHAPTERS = [
     season: '1999/00',
     title: 'להישאר בחיים',
     level: 'hardest',
-    budget: 550,
+    budget: 1200,
+    // After squad depth (substitutes + injuries, 2026-09-23) re-measured, 400-600 runs:
+    //   550 → 0.5%, 1,000 → 13%, 1,500 → 34%: a thin bench sinks this squad fastest.
+    //   1,200 (800 runs): ⭐ 14.9%  ⭐⭐ 5.8%  ⭐⭐⭐ 2.0%, with ⭐⭐/⭐⭐⭐ at 10th and 9th.
     // 1200 runs, 2026-09-23: ⭐ 20.8%  ⭐⭐ 3.8%  ⭐⭐⭐ 1.2%. Steep: 500 → 6.6%,
     // 600 → 26%, one affordable signing apart. A signings cap bound nobody (2) or
     // everybody (1), so ⭐⭐⭐ is a finish instead.
@@ -157,8 +185,8 @@ const STORY_CHAPTERS = [
            'הפרק הכי קשה במצב הסיפור.',
     stars: [
       { type: 'survive', label: 'להישאר בליגה' },
+      { type: 'rank', max: 10, label: 'לסיים במקום 10 או גבוה ממנו' },
       { type: 'rank', max: 9, label: 'לסיים במקום 9 או גבוה ממנו' },
-      { type: 'rank', max: 8, label: 'לסיים במקום 8 או גבוה ממנו' },
     ],
   },
   // ── the favourites: their rivals use the market too ──────────────────────
@@ -275,8 +303,11 @@ const STORY_CHAPTERS = [
     season: '2009/10',
     comp: 'ליגת האלופות',
     title: 'אפס ואפס',
-    level: 'hard',
+    level: 'hardest',
     budget: 2500,
+    // After squad depth (substitutes + injuries, 2026-09-23) re-measured, 400-600 runs:
+    //   ⭐ 14%; 20% only at 6 million. ⭐⭐/⭐⭐⭐ lowered to 4 and 5 points:
+    //   800 runs → ⭐ 12.5%  ⭐⭐ 6.4%  ⭐⭐⭐ 1.8%.
     // 1200 runs, 2026-09-23: ⭐ 23.9%  ⭐⭐ 7.3%  ⭐⭐⭐ 2.1%. "Score a goal" (48%) and "a point"
     // (42%) were measured first and were far too easy: the real zero was a freak.
     intro: 'ליגת האלופות 2009/10. מכבי חיפה עברה את גלנטורן, את אקטובה ואת זלצבורג, ' +
@@ -304,8 +335,8 @@ const STORY_CHAPTERS = [
     },
     stars: [
       { type: 'euGroupPoints', min: 3, label: 'לנצח משחק בבית' },
+      { type: 'euGroupPoints', min: 4, label: '4 נקודות בבית' },
       { type: 'euGroupPoints', min: 5, label: '5 נקודות בבית' },
-      { type: 'euGroupPoints', min: 7, label: '7 נקודות בבית' },
     ],
   },
   // ── Maccabi Tel Aviv (the owner: "הגזמנו קצת עם מכבי חיפה") ────────────────
@@ -314,13 +345,15 @@ const STORY_CHAPTERS = [
     teamId: 'maccabi-tlv',
     season: '2002/03',
     title: 'על חוט השערה',
-    level: 'normal',
-    budget: 500,
+    level: 'hard',
+    budget: 1000,
+    // After squad depth (substitutes + injuries, 2026-09-23) re-measured, 400-600 runs:
+    //   1,000 with 2+1 signings → ⭐ 22.8%  ⭐⭐ 3.8%  ⭐⭐⭐ 1.5%.
     // Measured 2026-09-23: with no market at all it is 24%; three signings took it
     // to 54%, one per window to 42% — the XI (84) is four points off Haifa (88),
     // so one good signing closes half the gap. Hence 'normal', one signing a
     // window, and the top star is winning it with the squad as it was.
-    rules: { buys: { summer: 1, jan: 1 }, minSquad: 24 },
+    rules: { buys: { summer: 2, jan: 1 }, minSquad: 24 },
     // 800 runs at 500: ⭐ 41.9%  ⭐⭐ 12.3%  ⭐⭐⭐ 5.3%.
     intro: 'מכבי תל אביב זכתה באליפות 2002/03 בשוויון נקודות עם מכבי חיפה, 69 כל אחת, ' +
            'והפועל תל אביב שתי נקודות מאחור. על הנייר זה היה רק הסגל השלישי בליגה, ' +

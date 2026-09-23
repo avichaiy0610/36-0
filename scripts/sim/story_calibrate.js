@@ -29,7 +29,7 @@ if (!ch) { console.log('no chapter ' + id); process.exit(1); }
 const setUp = run => {
   Object.assign(G.state, { story: { chapterId: ch.id }, peakMode: false, classic: false,
     coach: null, oppSeason: parseInt(ch.season, 10), leagueFormat: 'authentic' });
-  G.storyApplyXI(run);
+  G.storyApplyXI(run, 'h1');
 };
 
 // honor: the ⭐⭐⭐ profile — a player going for all three obeys the third star's
@@ -43,7 +43,16 @@ function sellBench(run, priceOf, honor) {
     .filter(Boolean).map(e => e.squad.id + '|' + e.player.name));
   const bench = G.storyOwned(run).filter(e => !xi.has(e.squad.id + '|' + e.player.name))
     .sort((a, b) => priceOf(b) - priceOf(a));
+  // Depth matters now (substitutes, injuries): a sensible player keeps the best
+  // two backups for each outfield line and a second keeper, and sells the rest.
+  const LINES = { atk: ['ST', 'CF', 'RW', 'LW', 'CAM'], mid: ['CM', 'CDM', 'RM', 'LM'], def: ['CB', 'RB', 'LB'], gk: ['GK'] };
+  const depth = new Set();
+  for (const [k, pos] of Object.entries(LINES)) {
+    bench.filter(e => pos.includes(e.player.position)).sort((a, b) => b.player.ovr - a.player.ovr)
+      .slice(0, k === 'gk' ? 1 : 2).forEach(e => depth.add(e));
+  }
   for (const e of bench) {
+    if (depth.has(e)) continue;
     if (run.own.length <= G.storyRules(ch).minSquad) break;
     if (keep && keep.has(e.player.name)) continue;
     // Selling is by bids now: list him, take the best bid on the table.

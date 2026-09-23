@@ -755,7 +755,7 @@ function myLineRatings(ovrAt) {
   // the gauntlet without any of them knowing a manager exists.
   const cEdge = typeof coachEdge === 'function' ? coachEdge() : 0;
   const cClean = typeof coachCleanMult === 'function' ? coachCleanMult() : 1;
-  return {
+  const out = {
     ovr,
     atk: line(SIM2_LINES.atk.pos) + t.atk + tagAtkBoost() + win + cEdge,
     mid: line(SIM2_LINES.mid.pos) + win + cEdge,
@@ -763,6 +763,9 @@ function myLineRatings(ovrAt) {
     gk:  line(SIM2_LINES.gk.pos) + win + cEdge,
     cs:  tagCleanBoost() * cClean,
   };
+  // מצב סיפור only: the bench's share of the minutes (js/story-season.js).
+  // state.story is null in every other mode, so nothing else changes.
+  return (state && state.story && typeof storyDepthAdjust === 'function') ? storyDepthAdjust(out) : out;
 }
 
 function pickWeightedIdx(weights) {

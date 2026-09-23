@@ -291,6 +291,28 @@ function storyCoreNames(ch) {
   return storyBestXI(entries, formationSlots('4-3-3', 'bal')).filter(Boolean).map(e => e.player.name);
 }
 
+// The eleven you picked, kept by slot id so a change of shape keeps whoever
+// still has a place. `xi`: { slotId: 'squadId|name' }. A pick that is no longer
+// in the squad (sold) or picked twice is dropped, and every slot left empty is
+// filled the way storyBestXI would fill it from whoever is left.
+function storyPickXI(entries, slots, xi) {
+  if (!xi || !Object.keys(xi).length) return storyBestXI(entries, slots);
+  const byKey = new Map(entries.map(e => [storyEntryKey(e), e]));
+  const used = new Set();
+  const picks = slots.map(s => {
+    const e = byKey.get(xi[s.id]);
+    if (!e || used.has(e)) return null;
+    used.add(e);
+    return e;
+  });
+  const open = slots.map((s, i) => (picks[i] ? null : i)).filter(i => i !== null);
+  if (open.length) {
+    const rest = storyBestXI(entries.filter(e => !used.has(e)), open.map(i => slots[i]));
+    open.forEach((i, k) => { picks[i] = rest[k]; });
+  }
+  return picks;
+}
+
 // res: { rank, points, margin, budget, sold: [names], boughtTeams: [teamIds] }
 //   margin — your points minus the best other club's; budget — what is left.
 // GRADED: a star counts only if the one before it does.
@@ -364,20 +386,52 @@ function storyClubRank(e) {
 // The selling club's opening position. `value` is the player's market value in
 // the current window (summer: rating + reputation; January: the same list price,
 // performance counts only for YOUR players).
+// A derby or a great rivalry between your club and the seller (STORY_RIVALRIES).
+function storyIsDerby(a, b) {
+  return typeof STORY_RIVALRIES !== 'undefined' &&
+    STORY_RIVALRIES.some(([x, y]) => (x === a && y === b) || (x === b && y === a));
+}
+// Seasons a man spent at a club up to the chapter's season, by our squads.
+const _storySeasonsAt = {};
+function storySeasonsAt(name, teamId, season) {
+  const k = name + '|' + teamId + '|' + season;
+  if (_storySeasonsAt[k] != null) return _storySeasonsAt[k];
+  const upTo = parseInt(season, 10);
+  return (_storySeasonsAt[k] = SQUADS.filter(s => s.teamId === teamId && parseInt(s.season, 10) <= upTo &&
+    s.players.some(p => p.name === name)).length);
+}
+function storyIsSymbol(e, season) {
+  const R = typeof STORY_RIVAL_RULES !== 'undefined' ? STORY_RIVAL_RULES : null;
+  if (!R) return false;
+  // Our squads start in 1999/00, so before 2003/04 nobody CAN have five seasons:
+  // the bar is five, or every season we have up to then, and never under three.
+  const have = new Set(SQUADS.map(s => parseInt(s.season, 10)).filter(y => y <= parseInt(season, 10))).size;
+  const bar = Math.max(3, Math.min(R.symbolSeasons, have));
+  return storySeasonsAt(e.player.name, e.squad.teamId, season) >= bar;
+}
+
+// why: '' | 'top' (a top rival keeps its best) | 'symbol' (a rival's symbol) | 'refuse' (will not cross)
 function storyAsk(run, ch, e, value) {
+  const R = typeof STORY_RIVAL_RULES !== 'undefined' ? STORY_RIVAL_RULES : { markup: 1, cap: STORY_RULES.maxAsk, refuse: 0, symbolMarkup: 1 };
   const rival = storyIsRival(ch, e.squad.teamId);
   const key = storyClubRank(e) <= 3;
-  const notForSale = rival && key && storyPrevPos(e.squad.teamId, ch.season) <= 3;
-  const ask = Math.min(STORY_RULES.maxAsk,
-    storyK(value * (rival ? STORY_RULES.rivalMarkup : 1) * (key ? STORY_RULES.keyMarkup : 1)));
-  return { ask, notForSale, rival, key };
+  const derby = storyIsDerby(ch.teamId, e.squad.teamId);
+  const symbol = storyIsSymbol(e, ch.season);
+  let why = '';
+  if (rival && key && storyPrevPos(e.squad.teamId, ch.season) <= 3) why = 'top';
+  else if (derby && symbol) why = 'symbol';
+  else if (derby && storyRand(run, 'refuse', storyEntryKey(e)) < R.refuse) why = 'refuse';
+  const mult = (rival ? STORY_RULES.rivalMarkup : 1) * (key ? STORY_RULES.keyMarkup : 1) *
+               (derby ? R.markup : 1) * (!derby && symbol ? R.symbolMarkup : 1);
+  const ask = Math.min(derby ? R.cap : STORY_RULES.maxAsk, storyK(value * mult));
+  return { ask, notForSale: !!why, why, rival, key, derby, symbol };
 }
 
 function storyTalk(run, ch, e, value) {
   const k = storyTalkKey(run, e);
   if (!run.talks[k]) {
     const a = storyAsk(run, ch, e, value);
-    run.talks[k] = { ask: a.ask, round: 0, closed: a.notForSale, nfs: a.notForSale };
+    run.talks[k] = { ask: a.ask, first: a.ask, round: 0, closed: a.notForSale, nfs: a.notForSale, why: a.why };
   }
   return run.talks[k];
 }
@@ -389,7 +443,8 @@ function storyTalk(run, ch, e, value) {
 //   'blocked' — the offer could not be made (`why`: budget, window, limit, closed)
 function storyOffer(run, ch, e, value, amount) {
   const talk = storyTalk(run, ch, e, value);
-  if (talk.nfs) return { kind: 'blocked', why: 'המועדון לא מוכר אותו', left: 0 };
+  if (talk.nfs) return { kind: 'blocked', why: talk.why === 'refuse' ? 'השחקן לא מוכן לעבור ליריבה'
+    : talk.why === 'symbol' ? 'סמל של המועדון. הוא לא עוזב ליריבה' : 'המועדון לא מוכר אותו', left: 0 };
   if (talk.closed) return { kind: 'blocked', why: 'המועדון הפסיק לענות', left: 0 };
   const block = storyBuyBlock(run, amount);
   if (block) return { kind: 'blocked', why: block, left: STORY_RULES.talkRounds - talk.round };
@@ -418,10 +473,17 @@ function storyOffer(run, ch, e, value, amount) {
   if (out.kind === 'accept') {
     storyBuy(run, ch, e, out.price);
     talk.closed = true;
+    storyNoteBargain(run, talk, out.price);
   } else if (left <= 0) {
     talk.closed = true;
   }
   return { ...out, left: out.kind === 'accept' ? 0 : left };
+}
+
+// A signing at 85% of the club's first price or less earns "מו"מ קשוח". (80% was
+// all but impossible: the clubs never accept under 80% and rarely right at it.)
+function storyNoteBargain(run, talk, price) {
+  if (talk.first && price <= talk.first * 0.85) run.bargain = true;
 }
 
 // Take the club's last counter as it stands.
@@ -433,6 +495,7 @@ function storyTakeCounter(run, ch, e, value) {
   storyBuy(run, ch, e, talk.ask);
   talk.closed = true;
   talk.lastCounter = false;
+  storyNoteBargain(run, talk, talk.ask);
   return { kind: 'accept', price: talk.ask };
 }
 
@@ -458,7 +521,8 @@ function storyMakeBids(run, ch, e, value, n, lo, span, unsolicited) {
     const club = uc < 0.2 ? STORY_ABROAD : clubs[Math.floor(uc * clubs.length) % clubs.length];
     if (out.some(o => o.club === club)) continue;              // one bid per club
     out.push({ id: `${run.phase}|${k}|${i}`, squadId: e.squad.id, name: e.player.name, club,
-               amount: storyK(value * (lo + span * u)), window: run.phase, asked: false, unsolicited });
+               // the ceiling holds for bids too: a 91 with a reputation drew 3.5 million
+               amount: Math.min(STORY_RULES.maxAsk, storyK(value * (lo + span * u))), window: run.phase, asked: false, unsolicited });
   }
   return out;
 }
@@ -520,7 +584,7 @@ function storyPushBid(run, id, amount) {
   }
   o.opening = o.opening || o.amount;
   o.round = (o.round || 0) + 1;
-  const max = storyK(o.opening * (1.1 + 0.2 * storyRand(run, 'ceiling', id)));
+  const max = Math.min(STORY_RULES.maxAsk, storyK(o.opening * (1.1 + 0.2 * storyRand(run, 'ceiling', id))));
   if (amount <= max) {
     o.amount = amount;
     const why = storyAcceptBid(run, id);

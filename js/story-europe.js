@@ -46,6 +46,11 @@ function storyEuStart(run) {
   run.eu = { at: 0, cur: null, done: [], stats: {}, out: false, windowDone: false };
   return run.eu;
 }
+// the injury key of the next match: 'eu|<round>|<match index>'
+function storyEuWhen(run, round) {
+  const cur = run.eu.cur;
+  return 'eu|' + round.id + '|' + (cur && cur.id === round.id ? cur.legs.length : 0);
+}
 function storyEuRound(ch, run) { return (run.eu && ch.europe.rounds[run.eu.at]) || null; }
 function storyEuOver(ch, run) { return !!run.eu && (run.eu.out || run.eu.at >= ch.europe.rounds.length); }
 // The window opens before the round named in ch.europe.window, once.
@@ -140,11 +145,8 @@ function storyEuGroupTable(round, played) {
 function storyEuPlay(ch, run, tactic) {
   const round = storyEuRound(ch, run);
   if (!round || run.eu.out) return null;
-  storyApplyXI(run);
-  state.tactic = tacticOf(tactic);
-  state.slots = formationSlots(run.formationId, state.tactic);
-  state.picks = storyBestXI(storyOwned(run), state.slots);
   const cur = run.eu.cur || (run.eu.cur = { id: round.id, legs: [], played: [] });
+  storyApplyXI(run, storyEuWhen(run, round), tactic);
 
   if (round.kind === 'tie') {
     const i = cur.legs.length;

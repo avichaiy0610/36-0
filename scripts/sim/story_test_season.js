@@ -14,6 +14,40 @@ module.exports = function (G, t) {
     assert.strictEqual(G.state.picks.filter(Boolean).length, 11);
     assert.ok(G.teamOVR() >= 80);
   });
+  t('depth: selling the bench lowers the lines through the substitutes', () => {
+    const run = G.storyNewRun(ch, 7);
+    setUp(run);
+    const full = G.myLineRatings();
+    // sell every bench man down to the minimum squad
+    const xi = new Set(G.state.picks.map(p => p.player.name));
+    for (const e of G.storyOwned(run)) {
+      if (run.own.length <= G.STORY_RULES.minSquad) break;
+      if (!xi.has(e.player.name)) G.storySell(run, e, 0);
+    }
+    setUp(run);
+    const thin = G.myLineRatings();
+    assert.ok(thin.atk + thin.mid + thin.def < full.atk + full.mid + full.def);
+    assert.strictEqual(thin.gk, full.gk);                         // the keeper is never changed
+  });
+  t('injuries: known ahead, the same every time, and the injured do not play', () => {
+    const run = G.storyNewRun(ch, 99);
+    const a = G.storyInjured(run, 'h1').map(e => e.player.name);
+    assert.deepStrictEqual(G.storyInjured(run, 'h1').map(e => e.player.name), a);
+    let any = null;
+    for (let seed = 1; seed < 40 && !any; seed++) {
+      const r = G.storyNewRun(ch, seed);
+      setUp(r);
+      const auto = G.storyBestXI(G.storyOwned(r), G.state.slots).map(e => e.player.name);
+      const hurt = G.storyInjured(r, 'h1').map(e => e.player.name).filter(n => auto.includes(n));
+      if (!hurt.length) continue;
+      G.storyApplyXI(r, 'h1');
+      const on = G.state.picks.map(p => p.player.name);
+      hurt.forEach(n => assert.ok(!on.includes(n), n + ' is injured but plays'));
+      assert.strictEqual(on.length, 11);
+      any = true;
+    }
+    assert.ok(any, 'no starter injured in 40 seeds');
+  });
   t('storyXiOvr does not disturb state', () => {
     const run = G.storyNewRun(ch, 7);
     setUp(run);

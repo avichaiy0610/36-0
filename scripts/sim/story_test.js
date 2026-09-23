@@ -29,7 +29,7 @@ const EXPORTS = ['state', 'SQUADS', 'LEAGUE_TABLES', 'FORMATIONS', 'formationSlo
   'STORY_RULES', 'STORY_CHAPTERS', 'storyChapter', 'storyValueOfOvr', 'storyPrevSeason',
   'storySummerValue', 'storyPerfBonus', 'storyJanValue', 'storyK', 'storyAsk', 'storyTalk', 'storyClubRank',
   'storyOffer', 'storyTakeCounter', 'storyListPlayer', 'storyCourt', 'storyLiveOffers', 'storyAcceptBid',
-  'storyRejectBid', 'storyPushBid', 'storyGroupOf', 'storyGroupNeeds', 'storyRivalClubs', 'storyRivalShop', 'storyRules',
+  'storyRejectBid', 'storyPushBid', 'storyGroupOf', 'storyGroupNeeds', 'storyRivalClubs', 'storyRivalShop', 'storyRules', 'storyPickXI', 'storyInjured', 'storyIsInjured', 'storyDepthAdjust', 'storyIsDerby', 'storyIsSymbol', 'STORY_RIVAL_RULES',
   'storyIsRival', 'storyReal', 'storyHomeSquad', 'storyNewRun', 'storyOwned', 'storyMarketPool',
   'storyBuy', 'storySell', 'storyOpponents', 'storyBestXI', 'storyStars', 'storyScore', 'storyCoreNames', 'storyResolveOvr', 'storyResult',
   'storyApplyXI', 'storyXiOvr', 'storyStatsFor', 'storyMergeStats', 'storySimulateFn',
@@ -132,11 +132,42 @@ if (require.main === module) {
     .sort((a, b) => b.player.ovr - a.player.ovr)[0];
   t('the asking price: rival ×1.5, one of the club\'s three best ×1.3', () => {
     const run = G.storyNewRun(ks, 3);
-    const e = pick(run, e => !G.storyIsRival(ks, e.squad.teamId) && G.storyClubRank(e) > 3);
+    const plain = e => !G.storyIsRival(ks, e.squad.teamId) && !G.storyIsDerby(ks.teamId, e.squad.teamId) && !G.storyIsSymbol(e, ks.season);
+    const e = pick(run, e => plain(e) && G.storyClubRank(e) > 3);
     const a = G.storyAsk(run, ks, e, 1000);
     assert.deepStrictEqual([a.ask, a.rival, a.key, a.notForSale], [1000, false, false, false]);
-    const k = pick(run, e => !G.storyIsRival(ks, e.squad.teamId) && G.storyClubRank(e) === 1);
+    const k = pick(run, e => plain(e) && G.storyClubRank(e) === 1);
     assert.strictEqual(G.storyAsk(run, ks, k, 1000).ask, 1150);
+  });
+  t('a derby: dearer, a symbol never crosses, an ordinary player sometimes refuses', () => {
+    const mta = G.storyChapter('mta-2002');                     // Maccabi TA; Hapoel TA and Haifa are rivals
+    assert.ok(G.storyIsDerby('maccabi-tlv', 'hapoel-tlv') && G.storyIsDerby('hapoel-tlv', 'maccabi-tlv'));
+    assert.ok(!G.storyIsDerby('maccabi-tlv', 'bnei-yehuda'));
+    const run = G.storyNewRun(mta, 3);
+    const pool = G.storyMarketPool(run, mta).filter(e => e.squad.teamId === 'hapoel-tlv');
+    const sym = pool.find(e => G.storyIsSymbol(e, mta.season) && G.storyClubRank(e) > 3);
+    assert.ok(sym, 'no Hapoel TA symbol in 2002/03');
+    assert.strictEqual(G.storyAsk(run, mta, sym, 1000).why, 'symbol');
+    assert.strictEqual(G.storyOffer(run, mta, sym, 1000, 99999).kind, 'blocked');
+    // an ordinary derby player: 1.4 dearer when he is willing
+    let seen = false;
+    for (let seed = 1; seed < 30 && !seen; seed++) {
+      const r = G.storyNewRun(mta, seed);
+      const e = G.storyMarketPool(r, mta).find(x => x.squad.teamId === 'hapoel-tlv' && !G.storyIsSymbol(x, mta.season) && G.storyClubRank(x) > 3);
+      const a = G.storyAsk(r, mta, e, 1000);
+      if (a.why) continue;
+      seen = true;
+      assert.ok(a.ask >= 1400, 'derby ask ' + a.ask);
+    }
+    assert.ok(seen);
+    // refusals happen, roughly as often as the rule says
+    let refuse = 0, n = 0;
+    for (let seed = 1; seed < 200; seed++) {
+      const r = G.storyNewRun(mta, seed);
+      const e = G.storyMarketPool(r, mta).find(x => x.squad.teamId === 'hapoel-tlv' && !G.storyIsSymbol(x, mta.season) && G.storyClubRank(x) > 3);
+      n++; if (G.storyAsk(r, mta, e, 1000).why === 'refuse') refuse++;
+    }
+    assert.ok(refuse / n > 0.15 && refuse / n < 0.45, 'refusal rate ' + refuse / n);
   });
   t('a top rival will not sell one of its three best', () => {
     // 2010/11: maccabi-haifa were champions — above KS, top three
@@ -150,7 +181,7 @@ if (require.main === module) {
   t('offering the asking price buys him at that price', () => {
     const run = G.storyNewRun(ks, 3);
     run.budget = 5000;
-    const e = pick(run, e => !G.storyIsRival(ks, e.squad.teamId) && G.storyClubRank(e) > 3);
+    const e = pick(run, e => !G.storyIsRival(ks, e.squad.teamId) && !G.storyIsSymbol(e, ks.season) && !G.storyIsDerby(ks.teamId, e.squad.teamId) && G.storyClubRank(e) > 3);
     const ask = G.storyTalk(run, ks, e, 600).ask;
     const r = G.storyOffer(run, ks, e, 600, ask);
     assert.deepStrictEqual([r.kind, r.price], ['accept', ask]);
@@ -160,7 +191,7 @@ if (require.main === module) {
   t('an insulting offer is refused; three refusals close the talk', () => {
     const run = G.storyNewRun(ks, 3);
     run.budget = 5000;
-    const e = pick(run, e => !G.storyIsRival(ks, e.squad.teamId) && G.storyClubRank(e) > 3);
+    const e = pick(run, e => !G.storyIsRival(ks, e.squad.teamId) && !G.storyIsSymbol(e, ks.season) && !G.storyIsDerby(ks.teamId, e.squad.teamId) && G.storyClubRank(e) > 3);
     for (let i = 0; i < 3; i++) assert.strictEqual(G.storyOffer(run, ks, e, 600, 100).kind, 'reject');
     assert.strictEqual(G.storyOffer(run, ks, e, 600, 600).kind, 'blocked');
   });
@@ -169,7 +200,7 @@ if (require.main === module) {
     for (let seed = 1; seed < 60 && !found; seed++) {
       const run = G.storyNewRun(ks, seed);
       run.budget = 5000;
-      const e = pick(run, e => !G.storyIsRival(ks, e.squad.teamId) && G.storyClubRank(e) > 3);
+      const e = pick(run, e => !G.storyIsRival(ks, e.squad.teamId) && !G.storyIsSymbol(e, ks.season) && !G.storyIsDerby(ks.teamId, e.squad.teamId) && G.storyClubRank(e) > 3);
       const r = G.storyOffer(run, ks, e, 600, 540);
       if (r.kind !== 'counter') continue;
       found = true;
@@ -182,7 +213,7 @@ if (require.main === module) {
   t('the same offer on the same run always gets the same answer', () => {
     const a = G.storyNewRun(ks, 77), b = G.storyNewRun(ks, 77);
     a.budget = b.budget = 5000;
-    const e = pick(a, e => !G.storyIsRival(ks, e.squad.teamId) && G.storyClubRank(e) > 3);
+    const e = pick(a, e => !G.storyIsRival(ks, e.squad.teamId) && !G.storyIsSymbol(e, ks.season) && G.storyClubRank(e) > 3);
     assert.deepStrictEqual(G.storyOffer(a, ks, e, 600, 500), G.storyOffer(b, ks, e, 600, 500));
   });
 
@@ -349,6 +380,47 @@ if (require.main === module) {
     assert.deepStrictEqual(G.storyStars(c, res(idx('final'))), [true, true, true]);
     assert.deepStrictEqual(G.storyStars(c, res(idx('r4'))), [false, false, false]);
     assert.strictEqual(G.storyEuRealReach(c), idx('qf'));
+  });
+  t('a picked eleven: your choice holds, the rest is filled, a sold man drops out', () => {
+    const run = G.storyNewRun(ks, 2);
+    const slots = G.formationSlots('4-3-3', 'bal');
+    const owned = G.storyOwned(run);
+    const auto = G.storyBestXI(owned, slots);
+    const benchGk = owned.filter(e => e.player.position === 'GK' && !auto.includes(e))[0];
+    const key = e => e.squad.id + '|' + e.player.name;
+    const xi = { gk: key(benchGk) };
+    const mine = G.storyPickXI(owned, slots, xi);
+    assert.strictEqual(mine[0].player.name, benchGk.player.name);
+    assert.strictEqual(mine.filter(Boolean).length, 11);
+    assert.strictEqual(new Set(mine.map(e => e.player.name)).size, 11);
+    // the same man in two slots counts once
+    const twice = G.storyPickXI(owned, slots, { gk: key(benchGk), cb1: key(benchGk) });
+    assert.strictEqual(new Set(twice.map(e => e.player.name)).size, 11);
+    // sell him: the goal is filled from who is left
+    run.budget = 0;
+    G.storySell(run, benchGk, 0);
+    const after = G.storyPickXI(G.storyOwned(run), slots, xi);
+    assert.ok(after[0] && after[0].player.name !== benchGk.player.name);
+    assert.deepStrictEqual(G.storyPickXI(owned, slots, {}).map(e => e.player.name), auto.map(e => e.player.name));
+  });
+  t('the achievements migration knows every chapter', () => {
+    const sql = fs.readFileSync(path.join(ROOT, 'supabase/migrations/20260923000002_story_achievements.sql'), 'utf8');
+    const known = (sql.match(/v_known\s+text\[\]\s+:=\s+ARRAY\[([^\]]*)\]/) || [])[1] || '';
+    const ids = known.split(',').map(s => s.trim().replace(/^'|'$/g, '')).filter(Boolean).sort();
+    assert.deepStrictEqual(ids, G.STORY_CHAPTERS.map(c => c.id).sort(),
+      'a chapter was added or renamed: add it to v_known in a new migration');
+  });
+  t('a signing at 85% of the first price or less is a bargain', () => {
+    let hit = false;
+    for (let seed = 1; seed < 120 && !hit; seed++) {
+      const run = G.storyNewRun(ks, seed);
+      run.budget = 5000;
+      const e = pick(run, e => !G.storyIsRival(ks, e.squad.teamId) && !G.storyIsSymbol(e, ks.season) && !G.storyIsDerby(ks.teamId, e.squad.teamId) && G.storyClubRank(e) > 3);
+      const r = G.storyOffer(run, ks, e, 1000, 850);
+      if (r.kind === 'accept') { assert.ok(run.bargain); hit = true; }
+      else assert.ok(!run.bargain);
+    }
+    assert.ok(hit, 'no club accepted 85% in 120 seeds');
   });
   t('position groups and what a shape needs', () => {
     assert.strictEqual(G.storyGroupOf('CAM'), 'cm');

@@ -122,6 +122,15 @@
 .st-amt{width:96px;background:var(--surface);color:var(--text);border:1px solid var(--border);
   border-radius:8px;padding:7px;font-family:inherit;font-size:14px}
 .st-unit{font-size:13px;color:var(--dim)}
+.st-hurt{color:#f85149}
+.st-tag.no{color:#f85149;border-color:#f8514966}
+.st-chk{display:flex;align-items:center;gap:5px;font-size:13px;color:var(--dim);white-space:nowrap}
+.lu{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;margin:0 0 12px}
+.lu>summary{cursor:pointer;font-weight:700;color:var(--accent)}
+.lu-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:6px;margin:10px 0 4px}
+.lu-row{display:flex;align-items:center;gap:6px;font-size:13px}
+.lu-row span{min-width:70px;color:var(--dim)}
+.lu-row select{flex:1;min-width:0;background:var(--panel);color:var(--text);border:1px solid var(--border);border-radius:7px;padding:5px;font-family:inherit}
 .st-crest{width:22px;height:22px;object-fit:contain;vertical-align:middle;margin-inline-end:6px}
 .st-crest.big{width:34px;height:34px}
 .eu-road{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px}
@@ -243,7 +252,11 @@
     if (fresh.length && ctx.persist) ctx.persist();
 
     const slots = formationSlots(run.formationId, run.tactic);
-    const xiNames = new Set(storyBestXI(owned, slots).filter(Boolean).map(e => e.player.name));
+    const when = ctx.when || null;
+    const lineup = storyLineup(run, when);
+    const xiNames = new Set(lineup.picks.filter(Boolean).map(e => e.player.name));
+    const hurt = new Set(storyInjured(run, when).map(e => e.player.name));
+    const hurtWhen = !when ? '' : when === 'h1' ? 'יחמיץ את החצי הראשון' : when === 'h2' ? 'יחמיץ את החצי השני' : 'יחמיץ את המשחק הבא';
     const needs = storyGroupNeeds(slots);
     const left = storyRules(ch).buys[ctx.window] - run.buys[ctx.window];
     const tactical = formationTactical(run.formationId);
@@ -257,8 +270,12 @@
       .filter(e => (!q || e.player.name.includes(q) || clubName(e.squad.teamId).includes(q)) &&
                    (!pos || e.player.position === pos))
       .sort((a, b) => b.player.ovr - a.player.ovr);
+    // One list, by rating, highest first. "רק מה שבתקציב" (on by default) hides
+    // whoever you cannot afford or cannot have; the old split — affordable first,
+    // then the rest — read as a list that was simply out of order.
     const fits = e => { const a = askOf(e); return !a.notForSale && a.ask <= run.budget; };
-    const pool = [...found.filter(fits).slice(0, 25), ...found.filter(e => !fits(e)).slice(0, 15)];
+    const onlyAfford = ctx.afford !== false;
+    const pool = (onlyAfford ? found.filter(fits) : found).slice(0, 40);
     const positions = [...new Set(storyMarketPool(run, ch).map(e => e.player.position))].sort();
 
     const statLine = e => {
@@ -268,7 +285,8 @@
     const playerRow = (e, right) => `
       <div class="st-p${xiNames.has(e.player.name) ? ' xi' : ''}">
         <span class="o">${e.player.ovr}</span>
-        <span class="n"><b>${esc(e.player.name)}</b><em>${esc(posHe(e.player.position))}${statLine(e)}</em></span>
+        <span class="n"><b>${esc(e.player.name)}</b><em>${esc(posHe(e.player.position))}${statLine(e)}${
+          hurt.has(e.player.name) ? ` · <span class="st-hurt">🩹 ${hurtWhen}</span>` : ''}</em></span>
         ${right}</div>`;
 
     // ── bids on your players
@@ -333,15 +351,16 @@
     };
     const marketHTML = pool.map(e => {
       const a = askOf(e);
-      const tags = [a.rival ? 'יריבה' : '', a.key ? 'שחקן מפתח' : '', a.notForSale ? 'לא למכירה' : '']
-        .filter(Boolean).map(s => `<span class="st-tag">${s}</span>`).join('');
+      const nfs = { top: 'לא למכירה', symbol: 'סמל: לא יעבור ליריבה', refuse: 'מסרב לעבור ליריבה' }[a.why] || '';
+      const tags = [a.derby ? 'דרבי' : (a.rival ? 'יריבה' : ''), a.symbol ? 'סמל' : '', a.key ? 'שחקן מפתח' : '', nfs]
+        .filter(Boolean).map(s => `<span class="st-tag${s === nfs ? ' no' : ''}">${s}</span>`).join('');
       const k = keyOf(e);
       const open = ctx.open === k;
       return `<div class="st-mkt">
         <div class="st-p">
           <span class="o">${e.player.ovr}</span>
           <span class="n"><b>${esc(e.player.name)}</b><em>${esc(posHe(e.player.position))} ·
-            ${esc(clubName(e.squad.teamId))} ${tags}</em></span>
+            ${esc(clubName(e.squad.teamId))}${a.notForSale ? '' : ` · ${money(a.ask)} ₪`} ${tags}</em></span>
           <button class="st-b" data-talk="${esc(k)}"${a.notForSale || left <= 0 ? ' disabled' : ''}>
             ${open ? 'לסגור' : 'מו״מ'}</button>
         </div>${open ? talkHTML(e) : ''}</div>`;
@@ -354,7 +373,7 @@
         <div class="st-chip"><i>תקציב</i><b>${money(run.budget)} ₪</b></div>
         <div class="st-chip"><i>רכישות שנשארו</i><b>${left}</b></div>
         <div class="st-chip"><i>סגל</i><b>${run.own.length}</b></div>
-        <div class="st-chip"><i>דירוג ההרכב</i><b>${storyXiOvr(run)}</b></div>
+        <div class="st-chip"><i>דירוג ההרכב</i><b>${lineup.ovr}</b></div>
       </div>
       <div class="st-row">
         <select id="st-form">${Object.keys(FORMATIONS).map(k =>
@@ -364,11 +383,13 @@
       </div>
       <div class="st-msg" id="st-msg">${ctx.msg || ''}</div>
       ${bidsHTML}
-      <div class="st-h">הסגל שלך. ההרכב (במסגרת צהובה) נבחר אוטומטית מהטובים לכל עמדה</div>
+      ${lineupHTML(run, lineup, hurt)}
+      <div class="st-h">הסגל שלך. ההרכב במסגרת צהובה</div>
       ${squadHTML}
       <div class="st-h">השוק. לחץ "מו״מ" כדי לפתוח משא ומתן עם המועדון</div>
       <div class="st-row">
         <input id="st-q" placeholder="חיפוש שחקן או מועדון" value="${esc(q)}">
+        <label class="st-chk"><input type="checkbox" id="st-afford"${onlyAfford ? ' checked' : ''}> רק מה שבתקציב</label>
         <select id="st-pos"><option value="">כל העמדות</option>${positions.map(p =>
           `<option value="${p}"${p === pos ? ' selected' : ''}>${esc(posHe(p))}</option>`).join('')}</select>
       </div>
@@ -385,6 +406,7 @@
       ? `${esc(why)}: יש לך ${money(run.budget)} ₪. ההצעה לא נשלחה.`
       : esc(why);
     const saved = () => { if (ctx.persist) ctx.persist(); };
+    wireLineup(ctx.host, run, lineup, () => { saved(); redraw({ msg: '' }); });
     const byKey = k => [...owned, ...pool].find(e => keyOf(e) === k);
     const $ = sel => ctx.host.querySelectorAll(sel);
 
@@ -467,7 +489,49 @@
     const qEl = byId('st-q');
     qEl.onchange = () => redraw({ q: qEl.value, msg: '', open: null });
     byId('st-pos').onchange = ev => redraw({ pos: ev.target.value, msg: '', open: null });
+    byId('st-afford').onchange = ev => redraw({ afford: ev.target.checked, msg: '', open: null });
     byId('st-done').onclick = ctx.onDone;
+  }
+
+  /* ── the lineup ─────────────────────────────────────────────────────────── */
+  // Pick the eleven yourself, slot by slot, or leave it to "הרכב אוטומטי". The
+  // choice is kept by slot (run.xi); injured men cannot be picked and a pick who
+  // gets injured is covered from the bench automatically.
+  function lineupHTML(run, lineup, hurt) {
+    const owned = storyOwned(run).filter(e => !hurt.has(e.player.name))
+      .sort((a, b) => b.player.ovr - a.player.ovr);
+    const keyOf = e => e.squad.id + '|' + e.player.name;
+    const rows = lineup.slots.map((s, i) => {
+      const cur = lineup.picks[i];
+      const pos = slotFitPos(s);
+      const fits = owned.filter(e => playerFitsSlot(e.player, pos));
+      const others = owned.filter(e => !playerFitsSlot(e.player, pos));
+      const opt = (e, off) => `<option value="${esc(keyOf(e))}"${cur && keyOf(cur) === keyOf(e) ? ' selected' : ''}>${
+        e.player.ovr} · ${esc(e.player.name)}${off ? ' (לא בעמדה)' : ''}</option>`;
+      return `<label class="lu-row"><span>${esc(s.label || posHe(pos))}</span>
+        <select data-slot="${esc(s.id)}">${fits.map(e => opt(e, false)).join('')}${others.map(e => opt(e, true)).join('')}</select></label>`;
+    }).join('');
+    const b = lineup.bench;
+    const auto = !run.xi || !Object.keys(run.xi).length;
+    return `<details class="lu"${auto ? '' : ' open'}><summary>ההרכב ${auto ? '(אוטומטי)' : '(שלך)'} · לחצו לבחירה</summary>
+      <div class="lu-grid">${rows}</div>
+      <p class="st-note">המחליפים הטובים ביותר בספסל (משחקים כ-10% מהדקות): התקפה ${Math.round(b.atk)} ·
+        קישור ${Math.round(b.mid)} · הגנה ${Math.round(b.def)}. ספסל חלש מוריד את הקבוצה בכל משחק.</p>
+      ${auto ? '' : '<button class="st-b" data-lu-auto>הרכב אוטומטי</button>'}</details>`;
+  }
+  function wireLineup(host, run, lineup, onChange) {
+    const keyOf = e => e.squad.id + '|' + e.player.name;
+    host.querySelectorAll('select[data-slot]').forEach(sel => sel.onchange = () => {
+      const xi = {};
+      lineup.slots.forEach((s, i) => { if (lineup.picks[i]) xi[s.id] = keyOf(lineup.picks[i]); });
+      // the man picked here leaves wherever else he stood
+      for (const k of Object.keys(xi)) if (xi[k] === sel.value) delete xi[k];
+      xi[sel.dataset.slot] = sel.value;
+      run.xi = xi;
+      onChange();
+    });
+    const auto = host.querySelector('[data-lu-auto]');
+    if (auto) auto.onclick = () => { run.xi = {}; onChange(); };
   }
 
   function storyShowMarket() {
@@ -476,7 +540,7 @@
     const ch = run && storyChapter(run.chapterId);
     if (!ch) { storyShowHub(); return; }
     showScreen('story');
-    renderMarket({ run, ch, window: 'summer', statOf: () => null, host: root(),
+    renderMarket({ run, ch, window: 'summer', when: 'h1', statOf: () => null, host: root(),
                    persist: storySave, onDone: storyEnterSeason });
   }
 
@@ -493,7 +557,7 @@
       <div id="st-jan"></div></div>`;
     document.body.appendChild(wrap);
     const statOf = name => pair.firstStats.find(s => s.name === name) || null;
-    renderMarket({ run: draft, ch, window: 'jan', statOf, host: wrap.querySelector('#st-jan'),
+    renderMarket({ run: draft, ch, window: 'jan', when: 'h2', statOf, host: wrap.querySelector('#st-jan'),
                    onDone: () => { wrap.remove(); onDone(); } });
   }
 
@@ -581,7 +645,7 @@
           ${cur.legs.map(l => euLegLine(us, l, r.club.name)).join('')}
           <p class="eu-next">${r.oneLeg ? 'משחק יחיד' : `משחק ${i + 1} מתוך 2`} · ${venue(r, home)}</p>
           ${storyEuNeed(ch, r, cur.legs) ? `<p class="eu-need">${esc(storyEuNeed(ch, r, cur.legs))}</p>` : ''}
-          ${r.ko && r.club.ovr > storyXiOvr(run)
+          ${r.ko && r.club.ovr > storyXiOvr(run, storyEuWhen(run, r))
             ? '<p class="st-note">לילה אירופי: מול יריבה חזקה ממכם, הקבוצה שלכם מתעלה.</p>' : ''}`;
       } else {
         const i = cur.legs.length;
@@ -593,7 +657,14 @@
           <p class="eu-next">הבא: ${oppMark(opp)} ${esc(opp.name)} <span class="st-tag">${opp.ovr}</span> · ${venue(r, fx[1])}</p>
           <p class="st-note">שתיים הראשונות עולות. אין כאן לילה אירופי: שש פעמים מול הטובות באירופה.</p>`;
       }
+      // who misses the next match, and the eleven that will play it
+      const when = storyEuWhen(run, r);
+      const hurtEu = new Set(storyInjured(run, when).map(e => e.player.name));
+      const lu = storyLineup(run, when);
+      view.lu = lu;
       main = `<div class="eu-card">${body}
+        ${hurtEu.size ? `<p class="st-hurt">🩹 לא ישחקו במשחק הזה: ${[...hurtEu].map(esc).join(', ')}</p>` : ''}
+        ${lineupHTML(run, lu, hurtEu)}
         <div class="eu-tac">${TACTIC_KEYS.map(k => `<button class="st-b${k === tac ? ' go' : ''}" data-tac="${k}">
           ${esc(TACTICS[k].label)}<small>${tacticTrade(k) || 'בלי שינוי'}</small></button>`).join('')}</div>
         <button class="st-b go st-go" id="eu-play">לשחק את המשחק</button></div>`;
@@ -606,6 +677,7 @@
 
     const byId = id => root().querySelector('#' + id);
     if (over) storyRenderEnd(ch, run.result, byId('st-eu-end'));
+    if (view.lu) wireLineup(root(), run, view.lu, () => { storySave(); storyShowEurope({ tactic: view.tactic }); });
     root().querySelectorAll('[data-tac]').forEach(b => b.onclick = () =>
       storyShowEurope({ ...view, tactic: b.dataset.tac }));
     const play = byId('eu-play');
@@ -618,7 +690,7 @@
       run.phase = 'jan';
       storySave();
       const statOf = name => run.eu.stats[name] || null;
-      renderMarket({ run, ch, window: 'jan', statOf, host: root(), persist: storySave,
+      renderMarket({ run, ch, window: 'jan', when: storyEuWhen(run, storyEuRound(ch, run)), statOf, host: root(), persist: storySave,
         doneLabel: 'חזרה למסע', onDone: () => { storyEuWindowClose(); storyShowEurope(); } });
     };
     const skip = byId('eu-skip');
