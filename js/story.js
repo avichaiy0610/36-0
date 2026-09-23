@@ -138,6 +138,11 @@
   function storyAward(ch, run, stars) {
     try {
       if (typeof getCurrentUser !== 'function' || !getCurrentUser() || typeof _supabase === 'undefined') return;
+      // The chapter's board (migration 20260923000003). The verdict box waits on
+      // this promise before it reads the board, so "your place" includes this run.
+      global._storySubmit = _supabase.rpc('submit_story_run', { p: {
+        chapter: ch.id, stars: stars.filter(Boolean).length, score: run.result ? run.result.score : 0,
+      } }).then(() => {}, () => {});
       const best = storyBest();
       const starred = STORY_CHAPTERS.filter(c => best[c.id] && best[c.id].stars && best[c.id].stars[0]).length;
       _supabase.rpc('award_story_achievements', { p: {
