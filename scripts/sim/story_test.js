@@ -312,7 +312,7 @@ if (require.main === module) {
   t('europe chapters: rounds are well formed, stars point at real rounds', () => {
     for (const c of G.STORY_CHAPTERS.filter(c => c.kind === 'europe')) {
       const ids = c.europe.rounds.map(r => r.id);
-      assert.ok(ids.includes(c.europe.window), c.id + ' window');
+      for (const w of [].concat(c.europe.window)) assert.ok(ids.includes(w), c.id + ' window ' + w);
       assert.ok(ids.includes(c.europe.realOut), c.id + ' realOut');
       c.stars.filter(s => s.type === 'euReach').forEach(s => assert.ok(ids.includes(s.round), c.id + ' ' + s.round));
       c.europe.rounds.filter(r => r.kind === 'group').forEach(r => {

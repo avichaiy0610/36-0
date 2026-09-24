@@ -485,17 +485,21 @@ const STORY_CHAPTERS = [
     comp: 'ליגת האלופות והליגה האירופית',
     title: 'הלילות של טרנר',
     level: 'hardest',
-    budget: 2000,   // measured 2026-09-24, 300 runs: ⭐ 18% ⭐⭐ 4% ⭐⭐⭐ 2% (budget barely moves it)
+    budget: 2000,   // measured 2026-09-24, 3000 runs: ⭐ 19.6% ⭐⭐ 3.1% ⭐⭐⭐ 0.8% (budget barely moves it: no upgrades on the market)
     intro: 'ב-2016/17 הפועל באר שבע הדיחה את אולימפיאקוס במוקדמות ליגת האלופות ונעצרה בפלייאוף ' +
-           'מול סלטיק. בליגה האירופית ניצחה פעמיים את אינטר, השיגה שתי תוצאות תיקו מול סאות\'המפטון ' +
-           'ועלתה מהבית. בשלב 32 האחרונות הודחה מול בשיקטאש. הפעם אפשר גם להדיח את סלטיק.',
+           'מול סלטיק. בליגה האירופית ניצחה פעמיים את אינטר ועלתה מהבית, ובשלב 32 האחרונות הודחה ' +
+           'מול בשיקטאש. הפעם, מי שמדיח את סלטיק לוקח את המקום שלה בבית: ברצלונה, מנצ\'סטר סיטי ' +
+           'ובורוסיה מנשנגלדבאך. מקום שלישי שם ממשיך לאביב בליגה האירופית, כמו בחוקים של אז.',
     europe: {
       tier: 'uel',
       awayGoals: true,
-      window: 'group',
+      window: ['clgroup', 'group'],       // before whichever group the play-off leads to
       realOut: 'r32',
       realText: 'עלתה מהבית של הליגה האירופית, הודחה ב-32 האחרונות',
       endLabel: 'שמינית הגמר של הליגה האירופית',
+      // Two roads from the play-off: win → Celtic's real group (Group C, 2016/17),
+      // third there → the Europa League round of 32; lose → the Europa League
+      // group, as really happened.
       rounds: [
         { id: 'q2', label: 'מוקדמות ליגת האלופות, סיבוב שני', kind: 'tie', firstHome: true,
           club: { name: 'שריף טירספול', crest: 'eu-sheriff', flag: '🇲🇩', ovr: 80 }, real: 'בבית 3-2, בחוץ 0-0' },
@@ -503,7 +507,15 @@ const STORY_CHAPTERS = [
           club: { name: 'אולימפיאקוס', crest: 'eu-olympiacos', flag: '🇬🇷', ovr: 89 }, real: 'בחוץ 0-0, בבית 1-0' },
         { id: 'po', label: 'הפלייאוף של ליגת האלופות', kind: 'tie', firstHome: false,
           club: { name: 'סלטיק', crest: 'eu-celtic', flag: '🏴󠁧󠁢󠁳󠁣󠁴󠁿', ovr: 90 }, real: 'בחוץ 2-5, בבית 2-0',
-          dropTo: 'group', winEnds: 'שלב הבתים של ליגת האלופות', tier: 'ucl', dress: true },
+          dropTo: 'group', tier: 'ucl', dress: true },
+        { id: 'clgroup', label: 'שלב הבתים של ליגת האלופות', kind: 'group', advance: 2, tier: 'ucl',
+          winEnds: 'שמינית הגמר של ליגת האלופות', thirdTo: 'r32',
+          clubs: [{ name: 'ברצלונה', crest: 'eu-barca', flag: '🇪🇸', ovr: 97 },
+                  { name: 'מנצ\'סטר סיטי', crest: 'eu-mancity', flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿', ovr: 95 },
+                  { name: 'בורוסיה מנשנגלדבאך', flag: '🇩🇪', ovr: 90 }],
+          // Celtic's order: Barcelona away, City home, Gladbach home and away, Barcelona home, City away
+          fixtures: [[0, false], [1, true], [2, true], [2, false], [0, true], [1, false]],
+          real: 'במציאות סלטיק סיימה את הבית אחרונה, עם שלוש תוצאות תיקו' },
         { id: 'group', label: 'שלב הבתים של הליגה האירופית', kind: 'group', advance: 2,
           clubs: [{ name: 'אינטר', crest: 'eu-inter', flag: '🇮🇹', ovr: 93 },
                   { name: 'סאות\'המפטון', flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿', ovr: 89 },
@@ -516,8 +528,8 @@ const STORY_CHAPTERS = [
     },
     stars: [
       { type: 'euReach', round: 'po', label: 'להדיח את אולימפיאקוס' },
-      { type: 'euReach', round: 'r32', label: 'משחק אירופי באביב: שלב 32 האחרונות, או ליגת האלופות' },
-      { type: 'euChampion', label: 'להדיח את בשיקטאש, או את סלטיק' },
+      { type: 'euPlayed', round: 'clgroup', label: 'להדיח את סלטיק: שלב הבתים של ליגת האלופות' },
+      { type: 'euGroupPoints', round: 'clgroup', min: 3, label: '3 נקודות לפחות בבית של ליגת האלופות, כמו סלטיק במציאות' },
     ],
   },
   {

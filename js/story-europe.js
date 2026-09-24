@@ -53,10 +53,11 @@ function storyEuWhen(run, round) {
 }
 function storyEuRound(ch, run) { return (run.eu && ch.europe.rounds[run.eu.at]) || null; }
 function storyEuOver(ch, run) { return !!run.eu && (run.eu.out || run.eu.at >= ch.europe.rounds.length); }
-// The window opens before the round named in ch.europe.window, once.
+// The window opens before the round named in ch.europe.window, once. `window`
+// may be a list: a campaign that branches has a different next round per branch.
 function storyEuWindowDue(ch, run) {
   const r = storyEuRound(ch, run);
-  return !!r && !run.eu.windowDone && r.id === ch.europe.window && !run.eu.cur;
+  return !!r && !run.eu.windowDone && [].concat(ch.europe.window).includes(r.id) && !run.eu.cur;
 }
 
 function storyEuAddStats(run, players) {
@@ -159,7 +160,7 @@ function storyEuPlay(ch, run, tactic) {
     const closed = storyEuCloseTie(ch, run, round, cur.legs);
     run.eu.done.push(closed);
     run.eu.cur = null;
-    storyEuAdvance(ch, run, round, closed.won);
+    storyEuAdvance(ch, run, round, closed);
     return { leg, round, closed };
   }
 
@@ -186,23 +187,30 @@ function storyEuPlay(ch, run, tactic) {
                    pts: us.pts, gf: us.gf, ga: us.ga, won: pos <= round.advance };
   run.eu.done.push(closed);
   run.eu.cur = null;
-  storyEuAdvance(ch, run, round, closed.won);
+  storyEuAdvance(ch, run, round, closed);
   return { leg, round, closed };
 }
 
 // Where a finished round sends the campaign.
 //   won  → the next round; or, when the round has `winEnds`, the end of the
-//          chapter above what really happened (beating Celtic in 2016 would have
-//          meant the Champions League groups — a story this chapter does not go on
-//          to invent, so it stops there with that as the result).
+//          chapter, above what really happened, with that text as the result.
 //   lost → out; or, when the round has `dropTo`, down into that round — the
 //          Champions League play-off loser's Europa League group, as it really was.
-function storyEuAdvance(ch, run, round, won) {
+//   a group finished one place below `advance` → `thirdTo` when the round has
+//          it: third in a Champions League group went on in the Europa League.
+function storyEuAdvance(ch, run, round, closed) {
   const rounds = ch.europe.rounds;
+  const won = closed.won;
+  const to = id => rounds.findIndex(r => r.id === id);
   if (won && round.winEnds) { run.eu.at = rounds.length; run.eu.endText = round.winEnds; return; }
   if (won) { run.eu.at++; return; }
+  if (round.thirdTo && closed.kind === 'group' && closed.pos === round.advance + 1) {
+    run.eu.at = to(round.thirdTo);
+    run.eu.dropped = round.id;
+    return;
+  }
   if (round.dropTo) {
-    run.eu.at = rounds.findIndex(r => r.id === round.dropTo);
+    run.eu.at = to(round.dropTo);
     run.eu.dropped = round.id;
     return;
   }
@@ -222,7 +230,12 @@ function storyEuResult(ch, run) {
   const rounds = ch.europe.rounds;
   const reached = run.eu.out ? run.eu.at : rounds.length;   // rounds.length = won the lot
   const group = run.eu.done.find(d => d.kind === 'group') || null;
-  return { reached, group, champion: !run.eu.out && run.eu.at >= rounds.length, endText: run.eu.endText || null };
+  // every group by its round id, and every round played — for a campaign that
+  // branches, where "the group" and "how far" depend on which way it went
+  const groups = {};
+  run.eu.done.filter(d => d.kind === 'group').forEach(d => { groups[d.id] = { pos: d.pos, pts: d.pts, gf: d.gf, ga: d.ga }; });
+  return { reached, group, groups, played: run.eu.done.map(d => d.id),
+           champion: !run.eu.out && run.eu.at >= rounds.length, endText: run.eu.endText || null };
 }
 function storyEuReachedRound(ch, res, roundId) {
   const idx = ch.europe.rounds.findIndex(r => r.id === roundId);

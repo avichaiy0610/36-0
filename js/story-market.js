@@ -326,9 +326,17 @@ function storyStars(ch, res) {
     // Europe: how far the campaign went, and what the group gave
     if (s.type === 'euReach') return !!res.eu && storyEuReachedRound(ch, res, s.round);
     if (s.type === 'euChampion') return !!res.eu && res.eu.champion;
-    if (s.type === 'euGroupPos') return !!(res.eu && res.eu.group) && res.eu.group.pos <= s.max;
+    if (s.type === 'euGroupPos') {
+      // `round` names which group, in a campaign with two
+      const g = res.eu && (s.round ? (res.eu.groups || {})[s.round] : res.eu.group);
+      return !!g && g.pos <= s.max;
+    }
+    if (s.type === 'euPlayed') return !!res.eu && (res.eu.played || []).includes(s.round);
     if (s.type === 'euGroupGoals') return !!(res.eu && res.eu.group) && res.eu.group.gf >= s.min;
-    if (s.type === 'euGroupPoints') return !!(res.eu && res.eu.group) && res.eu.group.pts >= s.min;
+    if (s.type === 'euGroupPoints') {
+      const g = res.eu && (s.round ? (res.eu.groups || {})[s.round] : res.eu.group);
+      return !!g && g.pts >= s.min;
+    }
     if (s.type === 'beatPoints') return !!real && res.points > real.pts;
     if (s.type === 'margin') return res.rank === 1 && (res.margin || 0) >= s.min;
     if (s.type === 'noBuyFrom') return !(res.boughtTeams || []).some(t => s.teams.includes(t));
