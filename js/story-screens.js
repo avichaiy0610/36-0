@@ -658,10 +658,13 @@ body.eu-blue #screen-story{background:transparent}
     // The competition's own night (js/europe-screens.js euBackdrop): off for the
     // qualifiers, on from the group stage or the knockout rounds — the same
     // "you have arrived" moment the ordinary Europe mode keeps it for. A
-    // finished campaign keeps the dress of the round it ended in.
-    const shown = over ? rounds[Math.min(run.eu.at, rounds.length - 1)] : storyEuRound(ch, run);
-    const dressed = !!shown && (shown.kind === 'group' || !!shown.ko);
-    const tier = ch.europe.tier || 'ucl';
+    // finished campaign keeps the dress of the round it ended in — the last one
+    // PLAYED, which is not the last in the list when a win ended it early.
+    // A round may carry its own tier and dress (the CL play-off of a UEL chapter).
+    const lastDone = run.eu.done.length ? rounds.find(r => r.id === run.eu.done[run.eu.done.length - 1].id) : null;
+    const shown = over ? (lastDone || rounds[Math.min(run.eu.at, rounds.length - 1)]) : storyEuRound(ch, run);
+    const dressed = !!shown && (shown.kind === 'group' || !!shown.ko || !!shown.dress);
+    const tier = (shown && shown.tier) || ch.europe.tier || 'ucl';
     if (typeof euBackdrop === 'function') euBackdrop(dressed ? tier : null);
     root().setAttribute('data-eu', dressed ? tier : '');
     const doneById = id => run.eu.done.find(d => d.id === id);
@@ -807,7 +810,7 @@ body.eu-blue #screen-story{background:transparent}
         return `<li>${mark} ${esc(starLabel(ch, i))}</li>`;
       }).join('')}</ul>
       <div class="st-vs">${r.eu ? `
-        <div><i>אתם</i><b>${r.eu.champion ? 'זכייה בגביע!' : 'עד ' + esc(storyEuRoundLabel(ch, r.eu.reached))}${r.eu.group
+        <div><i>אתם</i><b>${r.eu.champion ? esc(storyEuRoundLabel(ch, r.eu.reached, r.eu.endText)) + '!' : 'עד ' + esc(storyEuRoundLabel(ch, r.eu.reached))}${r.eu.group
           ? ` · ${r.eu.group.pts} נק׳ בבית, שערים ${score(r.eu.group.gf, r.eu.group.ga)}` : ''}</b></div>
         <div><i>המציאות</i><b>${esc(realTextOf(ch))}</b></div>` : `
         <div><i>אתם</i><b>מקום ${r.rank} · ${num(r.points)} נק׳</b></div>

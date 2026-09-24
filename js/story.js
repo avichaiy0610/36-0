@@ -121,7 +121,7 @@
     const stars = storyStars(ch, res);
     const g = res.eu.group;
     run.result = { budget: run.budget, stars, score: storyScore(ch, res),
-                   eu: { reached: res.eu.reached, champion: res.eu.champion,
+                   eu: { reached: res.eu.reached, champion: res.eu.champion, endText: res.eu.endText,
                          group: g ? { pos: g.pos, pts: g.pts, gf: g.gf, ga: g.ga } : null } };
     run.phase = 'done';
     const best = storyBest();
@@ -208,7 +208,7 @@
     const ch = run && storyChapter(run.chapterId);
     if (!ch) return;
     if (run.phase !== 'done') {
-      const r = storyResult(run, res.table, res.rank, res.points);
+      const r = storyResult(run, res.table, res.rank, res.points, res.losses);
       const stars = storyStars(ch, r);
       run.result = { rank: r.rank, points: r.points, budget: r.budget, margin: r.margin,
                      buys: run.bought.length, stars, score: storyScore(ch, r) };

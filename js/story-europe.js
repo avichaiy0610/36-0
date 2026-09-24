@@ -159,7 +159,7 @@ function storyEuPlay(ch, run, tactic) {
     const closed = storyEuCloseTie(ch, run, round, cur.legs);
     run.eu.done.push(closed);
     run.eu.cur = null;
-    if (closed.won) run.eu.at++; else run.eu.out = true;
+    storyEuAdvance(ch, run, round, closed.won);
     return { leg, round, closed };
   }
 
@@ -186,8 +186,27 @@ function storyEuPlay(ch, run, tactic) {
                    pts: us.pts, gf: us.gf, ga: us.ga, won: pos <= round.advance };
   run.eu.done.push(closed);
   run.eu.cur = null;
-  if (closed.won) run.eu.at++; else run.eu.out = true;
+  storyEuAdvance(ch, run, round, closed.won);
   return { leg, round, closed };
+}
+
+// Where a finished round sends the campaign.
+//   won  → the next round; or, when the round has `winEnds`, the end of the
+//          chapter above what really happened (beating Celtic in 2016 would have
+//          meant the Champions League groups — a story this chapter does not go on
+//          to invent, so it stops there with that as the result).
+//   lost → out; or, when the round has `dropTo`, down into that round — the
+//          Champions League play-off loser's Europa League group, as it really was.
+function storyEuAdvance(ch, run, round, won) {
+  const rounds = ch.europe.rounds;
+  if (won && round.winEnds) { run.eu.at = rounds.length; run.eu.endText = round.winEnds; return; }
+  if (won) { run.eu.at++; return; }
+  if (round.dropTo) {
+    run.eu.at = rounds.findIndex(r => r.id === round.dropTo);
+    run.eu.dropped = round.id;
+    return;
+  }
+  run.eu.out = true;
 }
 
 // The live group table, mid-group.
@@ -203,7 +222,7 @@ function storyEuResult(ch, run) {
   const rounds = ch.europe.rounds;
   const reached = run.eu.out ? run.eu.at : rounds.length;   // rounds.length = won the lot
   const group = run.eu.done.find(d => d.kind === 'group') || null;
-  return { reached, group, champion: !run.eu.out && run.eu.at >= rounds.length };
+  return { reached, group, champion: !run.eu.out && run.eu.at >= rounds.length, endText: run.eu.endText || null };
 }
 function storyEuReachedRound(ch, res, roundId) {
   const idx = ch.europe.rounds.findIndex(r => r.id === roundId);
@@ -214,7 +233,7 @@ function storyEuRealReach(ch) {
   const idx = ch.europe.rounds.findIndex(r => r.id === ch.europe.realOut);
   return idx < 0 ? ch.europe.rounds.length : idx;
 }
-function storyEuRoundLabel(ch, idx) {
-  if (idx >= ch.europe.rounds.length) return 'זכייה בגביע';
+function storyEuRoundLabel(ch, idx, endText) {
+  if (idx >= ch.europe.rounds.length) return endText || ch.europe.endLabel || 'זכייה בגביע';
   return ch.europe.rounds[idx].label;
 }

@@ -322,7 +322,7 @@ function storyStars(ch, res) {
     if (s.type === 'rank') return res.rank <= s.max;
     if (s.type === 'survive') return res.rank <= storySafeRank(ch);
     if (s.type === 'points') return res.points >= s.min;
-    if (s.type === 'points') return res.points >= s.min;
+    if (s.type === 'maxLosses') return res.losses != null && res.losses <= s.max;
     // Europe: how far the campaign went, and what the group gave
     if (s.type === 'euReach') return !!res.eu && storyEuReachedRound(ch, res, s.round);
     if (s.type === 'euChampion') return !!res.eu && res.eu.champion;
@@ -339,7 +339,10 @@ function storyStars(ch, res) {
     }
     return false;
   });
-  return raw.map((ok, i) => raw.slice(0, i + 1).every(Boolean));
+  // Any star may also carry maxLosses: "...and lose no more than N".
+  const capped = raw.map((ok, i) => ok && (ch.stars[i].maxLosses == null ||
+    (res.losses != null && res.losses <= ch.stars[i].maxLosses)));
+  return capped.map((ok, i) => capped.slice(0, i + 1).every(Boolean));
 }
 function storyScore(ch, res) {
   if (res.eu) {
@@ -354,12 +357,13 @@ function storyScore(ch, res) {
 }
 
 // The facts storyStars needs from a finished run and its league table.
-function storyResult(run, table, rank, points) {
+// losses: every match lost, playoffs included (the table rows carry only points).
+function storyResult(run, table, rank, points, losses) {
   const us = table.find(r => r.us);
   const others = table.filter(r => !r.us).map(r => r.pts ?? (r.w * 3 + r.d));
   const usPts = us ? (us.pts ?? (us.w * 3 + us.d)) : points;
   return {
-    rank, points, budget: run.budget,
+    rank, points, budget: run.budget, losses: losses ?? (us && us.l != null ? us.l : null),
     margin: usPts - Math.max(...others),
     sold: run.sold.map(s => s.name),
     boughtTeams: run.bought.map(b => (SQUADS.find(s => s.id === b.squadId) || {}).teamId),

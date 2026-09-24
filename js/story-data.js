@@ -407,4 +407,158 @@ const STORY_CHAPTERS = [
       { type: 'euGroupPos', max: 3, label: 'מקום שלישי: כרטיס לגביע אופ"א' },
     ],
   },
+  // ── round two (2026-09-24): more clubs, no more Haifa ─────────────────────
+  // Intros say only what our tables or the verified sources say. Budgets, levels
+  // and stars measured with story_calibrate (numbers on each budget line).
+  {
+    id: 'hta-2009',
+    teamId: 'hapoel-tlv',
+    season: '2009/10',
+    title: '49-49',
+    level: 'hard',
+    budget: 1000,   // measured 2026-09-24, 600 runs: ⭐ 25% ⭐⭐ 14% ⭐⭐⭐ 5%
+    intro: 'הפועל תל אביב סיימה את 2009/10 עם 49 נקודות, בדיוק כמו מכבי חיפה, ולקחה את האליפות. ' +
+           'עונת קיזוז: הנקודות חולקו לשניים לפני הפלייאוף. על הנייר חיפה הייתה חזקה בחצי נקודה, ' +
+           'והפועל הפסידה משחק אחד בכל העונה.',
+    stars: [
+      { type: 'rank', max: 1, maxLosses: 1, label: 'אליפות, עם הפסד אחד לכל היותר, כמו במציאות' },
+      { type: 'margin', min: 5, label: 'בלי 49-49: אליפות בפער של 5 נקודות לפחות' },
+      { type: 'maxLosses', max: 0, label: 'עונה בלי הפסד' },
+    ],
+  },
+  {
+    id: 'beitar-2007',
+    teamId: 'beitar-jerusalem',
+    season: '2007/08',
+    title: 'הבירה על הפסגה',
+    level: 'easy',
+    budget: 2000,   // measured 2026-09-24, 800 runs: ⭐ 83% ⭐⭐ 32% ⭐⭐⭐ 10%
+    intro: 'בית"ר ירושלים זכתה באליפות 2007/08 עם 67 נקודות, 9 לפני מכבי נתניה. ' +
+           'על הנייר זה הסגל החזק בליגה של 12 קבוצות. השאלה היא לא אם, אלא בכמה.',
+    stars: [
+      { type: 'rank', max: 1, label: 'אליפות' },
+      { type: 'margin', min: 10, label: 'אליפות בפער של 10 נקודות לפחות' },
+      { type: 'points', min: 88, label: '88 נקודות: 21 יותר מבמציאות' },
+    ],
+  },
+  {
+    id: 'aco-2017',
+    teamId: 'hapoel-aco',
+    season: '2017/18',
+    title: 'הסגל הכי חלש',
+    level: 'hardest',
+    budget: 250,    // measured 2026-09-24, 300 runs: ⭐ 19% ⭐⭐ 8% ⭐⭐⭐ 2%
+    intro: 'הפועל עכו 2017/18: הסגל עם הרייטינג הנמוך ביותר בכל הדאטה שלנו, והמקום האחרון ' +
+           'עם 20 נקודות. כדי להישאר בליגה צריך לעבור שתי קבוצות שחזקות ממך על הנייר.',
+    stars: [
+      { type: 'survive', label: 'להישאר בליגה' },
+      { type: 'rank', max: 11, label: 'לסיים במקום 11 או גבוה ממנו' },
+      { type: 'rank', max: 10, label: 'לסיים במקום 10 או גבוה ממנו' },
+    ],
+  },
+  {
+    id: 'reineh-2025',
+    teamId: 'maccabi-bnei-raina',
+    season: '2025/26',
+    title: 'העונה האחרונה',
+    level: 'hard',
+    budget: 250,    // measured 2026-09-24, 800 runs: ⭐ 25% ⭐⭐ 6.5% ⭐⭐⭐ 2.6%
+    // 2026/27's table is not in our data yet, so the relegation count cannot be
+    // read and storySafeRank falls back to two — the league's usual number.
+    intro: 'מכבי בני ריינה סיימה את 2025/26, העונה האחרונה בדאטה שלנו, במקום האחרון עם 22 נקודות. ' +
+           'הסיפור הכי טרי במצב הסיפור: מה היה קורה עם קיץ אחר.',
+    stars: [
+      { type: 'survive', label: 'להישאר בליגה' },
+      { type: 'rank', max: 10, label: 'לסיים במקום 10 או גבוה ממנו' },
+      { type: 'rank', max: 9, label: 'לסיים במקום 9 או גבוה ממנו' },
+    ],
+  },
+  // Europe, verified 2026-09-24: B7 — en.wikipedia "2016–17 Hapoel Be'er Sheva
+  // F.C. season" (qualifiers), he.wikipedia (group, round of 32), Sky Sports and
+  // Bleacher Report reports of the group. MTA — en.wikipedia "Maccabi Tel Aviv
+  // F.C. in European football" and he.wikipedia (the cancelled PAOK play-off).
+  {
+    id: 'b7-2016',
+    kind: 'europe',
+    teamId: 'hapoel-beersheba',
+    season: '2016/17',
+    comp: 'ליגת האלופות והליגה האירופית',
+    title: 'הלילות של טרנר',
+    level: 'hardest',
+    budget: 2000,   // measured 2026-09-24, 300 runs: ⭐ 18% ⭐⭐ 4% ⭐⭐⭐ 2% (budget barely moves it)
+    intro: 'ב-2016/17 הפועל באר שבע הדיחה את אולימפיאקוס במוקדמות ליגת האלופות ונעצרה בפלייאוף ' +
+           'מול סלטיק. בליגה האירופית ניצחה פעמיים את אינטר, השיגה שתי תוצאות תיקו מול סאות\'המפטון ' +
+           'ועלתה מהבית. בשלב 32 האחרונות הודחה מול בשיקטאש. הפעם אפשר גם להדיח את סלטיק.',
+    europe: {
+      tier: 'uel',
+      awayGoals: true,
+      window: 'group',
+      realOut: 'r32',
+      realText: 'עלתה מהבית של הליגה האירופית, הודחה ב-32 האחרונות',
+      endLabel: 'שמינית הגמר של הליגה האירופית',
+      rounds: [
+        { id: 'q2', label: 'מוקדמות ליגת האלופות, סיבוב שני', kind: 'tie', firstHome: true,
+          club: { name: 'שריף טירספול', crest: 'eu-sheriff', flag: '🇲🇩', ovr: 80 }, real: 'בבית 3-2, בחוץ 0-0' },
+        { id: 'q3', label: 'מוקדמות ליגת האלופות, סיבוב שלישי', kind: 'tie', firstHome: false,
+          club: { name: 'אולימפיאקוס', crest: 'eu-olympiacos', flag: '🇬🇷', ovr: 89 }, real: 'בחוץ 0-0, בבית 1-0' },
+        { id: 'po', label: 'הפלייאוף של ליגת האלופות', kind: 'tie', firstHome: false,
+          club: { name: 'סלטיק', crest: 'eu-celtic', flag: '🏴󠁧󠁢󠁳󠁣󠁴󠁿', ovr: 90 }, real: 'בחוץ 2-5, בבית 2-0',
+          dropTo: 'group', winEnds: 'שלב הבתים של ליגת האלופות', tier: 'ucl', dress: true },
+        { id: 'group', label: 'שלב הבתים של הליגה האירופית', kind: 'group', advance: 2,
+          clubs: [{ name: 'אינטר', crest: 'eu-inter', flag: '🇮🇹', ovr: 93 },
+                  { name: 'סאות\'המפטון', flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿', ovr: 89 },
+                  { name: 'ספרטה פראג', crest: 'eu-sparta', flag: '🇨🇿', ovr: 85 }],
+          fixtures: [[0, false], [1, true], [2, true], [2, false], [0, true], [1, false]],
+          real: 'אינטר: 0-2 בחוץ, 3-2 בבית · סאות\'המפטון: 0-0 בבית, 1-1 בחוץ · ספרטה: 0-1 בבית, 0-2 בחוץ' },
+        { id: 'r32', label: 'שלב 32 האחרונות', kind: 'tie', ko: true, firstHome: true,
+          club: { name: 'בשיקטאש', crest: 'eu-besiktas', flag: '🇹🇷', ovr: 90 }, real: 'בבית 1-3, בחוץ 1-2' },
+      ],
+    },
+    stars: [
+      { type: 'euReach', round: 'po', label: 'להדיח את אולימפיאקוס' },
+      { type: 'euReach', round: 'r32', label: 'משחק אירופי באביב: שלב 32 האחרונות, או ליגת האלופות' },
+      { type: 'euChampion', label: 'להדיח את בשיקטאש, או את סלטיק' },
+    ],
+  },
+  {
+    id: 'mta-2013',
+    kind: 'europe',
+    teamId: 'maccabi-tlv',
+    season: '2013/14',
+    comp: 'ליגת האלופות והליגה האירופית',
+    title: 'הנקמה בבאזל',
+    level: 'normal',
+    budget: 2000,   // measured 2026-09-24, 600 runs: ⭐ 43% ⭐⭐ 30% ⭐⭐⭐ 4.5% (⭐⭐ runs high: beating Basel in Q3 counts at once)
+    intro: 'ב-2013/14 מכבי תל אביב עברה את ג\'יור במוקדמות ליגת האלופות והודחה מול באזל. ' +
+           'לשלב הבתים של הליגה האירופית עלתה בלי לשחק, כי הפלייאוף מול פאוק בוטל. בבית ניצחה ' +
+           'פעמיים את בורדו ופעם את פרנקפורט, ועלתה לראשונה לשלב 32 האחרונות. שם חיכתה שוב באזל.',
+    europe: {
+      tier: 'uel',
+      awayGoals: true,
+      window: 'r32',                     // the winter break, before the round of 32
+      realOut: 'r32',
+      realText: 'עלתה מהבית במקום השני, הודחה ב-32 האחרונות מול באזל',
+      endLabel: 'שמינית הגמר של הליגה האירופית',
+      rounds: [
+        { id: 'q2', label: 'מוקדמות ליגת האלופות, סיבוב שני', kind: 'tie', firstHome: true,
+          club: { name: 'ג\'יור', flag: '🇭🇺', ovr: 78 }, real: 'בבית 2-1, בחוץ 2-0' },
+        { id: 'q3', label: 'מוקדמות ליגת האלופות, סיבוב שלישי', kind: 'tie', firstHome: true,
+          club: { name: 'באזל', crest: 'eu-basel', flag: '🇨🇭', ovr: 90 }, real: 'בבית 3-3, בחוץ 0-1',
+          dropTo: 'group', winEnds: 'הפלייאוף של ליגת האלופות' },
+        { id: 'group', label: 'שלב הבתים של הליגה האירופית', kind: 'group', advance: 2,
+          clubs: [{ name: 'בורדו', flag: '🇫🇷', ovr: 88 },
+                  { name: 'אפואל', flag: '🇨🇾', ovr: 83 },
+                  { name: 'איינטרכט פרנקפורט', flag: '🇩🇪', ovr: 88 }],
+          fixtures: [[2, false], [0, true], [1, false], [1, true], [0, false], [2, true]],
+          real: 'בורדו: 1-0 בבית, 2-1 בחוץ · אפואל: 0-0 ו-0-0 · פרנקפורט: 4-2 בבית, 0-2 בחוץ' },
+        { id: 'r32', label: 'שלב 32 האחרונות', kind: 'tie', ko: true, firstHome: true,
+          club: { name: 'באזל', crest: 'eu-basel', flag: '🇨🇭', ovr: 90 }, real: 'בבית 0-0, בחוץ 0-3' },
+      ],
+    },
+    stars: [
+      { type: 'euReach', round: 'r32', label: 'לעלות מהבית, כמו במציאות' },
+      { type: 'euChampion', label: 'לנקום בבאזל: להדיח אותה, במוקדמות או ב-32 האחרונות' },
+      { type: 'euGroupPos', max: 1, label: 'לנקום בבאזל אחרי שזוכים בבית' },
+    ],
+  },
 ];

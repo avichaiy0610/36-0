@@ -286,12 +286,31 @@ function clubAdoptRemote(remote) {
   } catch (e) { return false; }
 }
 
+/* ── מצב סיפור ──────────────────────────────────────────────────────────────
+   While a chapter is on, "your club" is the chapter's real club: its name, its
+   badge, its colours — on every board, card and newspaper. It is a READ-ONLY
+   stand-in: clubGet() still returns the player's own club, so the editor and
+   everything that saves never sees it. Display code asks clubShown(). */
+function clubStory() {
+  try {
+    if (typeof state === 'undefined' || !state || !state.story || typeof storyChapter !== 'function') return null;
+    const ch = storyChapter(state.story.chapterId);
+    const t = ch && typeof TEAMS !== 'undefined' ? TEAMS[ch.teamId] : null;
+    if (!t) return null;
+    const c1 = t.primaryColor || '#1e6f3c', c2 = t.secondaryColor || '#f5f5f5';
+    return { ...CLUB_DEFAULT, name: t.name, city: '', story: true,
+             crest: { ...CLUB_DEFAULT.crest, source: 'club', clubId: ch.teamId, c1, c2 },
+             kit: { pattern: 'solid', c1, c2 }, kitGK: { ...CLUB_DEFAULT.kitGK } };
+  } catch (e) { return null; }
+}
+function clubShown() { return clubStory() || clubGet(); }
+
 function clubHas() { const c = clubGet(); return !!(c && String(c.name || '').trim()); }
 
 // The club's name, or whatever the caller wanted to say instead. NOT escaped —
 // see myTeamName() in texts.js, which escapes its own return for the same reason.
 function clubNameRaw() {
-  const c = clubGet();
+  const c = clubShown();
   const n = c ? String(c.name || '').trim() : '';
   return n || '';
 }
@@ -329,7 +348,7 @@ function clubRandom() {
    Returned as a STRING so every caller can drop it into a template literal, the
    way trophy-art.js does. */
 function clubCrestSVG(club, px) {
-  const c = club || clubGet() || CLUB_DEFAULT;
+  const c = club || clubShown() || CLUB_DEFAULT;
   const cr = c.crest || CLUB_DEFAULT.crest;
 
   // A badge from /crests/ is a PNG, not a drawing, so it comes back as an <img>.
@@ -393,7 +412,7 @@ function clubCrestSVG(club, px) {
    trick as the crest. Used by the team photo and by the back page. */
 // `gk` picks the keeper's strip instead of the outfield one.
 function clubShirtSVG(club, px, number, gk, name) {
-  const c = club || clubGet() || CLUB_DEFAULT;
+  const c = club || clubShown() || CLUB_DEFAULT;
   const k = (gk ? (c.kitGK || CLUB_DEFAULT.kitGK) : (c.kit || CLUB_DEFAULT.kit));
   const c1 = k.c1 || '#1e6f3c', c2 = k.c2 || '#f5f5f5';
   const uid = 'clk' + (++_clUid);
