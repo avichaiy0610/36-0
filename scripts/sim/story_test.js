@@ -312,7 +312,7 @@ if (require.main === module) {
   t('europe chapters: rounds are well formed, stars point at real rounds', () => {
     for (const c of G.STORY_CHAPTERS.filter(c => c.kind === 'europe')) {
       const ids = c.europe.rounds.map(r => r.id);
-      assert.ok(ids.includes(c.europe.window), c.id + ' window');
+      for (const w of [].concat(c.europe.window)) assert.ok(ids.includes(w), c.id + ' window ' + w);
       assert.ok(ids.includes(c.europe.realOut), c.id + ' realOut');
       c.stars.filter(s => s.type === 'euReach').forEach(s => assert.ok(ids.includes(s.round), c.id + ' ' + s.round));
       c.europe.rounds.filter(r => r.kind === 'group').forEach(r => {
@@ -404,8 +404,13 @@ if (require.main === module) {
     assert.deepStrictEqual(G.storyPickXI(owned, slots, {}).map(e => e.player.name), auto.map(e => e.player.name));
   });
   t('the achievements and board migrations know every chapter', () => {
-    for (const mig of ['20260923000002_story_achievements.sql', '20260923000003_story_board.sql']) {
-    const sql = fs.readFileSync(path.join(ROOT, 'supabase/migrations/' + mig), 'utf8');
+    // the NEWEST definition of each function is the one the server runs
+    const dir = path.join(ROOT, 'supabase/migrations');
+    const files = fs.readdirSync(dir).filter(f => f.endsWith('.sql')).sort();
+    for (const fn of ['award_story_achievements', 'submit_story_run']) {
+    const mig = files.filter(f => fs.readFileSync(path.join(dir, f), 'utf8').includes('FUNCTION ' + fn)).pop();
+    const src = fs.readFileSync(path.join(dir, mig), 'utf8');
+    const sql = src.slice(src.indexOf('FUNCTION ' + fn));
     const known = (sql.match(/v_known\s+text\[\]\s+:=\s+ARRAY\[([^\]]*)\]/) || [])[1] || '';
     const ids = known.split(',').map(s => s.trim().replace(/^'|'$/g, '')).filter(Boolean).sort();
     assert.deepStrictEqual(ids, G.STORY_CHAPTERS.map(c => c.id).sort(),
@@ -502,6 +507,18 @@ if (require.main === module) {
     assert.deepStrictEqual(G.storyStars(ks, G.storyResult(run, table, 1, 80)), [true, true, false]);
     const tight = [{ us: true, pts: 80 }, { us: false, pts: 77 }];
     assert.deepStrictEqual(G.storyStars(ks, G.storyResult(run, tight, 1, 80)), [true, false, false]);
+  });
+  t('losses: counted from the matches, and a star can carry maxLosses', () => {
+    const ch = G.storyChapter('hta-2009');
+    const run = G.storyNewRun(ch, 1);
+    const table = [{ us: true, pts: 60 }, { us: false, pts: 52 }];   // table rows carry points only
+    assert.strictEqual(G.storyResult(run, table, 1, 60, 1).losses, 1);
+    assert.deepStrictEqual(G.storyStars(ch, G.storyResult(run, table, 1, 60, 0)), [true, true, true]);
+    assert.deepStrictEqual(G.storyStars(ch, G.storyResult(run, table, 1, 60, 1)), [true, true, false]);
+    // two losses break the FIRST star's cap, so nothing is left
+    assert.deepStrictEqual(G.storyStars(ch, G.storyResult(run, table, 1, 60, 2)), [false, false, false]);
+    // no count at all never passes a loss condition
+    assert.deepStrictEqual(G.storyStars(ch, G.storyResult(run, table, 1, 60)), [false, false, false]);
   });
   t('js/story-facts.js covers every chapter (else: node scripts/build_story_facts.js)', () => {
     for (const c of G.STORY_CHAPTERS.filter(c => c.kind !== 'europe')) {

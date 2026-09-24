@@ -1480,7 +1480,19 @@ function restoreDraftState() {
 // Markup shared by every filled token (draft pitch, pre-season, results) so the
 // three surfaces can't drift apart. showOvr is false wherever hiding ratings is
 // the point of the run.
+// מצב סיפור: a man you bought plays for the chapter's club now, so his token
+// wears its colours and reads its season. pick.squad keeps where he came from.
+function tokenSquad(squad) {
+  if (state.story && typeof storyChapter === 'function') {
+    const ch = storyChapter(state.story.chapterId);
+    if (ch && squad && squad.teamId !== ch.teamId) return { ...squad, teamId: ch.teamId, season: ch.season };
+  }
+  return squad;
+}
+function tokenTeam(squad) { return getTeam(tokenSquad(squad).teamId); }
+
 function filledTokenHTML(player, squad, showOvr, slotPos) {
+  squad = tokenSquad(squad);
   const team    = getTeam(squad.teamId);
   const peakTag = state.peakMode && player.peak_ovr && player.peak_ovr > player.ovr ? '⚡' : '';
   const ovrHTML = showOvr ? `<span class="slot-ovr">${peakTag}${playerOVR(player)}</span>` : '';
@@ -1544,7 +1556,7 @@ function getToken(idx) {
 function fillToken(idx, player, squad) {
   const token = getToken(idx);
   if (!token) return;
-  const team = getTeam(squad.teamId);
+  const team = tokenTeam(squad);
   token.className = 'slot-token filled';
   token.style.setProperty('--tc', team.primaryColor);
   token.style.setProperty('--ts', team.secondaryColor);
@@ -1724,7 +1736,7 @@ function refreshAllTokens() {
     if (!token) return;
     if (state.picks[idx]) {
       const { player, squad } = state.picks[idx];
-      const team = getTeam(squad.teamId);
+      const team = tokenTeam(squad);
       token.className = 'slot-token filled';
       token.style.setProperty('--tc', team.primaryColor);
       token.style.setProperty('--ts', team.secondaryColor);
@@ -3229,7 +3241,7 @@ function buildPitchInContainer(containerId) {
     token.style.left = slot.x + '%';
     token.style.top  = slot.y + '%';
     if (pick) {
-      const team = getTeam(pick.squad.teamId);
+      const team = tokenTeam(pick.squad);
       token.style.setProperty('--tc', team.primaryColor);
       token.style.setProperty('--ts', team.secondaryColor);
       token.style.setProperty('--tx', textColorFor(team.primaryColor));
@@ -3389,7 +3401,7 @@ function animateResults(ovr) {
     // squad was never yours to draft.
     if (state.story) {
       if (typeof storyOnSeasonEnd === 'function') {
-        storyOnSeasonEnd({ rank: myRank, n: leagueTable.length, points: wins * 3 + draws,
+        storyOnSeasonEnd({ rank: myRank, n: leagueTable.length, points: wins * 3 + draws, losses,
                            gf: gfTotal, ga: gaTotal, table: leagueTable });
       }
       return;
@@ -4131,7 +4143,7 @@ function populateShareCard() {
     // built a crest gets the NAME only — a default green shield it never chose
     // would be a crest the player is being told is his.
     const name = (typeof myTeamName === 'function') ? myTeamName('') : '';
-    const club = (typeof clubGet === 'function') ? clubGet() : null;
+    const club = (typeof clubShown === 'function') ? clubShown() : null;
     if (name) {
       const crest = (club && typeof clubCrestSVG === 'function') ? clubCrestSVG(club, 30) : '';
       scClub.innerHTML = `${crest}<span class="sc-club-name">${name}</span>`;
@@ -4177,10 +4189,10 @@ function populateShareCard() {
     const lastName = playerShortName(pick.player.name);
     const row = document.createElement('div');
     row.className = 'sc-player-row';
-    const team = getTeam(pick.squad.teamId);
+    const shown = tokenSquad(pick.squad), team = getTeam(shown.teamId);
     row.innerHTML = `
       <span class="sc-p-pos" style="color:${c};background:${c}18;border-color:${c}50">${slot.pos}</span>
-      <span class="sc-p-name">${lastName}<span class="sc-p-meta">${team.name} · ${pick.squad.season}</span></span>
+      <span class="sc-p-name">${lastName}<span class="sc-p-meta">${team.name} · ${shown.season}</span></span>
       ${state.showRatings ? `<span class="sc-p-ovr" style="color:${c}">${ovr}</span>` : ''}
     `;
     lineup.appendChild(row);

@@ -20,7 +20,7 @@ function cmEsc(s) {
 function cmSeason() { return window._lastSeason || null; }
 
 function cmClub() {
-  return clubGet() || { ...CLUB_DEFAULT, name: 'הקבוצה שלי' };
+  return clubShown() || { ...CLUB_DEFAULT, name: 'הקבוצה שלי' };
 }
 
 // A career names its own club and that name outranks the global one — the same
@@ -33,7 +33,7 @@ function cmClubName() {
       if (n) return n;
     }
   } catch (e) { /* no career module */ }
-  const c = clubGet();
+  const c = clubShown();
   return (c && String(c.name || '').trim()) || 'הקבוצה שלי';
 }
 

@@ -38,6 +38,7 @@ function daSave(list) {
 function daMode() {
   if (typeof state === 'undefined' || !state) return null;
   if (state.career)    return null;             // the career keeps its own archive
+  if (state.story)     return null;             // so does a story chapter: not your club's season
   if (state.gauntlet)  return 'gauntlet';
   if (state.leagueCode) return 'league';
   if (state.duelCode)  return 'duel';

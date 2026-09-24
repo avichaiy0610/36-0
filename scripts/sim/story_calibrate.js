@@ -155,12 +155,13 @@ function playOnce(budget, seed, honor) {
 
   const pts = season.matches.reduce((s, m) => s + (m.outcome === 'W' ? 3 : m.outcome === 'D' ? 1 : 0), 0);
   const rank = season.leagueTable.findIndex(r => r.us) + 1;
-  const stars = G.storyStars(ch, G.storyResult(run, season.leagueTable, rank, pts));
+  const sr = G.storyResult(run, season.leagueTable, rank, pts, season.matches.filter(m => m.outcome === 'L').length);
+  const stars = G.storyStars(ch, sr);
   if (!DETAIL) return stars;
   const gf = season.matches.reduce((a, m) => a + m.gf, 0), ga = season.matches.reduce((a, m) => a + m.ga, 0);
   const l = season.matches.filter(m => m.outcome === 'L').length;
   const second = season.leagueTable.filter(r => !r.us)[0];
-  return { stars, rank, pts, gd: gf - ga, ga, l, margin: pts - (second.pts ?? (second.w * 3 + second.d)),
+  return { stars, rank, pts, gd: gf - ga, ga, l, margin: sr.margin, tablePts: season.leagueTable.find(r => r.us).pts,
            spent: run.bought.reduce((a, b) => a + b.price, 0), nBought: run.bought.length,
            maxBought: Math.max(0, ...run.bought.map(b => G.storyResolveOvr(b))) };
 }
@@ -189,7 +190,7 @@ if (DETAIL) {
   const real = G.storyReal(ch);
   console.log(`${ch.id} budget ${b}: ⭐ in ${won.length}/${N}. real: ${real.pts} pts`);
   const q = (k, p) => { const a = won.map(r => r[k]).sort((x, y) => x - y); return a[Math.min(a.length - 1, Math.floor(a.length * p))]; };
-  for (const k of ['rank', 'pts', 'margin', 'gd', 'ga', 'l', 'spent', 'nBought', 'maxBought']) {
+  for (const k of ['rank', 'pts', 'tablePts', 'margin', 'gd', 'ga', 'l', 'spent', 'nBought', 'maxBought']) {
     console.log(k.padEnd(10), [0.1, 0.25, 0.5, 0.75, 0.9].map(p => String(q(k, p)).padStart(6)).join(''));
   }
   process.exit(0);
