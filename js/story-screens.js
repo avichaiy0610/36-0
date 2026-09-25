@@ -571,8 +571,11 @@ body.eu-blue #screen-story{background:transparent}
         <select data-slot="${esc(s.id)}">${fits.map(e => opt(e, false)).join('')}${others.map(e => opt(e, true)).join('')}</select></label>`;
     }).join('');
     const b = lineup.bench;
-    const auto = !run.xi || !Object.keys(run.xi).length;
-    return `<details class="lu"${auto ? '' : ' open'}><summary>ההרכב ${auto ? '(אוטומטי)' : '(שלך)'} · לחצו לבחירה</summary>
+    const pinned = run.xi ? Object.keys(run.xi).length : 0;
+    const auto = !pinned;
+    const whose = auto ? '(אוטומטי)' : pinned >= lineup.slots.length ? '(שלך)'
+      : `(${pinned === 1 ? 'עמדה אחת שבחרת' : pinned + ' עמדות שבחרת'}, השאר אוטומטי)`;
+    return `<details class="lu"${auto ? '' : ' open'}><summary>ההרכב ${whose} · לחצו לבחירה</summary>
       <div class="lu-grid">${rows}</div>
       <p class="st-note">המחליפים הטובים ביותר בספסל (משחקים כ-10% מהדקות): התקפה ${Math.round(b.atk)} ·
         קישור ${Math.round(b.mid)} · הגנה ${Math.round(b.def)}. ספסל חלש מוריד את הקבוצה בכל משחק.</p>
@@ -581,8 +584,10 @@ body.eu-blue #screen-story{background:transparent}
   function wireLineup(host, run, lineup, onChange) {
     const keyOf = e => e.squad.id + '|' + e.player.name;
     host.querySelectorAll('select[data-slot]').forEach(sel => sel.onchange = () => {
-      const xi = {};
-      lineup.slots.forEach((s, i) => { if (lineup.picks[i]) xi[s.id] = keyOf(lineup.picks[i]); });
+      // Only the slots you actually chose are pinned. Copying the whole eleven here
+      // froze it: a man bought afterwards could never get in, even when the rest
+      // of the lineup was still the automatic one.
+      const xi = { ...(run.xi || {}) };
       // the man picked here leaves wherever else he stood
       for (const k of Object.keys(xi)) if (xi[k] === sel.value) delete xi[k];
       xi[sel.dataset.slot] = sel.value;

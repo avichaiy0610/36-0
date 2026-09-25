@@ -454,9 +454,13 @@
 }
 .league-details[data-era] .lt-pts { color: var(--era-accent); font-family: Arial, Heebo, sans-serif; }
 .league-details[data-era] .lt-bracket-sep { border-top: 2px solid var(--era-accent); }
+/* A long name WRAPS rather than ending in "…": on a phone the six stat columns
+   leave room for about 13 letters, and "הפועל פתח תק…" or your own name cut
+   short beside its #3 badge is not a table anybody can read. */
 .league-details[data-era] .lt-name {
-  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  min-width: 0; white-space: normal; line-height: 1.25;
 }
+.league-details[data-era] .lt-name .lt-us-badge { display: inline-block; white-space: nowrap; }
 
 /* The five numeric columns. Fixed widths, not flex — a table whose columns do
    not line up between rows is not a table, and the name takes the slack. */
