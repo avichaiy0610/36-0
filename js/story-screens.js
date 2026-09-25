@@ -828,8 +828,10 @@ body.eu-blue #screen-story{background:transparent}
         <button class="st-b go" id="st-again" style="flex:1">לשחק שוב</button>
         <button class="st-b" id="st-chapters" style="flex:1">לפרקים</button>
       </div></div>`;
-    document.getElementById('st-again').onclick = () => storyStart(ch.id);
-    document.getElementById('st-chapters').onclick = storyExit;
+    // Scoped to THIS box: a league verdict can still sit hidden in the results
+    // screen, and getElementById wired its buttons instead of the ones on show.
+    box.querySelector('#st-again').onclick = () => storyStart(ch.id);
+    box.querySelector('#st-chapters').onclick = storyExit;
     storyFillBoard(box.querySelector('#st-end-board'), ch, 5, true);
   }
 
