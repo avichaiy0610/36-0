@@ -164,6 +164,21 @@ const QUERY = {
   'eu-zira': ['Azerbaijan', 'Zira', 'Zira FK'],
   'eu-neman': ['Belarus', 'Neman Grodno'],
   'eu-wisla': ['Poland', 'Wisla Krakow'],
+  /* -- מצב סיפור opponents (2026-09-25): every story round with no badge -- */
+  'eu-ararat-yerevan': ['Armenia', 'Ararat Yerevan', 'FC Ararat Yerevan'],
+  'eu-gaziantep': ['Turkey', 'Gaziantepspor'],
+  'eu-lokomotiv': ['Russia', 'Lokomotiv Moscow', 'Lokomotiv Moskva'],
+  'eu-parma': ['Italy', 'Parma', 'Parma Calcio 1913'],
+  'eu-belshina': ['Belarus', 'Belshina Bobruisk', 'Belshina'],
+  'eu-manutd': ['England', 'Manchester United'],
+  'eu-glentoran': ['Northern Ireland', 'Glentoran'],
+  'eu-aktobe': ['Kazakhstan', 'Aktobe', 'FC Aktobe'],
+  'eu-bordeaux': ['France', 'Bordeaux', 'Girondins Bordeaux'],
+  'eu-gladbach': ['Germany', 'Borussia Monchengladbach', 'Monchengladbach', 'Borussia Mönchengladbach'],
+  'eu-southampton': ['England', 'Southampton'],
+  'eu-gyor': ['Hungary', 'Gyori ETO', 'Gyor', 'Győri ETO'],
+  'eu-apoel': ['Cyprus', 'APOEL Nicosia', 'APOEL'],
+  'eu-frankfurt': ['Germany', 'Eintracht Frankfurt'],
 
 };
 
