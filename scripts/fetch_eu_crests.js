@@ -177,6 +177,8 @@ const QUERY = {
   'eu-gladbach': ['Germany', 'Borussia Monchengladbach', 'Monchengladbach', 'Borussia Mönchengladbach'],
   'eu-southampton': ['England', 'Southampton'],
   'eu-gyor': ['Hungary', 'Gyori ETO', 'Gyor', 'Győri ETO'],
+  'eu-schalke': ['Germany', 'Schalke 04', 'FC Schalke 04'],
+  'eu-zeljeznicar': ['Bosnia and Herzegovina', 'Zeljeznicar', 'Zeljeznicar Sarajevo'],
   'eu-apoel': ['Cyprus', 'APOEL Nicosia', 'APOEL'],
   'eu-frankfurt': ['Germany', 'Eintracht Frankfurt'],
 
