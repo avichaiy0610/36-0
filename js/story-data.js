@@ -573,4 +573,119 @@ const STORY_CHAPTERS = [
       { type: 'euGroupPos', max: 1, label: 'לנקום בבאזל אחרי שזוכים בבית' },
     ],
   },
+  // ── round three (2026-09-28): four clubs that had no chapter ──────────────
+  // Found by ranking every squad in our data on paper (best-XI average) against
+  // its real finish: these four finished furthest above their squads.
+  {
+    id: 'sakhnin-2007',
+    teamId: 'bnei-sakhnin',
+    season: '2007/08',
+    title: 'האחרונה על הנייר',
+    level: 'hard',
+    // The real 4th is out of reach: 0 in 300 runs even at 2,000 (top half 1% there).
+    budget: 750,    // measured 2026-09-28, 800 runs: ⭐ 43% ⭐⭐ 8.8% ⭐⭐⭐ 1.3%
+    intro: 'בני סכנין 2007/08: הסגל החלש בליגה של 12 קבוצות, על הנייר. היא סיימה רביעית, ' +
+           'עם 55 נקודות, מעל מכבי חיפה, מכבי תל אביב והפועל תל אביב. ' +
+           'הפעם החצי העליון של הטבלה הוא כבר נס.',
+    stars: [
+      { type: 'survive', label: 'להישאר בליגה' },
+      { type: 'rank', max: 8, label: 'לסיים במקום 8 או גבוה ממנו' },
+      { type: 'rank', max: 6, label: 'לסיים בחצי העליון של הטבלה' },
+    ],
+  },
+  {
+    id: 'rhs-2012',
+    teamId: 'hapoel-rhs',
+    season: '2012/13',
+    title: 'רמת השרון בפלייאוף העליון',
+    level: 'hard',
+    // Steep: 750 → ⭐ 33%, 850 → 56%, one affordable signing apart.
+    budget: 800,    // measured 2026-09-28, 800 runs: ⭐ 40% ⭐⭐ 9.5% ⭐⭐⭐ 1.3%
+    intro: 'עירוני רמת השרון 2012/13: הסגל ה-13 בכוחו בליגה של 14 קבוצות, על הנייר. ' +
+           'היא נכנסה לפלייאוף העליון וסיימה שישית, מעל בית"ר ירושלים, אשדוד והפועל באר שבע. ' +
+           'להישאר בליגה זה לא מספיק.',
+    stars: [
+      { type: 'rank', max: 10, label: 'לסיים במקום 10 או גבוה ממנו' },
+      { type: 'rank', max: 8, label: 'לסיים במקום 8 או גבוה ממנו' },
+      { type: 'rank', max: 6, label: 'הפלייאוף העליון, כמו במציאות' },
+    ],
+  },
+  {
+    id: 'by-2011',
+    teamId: 'bnei-yehuda',
+    season: '2011/12',
+    title: 'שלוש קבוצות על 59',
+    level: 'hard',
+    // 59 points came 66-75% of the time and bound nobody, so ⭐ is a finish.
+    budget: 1500,   // measured 2026-09-28, 800 runs: ⭐ 27% ⭐⭐ 10.5% ⭐⭐⭐ 4.6%
+    intro: 'בני יהודה 2011/12: הסגל השביעי בכוחו בליגה של 16 קבוצות. היא סיימה שלישית עם 59 נקודות, ' +
+           'בדיוק כמו הפועל תל אביב שמעליה ומכבי נתניה שמתחתיה. קריית שמונה לקחה את האליפות, ' +
+           '14 נקודות לפני כולן.',
+    stars: [
+      { type: 'rank', max: 5, label: 'לסיים בחמישייה הראשונה' },
+      { type: 'rank', max: 4, label: 'לסיים ברביעייה הראשונה' },
+      { type: 'rank', max: 3, label: 'מקום שלישי, כמו במציאות, או טוב ממנו' },
+    ],
+  },
+  {
+    id: 'hpt-1999',
+    teamId: 'hapoel-pt',
+    season: '1999/00',
+    title: '74 נקודות',
+    level: 'hard',
+    // 1999/00's top five were strong: the real 3rd came 0.3% of the time at 2,000,
+    // while the real 74 points is the chapter's ⭐. Below 1,500 almost nothing.
+    budget: 2000,   // measured 2026-09-28, 800 runs: ⭐ 29% ⭐⭐ 13.5% ⭐⭐⭐ 3.4%
+    intro: 'הפועל פתח תקווה 1999/00: הסגל השביעי בכוחו בליגה של 14 קבוצות. היא סיימה שלישית ' +
+           'עם 74 נקודות, שתיים בלבד אחרי מכבי חיפה, מעל בית"ר, מכבי תל אביב והפועל חיפה. ' +
+           'הפועל תל אביב לקחה את האליפות עם 85.',
+    stars: [
+      { type: 'points', min: 74, label: '74 נקודות, כמו במציאות' },
+      { type: 'rank', max: 5, label: 'לסיים בחמישייה הראשונה' },
+      { type: 'rank', max: 4, label: 'לסיים ברביעייה הראשונה' },
+    ],
+  },
+  // Europe, verified 2026-09-28: en.wikipedia "Hapoel Tel Aviv F.C. in European
+  // football", "2010–11 Hapoel Tel Aviv F.C. season" (qualifiers, dates and
+  // venues) and "2010–11 UEFA Champions League group stage" (Group B, every match).
+  {
+    id: 'hta-2010',
+    kind: 'europe',
+    teamId: 'hapoel-tlv',
+    season: '2010/11',
+    comp: 'ליגת האלופות',
+    title: 'הלילה של זהבי',
+    level: 'hardest',
+    budget: 2000,   // measured 2026-09-28, 400 runs: ⭐ 14% ⭐⭐ 7.3% ⭐⭐⭐ 1.5% (1,000 to 3,000 within noise)
+    intro: 'ליגת האלופות 2010/11. הפועל תל אביב עברה את ז\'לייזניצ\'ר סרייבו, את אקטובה ואת זלצבורג, ' +
+           'ובבית עם שאלקה, ליון ובנפיקה ניצחה את בנפיקה 0:3 בבלומפילד והוציאה 2-2 בליון. ' +
+           '5 נקודות ומקום רביעי, נקודה אחת מתחת לבנפיקה, שעברה לליגה האירופית.',
+    europe: {
+      tier: 'ucl',
+      awayGoals: true,
+      window: 'group',
+      realOut: 'group',
+      realText: 'סיימה רביעית בבית, 5 נקודות',
+      rounds: [
+        { id: 'q2', label: 'סיבוב המוקדמות השני', kind: 'tie', firstHome: true,
+          club: { name: 'ז\'לייזניצ\'ר סרייבו', crest: 'eu-zeljeznicar', flag: '🇧🇦', ovr: 72 }, real: 'בבית 5-0, בחוץ 1-0' },
+        { id: 'q3', label: 'סיבוב המוקדמות השלישי', kind: 'tie', firstHome: false,
+          club: { name: 'אקטובה', crest: 'eu-aktobe', flag: '🇰🇿', ovr: 78 }, real: 'בחוץ 0-1, בבית 3-1' },
+        { id: 'po', label: 'סיבוב הפלייאוף', kind: 'tie', firstHome: false,
+          club: { name: 'רד בול זלצבורג', crest: 'eu-salzburg', flag: '🇦🇹', ovr: 85 }, real: 'בחוץ 3-2, בבית 1-1' },
+        { id: 'group', label: 'שלב הבתים', kind: 'group', advance: 2,
+          clubs: [{ name: 'שאלקה', crest: 'eu-schalke', flag: '🇩🇪', ovr: 93 },
+                  { name: 'ליון', crest: 'eu-lyon', flag: '🇫🇷', ovr: 92 },
+                  { name: 'בנפיקה', crest: 'eu-benfica', flag: '🇵🇹', ovr: 91 }],
+          // Benfica away, Lyon home, Schalke away, Schalke home, Benfica home, Lyon away
+          fixtures: [[2, false], [1, true], [0, false], [0, true], [2, true], [1, false]],
+          real: 'בנפיקה: 0-2 בחוץ, 3-0 בבית · ליון: 1-3 בבית, 2-2 בחוץ · שאלקה: 1-3 בחוץ, 0-0 בבית' },
+      ],
+    },
+    stars: [
+      { type: 'euGroupPoints', min: 5, label: '5 נקודות בבית, כמו במציאות' },
+      { type: 'euGroupPos', max: 3, label: 'מקום שלישי: כרטיס לליגה האירופית' },
+      { type: 'euGroupPos', max: 2, label: 'לעלות מהבית' },
+    ],
+  },
 ];
