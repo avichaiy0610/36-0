@@ -247,6 +247,11 @@ function storyEuRealReach(ch) {
   return idx < 0 ? ch.europe.rounds.length : idx;
 }
 function storyEuRoundLabel(ch, idx, endText) {
-  if (idx >= ch.europe.rounds.length) return endText || ch.europe.endLabel || 'זכייה בגביע';
+  if (idx >= ch.europe.rounds.length) {
+    // Past the last round: a cup only when that round was the final. A chapter
+    // that stops at the group stage was won by getting out of it.
+    const last = ch.europe.rounds[ch.europe.rounds.length - 1];
+    return endText || ch.europe.endLabel || (last.id === 'final' ? 'זכייה בגביע' : 'עלייה משלב הבתים');
+  }
   return ch.europe.rounds[idx].label;
 }
