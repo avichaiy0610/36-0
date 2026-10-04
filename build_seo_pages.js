@@ -14,6 +14,7 @@
 const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
+const { FOOT_LINKS } = require('./scripts/player_pages.js');
 
 const BASE = __dirname;
 const OUTROOT = BASE;                // pages deploy at /team/<id>/ (repo root)
@@ -481,8 +482,7 @@ function page(teamId) {
 
     <div class="foot">
       36-0 — משחק דראפט חינמי לחובבי הכדורגל הישראלי · הנתונים למטרות מידע ובידור בלבד ואינם רשמיים ·
-      <a href="/articles/">מאמרים</a> · <a href="/players/">כל השחקנים</a> ·
-      <a href="/about.html">אודות</a> · <a href="/">משחק</a>
+      ${FOOT_LINKS}
     </div>
   </div>
   <script>${boot}</script>

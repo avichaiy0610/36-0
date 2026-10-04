@@ -15,6 +15,16 @@ const crypto = require('crypto');
 const BASE = path.join(__dirname, '..');          // repo root
 const SITE = 'https://www.36-0.co.il';
 
+// The site's link block, in the one order every page type uses — the
+// hand-written pages (home, articles, methodology, about, privacy, contact)
+// carry the same links in the same order. build_seo_pages.js imports this for
+// the team pages, so the generated pages cannot drift from each other.
+const FOOT_LINKS = [
+  ['/articles/', 'מאמרים'], ['/players/', 'כל השחקנים'], ['/how-to-play.html', 'איך משחקים'],
+  ['/methodology.html', 'מתודולוגיה'], ['/about.html', 'אודות'], ['/privacy.html', 'פרטיות'],
+  ['/contact.html', 'צור קשר'], ['/', 'משחק'],
+].map(([href, label]) => `<a href="${href}">${label}</a>`).join(' · ');
+
 // ── js/crowd.js, run once, as the browser would ──────────────────────────────
 // The crowd-ratings widget's markup is written in exactly one place. js/crowd.js
 // is a browser global, not a module, so it is evaluated in its own context and
@@ -559,9 +569,7 @@ function pageHtml(TEAMS, e) {
 
     <div class="foot">
       36-0 — משחק דראפט חינמי לחובבי הכדורגל הישראלי · הנתונים למטרות מידע ובידור בלבד ואינם רשמיים ·
-      <a href="/articles/">מאמרים</a> · <a href="/players/">כל השחקנים</a> ·
-      <a href="/methodology.html">מתודולוגיה</a> ·
-      <a href="/how-to-play.html">איך משחקים</a> · <a href="/about.html">אודות</a> · <a href="/">משחק</a>
+      ${FOOT_LINKS}
     </div>
   </div>
 
@@ -669,7 +677,18 @@ function writeIndex() {
     .sort((a, b) => TEAMS[a].name.localeCompare(TEAMS[b].name, 'he'));
   const url = `${SITE}/players/`;
   const title = 'כל שחקני ליגת העל — אינדקס | 36-0';
-  const desc = `אינדקס שחקני ליגת העל בכדורגל (1999–2025): ${players.length} שחקנים עם הקריירה, המועדונים והדירוגים. בנה את הרכב החלומות במשחק 36-0.`;
+  // Two different counts, and the page says which is which: every player in the
+  // dataset vs. the ones that have a page here. Both, and the season range, are
+  // read from js/data.js — never typed in — so they cannot fall behind the data.
+  const all = Object.values(idx);
+  const fmt = n => n.toLocaleString('en-US');
+  const seasons = [...new Set(SQUADS.map(s => s.season))].sort();
+  const range = `${seasons[0]}–${seasons[seasons.length - 1]}`;
+  const multi = all.filter(e => new Set(e.career.map(c => c.season)).size >= 2);
+  // the rule is only stated while it is true of what is on disk
+  const rule = multi.every(e => onDisk.has(slugFor(e.name))) ? ', כולל כל מי ששיחק בליגה שתי עונות ומעלה' : '';
+  const counts = `${fmt(players.length)} מתוך ${fmt(all.length)} השחקנים במאגר ליגת העל (${range}) יש עמוד קריירה${rule}`;
+  const desc = `אינדקס שחקני ליגת העל בכדורגל: ל-${counts}. הקריירה, המועדונים והדירוגים. בנה את הרכב החלומות במשחק 36-0.`;
   const list = players.map(e =>
     `<li><a href="/player/${slugFor(e.name)}/">${esc(e.name)}</a> <span>${e.peak} · ${TEAMS[e.mainTeam] ? esc(TEAMS[e.mainTeam].name) : ''}</span></li>`).join('');
   const chips = teams.map(id => `<a class="chip" href="/team/${id}/">${esc(TEAMS[id].name)}</a>`).join('');
@@ -716,7 +735,7 @@ function writeIndex() {
     <a class="back" href="/">← המשחק</a>
     <div class="logo"><a href="/"><span dir="ltr">36–0</span></a></div>
     <h1>כל שחקני ליגת העל</h1>
-    <p class="sub">${players.length} שחקנים מכל תולדות ליגת העל (1999–2025) — הקריירה, המועדונים והדירוגים.</p>
+    <p class="sub">ל-${counts}: הקריירה, המועדונים והדירוגים.</p>
 
     <div class="intro">
       <p>
@@ -746,7 +765,7 @@ function writeIndex() {
     <div class="chips">${chips}</div>
     <h2>שחקנים (לפי דירוג שיא)</h2>
     <ul class="players">${list}</ul>
-    <div class="foot">36-0 — משחק דראפט חינמי לחובבי הכדורגל הישראלי · הנתונים למטרות מידע ובידור בלבד · <a href="/articles/">מאמרים</a> · <a href="/how-to-play.html">איך משחקים</a> · <a href="/methodology.html">מתודולוגיה</a> · <a href="/about.html">אודות</a> · <a href="/contact.html">צור קשר</a> · <a href="/">משחק</a></div>
+    <div class="foot">36-0 — משחק דראפט חינמי לחובבי הכדורגל הישראלי · הנתונים למטרות מידע ובידור בלבד · ${FOOT_LINKS}</div>
   </div>
 </body>
 </html>`;
@@ -763,7 +782,7 @@ function writeIndex() {
 }
 
 module.exports = { load, buildIndex, slugFor, pageHtml, writePlayer, writeSitemap,
-                   writeIndex, writeSearchIndex, allSlugs, BASE };
+                   writeIndex, writeSearchIndex, allSlugs, BASE, FOOT_LINKS };
 
 // ── CLI ──────────────────────────────────────────────────────────────────────
 if (require.main === module) {
