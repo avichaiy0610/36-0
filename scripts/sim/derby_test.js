@@ -368,5 +368,35 @@ if (require.main === module) {
     assert.deepStrictEqual(known, G.derbyClubs().slice().sort());
   });
 
+  // ── Task V6: migration v2 mirrors the JS ───────────────────────────────────
+  const V6 = () => read('supabase/migrations/20261005000002_derby_champions.sql');
+  t('v_rivals == derbySeriesRival in play order, for every club', () => {
+    const m = V6().match(/v_rivals\s+jsonb\s*:=\s*'(\{[^']*\})'::jsonb/);
+    assert.ok(m, 'v_rivals not found');
+    const sqlRivals = JSON.parse(m[1]);
+    const want = {};
+    for (const c of G.derbyClubs()) want[c] = [0, 1, 2].map(s => G.derbySeriesRival(c, s));
+    assert.deepStrictEqual(sqlRivals, want);
+  });
+  t('v_underdog == DERBY_UNDERDOGS', () => {
+    const m = V6().match(/v_underdog\s+text\[\]\s*:=\s*ARRAY\[([^\]]+)\]/);
+    assert.ok(m, 'v_underdog not found');
+    const got = m[1].match(/'([^']+)'/g).map(s => s.slice(1, -1)).sort();
+    assert.deepStrictEqual(got, G.DERBY_UNDERDOGS.slice().sort());
+  });
+  t('every achievement key inserted is awarded by array_append, and vice versa', () => {
+    const sql = V6();
+    const ins = sql.match(/INSERT INTO achievements[\s\S]*?ON CONFLICT/)[0];
+    const inserted = [...ins.matchAll(/\('(dc_\w+)'/g)].map(x => x[1]).sort();
+    const code = sql.split('\n').filter(l => !l.trim().startsWith('--')).join('\n');
+    const appended = [...new Set([...code.matchAll(/array_append\(earned,\s*'(dc_\w+)'\)/g)].map(x => x[1]))].sort();
+    assert.strictEqual(inserted.length, 10);
+    assert.deepStrictEqual(appended, inserted);
+  });
+  t('no `|| \'` concatenation onto an array in the SQL code', () => {
+    const code = V6().split('\n').filter(l => !l.trim().startsWith('--')).join('\n');
+    assert.ok(!/\|\|\s*'/.test(code), 'found || \' in code');
+  });
+
   console.log(`\n${n} passed`);
 }
