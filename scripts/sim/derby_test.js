@@ -15,6 +15,9 @@ const window = {};
 const localStorage = { getItem(){ return null; }, setItem(){}, removeItem(){} };
 const getCurrentUser = () => null;
 const _supabase = { rpc(){ return Promise.resolve(); } };
+// js/duel.js owns mulberry32 in the browser; withSeededRandom (league-sim.js) needs it.
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;var t=Math.imul(a^a>>>15,1|a);
+t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
 `;
 // chem-data/chemistry/tag-data/tags are loaded so the computer's XI gets the same
 // chemistry and tag lifts the player's does. If one of them throws on load in
@@ -102,6 +105,51 @@ if (require.main === module) {
     assert.ok(r.ovr > 60 && r.atk > 0 && r.gk > 0);
     assert.strictEqual(G.state.picks, before);
     assert.strictEqual(G.state.slots, slotsBefore);
+  });
+
+  // ── Task 3: match and series ───────────────────────────────────────────────
+  const xiA = G.derbyAiDraft('maccabi-haifa', '4-3-3', 'hard', G.derbyRng(1));
+  const xiB = G.derbyAiDraft('maccabi-tlv', '4-3-3', 'hard', G.derbyRng(2));
+  const lnA = G.derbyLinesFor(xiA.picks, xiA.slots), lnB = G.derbyLinesFor(xiB.picks, xiB.slots);
+  t('every match has a winner; a draw is settled on penalties consistently', () => {
+    let draws = 0;
+    for (let s = 1; s <= 500; s++) {
+      const g = G.derbyPlayMatch(lnA, lnB, s % 2 === 0, s);
+      assert.strictEqual(typeof g.won, 'boolean');
+      if (g.gf === g.ga) {
+        draws++;
+        assert.ok(g.pens, 'draw without pens, seed ' + s);
+        assert.strictEqual(g.won, g.pens.gf > g.pens.ga);
+      } else {
+        assert.strictEqual(g.pens, null);
+        assert.strictEqual(g.won, g.gf > g.ga);
+      }
+    }
+    assert.ok(draws > 0, 'no draw in 500 matches');
+  });
+  t('a match is deterministic for its seed', () => {
+    assert.deepStrictEqual(G.derbyPlayMatch(lnA, lnB, true, 99), G.derbyPlayMatch(lnA, lnB, true, 99));
+  });
+  t('goal events: one per goal, sorted, no goalkeeper scores', () => {
+    for (let s = 1; s <= 200; s++) {
+      const g = G.derbyPlayMatch(lnA, lnB, true, s);
+      const ev = G.derbyGoalEvents(g, xiA.picks, xiB.picks, s);
+      assert.strictEqual(ev.filter(e => e.mine).length, g.gf);
+      assert.strictEqual(ev.filter(e => !e.mine).length, g.ga);
+      for (let i = 1; i < ev.length; i++) assert.ok(ev[i].min >= ev[i - 1].min);
+      const gks = new Set([...xiA.picks, ...xiB.picks].filter(p => p.player.position === 'GK').map(p => p.player.name));
+      ev.forEach(e => assert.ok(!gks.has(e.name), 'GK scored: ' + e.name));
+    }
+  });
+  t('series status stops at three', () => {
+    const W = { won: true }, L = { won: false };
+    assert.deepStrictEqual(G.derbySeriesStatus([W, W, W]), { w: 3, l: 0, over: true, won: true });
+    assert.deepStrictEqual(G.derbySeriesStatus([L, W, L, L]), { w: 1, l: 3, over: true, won: false });
+    assert.deepStrictEqual(G.derbySeriesStatus([W, L, W, L]), { w: 2, l: 2, over: false, won: false });
+  });
+  t('series order for Haifa: Beitar, H. Haifa, M. TLV, H. Haifa, M. TLV', () => {
+    assert.deepStrictEqual([0, 1, 2, 3, 4].map(i => G.derbyGameRival('maccabi-haifa', i)),
+      ['beitar-jerusalem', 'hapoel-haifa', 'maccabi-tlv', 'hapoel-haifa', 'maccabi-tlv']);
   });
 
   console.log(`\n${n} passed`);
