@@ -24,7 +24,7 @@ function derbyEntry(k) {
 
 function derbyStart(club, difficulty) {
   const run = { v: 1, club, difficulty, formationId: [_selectedFormationKey, state.formationId, '4-3-3'].find(k => k && FORMATIONS[k]),
-    tactic: tacticOf(state.tactic), seed: (Math.random() * 2147483647) | 0,
+    tactic: tacticOf(typeof _selectedTactic !== 'undefined' ? _selectedTactic : state.tactic), seed: (Math.random() * 2147483647) | 0,
     phase: 'draft', xi: null, rivals: null, games: [], submitted: false };
   derbySave(run);
   derbyTrack('progress', club + '|start');
