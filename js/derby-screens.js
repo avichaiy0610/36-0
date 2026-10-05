@@ -63,7 +63,7 @@ function derbyRenderRivals(run) {
     const games = DERBY_ORDER.map((r, i) => (r === k ? i + 1 : null)).filter(Boolean);
     return `<details class="dc-rival${k === 0 ? ' arch' : ''}"><summary>${derbyCrest(id)}
       <span class="dc-rv-name">${derbyEsc(derbyTeamName(id))}${k === 0 ? ' <em>המושבעת</em>' : ''}</span>
-      <span class="dc-rv-games">משחק ${games.join(' ו-')}</span><span class="dc-ovr">${ovr}</span></summary>
+      <span class="dc-rv-games">${games.length > 1 ? 'משחקים' : 'משחק'} ${games.join(', ')}</span><span class="dc-ovr">${ovr}</span></summary>
       <ul class="dc-xi">${derbyXiRows(picks, rivalSlots)}</ul></details>`;
   }).join('');
   derbyRoot().innerHTML = `
