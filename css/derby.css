@@ -30,7 +30,7 @@
 .dc-rv-name em { color: var(--accent2); font-style: normal; font-size: 12px; margin-inline-start: 6px; }
 .dc-rv-games { color: var(--dim); font-size: 12px; }
 .dc-ovr { font-weight: 800; color: var(--accent); min-width: 28px; text-align: center; }
-.dc-xi { list-style: none; margin: 0; padding: 0 10px 10px; display: grid; gap: 4px; }
+.dc-xi { list-style: none; margin: 0; padding: 0 10px 10px; display: grid; gap: 4px; max-width: 440px; }
 .dc-xi li { display: grid; grid-template-columns: 72px 1fr auto 28px; gap: 8px; font-size: 13px; }
 .dc-pos { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dc-pos, .dc-ss { color: var(--dim); }
