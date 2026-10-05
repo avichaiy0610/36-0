@@ -1,0 +1,71 @@
+/* אלופי הדרבי — js/derby-screens.js. Dark palette only: tokens from style.css. */
+#derby-root { display: flex; flex-direction: column; gap: 12px; padding-bottom: 24px; }
+.dc-lead { color: var(--dim); margin: 0; line-height: 1.5; }
+.dc-crest { width: 36px; height: 36px; object-fit: contain; }
+.dc-crest-lg { width: 56px; height: 56px; object-fit: contain; }
+
+.dc-diff { display: flex; gap: 8px; }
+.dc-diff-btn { flex: 1; padding: 8px; border-radius: 8px; border: 1px solid var(--border);
+  background: var(--surface); color: var(--text); font: inherit; cursor: pointer; }
+.dc-diff-btn.on { border-color: var(--accent); color: var(--accent); }
+
+.dc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.dc-club { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 12px 8px;
+  border-radius: 10px; border: 1px solid var(--border); background: var(--surface);
+  color: var(--text); font: inherit; cursor: pointer; text-align: center; }
+.dc-club:hover { border-color: var(--accent); }
+.dc-club-name { font-weight: 700; }
+.dc-club-seasons { color: var(--dim); font-size: 12px; }
+.dc-club-rivals { color: var(--dim); font-size: 11px; line-height: 1.4; }
+.dc-club-rivals b { color: var(--text); }
+
+.dc-me { display: flex; align-items: center; gap: 12px; }
+.dc-me-name { font-weight: 700; font-size: 18px; }
+.dc-me-sub { color: var(--dim); }
+.dc-sec { color: var(--dim); font-size: 13px; margin-top: 4px; }
+.dc-rival { border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+.dc-rival.arch { border-color: var(--accent2); }
+.dc-rival summary { display: flex; align-items: center; gap: 10px; padding: 10px; cursor: pointer; list-style: none; }
+.dc-rv-name { flex: 1; font-weight: 700; }
+.dc-rv-name em { color: var(--accent2); font-style: normal; font-size: 12px; margin-inline-start: 6px; }
+.dc-rv-games { color: var(--dim); font-size: 12px; }
+.dc-ovr { font-weight: 800; color: var(--accent); min-width: 28px; text-align: center; }
+.dc-xi { list-style: none; margin: 0; padding: 0 10px 10px; display: grid; gap: 4px; }
+.dc-xi li { display: grid; grid-template-columns: 42px 1fr auto 28px; gap: 8px; font-size: 13px; }
+.dc-pos, .dc-ss { color: var(--dim); }
+.dc-ov { text-align: center; }
+.dc-go { align-self: stretch; }
+
+.dc-match-head { text-align: center; color: var(--dim); }
+.dc-board { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 8px; }
+.dc-side { display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; font-weight: 700; }
+.dc-score { display: flex; flex-direction: column; align-items: center; }
+#dc-sc { font-size: 32px; font-weight: 800; direction: ltr; }
+.dc-clock { color: var(--accent); font-variant-numeric: tabular-nums; }
+.dc-events { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.dc-events li { padding: 6px 10px; border-radius: 8px; background: var(--surface2); font-size: 14px; }
+.dc-events li.theirs { color: var(--dim); }
+.dc-pens { text-align: center; color: var(--dim); }
+.dc-verdict { text-align: center; font-size: 22px; font-weight: 800; }
+.dc-verdict.w { color: #3fb950; }
+.dc-verdict.l { color: #f85149; }
+.dc-series { display: flex; justify-content: center; align-items: center; gap: 6px; }
+.dc-dot { width: 12px; height: 12px; border-radius: 50%; border: 1px solid var(--border); }
+.dc-dot.w { background: #3fb950; border-color: #3fb950; }
+.dc-dot.l { background: #f85149; border-color: #f85149; }
+.dc-series b { margin-inline-start: 6px; }
+
+.dc-end { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 16px;
+  border-radius: 12px; background: var(--surface); border: 1px solid var(--border); }
+.dc-end.w { border-color: var(--accent); }
+.dc-end-title { font-size: 26px; font-weight: 800; }
+.dc-end.w .dc-end-title { color: var(--accent); }
+.dc-end-score { color: var(--dim); }
+.dc-games { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.dc-games li { display: grid; grid-template-columns: 70px 1fr auto; gap: 8px; padding: 8px 10px;
+  border-radius: 8px; background: var(--surface2); border-inline-start: 3px solid var(--border); }
+.dc-games li.w { border-inline-start-color: #3fb950; }
+.dc-games li.l { border-inline-start-color: #f85149; }
+.dc-end-btns { display: flex; flex-wrap: wrap; gap: 8px; }
+.dc-end-btns > * { flex: 1 1 140px; }
