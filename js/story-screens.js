@@ -197,6 +197,16 @@ body.eu-blue #screen-story{background:transparent}
     if (typeof storyTrack === 'function') storyTrack('open');
     const back = document.getElementById('story-back');
     if (back) back.onclick = () => showScreen('setup');
+    renderHub();
+    // Stars won on another device: redraw once they arrive, if the hub is still up.
+    if (typeof storySyncBest === 'function') {
+      storySyncBest().then(changed => {
+        if (changed && root() && root().querySelector('.st-cards')) renderHub();
+      });
+    }
+  }
+
+  function renderHub() {
     const best = storyBest();
     const run = storyRun();
     root().innerHTML = `

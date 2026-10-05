@@ -35,6 +35,30 @@
   function storySave() { if (_run) save(RUN_KEY, _run); }
   function storyBest() { return load(BEST_KEY) || {}; }
 
+  // Merge the signed-in player's server bests (my_story_best, migration
+  // 20261005000001) into the local ones, so stars won on another device show
+  // here. Stars are graded, so a count of n means the first n. Resolves true
+  // when anything changed.
+  async function storySyncBest() {
+    try {
+      if (typeof getCurrentUser !== 'function' || !getCurrentUser() || typeof _supabase === 'undefined') return false;
+      const { data, error } = await _supabase.rpc('my_story_best');
+      if (error || !data) return false;
+      const best = storyBest();
+      let changed = false;
+      data.forEach(r => {
+        if (!storyChapter(r.chapter)) return;
+        const b = best[r.chapter] || { stars: [false, false, false], score: null };
+        const stars = b.stars.map((s, i) => s || i < r.stars);
+        const score = b.score == null ? r.score : Math.max(b.score, r.score);
+        if (!best[r.chapter] || score !== b.score || stars.some((s, i) => s !== b.stars[i])) changed = true;
+        best[r.chapter] = { stars, score };
+      });
+      if (changed) save(BEST_KEY, best);
+      return changed;
+    } catch (e) { return false; }
+  }
+
   function storyStart(chapterId) {
     const ch = storyChapter(chapterId);
     if (!ch) return;
@@ -239,7 +263,7 @@
   }
 
   Object.assign(global, {
-    storyRun, storySave, storyBest, storyStart, storyEnterSeason, storyOppForState,
+    storyRun, storySave, storyBest, storySyncBest, storyStart, storyEnterSeason, storyOppForState,
     storyEuAct, storyEuWindowClose, storyTrack,
     storyPrepare, storyOpen, storyOnSeasonEnd, storyRenderLast, storyExit,
   });
