@@ -1,13 +1,17 @@
 // ─── אלופי הדרבי — one match and the series ──────────────────────────────────
-// A match is the league's own model (simulateMatchV2: xG, binomial goals), so a
-// derby is not a different sport. Every game needs a winner: level after ninety
+// A match is the league's own model (simulateMatchV2's xG and binomial goals),
+// so a derby is not a different sport — with one change: simulateMatchV2 only
+// ever applies the PLAYER's clean-sheet tag (its opponents are real clubs with
+// no tags), while a rival here is a drafted XI whose tags must count too. Every game needs a winner: level after ninety
 // goes straight to penalties, tilted a little by the two goalkeepers.
 
 function derbyPlayMatch(me, opp, home, seed) {
   return withSeededRandom(seed, () => {
-    const m = simulateMatchV2(me, opp, home);
-    const g = { gf: m.gf, ga: m.ga, home, won: m.gf > m.ga, pens: null };
-    if (m.gf === m.ga) {
+    const a = simShrinkLines(me), b = simShrinkLines(opp);
+    const gf = simDrawGoals(simExpectedGoals(a, b, home), opp.cs);
+    const ga = simDrawGoals(simExpectedGoals(b, a, !home), me.cs);
+    const g = { gf, ga, home, won: gf > ga, pens: null };
+    if (gf === ga) {
       const p = Math.max(0.35, Math.min(0.65, 0.5 + 0.01 * ((me.gk || 80) - (opp.gk || 80))));
       g.won = Math.random() < p;
       const w = 3 + Math.floor(Math.random() * 3);

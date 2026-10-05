@@ -20,7 +20,7 @@ function derbyAiDraft(teamId, formationId, difficulty, rng) {
       const slot = open.find(i => playerFitsSlot(p, slotFitPos(slots[i])));
       if (slot !== undefined) out.push({ player: p, squad: sq, slot });
     }
-    return out.sort((a, b) => b.player.ovr - a.player.ovr);
+    return out.sort((a, b) => playerOVR(b.player) - playerOVR(a.player));
   };
   const choose = list => {
     const w = cfg.weights.slice(0, list.length);
@@ -37,17 +37,19 @@ function derbyAiDraft(teamId, formationId, difficulty, rng) {
     for (let k = 0; k < cfg.look; k++) {
       const sq = pool[Math.floor(rng() * pool.length)];
       const o = options(sq);
-      if (o.length && (!best || o[0].player.ovr > best.list[0].player.ovr)) best = { sq, list: o };
+      if (o.length && (!best || playerOVR(o[0].player) > playerOVR(best.list[0].player))) best = { sq, list: o };
     }
     // Nobody in the drawn season fits what is still open: look through the rest.
     if (!best) {
       for (const sq of pool) { const o = options(sq); if (o.length) { best = { sq, list: o }; break; } }
     }
-    // Nobody fits anywhere: the best man left, out of position (teamOVR's 93%).
+    // Nobody fits anywhere: the best man left, out of position (teamOVR's 93%),
+    // from an unused season if there is one.
     if (!best) {
       const all = seasons.flatMap(sq => sq.players.map(p => ({ player: p, squad: sq })))
         .filter(e => !usedNames.has(e.player.name))
-        .sort((a, b) => b.player.ovr - a.player.ovr);
+        .sort((a, b) => (usedSeasons.has(a.squad.id) - usedSeasons.has(b.squad.id)) ||
+                        (playerOVR(b.player) - playerOVR(a.player)));
       if (!all.length) break;
       picks[empty()[0]] = all[0];
       usedNames.add(all[0].player.name); usedSeasons.add(all[0].squad.id);
