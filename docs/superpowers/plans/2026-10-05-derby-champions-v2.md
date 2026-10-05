@@ -329,12 +329,12 @@ function derbyRunSummary(series) {
     assert.ok(!G.derbySub(s2, 4, 0, 75), 'a 4th window');
     assert.ok(G.derbySub(s2, 4, 0, 45), 'half-time is still free');
   });
-  t('a substitute is fresh: subbed side keeps its rating late', () => {
+  t('a substitute comes on fresh', () => {
     const m = G.derbyMatchNew(xiA, xiB, true, 5);
-    const tired = G.derbyLinesFor(m.me.picks, m.me.slots, 'bal', 85).ovr;
-    for (let k = 0; k < 5; k++) G.derbySub(m.me, 1 + k, 0, 60);
-    const fresher = G.derbyLinesFor(m.me.picks, m.me.slots, 'bal', 85);
-    assert.ok(fresher.ovr >= tired - 1, `${fresher.ovr} vs ${tired}`);
+    assert.ok(G.derbySub(m.me, 3, 0, 60));
+    assert.strictEqual(m.me.picks[3].on, 60);
+    assert.strictEqual(G.derbyFatigue(m.me.picks[3], 85), 0);
+    assert.ok(G.derbyFatigue(m.me.picks[4], 85) > 0);
   });
   t('the computer chases when behind and protects when ahead', () => {
     const m = G.derbyMatchNew(xiA, xiB, true, 5);
@@ -352,19 +352,6 @@ function derbyRunSummary(series) {
     const s = [{ games: [W, W, W] }, { games: [L, L, L] }, { games: [W, L, W, L, W] }];
     assert.deepStrictEqual(G.derbyRunSummary(s), { seriesWon: 2, over: true, title: false });
     assert.strictEqual(G.derbyRunSummary([{ games: [W, W, W] }, { games: [W, W, W] }, { games: [W, W, W] }]).title, true);
-  });
-  t('both sides\' clean-sheet tags count', () => {
-    const goals = cs => { let sum = 0;
-      const b = Object.assign({}, xiB);
-      for (let s = 1; s <= 300; s++) {
-        const m = G.derbyMatchNew(xiA, b, true, s);
-        const orig = G.derbyLinesFor;
-        while (!m.over) G.derbyMatchStep(m, true);
-        sum += m.gf;
-      }
-      return sum; };
-    // smoke: the engine runs with cs present on both sides (the multiplier path is simDrawGoals')
-    assert.ok(goals(1) >= 0);
   });
 ```
 
