@@ -1214,6 +1214,7 @@ function beginDraft() {
   state.formationId = _selectedFormationKey;
   const tacticPick  = (!classicPick && formationTactical(_selectedFormationKey)) ? _selectedTactic : 'bal';
   state.challenge   = null; state.challengeDeck = null; state.challengeReqs = null;   // the setup screen never starts a challenge run
+  state.derby       = null;              // ...nor a derby (the derby starts its draft itself)
 
   // Opponents league — league drafts always face the latest season (shared fairness)
   const oppChoice = state.leagueCode ? 'latest'
@@ -1452,7 +1453,7 @@ function restoreDraftState() {
 
   // Draft finished — resume at the results (same season, no re-roll) or preseason
   if (state.currentRound >= slots.length) {
-    if (state.derby && typeof derbyAfterDraft === 'function') { derbyAfterDraft(); return true; }
+    if (state.derby && !d.season && !state.story && !state.mga && typeof derbyAfterDraft === 'function') { derbyAfterDraft(); return true; }
     if (d.season) {
       window._restoredSeason = d.season;
       showResults();

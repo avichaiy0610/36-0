@@ -805,7 +805,7 @@ function crApplyStateFor(run) {
   const year = crYear(run);
   state.leagueCode = null; state.duelCode = null; state.gauntlet = null;
   state.challenge = null; state.challengeDeck = null; state.challengeReqs = null;
-  state.deck = null; state.mgw = null; state.mga = null;
+  state.deck = null; state.mgw = null; state.mga = null; state.derby = null;
   window._leagueReviewMode = null; window._duelReviewMode = null;
   window._restoredSeason = null; window._presetSeason = null;
   document.getElementById('league-review-back')?.remove();

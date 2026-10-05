@@ -104,7 +104,7 @@
     Object.assign(state, {
       story: { chapterId: ch.id },
       challenge: null, challengeDeck: null, challengeReqs: null,
-      leagueCode: null, duelCode: null, career: null, gauntlet: null,
+      leagueCode: null, duelCode: null, career: null, gauntlet: null, derby: null,
       salaryCap: false, deck: null, mgw: null,
       classic: false, peakMode: false, showRatings: true, difficulty: 'normal',
       coach: null, coachOn: false, januaryOn: false,       // managers arrive in phase 2

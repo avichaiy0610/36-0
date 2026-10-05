@@ -39,6 +39,7 @@ function daMode() {
   if (typeof state === 'undefined' || !state) return null;
   if (state.career)    return null;             // the career keeps its own archive
   if (state.story)     return null;             // so does a story chapter: not your club's season
+  if (state.derby)     return null;             // a derby is a one-club pool, not a draft of yours
   if (state.gauntlet)  return 'gauntlet';
   if (state.leagueCode) return 'league';
   if (state.duelCode)  return 'duel';

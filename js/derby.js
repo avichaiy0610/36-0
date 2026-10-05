@@ -53,7 +53,14 @@ function derbyBeginDraft(run) {
 // Called by game.js when the eleventh pick lands (and on a restored full draft).
 function derbyAfterDraft() {
   const run = derbyLoad();
-  if (!run || !state.derby) { showPreseason(teamOVR()); return; }
+  // No run, or a run of another club: a stale flag. Never play a season with it on.
+  if (!run || !state.derby || run.club !== state.derby.club) {
+    state.derby = null;
+    if (typeof clearDraftState === 'function') clearDraftState();
+    showScreen('welcome');
+    return;
+  }
+  if (run.phase !== 'draft') { derbyShow(); return; }       // re-entry: the XI is already fixed
   run.xi = state.picks.map(derbyEntryKey);
   run.tactic = state.tactic || 'bal';
   if (!run.rivals) {
@@ -63,7 +70,7 @@ function derbyAfterDraft() {
       run.rivals[id] = derbyAiDraft(id, run.formationId, run.difficulty, rng).picks.map(derbyEntryKey);
     }
   }
-  if (run.phase === 'draft') run.phase = 'rivals';
+  run.phase = 'rivals';
   derbySave(run);
   derbyTrack('progress', run.club + '|drafted');
   derbyShow();
@@ -76,6 +83,9 @@ function derbyApplyMine(run) {
   state.slots = formationSlots(run.formationId, run.tactic);
   state.picks = run.xi.map(derbyEntry);
   state.derby = { club: run.club };
+  // Whatever the last mode left on the shared state must not touch the ratings.
+  state.peakMode = false; state.story = null; state.coach = null; state.classic = false;
+  state.crowdMode = false;
 }
 function derbyRivalPicks(run, id) { return run.rivals[id].map(derbyEntry); }
 
@@ -94,7 +104,10 @@ function derbyPlayNext(run) {
   g.events = derbyGoalEvents(g, state.picks, oppPicks, seed ^ 0x9e3779b9);
   run.games.push(g);
   const after = derbySeriesStatus(run.games);
-  if (after.over) { run.phase = 'done'; derbyFinish(run, after); }
+  if (after.over) {
+    run.phase = 'done'; derbyFinish(run, after);
+    if (typeof clearDraftState === 'function') clearDraftState();   // a finished derby must not reopen on load
+  }
   derbySave(run);
   return g;
 }
