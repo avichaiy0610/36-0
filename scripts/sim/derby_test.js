@@ -160,5 +160,14 @@ if (require.main === module) {
     assert.ok(goals(1.6) < goals(1), 'opp.cs did not lower the player\'s goals');
   });
 
+  // ── Task 5: hooks ──────────────────────────────────────────────────────────
+  t('a derby draws only the chosen club\'s seasons; outside it, nothing changes', () => {
+    Object.assign(G.state, { eraMin: 1999, eraMax: 2025, derby: { club: 'ironi-ks' } });
+    const pool = G.getEraFilteredSquads();
+    assert.ok(pool.length === G.derbySeasonsOf('ironi-ks').length && pool.every(sq => sq.teamId === 'ironi-ks'));
+    G.state.derby = null;
+    assert.ok(G.getEraFilteredSquads().length > 300);
+  });
+
   console.log(`\n${n} passed`);
 }

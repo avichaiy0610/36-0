@@ -187,6 +187,7 @@ function gtChoose(row, node) {
   state.oppSeason = null; state.oppSeasonChoice = 'latest';
   state.leagueFormat = 'modern';
   state.formationId = state.formationId || '4-3-3';
+  state.derby = null;          // a derby's one-club pool must not follow us here
   beginDraftWithState();
 }
 

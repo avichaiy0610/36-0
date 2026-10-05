@@ -495,6 +495,7 @@ const state = {
   deck: null, mgw: null,                                       // a fixed squad deck (כדורדל) + which daily it belongs to
   challenge: null, challengeDeck: null, challengeReqs: null,   // { period, key } + missions for challenge runs
   story: null,                                                 // { chapterId } while a מצב סיפור chapter is being played
+  derby: null,                                                 // { club } while an אלופי הדרבי run is being drafted
 };
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
@@ -825,7 +826,7 @@ const TRACK_SCREENS = {
 let _salaryCapPick = false;
 
 function trackDraftMode() {
-  if (state.career) return null;
+  if (state.career || state.derby) return null;
   return state.challenge ? 'challenge'
        : state.leagueCode ? 'league'
        : state.duelCode ? 'duel' : 'draft';
@@ -887,6 +888,7 @@ function showScreen(id) {
 function startGame() {
   state.leagueCode = null;   // a normal game from the welcome screen isn't for a league
   state.duelCode = null;
+  state.derby = null;
   state.career = null;       // ...nor for a career: leaving one mid-run must not record this season into it
   // A career pins the era range to its single season (crStartDraft sets
   // eraMin = eraMax = year, because one season is one transfer market). Nothing
@@ -1287,6 +1289,7 @@ function saveDraftState() {
       challenge: state.challenge || null,
       challengeReqs: state.challengeReqs || null,
       story: state.story || null,
+      derby: state.derby || null,
       difficulty: state.difficulty,
       showRatings: state.showRatings,
       draftMode: state.draftMode,
@@ -1401,6 +1404,7 @@ function restoreDraftState() {
     deck: Array.isArray(d.deckIds) ? d.deckIds.map(id => bySquadId.get(id)).filter(Boolean) : null,
     challenge: d.challenge ?? null,
     story: d.story ?? null,
+    derby: d.derby ?? null,
     difficulty: d.difficulty, showRatings: d.showRatings,
     draftMode: d.draftMode, peakMode: d.peakMode,
     // A save from before managers existed carries neither field. It restores
@@ -1448,6 +1452,7 @@ function restoreDraftState() {
 
   // Draft finished — resume at the results (same season, no re-roll) or preseason
   if (state.currentRound >= slots.length) {
+    if (state.derby && typeof derbyAfterDraft === 'function') { derbyAfterDraft(); return true; }
     if (d.season) {
       window._restoredSeason = d.season;
       showResults();
@@ -1771,6 +1776,8 @@ function chemPaint() {
 
 // ─── Draft: Round management ───────────────────────────────────────────────────
 function getEraFilteredSquads() {
+  // אלופי הדרבי: every round is a season of the one club (js/derby.js)
+  if (state.derby) return SQUADS.filter(sq => sq.teamId === state.derby.club);
   const filtered = SQUADS.filter(sq => {
     const y = parseSeasonYear(sq.season);
     return y >= state.eraMin && y <= state.eraMax;
@@ -2155,6 +2162,8 @@ function assignPlayer(slotIdx, player) {
     if (state.duelCode && typeof submitDuelSquad === 'function') setTimeout(() => submitDuelSquad(), 500);
     // a gauntlet draft skips the pre-season too — the XI goes straight into a fight
     else if (state.gauntlet && typeof gtFight === 'function') setTimeout(() => gtFight(), 500);
+    // אלופי הדרבי: no season — the XI goes to the rivals and the series
+    else if (state.derby && typeof derbyAfterDraft === 'function') setTimeout(() => derbyAfterDraft(), 500);
     // Salary cap pauses on a complete XI instead of simulating: the one swap is
     // only worth anything once you can see all eleven together.
     else if (typeof salActive === 'function' && salActive() && typeof salShowReview === 'function')
@@ -2253,7 +2262,8 @@ function rerollSeason() {
   if (state.isAnimating || state.seasonRerollsLeft <= 0 || state.awaitingSlotPick) return;
   const currentTeamId = state.currentSquad?.teamId;
   const era = getEraFilteredSquads();
-  const sameTeam = era.filter(sq => sq.teamId === currentTeamId && sq.id !== state.currentSquad?.id);
+  const sameTeam = era.filter(sq => sq.teamId === currentTeamId && sq.id !== state.currentSquad?.id &&
+                                    !(state.derby && state.usedSquadIds.has(sq.id)));
   if (sameTeam.length === 0) { setHint('⚠ אין עונות נוספות לקבוצה זו בטווח הנבחר'); return; }
 
   // A player selected from the OLD season must not carry over to the new one
@@ -2290,6 +2300,8 @@ function updateRerollButtons() {
   document.getElementById('team-reroll-count').textContent   = state.teamRerollsLeft;
   document.getElementById('season-reroll-count').textContent = state.seasonRerollsLeft;
   document.getElementById('btn-reroll-team').disabled   = state.teamRerollsLeft   <= 0 || noSquad;
+  // A derby draws from one club only, so a club reroll is just a season reroll.
+  document.getElementById('btn-reroll-team').style.display = state.derby ? 'none' : '';
   // A draft locked to a single season — a career year — has no other season to
   // swap to: the button could only ever redraw the same one.
   const seasonBtn = document.getElementById('btn-reroll-season');
@@ -4387,6 +4399,7 @@ function restartGame() {
     challenge: null, challengeDeck: null, challengeReqs: null,
     career: null,          // "new game" leaves the career; the run itself stays in storage
     story: null,           // "new game" leaves the chapter; the run itself stays in storage
+    derby: null,
     coach: null,           // a new eleven is appointed its own manager, or none
     deck: null, mgw: null,
     slots:[], picks:[], currentRound:0,

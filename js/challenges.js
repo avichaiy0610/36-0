@@ -821,6 +821,7 @@ async function startChallenge(period, keyOverride) {
   state.challengeReqs = challengeRequirements(period, key, s);
   state.challengeDeck = challengeDeckFor(period, key, s.eraMin, s.eraMax, state.challengeReqs);
 
+  state.derby = null;          // a derby's one-club pool must not follow us here
   beginDraftWithState();
 }
 

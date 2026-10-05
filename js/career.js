@@ -926,6 +926,7 @@ function crRefreshCoachCard(run) {
 function crStartDraft() {
   const run = crRun();
   crApplyStateFor(run);
+  state.derby = null;          // a derby's one-club pool must not follow us here
   const kept = run.pending ? crRebuildPicks(run.pending, state.formationId, state.tactic) : null;
   if (kept && kept.some(Boolean)) crBeginDraftWithKept(kept);
   else beginDraftWithState({ classic: state.classic, tactic: state.tactic });
