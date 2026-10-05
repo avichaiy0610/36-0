@@ -35,11 +35,22 @@ const DERBY_RIVALS = {
   'ironi-ks':         ['bnei-sakhnin',     'hapoel-haifa',     'maccabi-haifa'],
 };
 
-// The series: which rival each game is against (index into DERBY_RIVALS[club],
-// 0 = archrival) and whether you are at home. Game 5 against the archrival is
-// only ever reached at 2:2.
-const DERBY_ORDER = [2, 1, 0, 1, 0];
-const DERBY_HOME  = [true, false, true, false, true];
+// v2 (spec §9): three series, a best-of-5 against each rival — rival ג, then ב,
+// then the archrival as the final. Every series: home, away, home, away, home.
+const DERBY_SERIES_ORDER = [2, 1, 0];
+const DERBY_GAME_HOME = [true, false, true, false, true];
+
+// The bench: seven more draft rounds after the XI, any position.
+const DERBY_BENCH = 7;
+// In a match: five substitutions in three stoppages, as in the real game
+// (half-time does not count as a stoppage). Played in 15-minute segments.
+const DERBY_SUBS = 5;
+const DERBY_SUB_WINDOWS = 3;
+const DERBY_CHUNK = 15;
+// Tiredness, so that a substitution is worth something: a man loses 0.1 of a
+// rating point for every minute past his 60th on the pitch (−3 at 90').
+const DERBY_FATIGUE_FROM = 60;
+const DERBY_FATIGUE_PER_MIN = 0.1;
 
 // How the computer drafts. Each round it ranks the players of the drawn season
 // who fit an open slot and takes the 1st/2nd/3rd best with these weights; `look`

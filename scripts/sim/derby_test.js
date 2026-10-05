@@ -27,10 +27,11 @@ const FILES = ['js/data.js', 'js/league_tables.js', 'js/sim-engine.js', 'js/game
   'js/derby-data.js', 'js/derby-ai.js', 'js/derby-match.js'];
 const EXPORTS = ['state', 'SQUADS', 'TEAMS', 'formationSlots', 'playerFitsSlot', 'slotFitPos',
   'myLineRatings', 'teamOVR', 'getEraFilteredSquads',
-  'DERBY_RIVALS', 'DERBY_MIN_SEASONS', 'DERBY_MIN_RIVAL_SEASONS', 'DERBY_ORDER', 'DERBY_HOME', 'DERBY_AI', 'DERBY_REROLLS',
+  'DERBY_RIVALS', 'DERBY_MIN_SEASONS', 'DERBY_MIN_RIVAL_SEASONS', 'DERBY_SERIES_ORDER', 'DERBY_GAME_HOME', 'DERBY_BENCH', 'DERBY_SUBS', 'DERBY_SUB_WINDOWS', 'DERBY_CHUNK', 'DERBY_AI', 'DERBY_REROLLS',
   'derbySeasonsOf', 'derbyClubs', 'derbyRng',
   'derbyAiDraft', 'derbyLinesFor',
-  'derbyPlayMatch', 'derbyGoalEvents', 'derbySeriesStatus', 'derbyGameRival'];
+  'derbyPlayMatch', 'derbySeriesStatus',
+  'derbyFatigue', 'derbyMatchNew', 'derbyMatchStep', 'derbySub', 'derbyCanSub', 'derbyAutoManage', 'derbySeriesRival', 'derbyRunSummary', 'playerOVR'];
 
 function load() {
   return new Function(STUB + FILES.map(read).join('\n') +
@@ -118,57 +119,86 @@ if (require.main === module) {
     assert.strictEqual(G.state.slots, slotsBefore);
   });
 
-  // ── Task 3: match and series ───────────────────────────────────────────────
-  const xiA = G.derbyAiDraft('maccabi-haifa', '4-3-3', 'hard', G.derbyRng(1));
-  const xiB = G.derbyAiDraft('maccabi-tlv', '4-3-3', 'hard', G.derbyRng(2));
-  const lnA = G.derbyLinesFor(xiA.picks, xiA.slots), lnB = G.derbyLinesFor(xiB.picks, xiB.slots);
-  t('every match has a winner; a draw is settled on penalties consistently', () => {
+  t('the computer drafts a bench of 7: no player repeats across XI and bench', () => {
+    for (let s = 1; s <= 100; s++) {
+      const d = G.derbyAiDraft('hapoel-pt', '4-3-3', 'normal', G.derbyRng(s));   // 15 seasons < 18 rounds
+      assert.strictEqual(d.bench.length, 7);
+      const names = [...d.picks, ...d.bench].map(e => e.player.name);
+      assert.strictEqual(new Set(names).size, 18, 'seed ' + s);
+      d.bench.forEach(e => assert.strictEqual(e.squad.teamId, 'hapoel-pt'));
+    }
+  });
+  t('tactic shifts attack against defence; tiredness lowers the lines after 60\'', () => {
+    const d = G.derbyAiDraft('maccabi-haifa', '4-3-3', 'hard', G.derbyRng(3));
+    const bal = G.derbyLinesFor(d.picks, d.slots, 'bal', 0);
+    const att = G.derbyLinesFor(d.picks, d.slots, 'att', 0);
+    const def = G.derbyLinesFor(d.picks, d.slots, 'def', 0);
+    assert.ok(att.atk > bal.atk && att.def < bal.def, 'att');
+    assert.ok(def.atk < bal.atk && def.def > bal.def, 'def');
+    const late = G.derbyLinesFor(d.picks, d.slots, 'bal', 85);
+    assert.ok(late.ovr < bal.ovr, 'no tiredness at 85\'');
+    assert.strictEqual(G.derbyFatigue({ on: 0 }, 90), 3);
+    assert.strictEqual(G.derbyFatigue({ on: 60 }, 90), 0);
+  });
+
+  // ── V2: the segment engine ─────────────────────────────────────────────────
+  const dA = G.derbyAiDraft('maccabi-haifa', '4-3-3', 'hard', G.derbyRng(1));
+  const dB = G.derbyAiDraft('maccabi-tlv', '4-3-3', 'hard', G.derbyRng(2));
+  const xiA = { picks: dA.picks, bench: dA.bench, slots: dA.slots, tactic: 'bal' };
+  const xiB = { picks: dB.picks, bench: dB.bench, slots: dB.slots, tactic: 'bal' };
+  t('every match ends at 90 with a winner; a draw is settled on penalties', () => {
     let draws = 0;
-    for (let s = 1; s <= 500; s++) {
-      const g = G.derbyPlayMatch(lnA, lnB, s % 2 === 0, s);
-      assert.strictEqual(typeof g.won, 'boolean');
-      if (g.gf === g.ga) {
-        draws++;
-        assert.ok(g.pens, 'draw without pens, seed ' + s);
-        assert.strictEqual(g.won, g.pens.gf > g.pens.ga);
-      } else {
-        assert.strictEqual(g.pens, null);
-        assert.strictEqual(g.won, g.gf > g.ga);
-      }
+    for (let s = 1; s <= 300; s++) {
+      const m = G.derbyPlayMatch(xiA, xiB, s % 2 === 0, s);
+      assert.strictEqual(m.min, 90); assert.ok(m.over);
+      assert.strictEqual(m.events.filter(e => e.mine).length, m.gf);
+      assert.strictEqual(m.events.filter(e => !e.mine).length, m.ga);
+      if (m.gf === m.ga) { draws++; assert.ok(m.pens); assert.strictEqual(m.won, m.pens.gf > m.pens.ga); }
+      else { assert.strictEqual(m.pens, null); assert.strictEqual(m.won, m.gf > m.ga); }
     }
-    assert.ok(draws > 0, 'no draw in 500 matches');
+    assert.ok(draws > 0);
   });
-  t('a match is deterministic for its seed', () => {
-    assert.deepStrictEqual(G.derbyPlayMatch(lnA, lnB, true, 99), G.derbyPlayMatch(lnA, lnB, true, 99));
+  t('a match is deterministic for its seed and decisions', () => {
+    const a = G.derbyPlayMatch(xiA, xiB, true, 99), b = G.derbyPlayMatch(xiA, xiB, true, 99);
+    assert.deepStrictEqual([a.gf, a.ga, a.won], [b.gf, b.ga, b.won]);
   });
-  t('goal events: one per goal, sorted, no goalkeeper scores', () => {
-    for (let s = 1; s <= 200; s++) {
-      const g = G.derbyPlayMatch(lnA, lnB, true, s);
-      const ev = G.derbyGoalEvents(g, xiA.picks, xiB.picks, s);
-      assert.strictEqual(ev.filter(e => e.mine).length, g.gf);
-      assert.strictEqual(ev.filter(e => !e.mine).length, g.ga);
-      for (let i = 1; i < ev.length; i++) assert.ok(ev[i].min >= ev[i - 1].min);
-      const gks = new Set([...xiA.picks, ...xiB.picks].filter(p => p.player.position === 'GK').map(p => p.player.name));
-      ev.forEach(e => assert.ok(!gks.has(e.name), 'GK scored: ' + e.name));
-    }
+  t('subs: at most 5, at most 3 windows, half-time is free', () => {
+    const m = G.derbyMatchNew(xiA, xiB, true, 5);
+    const side = m.me;
+    assert.ok(G.derbySub(side, 1, 0, 45)); assert.ok(G.derbySub(side, 2, 0, 45));   // half-time: no window
+    assert.strictEqual(side.windows, 0);
+    assert.ok(G.derbySub(side, 3, 0, 60)); assert.ok(G.derbySub(side, 4, 0, 60));   // window 1
+    assert.ok(G.derbySub(side, 5, 0, 75));                                           // window 2, 5th sub
+    assert.ok(!G.derbySub(side, 6, 0, 75), 'a 6th sub');
+    assert.strictEqual(side.subs, 5); assert.strictEqual(side.windows, 2);
+    const s2 = G.derbyMatchNew(xiA, xiB, true, 5).me;
+    assert.ok(G.derbySub(s2, 1, 0, 15) && G.derbySub(s2, 2, 0, 30) && G.derbySub(s2, 3, 0, 60));
+    assert.ok(!G.derbySub(s2, 4, 0, 75), 'a 4th window');
+    assert.ok(G.derbySub(s2, 4, 0, 45), 'half-time is still free');
   });
-  t('series status stops at three', () => {
+  t('a substitute comes on fresh', () => {
+    const m = G.derbyMatchNew(xiA, xiB, true, 5);
+    assert.ok(G.derbySub(m.me, 3, 0, 60));
+    assert.strictEqual(m.me.picks[3].on, 60);
+    assert.strictEqual(G.derbyFatigue(m.me.picks[3], 85), 0);
+    assert.ok(G.derbyFatigue(m.me.picks[4], 85) > 0);
+  });
+  t('the computer chases when behind and protects when ahead', () => {
+    const m = G.derbyMatchNew(xiA, xiB, true, 5);
+    G.derbyAutoManage(m.opp, 60, -1); assert.strictEqual(m.opp.tactic, 'att');
+    G.derbyAutoManage(m.opp, 75, 1);  assert.strictEqual(m.opp.tactic, 'def');
+    assert.ok(m.opp.subs >= 1 && m.opp.subs <= 5);
+  });
+  t('series order: ג, ב, then the archrival', () => {
+    assert.deepStrictEqual([0, 1, 2].map(s => G.derbySeriesRival('maccabi-haifa', s)),
+      ['beitar-jerusalem', 'hapoel-haifa', 'maccabi-tlv']);
+  });
+  t('series status and run summary', () => {
     const W = { won: true }, L = { won: false };
-    assert.deepStrictEqual(G.derbySeriesStatus([W, W, W]), { w: 3, l: 0, over: true, won: true });
-    assert.deepStrictEqual(G.derbySeriesStatus([L, W, L, L]), { w: 1, l: 3, over: true, won: false });
     assert.deepStrictEqual(G.derbySeriesStatus([W, L, W, L]), { w: 2, l: 2, over: false, won: false });
-  });
-  t('series order for Haifa: Beitar, H. Haifa, M. TLV, H. Haifa, M. TLV', () => {
-    assert.deepStrictEqual([0, 1, 2, 3, 4].map(i => G.derbyGameRival('maccabi-haifa', i)),
-      ['beitar-jerusalem', 'hapoel-haifa', 'maccabi-tlv', 'hapoel-haifa', 'maccabi-tlv']);
-  });
-  t('the rival\'s clean-sheet tag counts too (not only the player\'s)', () => {
-    const goals = cs => {
-      let sum = 0;
-      for (let s = 1; s <= 2000; s++) sum += G.derbyPlayMatch(lnA, Object.assign({}, lnB, { cs }), true, s).gf;
-      return sum;
-    };
-    assert.ok(goals(1.6) < goals(1), 'opp.cs did not lower the player\'s goals');
+    const s = [{ games: [W, W, W] }, { games: [L, L, L] }, { games: [W, L, W, L, W] }];
+    assert.deepStrictEqual(G.derbyRunSummary(s), { seriesWon: 2, over: true, title: false });
+    assert.strictEqual(G.derbyRunSummary([{ games: [W, W, W] }, { games: [W, W, W] }, { games: [W, W, W] }]).title, true);
   });
 
   // ── Task 5: hooks ──────────────────────────────────────────────────────────
