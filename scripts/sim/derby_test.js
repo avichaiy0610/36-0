@@ -31,7 +31,7 @@ const EXPORTS = ['state', 'SQUADS', 'TEAMS', 'formationSlots', 'playerFitsSlot',
   'derbySeasonsOf', 'derbyClubs', 'derbyRng',
   'derbyAiDraft', 'derbyLinesFor',
   'derbyPlayMatch', 'derbySeriesStatus',
-  'derbyFatigue', 'derbyMatchNew', 'derbyMatchStep', 'derbySub', 'derbyCanSub', 'derbyAutoManage', 'derbySeriesRival', 'derbyRunSummary', 'playerOVR'];
+  'derbyFatigue', 'derbyMatchNew', 'derbyMatchStep', 'derbySub', 'derbyCanSub', 'derbyAutoManage', 'derbySeriesRival', 'derbyRunSummary', 'playerOVR', 'SIM2', 'simulateMatchV2'];
 
 function load() {
   return new Function(STUB + FILES.map(read).join('\n') +
@@ -162,26 +162,60 @@ if (require.main === module) {
     const a = G.derbyPlayMatch(xiA, xiB, true, 99), b = G.derbyPlayMatch(xiA, xiB, true, 99);
     assert.deepStrictEqual([a.gf, a.ga, a.won], [b.gf, b.ga, b.won]);
   });
+  // a sub must fit the slot now: bring on the first bench man who fits an outfield
+  // slot that has not been changed yet (the slot argument is only a tie-break hint)
+  let subSlot = -1;
+  const sub = (side, hint, min) => {
+    for (let si = 1; si < side.picks.length; si++) {
+      if (side.picks[si].on) continue;
+      const bi = side.bench.findIndex(b => G.playerFitsSlot(b.player, G.slotFitPos(side.slots[si])));
+      if (bi >= 0) { const ok = G.derbySub(side, si, bi, min); if (ok) subSlot = si; return ok; }
+    }
+    return false;
+  };
   t('subs: at most 5, at most 3 windows, half-time is free', () => {
     const m = G.derbyMatchNew(xiA, xiB, true, 5);
     const side = m.me;
-    assert.ok(G.derbySub(side, 1, 0, 45)); assert.ok(G.derbySub(side, 2, 0, 45));   // half-time: no window
+    assert.ok(sub(side, 1, 45)); assert.ok(sub(side, 2, 45));   // half-time: no window
     assert.strictEqual(side.windows, 0);
-    assert.ok(G.derbySub(side, 3, 0, 60)); assert.ok(G.derbySub(side, 4, 0, 60));   // window 1
-    assert.ok(G.derbySub(side, 5, 0, 75));                                           // window 2, 5th sub
-    assert.ok(!G.derbySub(side, 6, 0, 75), 'a 6th sub');
+    assert.ok(sub(side, 3, 60)); assert.ok(sub(side, 4, 60));   // window 1
+    assert.ok(sub(side, 5, 75));                                           // window 2, 5th sub
+    assert.ok(!sub(side, 6, 75), 'a 6th sub');
     assert.strictEqual(side.subs, 5); assert.strictEqual(side.windows, 2);
     const s2 = G.derbyMatchNew(xiA, xiB, true, 5).me;
-    assert.ok(G.derbySub(s2, 1, 0, 15) && G.derbySub(s2, 2, 0, 30) && G.derbySub(s2, 3, 0, 60));
-    assert.ok(!G.derbySub(s2, 4, 0, 75), 'a 4th window');
-    assert.ok(G.derbySub(s2, 4, 0, 45), 'half-time is still free');
+    assert.ok(sub(s2, 1, 15) && sub(s2, 2, 30) && sub(s2, 3, 60));
+    assert.ok(!sub(s2, 4, 75), 'a 4th window');
+    assert.ok(sub(s2, 4, 45), 'half-time is still free');
+  });
+  t('a sub must fit the slot, and only strictly inside the match', () => {
+    const m = G.derbyMatchNew(xiA, xiB, true, 5);
+    const cbIdx = m.me.bench.findIndex(b => G.slotFitPos({ pos: 'GK' }) && !G.playerFitsSlot(b.player, 'GK'));
+    assert.ok(cbIdx >= 0);
+    assert.ok(!G.derbySub(m.me, 0, cbIdx, 60), 'an outfielder in goal');
+    assert.ok(!sub(m.me, 3, 0) && !sub(m.me, 3, 90), 'minute bounds');
+  });
+  t('chance-slots: no side beyond SIM2.CHANCES goals, and the scoring level matches the one-shot engine', () => {
+    const lines = x => G.derbyLinesFor(x.picks, x.slots, 'bal', 0);
+    const la = lines(xiA), lb = lines(xiB);
+    const one = { gf: 0, n: 0 };
+    let seg = 0, N = 2000;
+    for (let s = 1; s <= N; s++) {
+      const m = G.derbyMatchNew(xiA, Object.assign({}, xiB, { bench: [] }), s % 2 === 0, s);
+      while (!m.over) G.derbyMatchStep(m, false);
+      assert.ok(m.gf <= G.SIM2.CHANCES && m.ga <= G.SIM2.CHANCES, 'seed ' + s);
+      seg += m.gf + m.ga;
+      const o = G.simulateMatchV2(la, lb, s % 2 === 0);
+      one.gf += o.gf + o.ga;
+    }
+    assert.ok(Math.abs(seg - one.gf) / one.gf < 0.10, 'segments ' + seg / N + ' vs one-shot ' + one.gf / N);
   });
   t('a substitute comes on fresh', () => {
     const m = G.derbyMatchNew(xiA, xiB, true, 5);
-    assert.ok(G.derbySub(m.me, 3, 0, 60));
-    assert.strictEqual(m.me.picks[3].on, 60);
-    assert.strictEqual(G.derbyFatigue(m.me.picks[3], 85), 0);
-    assert.ok(G.derbyFatigue(m.me.picks[4], 85) > 0);
+    assert.ok(sub(m.me, 3, 60));
+    assert.strictEqual(m.me.picks[subSlot].on, 60);
+    assert.strictEqual(G.derbyFatigue(m.me.picks[subSlot], 85), 0);
+    const other = m.me.picks.findIndex((p, i) => i !== subSlot && !p.on);
+    assert.ok(G.derbyFatigue(m.me.picks[other], 85) > 0);
   });
   t('the computer chases when behind and protects when ahead', () => {
     const m = G.derbyMatchNew(xiA, xiB, true, 5);

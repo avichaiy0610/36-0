@@ -1,8 +1,13 @@
 // ─── אלופי הדרבי — the match engine and the series (spec §9) ────────────────
-// A match is played in DERBY_CHUNK-minute segments of the league's own model:
-// xG from the line ratings × the segment's share of ninety, goals drawn by the
-// same binomial (simDrawGoals) — the gauntlet's gtSimSegment pattern, so a
-// derby is not a different sport. Between segments the manager may change the
+// A match is played in DERBY_CHUNK-minute segments of the league's own model.
+// The engine's goals are Binomial(SIM2.CHANCES, xg/CHANCES): five chances a side,
+// a hard cap and a low variance. Drawing simDrawGoals(xg × share) per segment
+// would be Binomial(30, ·) and fatten the tails (6+ goals, upsets, doubled 0-0s),
+// so instead each side's CHANCES chances are PLACED on minutes 1..90 up front
+// (m.me.chances / m.opp.chances — persisted with the match, so V4's live save
+// must keep them) and each is converted, when its minute comes, with the engine's
+// own per-chance probability. Tactic, tiredness and substitutions therefore act
+// through that probability for the chances still to come. Between segments the manager may change the
 // tactic or bring men on, and tiredness (derbyFatigue) is what makes that worth
 // doing. Each segment is seeded from the match seed and its first minute, so a
 // match replays identically from any saved boundary given the same decisions.
@@ -14,19 +19,29 @@ function derbySide(xi) {
     picks: xi.picks.map(e => (e ? { player: e.player, squad: e.squad, on: e.on || 0 } : null)),
     bench: (xi.bench || []).map(e => ({ player: e.player, squad: e.squad })),
     slots: xi.slots, tactic: xi.tactic || 'bal',
+    chances: (xi.chances || []).slice(),
     subs: xi.subs || 0, windows: xi.windows || 0, lastWin: xi.lastWin ?? -1, off: (xi.off || []).slice(),
   };
 }
 
 // me / opp: { picks, bench, slots, tactic } — picks aligned with slots.
 function derbyMatchNew(me, opp, home, seed) {
-  return { min: 0, gf: 0, ga: 0, home, seed: seed | 0, events: [], over: false, won: null, pens: null,
-           me: derbySide(me), opp: derbySide(opp) };
+  const m = { min: 0, gf: 0, ga: 0, home, seed: seed | 0, events: [], over: false, won: null, pens: null,
+              me: derbySide(me), opp: derbySide(opp) };
+  const place = x => {
+    const r = derbyRng((m.seed ^ x) | 0), out = [];
+    for (let i = 0; i < SIM2.CHANCES; i++) out.push(1 + Math.floor(r() * 90));
+    return out.sort((p, q) => p - q);
+  };
+  if (!m.me.chances.length) m.me.chances = place(0x2545f491);
+  if (!m.opp.chances.length) m.opp.chances = place(0x6c8e9cf5);
+  return m;
 }
 
 // Half-time is free, as in the real rules; any other stoppage that brings a
 // man on uses one of the DERBY_SUB_WINDOWS.
 function derbyCanSub(side, minute) {
+  if (minute <= 0 || minute >= 90) return false;
   if (side.subs >= DERBY_SUBS || !side.bench.length) return false;
   return minute === 45 || side.lastWin === minute || side.windows < DERBY_SUB_WINDOWS;
 }
@@ -34,6 +49,7 @@ function derbyCanSub(side, minute) {
 function derbySub(side, slotIdx, benchIdx, minute) {
   const inE = side.bench[benchIdx];
   if (!inE || !side.picks[slotIdx] || !derbyCanSub(side, minute)) return false;
+  if (!playerFitsSlot(inE.player, slotFitPos(side.slots[slotIdx]))) return false;
   if (minute !== 45 && side.lastWin !== minute) { side.windows++; side.lastWin = minute; }
   side.subs++;
   side.off.push(side.picks[slotIdx]);
@@ -82,27 +98,34 @@ function derbyScorer(side, rng) {
 function derbyMatchStep(m, autoMe) {
   if (m.over) return [];
   const from = m.min, to = Math.min(90, from + DERBY_CHUNK);
-  const mid = (from + to) / 2, share = (to - from) / 90;
+  const mid = (from + to) / 2;
   derbyAutoManage(m.opp, from, m.ga - m.gf);
   if (autoMe) derbyAutoManage(m.me, from, m.gf - m.ga);
   const a = derbyLinesFor(m.me.picks, m.me.slots, m.me.tactic, mid);
   const b = derbyLinesFor(m.opp.picks, m.opp.slots, m.opp.tactic, mid);
   const seg = (m.seed + (from + 1) * 104729) | 0;
-  const g = withSeededRandom(seg, () => {
-    const A = simShrinkLines(a), B = simShrinkLines(b);
-    // a clean-sheet promise is about the whole match: each segment gets its share
-    return {
-      gf: simDrawGoals(simExpectedGoals(A, B, m.home) * share, Math.pow(b.cs || 1, share)),
-      ga: simDrawGoals(simExpectedGoals(B, A, !m.home) * share, Math.pow(a.cs || 1, share)),
-    };
-  });
-  const rng = derbyRng(seg ^ 0x9e3779b9), out = [];
-  const ev = (side, mine) => {
-    const e = derbyScorer(side, rng);
-    out.push({ min: from + 1 + Math.floor(rng() * (to - from)), mine, name: e.player.name, sub: (e.on || 0) > 0 });
+  // Per-chance conversion, solved exactly as simDrawGoals does (clamp, then the
+  // clean-sheet tag scales P(0), then clamp again) — from the FULL-match xG.
+  const conv = (xg, cs) => {
+    let p = Math.min(0.97, xg / SIM2.CHANCES);
+    if (cs && cs !== 1) p = Math.min(0.97, Math.max(0, 1 - Math.pow(cs, 1 / SIM2.CHANCES) * (1 - p)));
+    return p;
   };
-  for (let i = 0; i < g.gf; i++) ev(m.me, true);
-  for (let i = 0; i < g.ga; i++) ev(m.opp, false);
+  const pf = conv(simExpectedGoals(simShrinkLines(a), simShrinkLines(b), m.home), b.cs);
+  const pa = conv(simExpectedGoals(simShrinkLines(b), simShrinkLines(a), !m.home), a.cs);
+  const rng = derbyRng(seg ^ 0x9e3779b9), out = [];
+  const inSeg = x => x > from && x <= to;
+  withSeededRandom(seg, () => {
+    m.me.chances.filter(inSeg).forEach(min => {
+      if (Math.random() < pf) out.push({ min, mine: true, e: derbyScorer(m.me, rng) });
+    });
+    m.opp.chances.filter(inSeg).forEach(min => {
+      if (Math.random() < pa) out.push({ min, mine: false, e: derbyScorer(m.opp, rng) });
+    });
+  });
+  const goals = out.map(o => ({ min: o.min, mine: o.mine, name: o.e.player.name, sub: (o.e.on || 0) > 0 }));
+  out.length = 0; out.push(...goals);
+  const g = { gf: out.filter(o => o.mine).length, ga: out.filter(o => !o.mine).length };
   out.sort((x, y) => x.min - y.min);
   m.gf += g.gf; m.ga += g.ga; m.min = to;
   m.events.push(...out);

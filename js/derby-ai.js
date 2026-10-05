@@ -97,7 +97,9 @@ const _derbyLinesMemo = new Map();
 function derbyLinesFor(picks, slots, tactic, minute) {
   const m = minute || 0;
   const tired = m > DERBY_FATIGUE_FROM;
-  const key = (tactic || 'bal') + '|' + (tired ? m : 0) + '|' + slots.map(s => s.id || s.pos).join(',') + '|' +
+  const flags = (typeof classicMode === 'function' && classicMode() ? 'c' : '') + (state.peakMode ? 'p' : '') +
+    (state.crowdMode ? 'w' : '') + (state.coach ? 'k' : '') + (state.story ? 's' : '');
+  const key = flags + '|' + (tactic || 'bal') + '|' + (tired ? m : 0) + '|' + slots.map(s => s.id || s.pos).join(',') + '|' +
     picks.map(p => p ? p.squad.id + ':' + p.player.name + ':' + (p.on || 0) : '-').join(',');
   const hit = _derbyLinesMemo.get(key);
   if (hit) return Object.assign({}, hit);
