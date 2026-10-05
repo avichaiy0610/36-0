@@ -68,5 +68,41 @@ if (require.main === module) {
     for (let i = 0; i < 100; i++) { const x = a(); assert.strictEqual(x, b()); assert.ok(x >= 0 && x < 1); }
   });
 
+  // ── Task 2: the computer's draft ───────────────────────────────────────────
+  for (const club of ['maccabi-haifa', 'hapoel-pt']) {
+    t(`AI draft (${club}): 11 picks, no repeated player or season, all from the club`, () => {
+      for (let s = 1; s <= 150; s++) {
+        const d = G.derbyAiDraft(club, '4-3-3', 'normal', G.derbyRng(s));
+        assert.strictEqual(d.picks.length, 11);
+        assert.ok(d.picks.every(Boolean), 'empty slot, seed ' + s);
+        assert.strictEqual(new Set(d.picks.map(p => p.player.name)).size, 11, 'repeat player, seed ' + s);
+        assert.strictEqual(new Set(d.picks.map(p => p.squad.id)).size, 11, 'repeat season, seed ' + s);
+        d.picks.forEach(p => assert.strictEqual(p.squad.teamId, club));
+        d.picks.forEach((p, i) => assert.ok(G.playerFitsSlot(p.player, G.slotFitPos(d.slots[i])),
+          `${p.player.name} (${p.player.position}) in ${d.slots[i].pos}, seed ${s}`));
+      }
+    });
+  }
+  t('harder computer drafts a stronger XI on average', () => {
+    const avg = diff => {
+      let sum = 0;
+      for (let s = 1; s <= 200; s++) {
+        const d = G.derbyAiDraft('maccabi-tlv', '4-3-3', diff, G.derbyRng(s));
+        sum += G.derbyLinesFor(d.picks, d.slots).ovr;
+      }
+      return sum / 200;
+    };
+    const e = avg('easy'), nm = avg('normal'), h = avg('hard');
+    assert.ok(h > nm && nm > e, `easy ${e} normal ${nm} hard ${h}`);
+  });
+  t('derbyLinesFor leaves the player\'s own XI on state untouched', () => {
+    const before = G.state.picks, slotsBefore = G.state.slots;
+    const d = G.derbyAiDraft('beitar-jerusalem', '4-3-3', 'hard', G.derbyRng(7));
+    const r = G.derbyLinesFor(d.picks, d.slots);
+    assert.ok(r.ovr > 60 && r.atk > 0 && r.gk > 0);
+    assert.strictEqual(G.state.picks, before);
+    assert.strictEqual(G.state.slots, slotsBefore);
+  });
+
   console.log(`\n${n} passed`);
 }
