@@ -12,7 +12,9 @@ const document = { addEventListener(){}, getElementById(){ return null; },
   querySelectorAll(){ return []; }, querySelector(){ return null; },
   createElement(){ return { style:{}, classList:{ add(){}, remove(){} } }; } };
 const window = {};
-const localStorage = { getItem(){ return null; }, setItem(){}, removeItem(){} };
+const _ls = new Map();
+const localStorage = { getItem(k){ return _ls.has(k) ? _ls.get(k) : null; }, setItem(k, v){ _ls.set(k, String(v)); }, removeItem(k){ _ls.delete(k); } };
+const derbyShow = () => {};
 const getCurrentUser = () => null;
 const _supabase = { rpc(){ return Promise.resolve(); } };
 // js/duel.js owns mulberry32 in the browser; withSeededRandom (league-sim.js) needs it.
@@ -24,14 +26,16 @@ t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
 // Node, drop it from FILES: both sides then read 0 from it, which is still fair.
 const FILES = ['js/data.js', 'js/league_tables.js', 'js/sim-engine.js', 'js/game.js',
   'js/league-sim.js', 'js/chem-data.js', 'js/chemistry.js', 'js/tag-data.js', 'js/tags.js',
-  'js/derby-data.js', 'js/derby-ai.js', 'js/derby-match.js'];
+  'js/derby-data.js', 'js/derby-ai.js', 'js/derby-match.js', 'js/derby.js'];
 const EXPORTS = ['state', 'SQUADS', 'TEAMS', 'formationSlots', 'playerFitsSlot', 'slotFitPos',
   'myLineRatings', 'teamOVR', 'getEraFilteredSquads',
   'DERBY_RIVALS', 'DERBY_MIN_SEASONS', 'DERBY_MIN_RIVAL_SEASONS', 'DERBY_SERIES_ORDER', 'DERBY_GAME_HOME', 'DERBY_BENCH', 'DERBY_SUBS', 'DERBY_SUB_WINDOWS', 'DERBY_CHUNK', 'DERBY_AI', 'DERBY_REROLLS',
   'derbySeasonsOf', 'derbyClubs', 'derbyRng',
   'derbyAiDraft', 'derbyLinesFor',
   'derbyPlayMatch', 'derbySeriesStatus',
-  'derbyFatigue', 'derbyMatchNew', 'derbyMatchStep', 'derbySub', 'derbyCanSub', 'derbyAutoManage', 'derbySeriesRival', 'derbyRunSummary', 'playerOVR', 'SIM2', 'simulateMatchV2', 'withSeededRandom', 'DERBY_UNDERDOGS'];
+  'derbyFatigue', 'derbyMatchNew', 'derbyMatchStep', 'derbySub', 'derbyCanSub', 'derbyAutoManage', 'derbySeriesRival', 'derbyRunSummary', 'playerOVR', 'SIM2', 'simulateMatchV2', 'withSeededRandom', 'DERBY_UNDERDOGS',
+  'derbyEntryKey', 'derbyEntry', 'derbySave', 'derbyLoad', 'derbyBenchDraw', 'derbyBenchCandidates', 'derbyBenchPick', 'derbyBenchReroll',
+  'derbyBeginPlay', 'derbyCurrent', 'derbyGameStart', 'derbyGameStep', 'derbyLiveSave', 'derbyLiveLoad', 'derbySetTactic', 'derbyMakeSub', 'localStorage'];
 
 function load() {
   return new Function(STUB + FILES.map(read).join('\n') +
@@ -242,6 +246,117 @@ if (require.main === module) {
     assert.ok(pool.length === G.derbySeasonsOf('ironi-ks').length && pool.every(sq => sq.teamId === 'ironi-ks'));
     G.state.derby = null;
     assert.ok(G.getEraFilteredSquads().length > 300);
+  });
+
+
+  // ── Task V4: the run ───────────────────────────────────────────────────────
+  const newRun = (club, seed) => {
+    const fid = '4-3-3', diff = 'normal';
+    const d = G.derbyAiDraft(club, fid, diff, G.derbyRng(seed));
+    return { v: 2, club, difficulty: diff, formationId: fid, tactic: 'bal', seed, phase: 'bench',
+      xi: d.picks.map(G.derbyEntryKey), bench: [], benchDraw: null, rerolls: G.DERBY_REROLLS,
+      rivals: null, series: [], live: null, submitted: false };
+  };
+  const draftBench = run => {
+    for (let i = 0; i < G.DERBY_BENCH; i++) {
+      const sq = G.derbyBenchDraw(run);
+      assert.ok(G.derbyBenchPick(run, G.derbyBenchCandidates(run, sq)[0].name));
+    }
+  };
+  t('a v1 run in storage is dropped by derbyLoad', () => {
+    G.localStorage.setItem('36-0-derby', JSON.stringify({ v: 1, club: 'maccabi-haifa' }));
+    assert.strictEqual(G.derbyLoad(), null);
+    G.localStorage.removeItem('36-0-derby');
+  });
+  t('bench pick never repeats a man or a foreign season; reroll decrements and stops at 0', () => {
+    const run = newRun('maccabi-haifa', 11);
+    assert.strictEqual(G.derbyBenchPick(run, run.xi[0].name), false);     // no draw yet
+    const sq = G.derbyBenchDraw(run);
+    assert.strictEqual(G.derbyBenchDraw(run).id, sq.id);                  // persisted draw
+    const cands = G.derbyBenchCandidates(run, sq);
+    assert.ok(cands.every(p => !run.xi.some(k => k.name === p.name)));
+    assert.strictEqual(G.derbyBenchPick(run, 'Nobody At All'), false);
+    for (let i = 0; i < 3; i++) { assert.strictEqual(G.derbyBenchReroll(run), true); assert.strictEqual(run.benchDraw, null); G.derbyBenchDraw(run); }
+    assert.strictEqual(run.rerolls, 0);
+    assert.strictEqual(G.derbyBenchReroll(run), false);
+    assert.strictEqual(run.rerolls, 0);
+    for (let i = 0; i < G.DERBY_BENCH; i++) {
+      const s2 = G.derbyBenchDraw(run), c = G.derbyBenchCandidates(run, s2)[0].name;
+      assert.ok(G.derbyBenchPick(run, c));
+      assert.strictEqual(G.derbyBenchPick(run, c), false);               // draw cleared / already in
+    }
+    const names = run.xi.concat(run.bench).map(k => k.name);
+    assert.strictEqual(new Set(names).size, 11 + G.DERBY_BENCH);
+    assert.strictEqual(run.phase, 'rivals');
+  });
+  t('a full headless run: bench, rivals, three series in order, summary consistent', () => {
+    const run = newRun('maccabi-tlv', 4242);
+    draftBench(run);
+    assert.strictEqual(run.phase, 'rivals');
+    assert.deepStrictEqual(Object.keys(run.rivals).sort(), G.DERBY_RIVALS['maccabi-tlv'].slice().sort());
+    Object.values(run.rivals).forEach(r => { assert.strictEqual(r.xi.length, 11); assert.strictEqual(r.bench.length, G.DERBY_BENCH); });
+    assert.deepStrictEqual(run.series.map(s => s.rival), [G.derbySeriesRival('maccabi-tlv', 0)]);
+    G.derbyBeginPlay(run);
+    assert.strictEqual(run.phase, 'play');
+    let guard = 0;
+    while (run.phase !== 'done' && guard++ < 200) {
+      const m = G.derbyGameStart(run);
+      assert.ok(m && !m.over);
+      assert.ok(run.live);
+      while (!m.over) G.derbyGameStep(run, m);
+      assert.strictEqual(run.live, null);
+    }
+    assert.strictEqual(run.phase, 'done');
+    assert.strictEqual(run.series.length, 3);
+    assert.deepStrictEqual(run.series.map(s => s.rival), [0, 1, 2].map(i => G.derbySeriesRival('maccabi-tlv', i)));
+    run.series.forEach(s => { assert.ok(G.derbySeriesStatus(s.games).over); s.games.forEach((g, i) => assert.strictEqual(g.home, G.DERBY_GAME_HOME[i])); });
+    const sum = G.derbyRunSummary(run.series);
+    assert.ok(sum.over);
+    assert.strictEqual(sum.seriesWon, run.series.filter(s => G.derbySeriesStatus(s.games).won).length);
+    assert.strictEqual(G.derbyCurrent(run), null);
+    assert.strictEqual(run.submitted, true);
+  });
+  t('save + reload mid-match continues to exactly the same match', () => {
+    for (const seed of [7, 99, 2024]) {
+      const base = newRun('maccabi-haifa', seed); draftBench(base); G.derbyBeginPlay(base);
+      const snap = JSON.stringify(base);
+      const play = (run, interrupt) => {
+        let m = G.derbyGameStart(run);
+        for (let i = 0; i < 3; i++) G.derbyGameStep(run, m);
+        assert.strictEqual(m.min, 45);
+        assert.ok(G.derbySetTactic(run, m, 'att'));
+        // a like-for-like change at half-time: first bench man who fits an outfield slot
+        let done = false;
+        m.me.bench.forEach((b, bi) => m.me.picks.forEach((p, si) => {
+          if (!done && si > 0 && G.playerFitsSlot(b.player, G.slotFitPos(m.me.slots[si])) && G.derbyMakeSub(run, m, si, bi)) done = true;
+        }));
+        if (interrupt) { run = G.derbyLoad(); m = G.derbyGameStart(run); }
+        while (!m.over) G.derbyGameStep(run, m);
+        return { run, m, subbed: done };
+      };
+      G.derbySave(JSON.parse(snap)); const a = play(G.derbyLoad(), false);
+      G.derbySave(JSON.parse(snap)); const b = play(G.derbyLoad(), true);
+      assert.ok(a.subbed && b.subbed && b.m.me.subs === 1);
+      assert.strictEqual(b.m.gf, a.m.gf); assert.strictEqual(b.m.ga, a.m.ga);
+      assert.deepStrictEqual(b.m.events, a.m.events);
+      assert.deepStrictEqual(b.m.pens, a.m.pens);
+      assert.deepStrictEqual(b.run.series, a.run.series);
+      assert.strictEqual(G.derbyMakeSub(b.run, b.m, 1, 0), false);       // refused once over
+      assert.strictEqual(G.derbySetTactic(b.run, b.m, 'def'), false);
+    }
+  });
+  t('live save round-trips every engine field', () => {
+    const run = newRun('hapoel-tlv', 5); draftBench(run); G.derbyBeginPlay(run);
+    const m = G.derbyGameStart(run);
+    G.derbyGameStep(run, m); G.derbyGameStep(run, m);
+    const L = JSON.parse(JSON.stringify(G.derbyLiveSave(m)));
+    G.derbySave(run);
+    const m2 = G.derbyGameStart(G.derbyLoad());
+    for (const k of ['min', 'gf', 'ga', 'home', 'seed', 'over', 'won', 'pens']) assert.deepStrictEqual(m2[k], m[k], k);
+    assert.deepStrictEqual(m2.events, m.events);
+    for (const side of ['me', 'opp']) for (const k of ['chances', 'subs', 'windows', 'lastWin', 'tactic'])
+      assert.deepStrictEqual(m2[side][k], m[side][k], side + k);
+    assert.deepStrictEqual(G.derbyLiveSave(m2), L);
   });
 
   // ── Task 8: the migration knows the same clubs ─────────────────────────────
