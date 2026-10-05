@@ -54,9 +54,10 @@ DECLARE
   v_comeback boolean := COALESCE((p->>'comeback')::boolean, false);
   v_decider  boolean := COALESCE((p->>'decider')::boolean, false);
   v_total    int     := array_length(v_known, 1);
-  v_clubs    int     := LEAST(GREATEST(COALESCE((p->>'won_clubs')::int, 0), 0), v_total);
-  v_xi       jsonb   := CASE WHEN jsonb_typeof(p->'xi') = 'array' AND jsonb_array_length(p->'xi') <= 11
-                             THEN p->'xi' ELSE '[]'::jsonb END;
+  v_clubs    int     := 0;
+  v_xi       jsonb   := CASE WHEN jsonb_typeof(p->'xi') = 'array'
+                             THEN CASE WHEN jsonb_array_length(p->'xi') <= 11 THEN p->'xi' ELSE '[]'::jsonb END
+                             ELSE '[]'::jsonb END;
   v_won      boolean;
   earned     text[]  := '{}';
   fresh      text[]  := '{}';
@@ -76,6 +77,8 @@ BEGIN
 
   INSERT INTO derby_runs (user_id, club, difficulty, wins, losses, won, xi)
   VALUES (uid, v_club, v_diff, v_w, v_l, v_won, v_xi);
+  -- dc_all is counted here, from the rows, so it follows the account across devices
+  SELECT count(DISTINCT club) INTO v_clubs FROM derby_runs WHERE user_id = uid AND won;
 
   IF v_won THEN
     earned := array_append(earned, 'dc_first');

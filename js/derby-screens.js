@@ -125,6 +125,7 @@ function derbyRenderMatch(run, i, animate) {
   if (!animate) { done(); return; }
   let min = 0;
   _derbyTimer = setInterval(() => {
+    if (!document.getElementById('screen-derby')?.classList.contains('active')) { derbyStopClock(); return; }
     min += 1;
     if (min >= 90) { derbyStopClock(); done(); } else paint(min);
   }, 45);

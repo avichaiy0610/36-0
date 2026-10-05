@@ -5,7 +5,6 @@
 // step; a game is simulated only when it is reached, so a refresh resumes.
 
 const DERBY_KEY = '36-0-derby';
-const DERBY_WINS_KEY = '36-0-derby-wins';     // clubs won with, for dc_all
 
 function derbyLoad() {
   try { const r = JSON.parse(localStorage.getItem(DERBY_KEY)); return r && r.v === 1 ? r : null; }
@@ -24,7 +23,7 @@ function derbyEntry(k) {
 }
 
 function derbyStart(club, difficulty) {
-  const run = { v: 1, club, difficulty, formationId: state.formationId || '4-3-3',
+  const run = { v: 1, club, difficulty, formationId: [_selectedFormationKey, state.formationId, '4-3-3'].find(k => k && FORMATIONS[k]),
     tactic: tacticOf(state.tactic), seed: (Math.random() * 2147483647) | 0,
     phase: 'draft', xi: null, rivals: null, games: [], submitted: false };
   derbySave(run);
@@ -115,19 +114,13 @@ function derbyPlayNext(run) {
 function derbyFinish(run, st) {
   if (run.submitted) return;
   run.submitted = true;
-  let wins = [];
-  try { wins = JSON.parse(localStorage.getItem(DERBY_WINS_KEY)) || []; } catch (e) {}
-  if (st.won && !wins.includes(run.club)) {
-    wins.push(run.club);
-    try { localStorage.setItem(DERBY_WINS_KEY, JSON.stringify(wins)); } catch (e) {}
-  }
   derbyTrack('finish', run.club + '|' + st.w + '-' + st.l);
-  derbySubmit(run, st, wins.length);
+  derbySubmit(run, st);
 }
 
 // Migration 20261005000002: signed-in only; the server clamps everything and
 // returns only badges that are new.
-function derbySubmit(run, st, wonClubs) {
+function derbySubmit(run, st) {
   try {
     if (typeof getCurrentUser !== 'function' || !getCurrentUser() || typeof _supabase === 'undefined') return;
     const g = run.games;
@@ -135,7 +128,6 @@ function derbySubmit(run, st, wonClubs) {
       club: run.club, difficulty: run.difficulty, wins: st.w, losses: st.l,
       comeback: st.won && g.length >= 4 && !g[0].won && !g[1].won,
       decider: g.length === 5 && g[4].won,
-      won_clubs: wonClubs,
       xi: run.xi,
     } }).then(({ data }) => {
       const fresh = (data && data.achievements) || [];

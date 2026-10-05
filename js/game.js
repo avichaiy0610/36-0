@@ -4630,6 +4630,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-draft-exit')?.addEventListener('click', () => {
     if (state.currentRound > 0 && !confirm('לצאת מהדראפט? ההתקדמות לא תישמר.')) return;
     clearDraftState();
+    state.derby = null;
     if (state.duelCode) { state.duelCode = null; if (typeof closeDuelRealtime === 'function') closeDuelRealtime(); }
     state.challenge = null; state.challengeDeck = null; state.challengeReqs = null;
     showScreen('welcome');
