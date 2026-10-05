@@ -155,6 +155,21 @@ function factsData() {
   return _facts;
 }
 
+// Written bios and season paragraphs, approved by the owner word for word —
+// printed as they are, never edited here. Keyed by the page's folder name under
+// player/. A missing file means no page carries the block; a file that does not
+// parse throws, because a rebuild that silently dropped every bio would be worse
+// than one that stops.
+let _content = null;
+function approvedContent() {
+  if (_content) return _content;
+  const file = path.join(BASE, 'data', 'player-content-approved.json');
+  _content = {};
+  if (!fs.existsSync(file)) return _content;
+  for (const p of JSON.parse(fs.readFileSync(file, 'utf8')).players) _content[p.slug] = p;
+  return _content;
+}
+
 // The rest of what the game knows about a man and these pages threw away. The
 // six attributes are the important one: js/attr-data.js carries a row for every
 // player in every squad — 366 of 366, no gaps — so unlike the scorers' table
@@ -368,6 +383,15 @@ function pageHtml(TEAMS, e) {
   }
   const intro = `<p class="lede">${sentences.join(' ')}</p>`;
 
+  // The approved bio and season paragraph, when this page has them. A page
+  // without an entry gets an empty string, so its HTML is byte-for-byte what it
+  // was before this block existed.
+  const ac = approvedContent()[slugFor(name)];
+  const bioHtml = !ac || (!ac.bio && !ac.seasons) ? '' :
+    (ac.bio ? `<p class="lede">${esc(ac.bio)}</p>` : '') +
+    (ac.seasons ? `<p class="lede">${esc(ac.seasons)}</p>` : '') +
+    (ac.disclaimer ? `<p class="note">${esc(ac.disclaimer)}</p>` : '');
+
   /* ── the six attributes: REMOVED from the public pages, deliberately ──────
      Owner's call, 2026-09-15: "לא להציג נתונים כאלה בדף השחקן!!! הם לא מבוססים
      וכבר רואים שהם מחורבנים."
@@ -545,7 +569,8 @@ function pageHtml(TEAMS, e) {
       <a class="cta" href="/team/${esc(e.mainTeam)}/">בנה את הרכב כל הזמנים של ${esc(mtName)} ←</a>
     </div>
 
-    ${intro}
+    ${intro}${bioHtml ? `
+    ${bioHtml}` : ''}
     ${factsHtml}
     ${attrHtml}
     ${tagHtml}
