@@ -9,23 +9,29 @@
 // A club takes part only with this many top-flight seasons in SQUADS — fewer and
 // eleven rounds without repeating a season are not possible.
 const DERBY_MIN_SEASONS = 15;
+// ...and a club can be a RIVAL with this many (see DERBY_RIVALS).
+const DERBY_MIN_RIVAL_SEASONS = 7;
 
 // Three rivals per club, ARCHRIVAL FIRST. Approved by the owner 2026-10-05.
-// Every rival must itself take part: a rival with three seasons has no squad
-// deep enough for the computer to draft from. scripts/sim/derby_test.js checks it.
+// A rival need not take part itself, but it needs DERBY_MIN_RIVAL_SEASONS
+// seasons: with fewer, its squads are too thin for the computer to field eleven
+// in position. With fewer than eleven seasons the computer's draft repeats
+// seasons (never players) — fine for a rival. scripts/sim/derby_test.js checks it.
+// Changed by the owner 2026-10-05: Netanya ← Be'er Sheva/Beitar/Hadera,
+// Be'er Sheva ← Netanya for Ashdod, Sakhnin ← Beitar for Kiryat Shmona.
 const DERBY_RIVALS = {
   'maccabi-haifa':    ['maccabi-tlv',      'hapoel-haifa',     'beitar-jerusalem'],
   'maccabi-tlv':      ['hapoel-tlv',       'maccabi-haifa',    'beitar-jerusalem'],
   'beitar-jerusalem': ['bnei-sakhnin',     'hapoel-tlv',       'maccabi-tlv'],
   'hapoel-tlv':       ['maccabi-tlv',      'beitar-jerusalem', 'bnei-yehuda'],
   'hapoel-haifa':     ['maccabi-haifa',    'hapoel-tlv',       'bnei-sakhnin'],
-  'hapoel-beersheba': ['maccabi-haifa',    'maccabi-tlv',      'ms-ashdod'],
+  'hapoel-beersheba': ['maccabi-haifa',    'maccabi-tlv',      'maccabi-netanya'],
   'ms-ashdod':        ['hapoel-beersheba', 'bnei-yehuda',      'maccabi-pt'],
-  'maccabi-netanya':  ['maccabi-pt',       'hapoel-pt',        'beitar-jerusalem'],
+  'maccabi-netanya':  ['hapoel-beersheba', 'beitar-jerusalem', 'hapoel-hadera'],
   'maccabi-pt':       ['hapoel-pt',        'maccabi-netanya',  'bnei-yehuda'],
   'hapoel-pt':        ['maccabi-pt',       'hapoel-tlv',       'maccabi-netanya'],
   'bnei-yehuda':      ['hapoel-tlv',       'maccabi-tlv',      'maccabi-pt'],
-  'bnei-sakhnin':     ['ironi-ks',         'hapoel-haifa',     'maccabi-haifa'],
+  'bnei-sakhnin':     ['beitar-jerusalem', 'hapoel-haifa',     'maccabi-haifa'],
   'ironi-ks':         ['bnei-sakhnin',     'hapoel-haifa',     'maccabi-haifa'],
 };
 

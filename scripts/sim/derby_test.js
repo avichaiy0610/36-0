@@ -27,7 +27,7 @@ const FILES = ['js/data.js', 'js/league_tables.js', 'js/sim-engine.js', 'js/game
   'js/derby-data.js', 'js/derby-ai.js', 'js/derby-match.js'];
 const EXPORTS = ['state', 'SQUADS', 'TEAMS', 'formationSlots', 'playerFitsSlot', 'slotFitPos',
   'myLineRatings', 'teamOVR', 'getEraFilteredSquads',
-  'DERBY_RIVALS', 'DERBY_MIN_SEASONS', 'DERBY_ORDER', 'DERBY_HOME', 'DERBY_AI', 'DERBY_REROLLS',
+  'DERBY_RIVALS', 'DERBY_MIN_SEASONS', 'DERBY_MIN_RIVAL_SEASONS', 'DERBY_ORDER', 'DERBY_HOME', 'DERBY_AI', 'DERBY_REROLLS',
   'derbySeasonsOf', 'derbyClubs', 'derbyRng',
   'derbyAiDraft', 'derbyLinesFor',
   'derbyPlayMatch', 'derbyGoalEvents', 'derbySeriesStatus', 'derbyGameRival'];
@@ -52,19 +52,30 @@ if (require.main === module) {
     assert.ok(!clubs.includes('hapoel-jerusalem'));          // 6 seasons
     clubs.forEach(c => assert.ok(G.derbySeasonsOf(c).length >= G.DERBY_MIN_SEASONS, c));
   });
-  t('every club has three distinct rivals, all of them taking part', () => {
+  t('every club has three distinct rivals, each with enough seasons to draft', () => {
     const clubs = new Set(G.derbyClubs());
     for (const c of clubs) {
       const r = G.DERBY_RIVALS[c];
       assert.strictEqual(r.length, 3, c);
       assert.strictEqual(new Set(r).size, 3, c);
       assert.ok(!r.includes(c), c);
-      r.forEach(x => assert.ok(clubs.has(x), c + ' → ' + x));
+      r.forEach(x => assert.ok(G.derbySeasonsOf(x).length >= G.DERBY_MIN_RIVAL_SEASONS, c + ' → ' + x));
+    }
+  });
+  t('a rival from outside the 13 (Hadera, 7 seasons) still fields 11 in position, no repeated player', () => {
+    for (const f of ['4-3-3', '4-4-2', '3-5-2']) for (let s = 1; s <= 100; s++) {
+      const d = G.derbyAiDraft('hapoel-hadera', f, 'hard', G.derbyRng(s));
+      assert.ok(d.picks.every(Boolean), f + ' seed ' + s);
+      assert.strictEqual(new Set(d.picks.map(p => p.player.name)).size, 11);
+      d.picks.forEach((p, i) => assert.ok(G.playerFitsSlot(p.player, G.slotFitPos(d.slots[i])), f + ' ' + p.player.name));
     }
   });
   t('owner rulings: Beitar\'s archrival is Sakhnin, Haifa\'s is Maccabi TLV', () => {
     assert.strictEqual(G.DERBY_RIVALS['beitar-jerusalem'][0], 'bnei-sakhnin');
     assert.strictEqual(G.DERBY_RIVALS['maccabi-haifa'][0], 'maccabi-tlv');
+    assert.deepStrictEqual(G.DERBY_RIVALS['maccabi-netanya'], ['hapoel-beersheba', 'beitar-jerusalem', 'hapoel-hadera']);
+    assert.strictEqual(G.DERBY_RIVALS['hapoel-beersheba'][2], 'maccabi-netanya');
+    assert.strictEqual(G.DERBY_RIVALS['bnei-sakhnin'][0], 'beitar-jerusalem');
   });
   t('derbyRng is deterministic and in [0,1)', () => {
     const a = G.derbyRng(42), b = G.derbyRng(42);
