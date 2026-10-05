@@ -31,7 +31,7 @@ const EXPORTS = ['state', 'SQUADS', 'TEAMS', 'formationSlots', 'playerFitsSlot',
   'derbySeasonsOf', 'derbyClubs', 'derbyRng',
   'derbyAiDraft', 'derbyLinesFor',
   'derbyPlayMatch', 'derbySeriesStatus',
-  'derbyFatigue', 'derbyMatchNew', 'derbyMatchStep', 'derbySub', 'derbyCanSub', 'derbyAutoManage', 'derbySeriesRival', 'derbyRunSummary', 'playerOVR', 'SIM2', 'simulateMatchV2'];
+  'derbyFatigue', 'derbyMatchNew', 'derbyMatchStep', 'derbySub', 'derbyCanSub', 'derbyAutoManage', 'derbySeriesRival', 'derbyRunSummary', 'playerOVR', 'SIM2', 'simulateMatchV2', 'withSeededRandom', 'DERBY_UNDERDOGS'];
 
 function load() {
   return new Function(STUB + FILES.map(read).join('\n') +
@@ -204,7 +204,7 @@ if (require.main === module) {
       while (!m.over) G.derbyMatchStep(m, false);
       assert.ok(m.gf <= G.SIM2.CHANCES && m.ga <= G.SIM2.CHANCES, 'seed ' + s);
       seg += m.gf + m.ga;
-      const o = G.simulateMatchV2(la, lb, s % 2 === 0);
+      const o = G.withSeededRandom(s, () => G.simulateMatchV2(la, lb, s % 2 === 0));
       one.gf += o.gf + o.ga;
     }
     assert.ok(Math.abs(seg - one.gf) / one.gf < 0.10, 'segments ' + seg / N + ' vs one-shot ' + one.gf / N);

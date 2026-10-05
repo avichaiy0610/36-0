@@ -55,12 +55,17 @@ const DERBY_FATIGUE_PER_MIN = 0.1;
 // How the computer drafts. Each round it ranks the players of the drawn season
 // who fit an open slot and takes the 1st/2nd/3rd best with these weights; `look`
 // is how many seasons it draws per round, keeping the best (its reroll).
-// Starting values — Task 4 calibrates them; the engine is never touched.
+// Calibrated 2026-10-06 (scripts/sim/derby_calibrate.js); the engine is never touched.
 const DERBY_AI = {
-  easy:   { weights: [0.25, 0.30, 0.45], look: 1 },
-  normal: { weights: [1, 0, 0],          look: 1 },
-  hard:   { weights: [1, 0, 0],          look: 3 },
+  easy:   { weights: [0.10, 0.25, 0.65], look: 1 },
+  normal: { weights: [0.6, 0.25, 0.15], look: 1 },
+  hard:   { weights: [1, 0, 0], look: 2 },
 };
+
+// The three hardest clubs on normal, from the v2 calibration (2026-10-06, 1000 runs,
+// three best-of-5 series each): bnei-sakhnin 12.8%, hapoel-pt 24.1%, bnei-yehuda 25.2%
+// series wins. Drives the dc_underdog achievement.
+const DERBY_UNDERDOGS = ['bnei-sakhnin', 'hapoel-pt', 'bnei-yehuda'];
 
 // Season rerolls for the whole draft. The club reroll is hidden: with one club
 // in the pool it could only redraw another season of the same club.
