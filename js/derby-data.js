@@ -40,9 +40,9 @@ const DERBY_HOME  = [true, false, true, false, true];
 // is how many seasons it draws per round, keeping the best (its reroll).
 // Starting values — Task 4 calibrates them; the engine is never touched.
 const DERBY_AI = {
-  easy:   { weights: [0.40, 0.35, 0.25], look: 1 },
-  normal: { weights: [0.70, 0.20, 0.10], look: 1 },
-  hard:   { weights: [1, 0, 0],          look: 1 },
+  easy:   { weights: [0.25, 0.30, 0.45], look: 1 },
+  normal: { weights: [1, 0, 0],          look: 1 },
+  hard:   { weights: [1, 0, 0],          look: 3 },
 };
 
 // Season rerolls for the whole draft. The club reroll is hidden: with one club
