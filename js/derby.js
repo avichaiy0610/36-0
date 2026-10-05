@@ -11,6 +11,14 @@ function derbyLoad() {
   catch (e) { return null; }
 }
 function derbySave(run) { try { localStorage.setItem(DERBY_KEY, JSON.stringify(run)); } catch (e) {} }
+// Remove the draft save only if it is a DERBY draft — by the time a series ends
+// the player may have started another mode, whose save this must not delete.
+function derbyClearDraftSave() {
+  try {
+    const d = JSON.parse(localStorage.getItem(DRAFT_SAVE_KEY) || 'null');
+    if (d && d.derby && typeof clearDraftState === 'function') clearDraftState();
+  } catch (e) {}
+}
 function derbyClear() { try { localStorage.removeItem(DERBY_KEY); } catch (e) {} }
 
 // A pick is stored by squad id + name and looked up again on load.
@@ -105,7 +113,7 @@ function derbyPlayNext(run) {
   const after = derbySeriesStatus(run.games);
   if (after.over) {
     run.phase = 'done'; derbyFinish(run, after);
-    if (typeof clearDraftState === 'function') clearDraftState();   // a finished derby must not reopen on load
+    derbyClearDraftSave();   // a finished derby must not reopen on load
   }
   derbySave(run);
   return g;

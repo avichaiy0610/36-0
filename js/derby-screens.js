@@ -18,7 +18,12 @@ function derbyShow() {
   const scr = document.getElementById('screen-derby');
   if (!scr || !scr.classList.contains('active')) showScreen('derby');
   const back = document.getElementById('derby-back');
-  if (back) back.onclick = () => { derbyStopClock(); state.derby = null; showScreen('setup'); };
+  if (back) back.onclick = () => {
+    derbyStopClock(); state.derby = null;
+    // the derby drafted over the full era range; put the slider back in step with state
+    if (typeof prepareSetupScreen === 'function') prepareSetupScreen();
+    showScreen('setup');
+  };
   const run = derbyLoad();
   if (!run || run.phase === 'draft') return derbyRenderPicker();
   if (run.phase === 'rivals' || (run.phase === 'series' && !run.games.length)) return derbyRenderRivals(run);
@@ -161,7 +166,7 @@ function derbyRenderEnd(run) {
     </div>`;
   document.getElementById('dc-share').onclick = () => derbyShare(run);
   document.getElementById('dc-again').onclick = () => derbyStart(run.club, run.difficulty);
-  document.getElementById('dc-other').onclick = () => { derbyClear(); clearDraftState(); state.derby = null; derbyRenderPicker(); };
+  document.getElementById('dc-other').onclick = () => { derbyClear(); derbyClearDraftSave(); state.derby = null; derbyRenderPicker(); };
 }
 
 function derbyShareText(run) {
@@ -177,8 +182,9 @@ function derbyShare(run) {
   derbyTrack('share', run.club);
   if (navigator.share) { navigator.share({ text }).catch(() => {}); return; }
   try {
-    navigator.clipboard.writeText(text);
-    const b = document.getElementById('dc-share'); if (b) b.textContent = 'הועתק ✓';
+    navigator.clipboard.writeText(text).then(() => {
+      const b = document.getElementById('dc-share'); if (b) b.textContent = 'הועתק ✓';
+    }, () => {});
   } catch (e) {}
 }
 
