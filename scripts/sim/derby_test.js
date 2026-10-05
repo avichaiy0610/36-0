@@ -151,6 +151,14 @@ if (require.main === module) {
     assert.deepStrictEqual([0, 1, 2, 3, 4].map(i => G.derbyGameRival('maccabi-haifa', i)),
       ['beitar-jerusalem', 'hapoel-haifa', 'maccabi-tlv', 'hapoel-haifa', 'maccabi-tlv']);
   });
+  t('the rival\'s clean-sheet tag counts too (not only the player\'s)', () => {
+    const goals = cs => {
+      let sum = 0;
+      for (let s = 1; s <= 2000; s++) sum += G.derbyPlayMatch(lnA, Object.assign({}, lnB, { cs }), true, s).gf;
+      return sum;
+    };
+    assert.ok(goals(1.6) < goals(1), 'opp.cs did not lower the player\'s goals');
+  });
 
   console.log(`\n${n} passed`);
 }
