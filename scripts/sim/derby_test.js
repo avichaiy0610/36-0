@@ -169,5 +169,14 @@ if (require.main === module) {
     assert.ok(G.getEraFilteredSquads().length > 300);
   });
 
+  // ── Task 8: the migration knows the same clubs ─────────────────────────────
+  t('submit_derby_run\'s v_known == derbyClubs()', () => {
+    const sql = read('supabase/migrations/20261005000002_derby_champions.sql');
+    const m = sql.match(/v_known\s+text\[\]\s*:=\s*ARRAY\[([^\]]+)\]/);
+    assert.ok(m, 'v_known not found');
+    const known = m[1].match(/'([^']+)'/g).map(s => s.slice(1, -1)).sort();
+    assert.deepStrictEqual(known, G.derbyClubs().slice().sort());
+  });
+
   console.log(`\n${n} passed`);
 }
