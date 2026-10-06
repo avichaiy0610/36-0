@@ -1,5 +1,5 @@
 // ─── אלופי הדרבי — screens (v2, spec §9) ─────────────────────────────────────
-// picker → (the normal draft screen) → bench → rivals → live matches → end.
+// picker → (the normal draft screen: XI, then the bench) → rivals → live matches → end.
 // Every interpolated string goes through derbyEsc.
 const DERBY_DIFF_HE = { easy: 'קל', normal: 'רגיל', hard: 'קשה' };
 const DERBY_TACTIC_HE = { att: 'התקפי', bal: 'מאוזן', def: 'הגנתי' };
@@ -19,7 +19,8 @@ function derbyBusy() {
 function derbyLogClear() { try { localStorage.removeItem(DERBY_LOG_KEY); } catch (e) {} }
 // bidi marks inside a name would scramble a shared line
 function derbyPlain(s) { return String(s ?? '').replace(/[‎‏‪-‮⁦-⁩]/g, ''); }
-// Which groups of the XI have no bench man who could take a slot there.
+// Which groups of the XI have no bench man who could take a slot there
+// (shown under the bench slots on the draft screen, js/derby.js).
 const DERBY_SLOT_GROUPS = [['שוער', ['GK']], ['הגנה', ['RB', 'CB', 'LB']],
   ['קישור', ['CDM', 'CM', 'CAM', 'RM', 'LM']], ['התקפה', ['RW', 'LW', 'CF', 'ST']]];
 function derbyUncoveredGroups(slots, bench) {
@@ -56,7 +57,8 @@ function derbyShow() {
   window.scrollTo?.(0, 0);
   const run = derbyLoad();
   if (!run || run.phase === 'draft') return derbyRenderPicker();
-  if (run.phase === 'bench') return derbyRenderBench(run);
+  // a v2 run parked in the old bench screen: back into the draft screen's bench rounds
+  if (run.phase === 'bench') return derbyResumeOldBench(run) ? undefined : derbyRenderPicker();
   if (run.phase === 'rivals') return derbyRenderRivals(run);
   if (run.phase === 'play') return derbyRenderMatch(run);
   return derbyRenderEnd(run);
@@ -99,56 +101,6 @@ function derbySideCard(title, side, cls, extra) {
     <ul class="dc-xi">${derbyXiRows(side.picks, side.slots)}</ul>
     ${side.bench.length ? `<div class="dc-sub-head">ספסל</div><ul class="dc-xi dc-xi-bench">${derbyBenchRows(side.bench)}</ul>` : ''}
   </section>`;
-}
-
-/* ── the bench draft ─────────────────────────────────────────────────────── */
-function derbyRenderBench(run) {
-  let sq = derbyBenchDraw(run), cands = sq ? derbyBenchCandidates(run, sq) : [];
-  // A season whose every man is already in the squad: draw again (free).
-  for (let k = 0; sq && !cands.length && k < 30; k++) {
-    run.benchDraw = null; derbySave(run);
-    sq = derbyBenchDraw(run); cands = sq ? derbyBenchCandidates(run, sq) : [];
-  }
-  if (!sq) {
-    // an inconsistent run (bench full, phase still 'bench'): go on to the rivals, never recurse
-    if (run.bench.length >= DERBY_BENCH && run.rivals) {
-      run.phase = 'rivals';
-      if (!run.series.length) run.series = [{ rival: derbySeriesRival(run.club, 0), games: [] }];
-      derbySave(run);
-      return derbyRenderRivals(run);
-    }
-    derbyClear(); derbyClearDraftSave();
-    return derbyRenderPicker();
-  }
-  const mine = derbyMySide(run);
-  const gaps = derbyUncoveredGroups(mine.slots, mine.bench);
-  derbyRoot().innerHTML = `
-    <div class="dc-step">ספסל · שחקן ${run.bench.length + 1} מתוך ${DERBY_BENCH}</div>
-    <div class="dc-draw">${derbyCrest(sq.teamId, 'dc-crest-lg')}
-      <div class="dc-draw-name">${derbyEsc(derbyTeamName(sq.teamId))} ${derbyEsc(sq.season)}</div>
-      <button class="btn-secondary dc-reroll" id="dc-reroll"${run.rerolls > 0 ? '' : ' disabled'}>🎲 החלף עונה (${run.rerolls || 0})</button>
-    </div>
-    ${gaps.length ? `<div class="dc-gap">אין עדיין מחליף ל: ${gaps.map(derbyEsc).join(' · ')}</div>` : ''}
-    <p class="dc-hint">אפשר לצרף כל עמדה, אבל מחליף חייב להתאים לעמדה של מי שהוא מחליף. בחר שחקן לספסל:</p>
-    <div class="dc-cands">${cands.map(p => `<button class="dc-cand" data-draw="${derbyEsc(sq.id)}" data-name="${derbyEsc(p.name)}">
-      <span class="dc-pos">${derbyEsc(derbyPosHe(p))}</span><span class="dc-nm">${derbyEsc(p.name)}</span>
-      <span class="dc-ov">${playerOVR(p)}</span></button>`).join('')}</div>
-    ${derbySideCard('ההרכב שלך', { picks: mine.picks, slots: mine.slots, bench: mine.bench.filter(Boolean) }, 'mine',
-      ` <span class="dc-dim">· ספסל ${run.bench.length}/${DERBY_BENCH}</span>`)}`;
-  document.getElementById('dc-reroll').onclick = () => {
-    if (derbyBusy()) return;
-    const r = derbyLoad();
-    if (r && r.phase === 'bench' && derbyBenchReroll(r)) derbyRenderBench(r);
-  };
-  derbyRoot().querySelectorAll('.dc-cand').forEach(b => {
-    b.onclick = () => {
-      // the run as stored NOW: a second tap of a double tap lands on the next draw's list
-      const r = derbyLoad();
-      if (!r || r.phase !== 'bench' || b.dataset.draw !== r.benchDraw) return;
-      if (derbyBusy()) return;      // the second tap of a double tap lands on the NEW list, which is current
-      if (derbyBenchPick(r, b.dataset.name)) derbyShow();
-    };
-  });
 }
 
 /* ── the rivals ──────────────────────────────────────────────────────────── */

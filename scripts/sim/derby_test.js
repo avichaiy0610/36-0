@@ -34,7 +34,7 @@ const EXPORTS = ['state', 'SQUADS', 'TEAMS', 'formationSlots', 'playerFitsSlot',
   'derbyAiDraft', 'derbyLinesFor',
   'derbyPlayMatch', 'derbySeriesStatus',
   'derbyFatigue', 'derbyMatchNew', 'derbyMatchStep', 'derbySub', 'derbyCanSub', 'derbyAutoManage', 'derbySeriesRival', 'derbyRunSummary', 'playerOVR', 'SIM2', 'simulateMatchV2', 'withSeededRandom', 'DERBY_UNDERDOGS',
-  'derbyEntryKey', 'derbyEntry', 'derbySave', 'derbyLoad', 'derbyBenchDraw', 'derbyBenchCandidates', 'derbyBenchPick', 'derbyBenchReroll',
+  'derbyEntryKey', 'derbyEntry', 'derbySave', 'derbyLoad', 'derbyBenchAdd', 'derbyFinishSquad', 'derbyInBench',
   'derbyBeginPlay', 'derbyCurrent', 'derbyGameStart', 'derbyGameStep', 'derbyLiveSave', 'derbyLiveLoad', 'derbySetTactic', 'derbyMakeSub',
   'FORMATIONS', 'derbySetFormation', 'derbySwap', 'derbyPreSwap', 'derbySetFormationMine', 'derbySwapMine', 'derbyPreSwapMine', 'derbyAutoTactic', 'localStorage'];
 
@@ -255,44 +255,68 @@ if (require.main === module) {
 
 
   // ── Task V4: the run ───────────────────────────────────────────────────────
+  // The XI is drafted by the computer here; the bench goes through the same pure
+  // helpers the draft screen's bench rounds use (derbyBenchAdd, derbyFinishSquad).
   const newRun = (club, seed) => {
     const fid = '4-3-3', diff = 'normal';
     const d = G.derbyAiDraft(club, fid, diff, G.derbyRng(seed));
-    return { v: 2, club, difficulty: diff, formationId: fid, tactic: 'bal', seed, phase: 'bench',
-      xi: d.picks.map(G.derbyEntryKey), bench: [], benchDraw: null, rerolls: G.DERBY_REROLLS,
+    return { v: 2, club, difficulty: diff, formationId: fid, tactic: 'bal', seed, phase: 'draft',
+      xi: d.picks.map(G.derbyEntryKey), bench: [], rerolls: G.DERBY_REROLLS,
       rivals: null, series: [], live: null, submitted: false };
   };
+  // One bench round: the first season not yet drawn, its best man not yet taken.
+  const benchRound = (run, used) => {
+    const seasons = G.derbySeasonsOf(run.club);
+    const sq = seasons.find(s => !used.has(s.id)) || seasons[0];
+    used.add(sq.id);
+    const taken = new Set(run.xi.concat(run.bench).map(k => k.name));
+    const p = sq.players.filter(x => !taken.has(x.name)).sort((a, b) => G.playerOVR(b) - G.playerOVR(a))[0];
+    return p ? { player: p, squad: sq } : benchRound(run, used);
+  };
   const draftBench = run => {
-    for (let i = 0; i < G.DERBY_BENCH; i++) {
-      const sq = G.derbyBenchDraw(run);
-      assert.ok(G.derbyBenchPick(run, G.derbyBenchCandidates(run, sq)[0].name));
-    }
+    const used = new Set(run.xi.map(k => k.squadId));
+    for (let i = 0; i < G.DERBY_BENCH; i++) assert.ok(G.derbyBenchAdd(run, benchRound(run, used)));
+    assert.ok(G.derbyFinishSquad(run));
   };
   t('a v1 run in storage is dropped by derbyLoad', () => {
     G.localStorage.setItem('36-0-derby', JSON.stringify({ v: 1, club: 'maccabi-haifa' }));
     assert.strictEqual(G.derbyLoad(), null);
     G.localStorage.removeItem('36-0-derby');
   });
-  t('bench pick never repeats a man or a foreign season; reroll decrements and stops at 0', () => {
+  t('bench add never repeats a man, refuses an unknown one and a full bench; finish needs 11+7', () => {
     const run = newRun('maccabi-haifa', 11);
-    assert.strictEqual(G.derbyBenchPick(run, run.xi[0].name), false);     // no draw yet
-    const sq = G.derbyBenchDraw(run);
-    assert.strictEqual(G.derbyBenchDraw(run).id, sq.id);                  // persisted draw
-    const cands = G.derbyBenchCandidates(run, sq);
-    assert.ok(cands.every(p => !run.xi.some(k => k.name === p.name)));
-    assert.strictEqual(G.derbyBenchPick(run, 'Nobody At All'), false);
-    for (let i = 0; i < 3; i++) { assert.strictEqual(G.derbyBenchReroll(run), true); assert.strictEqual(run.benchDraw, null); G.derbyBenchDraw(run); }
-    assert.strictEqual(run.rerolls, 0);
-    assert.strictEqual(G.derbyBenchReroll(run), false);
-    assert.strictEqual(run.rerolls, 0);
+    const xi0 = G.derbyEntry(run.xi[0]);
+    assert.strictEqual(G.derbyBenchAdd(run, xi0), false);                  // already in the XI
+    assert.strictEqual(G.derbyBenchAdd(run, { player: { name: 'Nobody At All' }, squad: xi0.squad }), false);
+    assert.strictEqual(G.derbyFinishSquad(run), false);                    // bench empty
+    const used = new Set();
     for (let i = 0; i < G.DERBY_BENCH; i++) {
-      const s2 = G.derbyBenchDraw(run), c = G.derbyBenchCandidates(run, s2)[0].name;
-      assert.ok(G.derbyBenchPick(run, c));
-      assert.strictEqual(G.derbyBenchPick(run, c), false);               // draw cleared / already in
+      const e = benchRound(run, used);
+      assert.ok(G.derbyBenchAdd(run, e));
+      assert.strictEqual(G.derbyBenchAdd(run, e), false);                 // already on the bench
+      assert.strictEqual(run.phase, 'draft');
     }
+    assert.strictEqual(G.derbyBenchAdd(run, benchRound(run, used)), false);   // full
     const names = run.xi.concat(run.bench).map(k => k.name);
     assert.strictEqual(new Set(names).size, 11 + G.DERBY_BENCH);
+    assert.ok(G.derbyFinishSquad(run));
     assert.strictEqual(run.phase, 'rivals');
+  });
+  t('the draft screen bench rounds: derbyInBench follows state.derby.bench, keys survive JSON', () => {
+    const saved = G.state.derby;
+    G.state.derby = { club: 'maccabi-haifa' };
+    assert.strictEqual(G.derbyInBench(), false);                           // still drafting the XI
+    G.state.derby.bench = [];
+    assert.strictEqual(G.derbyInBench(), true);
+    const run = newRun('maccabi-haifa', 12), used = new Set();
+    for (let i = 0; i < G.DERBY_BENCH; i++) {
+      const e = benchRound(run, used);
+      assert.ok(G.derbyBenchAdd(G.state.derby, e)); run.bench.push(G.derbyEntryKey(e));
+      const back = JSON.parse(JSON.stringify(G.state.derby)).bench.map(G.derbyEntry);
+      assert.strictEqual(back[i].player, e.player);
+    }
+    assert.strictEqual(G.derbyInBench(), false);                           // full: hand off
+    G.state.derby = saved;
   });
   t('a full headless run: bench, rivals, three series in order, summary consistent', () => {
     const run = newRun('maccabi-tlv', 4242);

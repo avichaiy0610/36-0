@@ -1,7 +1,7 @@
 // ─── אלופי הדרבי — the run ───────────────────────────────────────────────────
 // Spec: docs/superpowers/specs/2026-10-05-derby-champions-design.md
-// v2 flow (spec §9): pick club → XI draft (the normal draft screen, one-club pool)
-// → 7-man bench draft → the three rivals → three best-of-5 series, each game
+// v3 flow (spec §10.1): pick club → XI draft then 7-man bench draft, both in the
+// normal draft screen (one-club pool) → the three rivals → three best-of-5 series, each game
 // played live in 15-minute segments. The run lives in localStorage and is saved
 // after every step, a live match at every segment boundary, so a refresh resumes.
 
@@ -34,7 +34,7 @@ function derbyEntry(k) {
 function derbyStart(club, difficulty) {
   const run = { v: 2, club, difficulty, formationId: [_selectedFormationKey, state.formationId, '4-3-3'].find(k => k && FORMATIONS[k]),
     tactic: tacticOf(typeof _selectedTactic !== 'undefined' ? _selectedTactic : state.tactic), seed: (Math.random() * 2147483647) | 0,
-    phase: 'draft', xi: null, bench: [], benchDraw: null, rerolls: 0, rivals: null, series: [], live: null, submitted: false };
+    phase: 'draft', xi: null, bench: [], rerolls: 0, rivals: null, series: [], live: null, submitted: false };
   derbySave(run);
   if (typeof derbyLogClear === 'function') derbyLogClear();
   derbyTrack('progress', club + '|start');
@@ -59,7 +59,9 @@ function derbyBeginDraft(run) {
   saveDraftState();
 }
 
-// Called by game.js when the eleventh pick lands (and on a restored full draft).
+// Called by game.js when the eleventh pick lands (and on a restored full XI).
+// A full XI with a bench still short of seven goes on drafting the bench in the
+// same screen; only a full bench hands off to the rivals.
 function derbyAfterDraft() {
   const run = derbyLoad();
   // No run, or a run of another club: a stale flag. Never play a season with it on.
@@ -69,14 +71,37 @@ function derbyAfterDraft() {
     showScreen('welcome');
     return;
   }
-  if (run.phase !== 'draft') { derbyShow(); return; }       // re-entry: the XI is already fixed
+  if (run.phase !== 'draft') { derbyShow(); return; }       // re-entry: the squad is already fixed
+  if (!Array.isArray(state.derby.bench)) {
+    // The bench rounds begin. A v2 run left in its old bench screen brings the
+    // men it had already taken (those still valid and not in the XI).
+    state.derby.bench = [];
+    (run.bench || []).forEach(k => {
+      const e = derbyEntry(k);
+      if (e && !state.usedPlayerKeys.has(e.player.name) && derbyBenchAdd(state.derby, e)) state.usedPlayerKeys.add(e.player.name);
+    });
+    saveDraftState();
+    if (state.derby.bench.length < DERBY_BENCH) { derbyBenchEnter(true); return; }
+  } else if (state.derby.bench.length < DERBY_BENCH) { derbyBenchEnter(false); return; }
   run.xi = state.picks.map(derbyEntryKey);
+  run.bench = state.derby.bench.slice(0, DERBY_BENCH);
   run.tactic = state.tactic || 'bal';
   run.rerolls = state.seasonRerollsLeft || 0;
-  run.phase = 'bench';
+  derbyFinishSquad(run);
   derbySave(run);
   derbyTrack('progress', run.club + '|drafted');
   derbyShow();
+}
+// A v2 run stored in its old 'bench' phase (the separate bench screen is gone):
+// resume through its draft save, or start over at the picker.
+function derbyResumeOldBench(run) {
+  run.phase = 'draft'; run.benchDraw = null;
+  derbySave(run);
+  let d = null;
+  try { d = JSON.parse(localStorage.getItem(DRAFT_SAVE_KEY) || 'null'); } catch (e) {}
+  if (d && d.derby && d.derby.club === run.club && typeof restoreDraftState === 'function' && restoreDraftState()) return true;
+  derbyClear(); derbyClearDraftSave();
+  return false;
 }
 
 // Put the player's XI back on `state` (after a refresh nothing else will).
@@ -90,59 +115,96 @@ function derbyApplyMine(run) {
   state.peakMode = false; state.story = null; state.coach = null; state.classic = false;
   state.crowdMode = false;
 }
-// ── The bench draft: seven more rounds after the XI, any position ───────────
-function derbyBenchSeasonsUsed(run) {
-  const used = new Set();
-  run.xi.concat(run.bench).forEach(k => { if (k) used.add(k.squadId); });
-  return used;
+// ── The bench: seven more rounds IN THE DRAFT SCREEN after the XI (spec §10.1) ──
+// state.picks stays the eleven (teamOVR, chemistry and the lines read it); the
+// bench lives in state.derby.bench as {squadId, name} keys, so saveDraftState
+// carries it through a refresh as it is. game.js asks derbyInBench() at a few
+// guarded points (player tap, slot tap, progress line) and leaves the rest here.
+function derbyInBench() {
+  return !!(state.derby && Array.isArray(state.derby.bench) && state.derby.bench.length < DERBY_BENCH);
 }
-function derbyBenchNamesUsed(run) {
-  return new Set(run.xi.concat(run.bench).filter(Boolean).map(k => k.name));
+// Pure: append one man to holder.bench (a run, or state.derby). Refused (false,
+// nothing changed) for a full bench, an unknown man, or one already in the XI
+// or on the bench.
+function derbyBenchAdd(holder, entry) {
+  if (!holder || !Array.isArray(holder.bench) || holder.bench.length >= DERBY_BENCH) return false;
+  const k = derbyEntryKey(entry);
+  if (!k || !derbyEntry(k)) return false;
+  const taken = (holder.xi || []).concat(holder.bench).filter(Boolean).map(x => x.name);
+  if (taken.includes(k.name)) return false;
+  holder.bench.push(k);
+  return true;
 }
-// The season on offer: persisted, so a refresh shows the same one.
-function derbyBenchDraw(run) {
-  if (run.bench.length >= DERBY_BENCH) return null;
-  if (run.benchDraw) { const sq = SQUADS.find(s => s.id === run.benchDraw); if (sq) return sq; }
-  const all = derbySeasonsOf(run.club), used = derbyBenchSeasonsUsed(run);
-  const fresh = all.filter(sq => !used.has(sq.id));
-  const pool = fresh.length ? fresh : all;
-  const sq = pool[Math.floor(Math.random() * pool.length)];
-  run.benchDraw = sq.id;
-  derbySave(run);
-  return sq;
-}
-function derbyBenchCandidates(run, sq) {
-  const used = derbyBenchNamesUsed(run);
-  return sq.players.filter(p => !used.has(p.name)).sort((a, b) => playerOVR(b) - playerOVR(a));
-}
-// Returns false (changing nothing) for a man already in the squad, one not in
-// the season on offer, or a full bench.
-function derbyBenchPick(run, name) {
-  if (run.bench.length >= DERBY_BENCH || !run.benchDraw) return false;
-  const sq = SQUADS.find(s => s.id === run.benchDraw);
-  if (!sq || !sq.players.some(p => p.name === name) || derbyBenchNamesUsed(run).has(name)) return false;
-  run.bench.push({ squadId: sq.id, name });
-  run.benchDraw = null;
-  if (run.bench.length === DERBY_BENCH) {
-    const rng = derbyRng(run.seed);
-    run.rivals = {};
-    for (const id of DERBY_RIVALS[run.club]) {
-      const d = derbyAiDraft(id, run.formationId, run.difficulty, rng);
-      run.rivalFormationId = run.formationId;      // the rivals keep their shape whatever the player changes later
-      run.rivals[id] = { xi: d.picks.map(derbyEntryKey), bench: d.bench.map(derbyEntryKey) };
-    }
-    run.series = [{ rival: derbySeriesRival(run.club, 0), games: [] }];
-    run.phase = 'rivals';
-    derbyTrack('progress', run.club + '|bench');
+// Pure: the squad is complete — draft the three rivals and open the first series.
+function derbyFinishSquad(run) {
+  if (!run.xi || run.xi.length !== 11 || run.bench.length !== DERBY_BENCH) return false;
+  const rng = derbyRng(run.seed);
+  run.rivals = {};
+  run.rivalFormationId = run.formationId;      // the rivals keep their shape whatever the player changes later
+  for (const id of DERBY_RIVALS[run.club]) {
+    const d = derbyAiDraft(id, run.formationId, run.difficulty, rng);
+    run.rivals[id] = { xi: d.picks.map(derbyEntryKey), bench: d.bench.map(derbyEntryKey) };
   }
-  derbySave(run);
+  run.series = [{ rival: derbySeriesRival(run.club, 0), games: [] }];
+  run.phase = 'rivals';
   return true;
 }
-function derbyBenchReroll(run) {
-  if (!(run.rerolls > 0)) return false;
-  run.rerolls--; run.benchDraw = null;
-  derbySave(run);
-  return true;
+// A tap on a player in the list during the bench rounds (from handlePlayerClick).
+function derbyBenchTake(player) {
+  if (!derbyInBench() || state.isAnimating || !state.currentSquad) return;
+  if (state.usedPlayerKeys.has(player.name) || !state.currentSquad.players.includes(player)) return;
+  // The same gate assignPlayer raises: no second man from this list while the
+  // next roulette is on its way. animateRoulette clears it.
+  state.isAnimating = true;
+  if (!derbyBenchAdd(state.derby, { player, squad: state.currentSquad })) { state.isAnimating = false; return; }
+  state.usedPlayerKeys.add(player.name);
+  saveDraftState();
+  derbyBenchRender();
+  if (state.derby.bench.length >= DERBY_BENCH) {
+    state.isAnimating = false;
+    document.getElementById('players-list').innerHTML = '';
+    setTimeout(() => derbyAfterDraft(), 500);
+  } else {
+    setTimeout(startRound, 400);
+  }
+}
+// Into the bench rounds, on the draft screen. `fresh`: draw a new season;
+// otherwise (a refresh) show the season that was on offer.
+function derbyBenchEnter(fresh) {
+  if (state.moveMode) { state.moveMode = false; updateMoveButton(); }
+  state.movingFromIdx = null; state.selectedPlayer = null; state.selectedSlotIdx = null;
+  state.isAnimating = false; state.awaitingSlotPick = false;
+  const moveBtn = document.getElementById('btn-move-player');
+  if (moveBtn) moveBtn.style.display = 'none';
+  showScreen('draft');
+  clearAllHighlights();
+  updateProgress(); updateRerollButtons();
+  if (fresh || !state.currentSquad) { startRound(); return; }
+  showSquadCardData(state.currentSquad);
+  renderSquadPlayers(state.currentSquad);
+  setHint('בחר שחקן לספסל');
+}
+// The seven bench slots under the draft pitch: shown for a derby draft only.
+function derbyBenchRender() {
+  const el = document.getElementById('derby-bench-slots');
+  if (!el) return;
+  if (!state.derby) { el.style.display = 'none'; el.innerHTML = ''; return; }
+  const bench = (state.derby.bench || []).map(derbyEntry);
+  const esc = typeof derbyEsc === 'function' ? derbyEsc : s => String(s ?? '');
+  const slot = i => {
+    const e = bench[i];
+    if (!e) return `<div class="dbs-slot dbs-empty${i === bench.length && Array.isArray(state.derby.bench) ? ' dbs-next' : ''}"><span class="dbs-n">${i + 1}</span></div>`;
+    const pos = normalizePos(e.player.position);
+    return `<div class="dbs-slot"><span class="dbs-ov">${playerOVR(e.player)}</span>
+      <span class="dbs-nm">${esc(typeof playerShortName === 'function' ? playerShortName(e.player.name) : e.player.name)}</span>
+      <span class="dbs-meta">${esc(POS_HE[pos] || pos)} · ${esc(e.squad.season)}</span></div>`;
+  };
+  const gaps = bench.length && typeof derbyUncoveredGroups === 'function' && state.picks.every(Boolean)
+    ? derbyUncoveredGroups(state.slots, bench) : [];
+  el.innerHTML = `<div class="dbs-head">ספסל <span>${bench.length}/${DERBY_BENCH}</span></div>
+    <div class="dbs-grid">${Array.from({ length: DERBY_BENCH }, (_, i) => slot(i)).join('')}</div>
+    ${gaps.length && bench.length < DERBY_BENCH ? `<div class="dbs-gap">אין עדיין מחליף ל: ${gaps.map(esc).join(' · ')}</div>` : ''}`;
+  el.style.display = '';
 }
 // The rivals screen's "to the first match".
 function derbyBeginPlay(run) {

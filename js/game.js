@@ -1640,6 +1640,7 @@ function clearAllHighlights() {
 // ─── Move mode ─────────────────────────────────────────────────────────────────
 // Move mode only touches pitch tokens, so it stays usable during the roulette animation
 function toggleMoveMode() {
+  if (state.derby && typeof derbyInBench === 'function' && derbyInBench()) return;   // derby bench rounds: no moves
   state.moveMode = !state.moveMode;
   state.movingFromIdx = null;
   if (state.moveMode) {
@@ -1947,10 +1948,12 @@ function renderSquadPlayers(squad, filterSlotIdx = null) {
   // on the raw pos offered holding midfielders for it — men the placement rules
   // then refused, so the pick landed in some other slot or nowhere at all.
   const fitOf = i => slotFitPos(state.slots[i]);
+  // אלופי הדרבי bench rounds: the pitch is full and any position goes to the bench
+  const benching = !!(state.derby && typeof derbyInBench === 'function' && derbyInBench());
   const anyAvailable = players.some(player => {
     if (state.usedPlayerKeys.has(player.name)) return false;
     if (filterSlotIdx !== null && !playerFitsSlot(player, fitOf(filterSlotIdx))) return false;
-    return compatibleEmptySlots(player).length > 0;
+    return benching || compatibleEmptySlots(player).length > 0;
   });
 
   // Auto-reroll if no one fits — counts as free (don't spend a reroll)
@@ -1972,7 +1975,7 @@ function renderSquadPlayers(squad, filterSlotIdx = null) {
   players.forEach(player => {
     if (filterSlotIdx !== null && !playerFitsSlot(player, fitOf(filterSlotIdx))) return;
     const isUsed    = state.usedPlayerKeys.has(player.name);
-    const hasSlot   = compatibleEmptySlots(player).length > 0;
+    const hasSlot   = benching || compatibleEmptySlots(player).length > 0;
     // Salary cap: a man you cannot pay for is not an option. Letting the pick
     // through and asking the player to dismantle afterwards meant a draft could
     // end over the cap, which it must never do.
@@ -2065,6 +2068,8 @@ function renderSquadPlayers(squad, filterSlotIdx = null) {
 // ─── Draft: Selection logic ────────────────────────────────────────────────────
 function handlePlayerClick(player, cardEl) {
   if (state.isAnimating) return;
+  // אלופי הדרבי bench rounds: a tap puts him straight on the bench (js/derby.js)
+  if (state.derby && typeof derbyInBench === 'function' && derbyInBench()) { derbyBenchTake(player); return; }
   if (state.moveMode) {
     state.moveMode = false;
     clearAllHighlights(); updateMoveButton();
@@ -2084,6 +2089,8 @@ function handlePlayerClick(player, cardEl) {
 }
 
 function handleSlotClick(slotIdx) {
+  // אלופי הדרבי bench rounds: the eleven are fixed, the pitch takes no taps
+  if (state.derby && typeof derbyInBench === 'function' && derbyInBench()) return;
   // A move in progress, move mode, or a click on a placed player → move flow.
   // Clicking a placed player directly highlights the slots he can move to.
   if (state.moveMode || state.movingFromIdx !== null || state.picks[slotIdx]) {
@@ -2316,6 +2323,14 @@ function updateRerollButtons() {
 
 // ─── Progress & Hint ───────────────────────────────────────────────────────────
 function updateProgress() {
+  // The derby's bench slots under the pitch; hidden (and emptied) in every other mode.
+  if (typeof derbyBenchRender === 'function') derbyBenchRender();
+  if (state.derby && typeof derbyInBench === 'function' && derbyInBench()) {
+    const b = state.derby.bench.length;
+    document.getElementById('progress-text').textContent = `ספסל · שחקן ${b + 1} מתוך ${DERBY_BENCH}`;
+    document.getElementById('progress-fill').style.width = ((b / DERBY_BENCH) * 100) + '%';
+    return;
+  }
   const done = state.currentRound, total = state.slots.length;
   document.getElementById('progress-text').textContent = `שחקן ${done + 1} מתוך ${total}`;
   document.getElementById('progress-fill').style.width = ((done / total) * 100) + '%';
