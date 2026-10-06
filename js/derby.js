@@ -378,6 +378,13 @@ function derbyDropSubLog(m, o) {
   const rows = derbyLogLoad(m.seed).filter(r => !(r && r.cls === 'mine' && r.min === o.offAt && r.out === o.player.name));
   try { localStorage.setItem(DERBY_LOG_KEY, JSON.stringify({ seed: m.seed, rows })); } catch (e) {}
 }
+// The sub of THIS stop whose replacement stands in pitch slot `slotIdx`: the
+// index of the man he replaced in m.me.off, or -1 (not a replacement of this stop).
+function derbyOffFor(m, slotIdx) {
+  const p = m.me.picks[slotIdx];
+  if (!p || m.over || m.min <= 0 || p.on !== m.min) return -1;
+  return m.me.off.findIndex(o => o.offAt === m.min && o.inName === p.player.name);
+}
 function derbyUndoSubMine(run, m, offIdx) {
   const o = m.me.off[offIdx];
   if (m.over || !derbyUndoSub(m.me, offIdx, m.min)) return false;

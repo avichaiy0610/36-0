@@ -290,13 +290,15 @@ function derbyShort(p) { return derbyEsc(typeof playerShortName === 'function' ?
 function derbyPitchHtml(ctx, live) {
   const { m } = ctx, me = m.me, sel = _derbySel;
   const selBench = sel && sel.k === 'bench' ? me.bench[sel.i] : null;
+  const selOff = sel && sel.k === 'off' ? me.off[sel.i] : null;   // his replacement is lit: tap him to bring the man back
   const rt = derbyRatings(me, m.min);
   return `<div class="dc-pitch-wrap"><div class="pitch dc-pitch">${me.picks.map((p, i) => {
     if (!p) return '';
     const slot = me.slots[i], f = derbyFatigue(p, m.min), en = derbyEnergyAt(p, m.min);
     const oop = !derbyInPos(p, slot);
     const cls = (sel && sel.k === 'slot' && sel.i === i ? ' highlight-selected'
-      : selBench && derbyInPos(selBench, slot) ? ' highlight-compat' : '') + (live ? '' : ' dc-ro');
+      : selBench && derbyInPos(selBench, slot) ? ' highlight-compat'
+      : selOff && p.on === m.min && p.player.name === selOff.inName ? ' highlight-compat dc-back-to' : '') + (live ? '' : ' dc-ro');
     const pills = (p.on ? `<span class="dc-pill dc-pill-on" dir="ltr">⬆${derbyEsc(p.on)}'</span>` : '');
     const inner = `<div class="slot-circle filled-circle${oop ? ' circle-oop' : ''}">
         <span class="slot-ovr${f > 0 ? ' dc-ovr-tired' : ''}">${Math.round(rt[i])}</span>
@@ -325,7 +327,8 @@ function derbyGoneHtml(ctx, live) {
         <span class="slot-player-short">${derbyShort(o)}</span></div>
       ${derbyEnergyBar(derbyEnergyAt(o, 90))}
       <span class="dc-btok-pos dc-gone-mark">יצא <bdi dir="ltr">${derbyEsc(o.offAt)}'</bdi></span>`;
-    const cls = ' dc-gone' + (sel && sel.k === 'off' && sel.i === oi ? ' sel' : '') + (can ? ' dc-gone-undo' : '');
+    const selY = sel && sel.k === 'slot' ? derbyOffFor(m, sel.i) : -1;
+    const cls = ' dc-gone' + (sel && sel.k === 'off' && sel.i === oi ? ' sel' : '') + (can ? ' dc-gone-undo' : '') + (can && selY === oi ? ' fit' : '');
     return can
       ? `<button type="button" class="dc-btok${cls}" style="${derbyTeamVars(o.squad)}" data-off="${oi}" aria-label="${derbyEsc(o.player.name)} — יצא, אפשר להחזיר">${inner}</button>`
       : `<div class="dc-btok dc-ro${cls}" style="${derbyTeamVars(o.squad)}" aria-disabled="true" title="יצא — לא יכול לחזור">${inner}</div>`;
@@ -380,10 +383,13 @@ function derbyPaintPanel(ctx) {
     const selEn = selMan ? (sel.k === 'slot' ? derbyEnergyAt(selMan, m.min) : (selMan.e0 ?? 100)) : 0;
     const who = selMan ? `<b>${derbyEsc(selMan.player.name)}</b> · כושר: ${derbyEnergyWord(selEn)}. ` : '';
     const undo = derbyCanUndo(m);
+    const yOff = sel && sel.k === 'slot' ? derbyOffFor(m, sel.i) : -1;
     const why = selOff
         ? `<b>${derbyEsc(selOff.player.name)}</b> יצא בדקה ${derbyEsc(selOff.offAt)} ו-<b>${derbyEsc(selOff.inName)}</b> נכנס במקומו.
            <button type="button" class="btn-secondary dc-back" id="dc-back">↩ החזר למגרש</button>
-           או לחץ על שחקן מהספסל שייכנס במקום ${derbyEsc(selOff.inName)} (אותו חילוף).`
+           או לחץ על ${derbyEsc(selOff.inName)} במגרש (מסומן) כדי להחזיר אותו, או על שחקן מהספסל שייכנס במקום ${derbyEsc(selOff.inName)} (אותו חילוף).`
+      : yOff >= 0
+        ? `<b>${derbyEsc(m.me.picks[sel.i].player.name)}</b> נכנס עכשיו במקום <b>${derbyEsc(m.me.off[yOff].player.name)}</b> — לחץ על ${derbyEsc(m.me.off[yOff].player.name)} בספסל כדי להחזיר אותו, על שחקן אחר במגרש להחלפת מקומות, או על שחקן מהספסל.`
       : sel && sel.k === 'slot'
         ? (benchOk ? 'עכשיו לחץ על שחקן אחר במגרש להחלפת מקומות, או על שחקן מהספסל (ירוק = מתאים לעמדה).'
                    : `עכשיו לחץ על שחקן אחר במגרש להחלפת מקומות. ${block}`)
@@ -419,9 +425,7 @@ function derbyPaintPanel(ctx) {
     ctl.querySelectorAll('[data-off]').forEach(b => { b.onclick = () => derbyTapOff(ctx, +b.dataset.off); });
     const bk = document.getElementById('dc-back');
     if (bk) bk.onclick = () => {
-      if (!selOff || !derbyUndoSubMine(run, m, sel.i)) return;
-      _derbySel = null;
-      derbyPaintBoard(ctx); derbyPaintPanel(ctx);
+      if (selOff) derbyUndoBack(ctx, sel.i);
     };
     document.getElementById('dc-undo').onclick = () => {
       if (!derbyUndoMine(run, m)) return;
@@ -448,7 +452,15 @@ function derbyPaintPanel(ctx) {
 function derbyTapSlot(ctx, i) {
   const { m, run } = ctx, sel = _derbySel;
   if (!m.me.picks[i]) return;
-  if (!sel || sel.k === 'off') { _derbySel = { k: 'slot', i }; }
+  if (sel && sel.k === 'off') {
+    // the man taken off comes back only in his replacement's place
+    const o = m.me.off[sel.i];
+    if (o && derbyOffFor(m, i) === sel.i) { derbyUndoBack(ctx, sel.i); return; }
+    const h = document.getElementById('dc-hint');
+    if (o && h) h.innerHTML = `<b>${derbyEsc(o.player.name)}</b> יכול לחזור רק במקום <b>${derbyEsc(o.inName)}</b> — לחץ עליו במגרש, או על שחקן מהספסל שייכנס במקומו.`;
+    return;
+  }
+  if (!sel) { _derbySel = { k: 'slot', i }; }
   else if (sel.k === 'slot') {
     if (sel.i !== i) derbySwapMine(run, m, sel.i, i);
     _derbySel = null;
@@ -473,9 +485,18 @@ function derbyTapBench(ctx, bi) {
   derbyPaintPanel(ctx);
 }
 // A man taken off at this stop: pick him to bring him back or replace his replacement.
+function derbyUndoBack(ctx, oi) {
+  const { m, run } = ctx;
+  if (!derbyUndoSubMine(run, m, oi)) return false;
+  _derbySel = null;
+  derbyPaintBoard(ctx); derbyPaintPanel(ctx);
+  return true;
+}
 function derbyTapOff(ctx, oi) {
   const { m } = ctx, sel = _derbySel;
   if (!derbyOffUndoable(m, m.me.off[oi])) return;
+  // his replacement picked on the pitch first: swap them back
+  if (sel && sel.k === 'slot' && derbyOffFor(m, sel.i) === oi) { derbyUndoBack(ctx, oi); return; }
   _derbySel = sel && sel.k === 'off' && sel.i === oi ? null : { k: 'off', i: oi };
   derbyPaintPanel(ctx);
 }

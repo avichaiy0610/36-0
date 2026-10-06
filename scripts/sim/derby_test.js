@@ -39,7 +39,7 @@ const EXPORTS = ['state', 'SQUADS', 'TEAMS', 'formationSlots', 'playerFitsSlot',
   'FORMATIONS', 'derbySetFormation', 'derbySwap', 'derbyPreSwap', 'derbySetFormationMine', 'derbySwapMine', 'derbyPreSwapMine', 'derbyAutoTactic', 'localStorage',
   'DERBY_ENERGY_DRAIN', 'DERBY_ENERGY_FREE', 'DERBY_RECOVER_GAME', 'DERBY_RECOVER_SERIES', 'DERBY_ROTATE_BELOW',
   'derbyEnergyPenalty', 'derbyEnergyLevel', 'derbyEnergyAt', 'derbyEnergyAfter', 'derbyRotate', 'derbyEnergyMaps',
-  'derbySnapshot', 'derbyRestore', 'derbySnapChanged', 'derbyMarkStop', 'derbyCanUndo', 'derbyUndoMine', 'inNaturalPos', 'derbyUndoSub', 'derbyResub', 'derbyUndoSubMine', 'derbyResubMine'];
+  'derbySnapshot', 'derbyRestore', 'derbySnapChanged', 'derbyMarkStop', 'derbyCanUndo', 'derbyUndoMine', 'inNaturalPos', 'derbyUndoSub', 'derbyResub', 'derbyUndoSubMine', 'derbyResubMine', 'derbyOffFor'];
 
 function load() {
   return new Function(STUB + FILES.map(read).join('\n') +
@@ -792,6 +792,36 @@ if (require.main === module) {
     assert.strictEqual(m.me.subs, 0); assert.strictEqual(m.me.windows, 0); assert.strictEqual(m.me.lastWin, -1);
     G.derbyGameStep(run = G.derbyLoad(), m, 50);
     assert.ok(!G.derbyUndoSubMine(run, m, 0));
+  });
+
+  t('tap either side of a sub: derbyOffFor finds the sub from its replacement; any other man → -1', () => {
+    for (const stop of [37, 45]) {                                  // a paused odd minute, and half-time
+      const run = newRun('maccabi-haifa', 616); draftBench(run); G.derbyBeginPlay(run);
+      const m = G.derbyGameStart(run);
+      while (m.min < stop) G.derbyGameStep(run, m, stop);
+      assert.strictEqual(m.min, stop);
+      G.derbyMarkStop(run, m);
+      const subAt = (si, bi) => assert.ok(G.derbyMakeSub(run, m, si, bi));
+      subAt(7, 0); subAt(4, 0);
+      const y7 = m.me.picks[7].player.name;
+      assert.ok(m.me.off.every(o => o.offAt === m.min));
+      // (a)/(b): slot 7's replacement maps to the man he replaced, whichever is tapped first
+      const oi = G.derbyOffFor(m, 7);
+      assert.ok(oi >= 0 && m.me.off[oi].inName === y7);
+      const x = m.me.off[oi].player.name;
+      // (e): a different man on the pitch is not his replacement
+      assert.strictEqual(G.derbyOffFor(m, 2), -1);
+      assert.notStrictEqual(G.derbyOffFor(m, 4), oi);
+      assert.ok(G.derbyUndoSubMine(run, m, oi));
+      assert.strictEqual(m.me.picks[7].player.name, x);
+      assert.ok(m.me.bench.some(b => b.player.name === y7));
+      assert.strictEqual(m.me.subs, 1);
+      assert.strictEqual(m.me.windows, stop === 45 ? 0 : 1);
+      assert.strictEqual(G.derbyOffFor(m, 7), -1);
+      // after play goes on, the replacement no longer maps to anything
+      G.derbyGameStep(run, m, stop + 1);
+      assert.strictEqual(G.derbyOffFor(m, 4), -1);
+    }
   });
 
   console.log(`\n${n} passed`);

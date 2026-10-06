@@ -229,3 +229,4 @@ details.dc-card > summary::-webkit-details-marker { display: none; }
 .dc-btok.dc-gone.sel { opacity: 1; filter: grayscale(.6); border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
 .dc-gone-mark { color: #f85149; font-weight: 700; white-space: nowrap; }
 .dc-back { min-height: 36px !important; padding: 2px 10px; margin: 4px 0; font-size: 13px; }
+.dc-btok.dc-gone.fit { filter: none; opacity: 1; border-style: solid; border-color: #4CAF50; box-shadow: inset 0 0 0 2px #4CAF50; }
