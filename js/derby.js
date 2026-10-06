@@ -36,6 +36,7 @@ function derbyStart(club, difficulty) {
     tactic: tacticOf(typeof _selectedTactic !== 'undefined' ? _selectedTactic : state.tactic), seed: (Math.random() * 2147483647) | 0,
     phase: 'draft', xi: null, bench: [], benchDraw: null, rerolls: 0, rivals: null, series: [], live: null, submitted: false };
   derbySave(run);
+  if (typeof derbyLogClear === 'function') derbyLogClear();
   derbyTrack('progress', club + '|start');
   derbyBeginDraft(run);
 }

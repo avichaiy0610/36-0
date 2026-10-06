@@ -10,6 +10,23 @@ let _derbyTimer = null;
 let _derbyGen = 0;          // bumped on every render: a stale tick never writes into a new screen
 let _derbyPauseReq = false; // "⏸ עצירה" pressed: stop at the next 15' boundary
 let _derbySel = null;       // the slot of your XI picked for a substitution
+let _derbyBusyAt = 0;       // double-tap guard: a screen change swallows taps for ~350 ms
+function derbyBusy() {
+  const n = Date.now();
+  if (n - _derbyBusyAt < 350) return true;
+  _derbyBusyAt = n; return false;
+}
+function derbyLogClear() { try { localStorage.removeItem(DERBY_LOG_KEY); } catch (e) {} }
+// bidi marks inside a name would scramble a shared line
+function derbyPlain(s) { return String(s ?? '').replace(/[‎‏‪-‮⁦-⁩]/g, ''); }
+// Which groups of the XI have no bench man who could take a slot there.
+const DERBY_SLOT_GROUPS = [['שוער', ['GK']], ['הגנה', ['RB', 'CB', 'LB']],
+  ['קישור', ['CDM', 'CM', 'CAM', 'RM', 'LM']], ['התקפה', ['RW', 'LW', 'CF', 'ST']]];
+function derbyUncoveredGroups(slots, bench) {
+  const players = bench.filter(Boolean).map(e => e.player);
+  return DERBY_SLOT_GROUPS.filter(([, poss]) => slots.some(sl => poss.includes(slotFitPos(sl))
+    && !players.some(p => playerFitsSlot(p, slotFitPos(sl))))).map(g => g[0]);
+}
 
 function derbyEsc(s) {
   return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -92,23 +109,45 @@ function derbyRenderBench(run) {
     run.benchDraw = null; derbySave(run);
     sq = derbyBenchDraw(run); cands = sq ? derbyBenchCandidates(run, sq) : [];
   }
-  if (!sq) return derbyShow();
+  if (!sq) {
+    // an inconsistent run (bench full, phase still 'bench'): go on to the rivals, never recurse
+    if (run.bench.length >= DERBY_BENCH && run.rivals) {
+      run.phase = 'rivals';
+      if (!run.series.length) run.series = [{ rival: derbySeriesRival(run.club, 0), games: [] }];
+      derbySave(run);
+      return derbyRenderRivals(run);
+    }
+    derbyClear(); derbyClearDraftSave();
+    return derbyRenderPicker();
+  }
   const mine = derbyMySide(run);
+  const gaps = derbyUncoveredGroups(mine.slots, mine.bench);
   derbyRoot().innerHTML = `
     <div class="dc-step">ספסל · שחקן ${run.bench.length + 1} מתוך ${DERBY_BENCH}</div>
     <div class="dc-draw">${derbyCrest(sq.teamId, 'dc-crest-lg')}
       <div class="dc-draw-name">${derbyEsc(derbyTeamName(sq.teamId))} ${derbyEsc(sq.season)}</div>
       <button class="btn-secondary dc-reroll" id="dc-reroll"${run.rerolls > 0 ? '' : ' disabled'}>🎲 החלף עונה (${run.rerolls || 0})</button>
     </div>
-    <p class="dc-hint">כל עמדה מותרת. בחר שחקן לספסל:</p>
-    <div class="dc-cands">${cands.map(p => `<button class="dc-cand" data-name="${derbyEsc(p.name)}">
+    ${gaps.length ? `<div class="dc-gap">אין עדיין מחליף ל: ${gaps.map(derbyEsc).join(' · ')}</div>` : ''}
+    <p class="dc-hint">אפשר לצרף כל עמדה, אבל מחליף חייב להתאים לעמדה של מי שהוא מחליף. בחר שחקן לספסל:</p>
+    <div class="dc-cands">${cands.map(p => `<button class="dc-cand" data-draw="${derbyEsc(sq.id)}" data-name="${derbyEsc(p.name)}">
       <span class="dc-pos">${derbyEsc(derbyPosHe(p))}</span><span class="dc-nm">${derbyEsc(p.name)}</span>
       <span class="dc-ov">${playerOVR(p)}</span></button>`).join('')}</div>
     ${derbySideCard('ההרכב שלך', { picks: mine.picks, slots: mine.slots, bench: mine.bench.filter(Boolean) }, 'mine',
       ` <span class="dc-dim">· ספסל ${run.bench.length}/${DERBY_BENCH}</span>`)}`;
-  document.getElementById('dc-reroll').onclick = () => { if (derbyBenchReroll(run)) derbyRenderBench(run); };
+  document.getElementById('dc-reroll').onclick = () => {
+    if (derbyBusy()) return;
+    const r = derbyLoad();
+    if (r && r.phase === 'bench' && derbyBenchReroll(r)) derbyRenderBench(r);
+  };
   derbyRoot().querySelectorAll('.dc-cand').forEach(b => {
-    b.onclick = () => { if (derbyBenchPick(run, b.dataset.name)) derbyShow(); };
+    b.onclick = () => {
+      // the run as stored NOW: a second tap of a double tap lands on the next draw's list
+      const r = derbyLoad();
+      if (!r || r.phase !== 'bench' || b.dataset.draw !== r.benchDraw) return;
+      if (derbyBusy()) return;      // the second tap of a double tap lands on the NEW list, which is current
+      if (derbyBenchPick(r, b.dataset.name)) derbyShow();
+    };
   });
 }
 
@@ -132,6 +171,7 @@ function derbyRenderRivals(run) {
     <div class="dc-sec">היריבות, לפי סדר הסדרות</div>${cards}
     <button class="btn-primary dc-go" id="dc-go">לסדרה הראשונה ←</button>`;
   document.getElementById('dc-go').onclick = () => {
+    if (derbyBusy()) return;
     derbyBeginPlay(run);
     derbyTrack('progress', run.club + '|series');
     derbyShow();
@@ -142,7 +182,7 @@ function derbyRenderRivals(run) {
 // Substitutions are not goal events (m.events feeds the game record), so the
 // display log of subs is kept on its own, keyed by the match seed.
 function derbyLogLoad(seed) {
-  try { const L = JSON.parse(localStorage.getItem(DERBY_LOG_KEY)); return L && L.seed === seed ? L.rows : []; }
+  try { const L = JSON.parse(localStorage.getItem(DERBY_LOG_KEY)); return L && L.seed === seed && Array.isArray(L.rows) ? L.rows : []; }
   catch (e) { return []; }
 }
 function derbyLogAdd(m, row) {
@@ -212,23 +252,31 @@ function derbyPaintBoard(ctx) {
   const cl = document.getElementById('dc-clock');
   if (cl) cl.textContent = ctx.mode === 'over' ? 'סיום' : upTo === 45 && ctx.mode === 'paused' ? "מחצית · 45'" : `${upTo}'`;
   const rows = goals.map(e => ({ min: e.min, cls: e.mine ? 'mine' : 'theirs',
-      text: `${e.min}' ⚽ ${e.name}${e.sub ? ' (מחליף)' : ''}` }))
-    .concat(derbyLogLoad(m.seed).filter(r => r.min <= upTo).map(r => ({ min: r.min, cls: r.cls + ' sub', text: `${r.min}' 🔁 ${r.text}` })))
+      html: derbyEsc(`${e.min}' ⚽ ${e.name}${e.sub ? ' (מחליף)' : ''}`) }))
+    .concat(derbyLogLoad(m.seed).filter(r => r && r.min <= upTo).map(r => ({ min: r.min, cls: derbyEsc(r.cls) + ' sub',
+      html: `${derbyEsc(r.min)}' 🔁 ` + (r.inn != null
+        ? `${derbyEsc(r.team)}: <span class="dc-in">⬆ ${derbyEsc(r.inn)}</span> <span class="dc-out">⬇ ${derbyEsc(r.out)}</span>`
+        : derbyEsc(r.text)) })))
     .sort((a, b) => a.min - b.min);
   const ul = document.getElementById('dc-events');
-  if (ul) ul.innerHTML = rows.map(r => `<li class="${r.cls}">${derbyEsc(r.text)}</li>`).join('');
+  if (ul) ul.innerHTML = rows.map(r => `<li class="${r.cls}">${r.html}</li>`).join('');
 }
 
 function derbyPaintPanel(ctx) {
   const { m, run } = ctx, ctl = document.getElementById('dc-ctl');
   if (!ctl) return;
-  if (ctx.mode === 'playing') {
+  if (ctx.mode === 'playing' && m.min >= 90) {
+    ctl.innerHTML = '';      // the last segment: a pause could stop nothing
+  } else if (ctx.mode === 'playing') {
     ctl.innerHTML = `<button class="btn-secondary dc-pause${_derbyPauseReq ? ' on' : ''}" id="dc-pause">${
       _derbyPauseReq ? `⏸ עוצרים ב-${Math.min(90, m.min)}' (ביטול)` : '⏸ עצירה'}</button>`;
     document.getElementById('dc-pause').onclick = () => { _derbyPauseReq = !_derbyPauseReq; derbyPaintPanel(ctx); };
   } else if (ctx.mode === 'paused') {
     const can = derbyCanSub(m.me, m.min);
-    const why = m.min === 0 ? 'חילופים אפשר מהעצירה הראשונה. הטקטיקה חלה כבר משריקת הפתיחה.'
+    const noFit = can && _derbySel != null && m.me.bench.length
+      && !m.me.bench.some(b => playerFitsSlot(b.player, slotFitPos(m.me.slots[_derbySel])));
+    const why = noFit ? 'אין בספסל מחליף שמתאים לעמדה הזו.'
+      : m.min === 0 && _derbySel == null ? 'חילופים אפשר מהעצירה הראשונה. הטקטיקה חלה כבר משריקת הפתיחה.'
       : m.me.subs >= DERBY_SUBS ? 'ניצלת את כל החילופים.'
       : !m.me.bench.length ? 'אין עוד שחקנים על הספסל.'
       : !can ? 'ניצלת את שלוש העצירות. אפשר לשנות רק טקטיקה.'
@@ -245,11 +293,11 @@ function derbyPaintPanel(ctx) {
     ctl.querySelectorAll('.dc-tac').forEach(b => {
       b.onclick = () => { if (derbySetTactic(run, m, b.dataset.t)) derbyPaintPanel(ctx); };
     });
-    document.getElementById('dc-cont').onclick = () => { _derbySel = null; derbyPlaySegment(ctx); };
+    document.getElementById('dc-cont').onclick = () => { if (derbyBusy()) return; _derbySel = null; derbyPlaySegment(ctx); };
   } else {
     ctl.innerHTML = derbyAfterHtml(ctx);
     const hs = document.getElementById('dc-head-ser'); if (hs) hs.innerHTML = derbySeriesLine(ctx.ser.games);
-    document.getElementById('dc-next').onclick = () => derbyShow();
+    document.getElementById('dc-next').onclick = () => { if (derbyBusy()) return; derbyShow(); };
   }
   derbyPaintSides(ctx);
 }
@@ -296,7 +344,7 @@ function derbyPaintSides(ctx) {
           const out = m.me.picks[si], inn = m.me.bench[bi];
           if (si == null || !out || !inn) return;
           if (derbyMakeSub(run, m, si, bi)) {
-            derbyLogAdd(m, { min: m.min, cls: 'mine', text: `${derbyTeamName(run.club)}: ${inn.player.name} ⬅ ${out.player.name}` });
+            derbyLogAdd(m, { min: m.min, cls: 'mine', team: derbyTeamName(run.club), inn: inn.player.name, out: out.player.name });
             _derbySel = null;
             derbyPaintBoard(ctx);
             derbyPaintPanel(ctx);
@@ -324,13 +372,14 @@ function derbyPlaySegment(ctx) {
   if (m.over) return;
   derbyStopClock();
   const gen = _derbyGen;
+  document.querySelector('.dc-prev')?.remove();   // the previous game's line belongs to kick-off only
   const from = m.min, oppBefore = m.opp.picks.slice();
   derbyGameStep(run, m);
   // The computer's substitutions happen at the start of the segment.
   m.opp.picks.forEach((p, i) => {
     const was = oppBefore[i];
     if (p && was && p.player.name !== was.player.name) {
-      derbyLogAdd(m, { min: from, cls: 'theirs', text: `${derbyTeamName(ctx.rival)}: ${p.player.name} ⬅ ${was.player.name}` });
+      derbyLogAdd(m, { min: from, cls: 'theirs', team: derbyTeamName(ctx.rival), inn: p.player.name, out: was.player.name });
     }
   });
   ctx.mode = 'playing'; ctx.shown = from;
@@ -377,7 +426,7 @@ function derbyChip(g) {
 
 /* ── the end ─────────────────────────────────────────────────────────────── */
 function derbyRenderEnd(run) {
-  derbyStopClock();
+  derbyStopClock(); derbyLogClear();
   const sum = derbyRunSummary(run.series), club = derbyTeamName(run.club);
   const rows = run.series.map((s, i) => {
     const st = derbySeriesStatus(s.games);
@@ -399,7 +448,7 @@ function derbyRenderEnd(run) {
     </div>`;
   document.getElementById('dc-share').onclick = () => derbyShare(run);
   document.getElementById('dc-again').onclick = () => derbyStart(run.club, run.difficulty);
-  document.getElementById('dc-other').onclick = () => { derbyClear(); derbyClearDraftSave(); state.derby = null; derbyRenderPicker(); };
+  document.getElementById('dc-other').onclick = () => { derbyClear(); derbyLogClear(); derbyClearDraftSave(); state.derby = null; derbyRenderPicker(); };
 }
 
 function derbyShareText(run) {
@@ -410,7 +459,7 @@ function derbyShareText(run) {
     const st = derbySeriesStatus(s.games);
     return `${st.won ? '🟩' : '🟥'} ${derbyTeamName(s.rival)} ${st.w}:${st.l} (${s.games.map(g => (g.won ? '✅' : '❌') + derbyChip(g)).join(', ')})`;
   });
-  const xi = (run.xi || []).map(derbyEntry).filter(Boolean).map(e => e.player.name).join(', ');
+  const xi = (run.xi || []).map(derbyEntry).filter(Boolean).map(e => derbyPlain(e.player.name)).join(', ');
   return `${head}\n${lines.join('\n')}\nההרכב: ${xi}\nhttps://www.36-0.co.il`;
 }
 

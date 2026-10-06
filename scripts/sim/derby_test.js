@@ -398,5 +398,14 @@ if (require.main === module) {
     assert.ok(!/\|\|\s*'/.test(code), 'found || \' in code');
   });
 
+  t('SQL casts w/l via ::numeric::int, rejects non-integers, stores a rebuilt series', () => {
+    const code = V6().split('\n').filter(l => !l.trim().startsWith('--')).join('\n');
+    assert.ok(/\(v_el->>'w'\)::numeric::int/.test(code) && /\(v_el->>'l'\)::numeric::int/.test(code));
+    assert.ok(!/\(v_el->>'[wl]'\)::int/.test(code), 'direct ::int cast');
+    assert.ok(/<> trunc\(\(v_el->>'w'\)::numeric\)/.test(code));
+    assert.ok(/VALUES \(uid, v_club, v_diff, v_clean,/.test(code), 'raw series stored');
+    assert.ok(/v_supersub AND v_sum_w >= 1/.test(code));
+  });
+
   console.log(`\n${n} passed`);
 }

@@ -90,6 +90,8 @@ DECLARE
   v_fin_w    int;
   v_fin_l    int;
   v_won      int     := 0;
+  v_sum_w    int     := 0;
+  v_clean    jsonb   := '[]'::jsonb;
   v_title    boolean;
   v_clubs    int     := 0;
   v_both     boolean := false;
@@ -116,11 +118,14 @@ BEGIN
        OR jsonb_typeof(v_el->'w') IS DISTINCT FROM 'number'
        OR jsonb_typeof(v_el->'l') IS DISTINCT FROM 'number'
        OR (v_el->>'w')::numeric NOT IN (0,1,2,3)
-       OR (v_el->>'l')::numeric NOT IN (0,1,2,3) THEN
+       OR (v_el->>'l')::numeric NOT IN (0,1,2,3)
+       OR (v_el->>'w')::numeric <> trunc((v_el->>'w')::numeric)
+       OR (v_el->>'l')::numeric <> trunc((v_el->>'l')::numeric) THEN
       RETURN jsonb_build_object('error', 'bad series');
     END IF;
-    v_w := (v_el->>'w')::int;
-    v_l := (v_el->>'l')::int;
+    -- via numeric: '3.0' parses as numeric but a direct ::int would throw
+    v_w := (v_el->>'w')::numeric::int;
+    v_l := (v_el->>'l')::numeric::int;
     -- a finished best-of-5 has exactly one side on three
     IF NOT ((v_w = 3 AND v_l < 3) OR (v_l = 3 AND v_w < 3)) THEN
       RETURN jsonb_build_object('error', 'bad series');
@@ -128,6 +133,8 @@ BEGIN
     IF v_w = 3 THEN v_won := v_won + 1; END IF;
     IF v_w = 3 AND v_l = 0 THEN v_sweep := true; END IF;
     IF v_w = 3 AND v_l = 2 THEN v_series_comeback := true; END IF;
+    v_sum_w := v_sum_w + v_w;
+    v_clean := v_clean || jsonb_build_array(jsonb_build_object('rival', v_el->>'rival', 'w', v_w, 'l', v_l));
     v_fin_w := v_w;   -- the last pass leaves the final series
     v_fin_l := v_l;
   END LOOP;
@@ -138,15 +145,28 @@ BEGIN
   v_decider  := COALESCE(p->'decider'  = 'true'::jsonb, false);
   v_supersub := COALESCE(p->'super_sub' = 'true'::jsonb, false);
 
-  IF jsonb_typeof(p->'xi') = 'array' AND jsonb_array_length(p->'xi') <= 11 THEN v_xi := p->'xi'; END IF;
-  IF jsonb_typeof(p->'bench') = 'array' AND jsonb_array_length(p->'bench') <= 7 THEN v_bench := p->'bench'; END IF;
+  -- xi / bench: arrays of {squadId, name} objects, else '[]'
+  IF jsonb_typeof(p->'xi') = 'array' AND jsonb_array_length(p->'xi') <= 11
+     AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(p->'xi') e
+                     WHERE jsonb_typeof(e) IS DISTINCT FROM 'object'
+                        OR jsonb_typeof(e->'squadId') IS DISTINCT FROM 'string'
+                        OR jsonb_typeof(e->'name') IS DISTINCT FROM 'string') THEN
+    v_xi := p->'xi';
+  END IF;
+  IF jsonb_typeof(p->'bench') = 'array' AND jsonb_array_length(p->'bench') <= 7
+     AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(p->'bench') e
+                     WHERE jsonb_typeof(e) IS DISTINCT FROM 'object'
+                        OR jsonb_typeof(e->'squadId') IS DISTINCT FROM 'string'
+                        OR jsonb_typeof(e->'name') IS DISTINCT FROM 'string') THEN
+    v_bench := p->'bench';
+  END IF;
 
   IF NOT EXISTS (SELECT 1 FROM profiles WHERE id = uid) THEN
     RETURN jsonb_build_object('error', 'no profile');
   END IF;
 
   INSERT INTO derby_runs (user_id, club, difficulty, series, series_won, title, xi, bench)
-  VALUES (uid, v_club, v_diff, v_series, v_won, v_title, v_xi, v_bench);
+  VALUES (uid, v_club, v_diff, v_clean, v_won, v_title, v_xi, v_bench);
 
   -- dc_all and dc_both_sides are counted here, from the rows (after this INSERT),
   -- so they follow the account across devices
@@ -175,8 +195,9 @@ BEGIN
     earned := array_append(earned, 'dc_underdog');
   END IF;
   -- the mode runs client-side, so this flag is trust-on-submit like the other
-  -- client-run modes; series_won >= 1 is only a weak plausibility check
-  IF v_supersub AND v_won >= 1 THEN earned := array_append(earned, 'dc_super_sub'); END IF;
+  -- client-run modes; at least one game won (sum of w over the series) is only a
+  -- weak plausibility check
+  IF v_supersub AND v_sum_w >= 1 THEN earned := array_append(earned, 'dc_super_sub'); END IF;
 
   WITH ins AS (
     INSERT INTO user_achievements (user_id, achievement_key)

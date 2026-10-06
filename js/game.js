@@ -858,6 +858,10 @@ function styleProfile() {
 }
 
 function showScreen(id) {
+  // state.derby marks "this session is a derby" (clubShown, cup, january read it) and
+  // derbyApplyMine re-sets it on every derby render. Leaving the derby for any
+  // other screen must drop it, or the derby club leaks in as "your club".
+  if (state.derby && id !== 'derby' && id !== 'draft') state.derby = null;
   // Europe's backdrop is a fixed layer on <body>, so it does not leave with the
   // screen. Anything that navigates away — the nav logo above all — has to take
   // it down, or the next screen paints over nothing and looks empty.
