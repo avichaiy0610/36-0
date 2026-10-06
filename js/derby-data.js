@@ -47,19 +47,49 @@ const DERBY_BENCH = 7;
 const DERBY_SUBS = 5;
 const DERBY_SUB_WINDOWS = 3;
 const DERBY_CHUNK = 15;
-// Tiredness, so that a substitution is worth something: a man loses 0.1 of a
-// rating point for every minute past his 60th on the pitch (−3 at 90').
-const DERBY_FATIGUE_FROM = 60;
-const DERBY_FATIGUE_PER_MIN = 0.1;
+// Energy (spec §11.1), carried through the run: every man of each 18 has 0–100.
+// It drains with the minutes he is on the pitch (a keeper at a third of the
+// rate) and costs rating only below DERBY_ENERGY_FREE, progressively:
+//   penalty(E) = 0.0006 × (75 − E)² + 0.12 × (75 − E)      (E < 75; else 0)
+//   E 75 → 0 · 60 → −1.9 · 50 → −3.4 · 40 → −4.9 · 30 → −6.6 · 0 → −12.4
+// A fresh man playing 90' ends at 100 − 40.5 = 59.5: −2.0 at the whistle. A man
+// starting at 70 ends at 29.5: −6.7 (the spec's "≈ −5" and a progressive curve
+// cannot both hold with fresh-90' at −2; the curve wins — see the commit).
+// Between games of a series everyone recovers +30 (cap 100) and a man who did
+// not play at all is back to 100; between series +60. So a man who ended at 60
+// starts the next game at 90 — tired is a matter of playing game after game.
+const DERBY_ENERGY_DRAIN = 0.45;          // per minute on the pitch; GK × 1/3
+const DERBY_ENERGY_GK = 1 / 3;
+const DERBY_ENERGY_FREE = 75;
+const DERBY_ENERGY_SQ = 0.0006, DERBY_ENERGY_LIN = 0.12;
+const DERBY_RECOVER_GAME = 30;
+const DERBY_RECOVER_SERIES = 60;
+// The computer rests a starter below this before a game (when the bench has better).
+const DERBY_ROTATE_BELOW = 55;
+// Shown levels, highest first: [from, word, css key].
+const DERBY_ENERGY_LEVELS = [[80, 'רענן', 'fresh'], [60, 'עייף', 'tired'], [40, 'עייף מאוד', 'vtired'], [-Infinity, 'מותש', 'spent']];
+
+function derbyEnergyPenalty(e) {
+  const d = DERBY_ENERGY_FREE - e;
+  return d > 0 ? DERBY_ENERGY_SQ * d * d + DERBY_ENERGY_LIN * d : 0;
+}
+function derbyEnergyLevel(e) {
+  const L = DERBY_ENERGY_LEVELS.find(l => e >= l[0]);
+  return { word: L[1], key: L[2] };
+}
 
 // How the computer drafts. Each round it ranks the players of the drawn season
 // who fit an open slot and takes the 1st/2nd/3rd best with these weights; `look`
 // is how many seasons it draws per round, keeping the best (its reroll).
 // Calibrated 2026-10-06 (scripts/sim/derby_calibrate.js); the engine is never touched.
+// Re-calibrated for v4 (energy carried through the run — both sides rotate, and
+// tiredness cost the player's bot more than it cost the rivals): normal had
+// fallen to ~43% with [0.6, 0.25, 0.15]. v4 at 300 runs: easy 65.3 · normal 51.9 ·
+// hard 37.2% series wins; title on normal 18.3%; lowest three unchanged.
 const DERBY_AI = {
-  easy:   { weights: [0.10, 0.25, 0.65], look: 1 },
-  normal: { weights: [0.6, 0.25, 0.15], look: 1 },
-  hard:   { weights: [1, 0, 0], look: 2 },
+  easy:   { weights: [0, 0.1, 0.9], look: 1 },
+  normal: { weights: [0.3, 0.25, 0.45], look: 1 },
+  hard:   { weights: [0.6, 0.25, 0.15], look: 2 },
 };
 
 // The three hardest clubs on normal, from the v2 calibration (2026-10-06, 1000 runs,

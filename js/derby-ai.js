@@ -81,11 +81,19 @@ function derbyAiDraft(teamId, formationId, difficulty, rng) {
   return { slots, picks, bench };
 }
 
-// Rating lost to tiredness: 0.1 a minute past a man's 60th on the pitch.
-// `pick.on` is the minute he came on (0 for a starter).
+// A man's energy at `minute` (spec §11.1). `pick.e0` is his energy at kick-off,
+// or when he came on; `pick.on` the minute he came on (0 for a starter);
+// `pick.offAt` the minute he went off, if he did. No e0 (tests, old saves): 100.
+function derbyEnergyAt(pick, minute) {
+  const e0 = pick.e0 ?? 100;
+  const until = pick.offAt != null ? Math.min(minute, pick.offAt) : minute;
+  const played = Math.max(0, until - (pick.on || 0));
+  const gk = pick.player && normalizePos(pick.player.position) === 'GK';
+  return Math.max(0, e0 - played * DERBY_ENERGY_DRAIN * (gk ? DERBY_ENERGY_GK : 1));
+}
+// Rating lost to tiredness at `minute`: the energy penalty (derbyEnergyPenalty).
 function derbyFatigue(pick, minute) {
-  const t = minute - (pick.on || 0) - DERBY_FATIGUE_FROM;
-  return t > 0 ? t * DERBY_FATIGUE_PER_MIN : 0;
+  return derbyEnergyPenalty(derbyEnergyAt(pick, minute));
 }
 
 // The four line ratings of ANY XI, on exactly the terms of the player's own
@@ -96,17 +104,19 @@ function derbyFatigue(pick, minute) {
 const _derbyLinesMemo = new Map();
 function derbyLinesFor(picks, slots, tactic, minute) {
   const m = minute || 0;
-  const tired = m > DERBY_FATIGUE_FROM;
+  // Each man's tiredness now: it, not the minute, is what the ratings depend on.
+  const pen = picks.map(p => (p ? derbyFatigue(p, m) : 0));
+  const tired = pen.some(x => x > 0);
   const flags = (typeof classicMode === 'function' && classicMode() ? 'c' : '') + (state.peakMode ? 'p' : '') +
     (state.crowdMode ? 'w' : '') + (state.coach ? 'k' : '') + (state.story ? 's' : '');
-  const key = flags + '|' + (tactic || 'bal') + '|' + (tired ? m : 0) + '|' + slots.map(s => s.id || s.pos).join(',') + '|' +
-    picks.map(p => p ? p.squad.id + ':' + p.player.name + ':' + (p.on || 0) : '-').join(',');
+  const key = flags + '|' + (tactic || 'bal') + '|' + slots.map(s => s.id || s.pos).join(',') + '|' +
+    picks.map((p, i) => p ? p.squad.id + ':' + p.player.name + ':' + pen[i] : '-').join(',');
   const hit = _derbyLinesMemo.get(key);
   if (hit) return Object.assign({}, hit);
   const keep = { picks: state.picks, slots: state.slots, tactic: state.tactic };
   try {
     state.picks = picks; state.slots = slots; state.tactic = tactic || 'bal';
-    const out = myLineRatings(tired ? (p => playerOVR(p.player) - derbyFatigue(p, m)) : undefined);
+    const out = myLineRatings(tired ? ((p, i) => playerOVR(p.player) - pen[i]) : undefined);
     if (_derbyLinesMemo.size > 20000) _derbyLinesMemo.clear();
     _derbyLinesMemo.set(key, out);
     return Object.assign({}, out);

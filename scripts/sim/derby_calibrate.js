@@ -7,6 +7,10 @@
 // reroll and chase chemistry, so they do a little better than this). Both sides
 // are auto-managed by the same rule (spec 9.5). A run = three best-of-5 series
 // (rival 3, rival 2, the archrival), home/away per DERBY_GAME_HOME.
+// Energy (spec §11.1) is carried through the whole run as in the game: each
+// game starts from the side's energy map, both sides rest tired starters first
+// (derbyRotate — the computer's rule, also the bot's), and full time writes the
+// map back with +30 within a series, +60 into the next one.
 // Targets (spec 9.5): normal ≈ 50% series wins averaged over all clubs (gate
 // 50 ± 5); easy ≈ 65%; hard ≈ 35%. Title % (3 of 3) is reported, not gated.
 // Clubs under 10% on normal are a NOTE, not a failure (rivalry choices make
@@ -18,16 +22,25 @@ const F = '4-3-3';
 Object.assign(G.state, { peakMode: false, classic: false, coach: null, story: null });
 
 G.DERBY_AI.__bot = { weights: [1, 0, 0], look: 1 };   // the player bot is fixed; DERBY_AI tunes only the computer
-const side = d => ({ picks: d.picks, bench: d.bench, slots: d.slots, tactic: 'bal' });
+const withE = map => e => Object.assign({}, e, { e0: map[e.player.name] ?? 100 });
+const side = (d, map) => ({ picks: d.picks.map(withE(map)), bench: d.bench.map(withE(map)), slots: d.slots, tactic: 'bal' });
 function run(club, diff, seed) {
   const rng = G.derbyRng(seed);
-  const me = side(G.derbyAiDraft(club, F, '__bot', rng));
+  const me = G.derbyAiDraft(club, F, '__bot', rng);
+  const eMe = {};
   let won = 0;
   for (let s = 0; s < 3; s++) {
-    const opp = side(G.derbyAiDraft(G.derbySeriesRival(club, s), F, diff, rng));
+    const opp = G.derbyAiDraft(G.derbySeriesRival(club, s), F, diff, rng);
+    const eOpp = {};
     const games = [];
-    for (let i = 0; !G.derbySeriesStatus(games).over; i++)
-      games.push(G.derbyPlayMatch(me, opp, G.DERBY_GAME_HOME[i], (seed * 31 + s * 1009 + i * 7919) | 0));
+    for (let i = 0; !G.derbySeriesStatus(games).over; i++) {
+      const m = G.derbyMatchNew(side(me, eMe), side(opp, eOpp), G.DERBY_GAME_HOME[i], (seed * 31 + s * 1009 + i * 7919) | 0);
+      G.derbyRotate(m.me); G.derbyRotate(m.opp);
+      while (!m.over) G.derbyMatchStep(m, true);
+      games.push(m);
+      const rec = G.derbySeriesStatus(games).over ? G.DERBY_RECOVER_SERIES : G.DERBY_RECOVER_GAME;
+      G.derbyEnergyAfter(m.me, eMe, rec); G.derbyEnergyAfter(m.opp, eOpp, rec);
+    }
     if (G.derbySeriesStatus(games).won) won++;
   }
   return won;

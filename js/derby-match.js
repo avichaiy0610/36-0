@@ -15,13 +15,23 @@
 // Both sides' clean-sheet tags count (simulateMatchV2 only applies the
 // player's — its opponents are real clubs without tags).
 
+// An entry of a side: who, from which season, and his energy (spec §11.1) —
+// e0 at kick-off or when he came on, `on` the minute he came on, `offAt` the
+// minute he went off.
+function derbyMan(e, on) {
+  const out = { player: e.player, squad: e.squad, e0: e.e0 ?? 100 };
+  if (on !== undefined) out.on = on;
+  if (e.offAt != null) out.offAt = e.offAt;
+  return out;
+}
 function derbySide(xi) {
   return {
-    picks: xi.picks.map(e => (e ? { player: e.player, squad: e.squad, on: e.on || 0 } : null)),
-    bench: (xi.bench || []).map(e => ({ player: e.player, squad: e.squad })),
+    picks: xi.picks.map(e => (e ? derbyMan(e, e.on || 0) : null)),
+    bench: (xi.bench || []).map(e => derbyMan(e)),
     slots: xi.slots, tactic: xi.tactic || 'bal', formationId: xi.formationId || null, slotTac: xi.slotTac || null,
     chances: (xi.chances || []).slice(),
-    subs: xi.subs || 0, windows: xi.windows || 0, lastWin: xi.lastWin ?? -1, off: (xi.off || []).slice(),
+    subs: xi.subs || 0, windows: xi.windows || 0, lastWin: xi.lastWin ?? -1,
+    off: (xi.off || []).map(e => derbyMan(e, e.on || 0)),
   };
 }
 
@@ -52,8 +62,8 @@ function derbySub(side, slotIdx, benchIdx, minute) {
   if (!inE || !side.picks[slotIdx] || !derbyCanSub(side, minute)) return false;
   if (minute !== 45 && side.lastWin !== minute) { side.windows++; side.lastWin = minute; }
   side.subs++;
-  side.off.push(side.picks[slotIdx]);
-  side.picks[slotIdx] = { player: inE.player, squad: inE.squad, on: minute };
+  side.off.push(Object.assign({}, side.picks[slotIdx], { offAt: minute }));
+  side.picks[slotIdx] = { player: inE.player, squad: inE.squad, on: minute, e0: inE.e0 ?? 100 };
   side.bench.splice(benchIdx, 1);
   return true;
 }
@@ -61,24 +71,85 @@ function derbySub(side, slotIdx, benchIdx, minute) {
 // How the computer manages — and the calibration bot's rule for the player.
 // `lead` is this side's goal difference. Tactic: chase from 60', protect from
 // 70'. Substitutions: three at 60', two at 75', each only when a bench man who
-// fits the slot will be better than the tired man there over the next segment.
-// The goalkeeper is never changed.
+// fits the slot will be better than the tired man there over the next segment —
+// both priced by their real energy (derbyFatigue). The goalkeeper is never changed.
 function derbyAutoManage(side, minute, lead) {
   side.tactic = (minute >= 60 && lead < 0) ? 'att' : (minute >= 70 && lead > 0) ? 'def' : 'bal';
   const n = minute === 60 ? 3 : minute === 75 ? 2 : 0;
+  const ahead = minute + DERBY_CHUNK;
   for (let k = 0; k < n && derbyCanSub(side, minute); k++) {
     let best = null;
     side.bench.forEach((b, bi) => {
+      const inn = playerOVR(b.player) - derbyFatigue({ player: b.player, e0: b.e0, on: minute }, ahead);
       side.picks.forEach((p, si) => {
         const pos = slotFitPos(side.slots[si]);
         if (!p || pos === 'GK' || !playerFitsSlot(b.player, pos)) return;
-        const gain = playerOVR(b.player) - (playerOVR(p.player) - derbyFatigue(p, minute + DERBY_CHUNK));
+        const gain = inn - (playerOVR(p.player) - derbyFatigue(p, ahead));
         if (gain > 0 && (!best || gain > best.gain)) best = { bi, si, gain };
       });
     });
     if (!best) break;
     derbySub(side, best.si, best.bi, minute);
   }
+}
+
+// Before a game (spec §11.1): the computer — and the calibration bot — rests a
+// starter whose energy is under DERBY_ROTATE_BELOW when a bench man who fits the
+// slot (inNaturalPos with slot.pos, as the engine judges) is worth more now,
+// rating less his own tiredness. A free pre-kick swap, never a substitution.
+function derbyRotate(side) {
+  const eff = e => playerOVR(e.player) - derbyEnergyPenalty(e.e0 ?? 100);
+  let n = 0;
+  side.picks.forEach((p, si) => {
+    if (!p || (p.e0 ?? 100) >= DERBY_ROTATE_BELOW) return;
+    let best = -1, bestEff = eff(p);
+    side.bench.forEach((b, bi) => {
+      if (inNaturalPos(b.player, side.slots[si].pos) && eff(b) > bestEff) { best = bi; bestEff = eff(b); }
+    });
+    if (best >= 0 && derbyPreSwap(side, si, best, 0)) n++;
+  });
+  return n;
+}
+
+// Full time (spec §11.1): everyone who played is at his energy at 90' (or when
+// he went off); then the recovery before the next game — +rec for them (cap
+// 100), and 100 for anyone who did not play. `map` is { name: energy } for the
+// side's 18 and is updated in place.
+function derbyEnergyAfter(side, map, rec) {
+  const played = new Map();
+  side.off.forEach(p => played.set(p.player.name, derbyEnergyAt(p, 90)));
+  side.picks.forEach(p => { if (p) played.set(p.player.name, derbyEnergyAt(p, 90)); });
+  const names = new Set(Object.keys(map));
+  side.picks.concat(side.bench, side.off).forEach(p => { if (p) names.add(p.player.name); });
+  for (const n of names) {
+    map[n] = played.has(n) ? Math.min(100, Math.round((played.get(n) + rec) * 10) / 10) : 100;
+  }
+  return map;
+}
+
+// Undo at a stop (spec §11.2): a copy of the player's side when the stop began
+// (or the pre-kick screen opened). Restoring it also restores the substitution
+// counters, so a stop whose substitutions were all undone uses no window.
+function derbySnapshot(side, minute) {
+  const c = e => (e ? Object.assign({}, e) : null);
+  return { min: minute, picks: side.picks.map(c), bench: side.bench.map(c), off: side.off.map(c),
+    slots: side.slots, formationId: side.formationId, slotTac: side.slotTac, tactic: side.tactic,
+    subs: side.subs, windows: side.windows, lastWin: side.lastWin };
+}
+function derbyRestore(side, snap) {
+  if (!snap) return false;
+  const c = e => (e ? Object.assign({}, e) : null);
+  Object.assign(side, { picks: snap.picks.map(c), bench: snap.bench.map(c), off: snap.off.map(c),
+    slots: snap.slots, formationId: snap.formationId, slotTac: snap.slotTac, tactic: snap.tactic,
+    subs: snap.subs, windows: snap.windows, lastWin: snap.lastWin });
+  return true;
+}
+// Has anything changed since the snapshot? (the undo button is live only then)
+function derbySnapChanged(side, snap) {
+  if (!snap) return false;
+  const k = s => [s.picks, s.bench, s.off].map(l => l.map(e => (e ? e.player.name + ':' + (e.on || 0) : '-')).join(','))
+    .concat([s.formationId, s.tactic, s.subs, s.windows, s.lastWin]).join('|');
+  return k(side) !== k(snap);
 }
 
 // Who scored — display only; the goal itself is already drawn.
@@ -135,8 +206,8 @@ function derbySwap(side, i, j) {
 function derbyPreSwap(side, slotIdx, benchIdx, minute) {
   const inE = side.bench[benchIdx], out = side.picks[slotIdx];
   if ((minute || 0) > 0 || !inE || !out) return false;
-  side.picks[slotIdx] = { player: inE.player, squad: inE.squad, on: 0 };
-  side.bench[benchIdx] = { player: out.player, squad: out.squad };
+  side.picks[slotIdx] = { player: inE.player, squad: inE.squad, on: 0, e0: inE.e0 ?? 100 };
+  side.bench[benchIdx] = { player: out.player, squad: out.squad, e0: out.e0 ?? 100 };
   return true;
 }
 

@@ -1,7 +1,9 @@
 // ─── אלופי הדרבי — screens (v3, spec §9–§10) ─────────────────────────────────────
 // picker → (the normal draft screen: XI, then the bench) → rivals → live matches → end.
 // Every interpolated string goes through derbyEsc.
-const DERBY_DIFF_HE = { easy: 'קל', normal: 'רגיל', hard: 'קשה' };
+// Difficulty — "רמת קושי", so the words are feminine (spec §11.3).
+const DERBY_DIFF_HE = { easy: 'קלה', normal: 'רגילה', hard: 'קשה' };
+function derbyDiffText(d) { return 'רמת קושי: ' + (DERBY_DIFF_HE[d] || DERBY_DIFF_HE.normal); }
 const DERBY_TACTIC_HE = { att: 'התקפי', bal: 'מאוזן', def: 'הגנתי' };
 const DERBY_MS_PER_MIN = 45;
 const DERBY_LOG_KEY = '36-0-derby-log';
@@ -69,6 +71,7 @@ function derbyRenderPicker() {
   const root = derbyRoot();
   root.innerHTML = `
     <p class="dc-lead">בנה את הרכב הנצח של המועדון מכל העונות שלו בליגת העל — 11 בהרכב ו-7 על הספסל — ואז שחק סדרת הטוב מ-5 מול כל אחת משלוש היריבות. היריבה המושבעת בגמר.</p>
+    <div class="dc-sub-head dc-diff-head">רמת קושי</div>
     <div class="dc-diff">${['easy', 'normal', 'hard'].map(d =>
       `<button class="dc-diff-btn${d === _derbyDiff ? ' on' : ''}" data-diff="${d}">${DERBY_DIFF_HE[d]}</button>`).join('')}</div>
     <div class="dc-grid">${derbyClubs().map(id => {
@@ -118,7 +121,7 @@ function derbyRenderRivals(run) {
   derbyRoot().innerHTML = `
     <div class="dc-me">${derbyCrest(run.club, 'dc-crest-lg')}<div>
       <div class="dc-me-name">${derbyEsc(derbyTeamName(run.club))} · הרכב הנצח שלך</div>
-      <div class="dc-me-sub">דירוג ${myOvr} · רמה ${DERBY_DIFF_HE[run.difficulty] || ''} · שלוש סדרות של הטוב מ-5</div></div></div>
+      <div class="dc-me-sub">דירוג ${myOvr} · ${derbyDiffText(run.difficulty)} · שלוש סדרות של הטוב מ-5</div></div></div>
     ${derbySideCard('ההרכב שלך', mine, 'mine')}
     <div class="dc-sec">היריבות, לפי סדר הסדרות</div>${cards}
     <button class="btn-primary dc-go" id="dc-go">לסדרה הראשונה ←</button>`;
@@ -136,6 +139,11 @@ function derbyRenderRivals(run) {
 function derbyLogLoad(seed) {
   try { const L = JSON.parse(localStorage.getItem(DERBY_LOG_KEY)); return L && L.seed === seed && Array.isArray(L.rows) ? L.rows : []; }
   catch (e) { return []; }
+}
+// Undo at a stop: the player's substitution rows of this minute go too.
+function derbyLogDropMine(m, min) {
+  const rows = derbyLogLoad(m.seed).filter(r => !(r && r.cls === 'mine' && r.min === min));
+  try { localStorage.setItem(DERBY_LOG_KEY, JSON.stringify({ seed: m.seed, rows })); } catch (e) {}
 }
 function derbyLogAdd(m, row) {
   const rows = derbyLogLoad(m.seed); rows.push(row);
@@ -182,9 +190,11 @@ function derbyRenderMatch(run) {
     // Stop AT the minute on screen: m.min is already played and saved.
     derbyStopClock(); _derbySel = null;
     ctx.mode = 'paused'; ctx.shown = m.min;
+    derbyMarkStop(run, m);
     derbyPaintBoard(ctx);
     derbyPaintPanel(ctx);
   };
+  derbyMarkStop(run, m);           // the pre-kick screen (or a refreshed stop): undo from here
   derbyPaintBoard(ctx);
   derbyPaintPanel(ctx);
 }
@@ -235,18 +245,17 @@ function derbyPaintBoard(ctx) {
 }
 
 // Each man's worth on the pitch now, exactly as the engine counts him
-// (teamOVR / calcGroupOVR, through derbyLinesFor): rating, less tiredness past
-// DERBY_FATIGUE_FROM, plus chemistry; out of position (judged by slot.pos, as the
+// (teamOVR / calcGroupOVR, through derbyLinesFor): rating, less his energy
+// penalty now (derbyFatigue), plus chemistry; out of position (judged by slot.pos, as the
 // engine does — a tactic's CAM/CDM role slot is still a CM slot) at 93%, rounded.
 // The side is lent to `state` for chemAt and put back whatever happens.
 function derbyRatings(side, minute) {
-  const tired = minute > DERBY_FATIGUE_FROM;
   const keep = { picks: state.picks, slots: state.slots };
   try {
     state.picks = side.picks; state.slots = side.slots;
     return side.picks.map((p, i) => {
       if (!p) return null;
-      const ovr = (tired ? playerOVR(p.player) - derbyFatigue(p, minute) : playerOVR(p.player)) + chemAt(i);
+      const ovr = playerOVR(p.player) - derbyFatigue(p, minute) + chemAt(i);
       return derbyInPos(p, side.slots[i]) ? ovr : Math.round(ovr * OUT_OF_POS);
     });
   } finally { state.picks = keep.picks; state.slots = keep.slots; }
@@ -255,6 +264,25 @@ function derbyInPos(p, slot) { return inNaturalPos(p.player, slot.pos); }
 function derbyTeamVars(squad) {
   const t = getTeam(squad.teamId);
   return `--tc:${derbyEsc(t.primaryColor)};--ts:${derbyEsc(t.secondaryColor)};--tx:${derbyEsc(textColorFor(t.primaryColor))}`;
+}
+// Energy (spec §11.1): a thin bar under each token, coloured by level.
+function derbyEnergyBar(e) {
+  const v = Math.max(0, Math.min(100, Math.round(e))), L = derbyEnergyLevel(v);
+  return `<span class="dc-en dc-en-${L.key}" title="כושר ${v} · ${L.word}"><i style="width:${v}%"></i></span>`;
+}
+function derbyEnergyWord(e) {
+  const v = Math.round(e), L = derbyEnergyLevel(v);
+  return `<span class="dc-lvl dc-lvl-${L.key}">${L.word} ${v}</span>`;
+}
+const DERBY_ENERGY_LEGEND = `<div class="dc-legend dc-en-legend">כושר: ${DERBY_ENERGY_LEVELS.map(l =>
+  `<span class="dc-lg"><i class="dc-en-${l[2]}"></i>${l[1]}</span>`).join('')}</div>`;
+// Before kick-off: who of the 18 is not fresh, most tired first.
+function derbyRestHtml(side) {
+  const men = side.picks.concat(side.bench).filter(Boolean).map(p => ({ p, e: p.e0 ?? 100, on: side.picks.includes(p) }))
+    .filter(x => x.e < 80).sort((a, b) => a.e - b.e);
+  if (!men.length) return '<div class="dc-rest dc-rest-ok">כל ה-18 רעננים.</div>';
+  return `<div class="dc-rest"><b>צריכים מנוחה:</b> ${men.map(x =>
+    `<span class="dc-rest-man">${derbyShort(x.p)}${x.on ? '' : ' <small>(ספסל)</small>'} ${derbyEnergyWord(x.e)}</span>`).join(' ')}</div>`;
 }
 function derbyShort(p) { return derbyEsc(typeof playerShortName === 'function' ? playerShortName(p.player.name) : p.player.name); }
 
@@ -265,22 +293,24 @@ function derbyPitchHtml(ctx, live) {
   const rt = derbyRatings(me, m.min);
   return `<div class="dc-pitch-wrap"><div class="pitch dc-pitch">${me.picks.map((p, i) => {
     if (!p) return '';
-    const slot = me.slots[i], f = derbyFatigue(p, m.min);
+    const slot = me.slots[i], f = derbyFatigue(p, m.min), en = derbyEnergyAt(p, m.min);
     const oop = !derbyInPos(p, slot);
     const cls = (sel && sel.k === 'slot' && sel.i === i ? ' highlight-selected'
       : selBench && derbyInPos(selBench, slot) ? ' highlight-compat' : '') + (live ? '' : ' dc-ro');
-    const pills = (f > 0 ? '<span class="dc-pill dc-pill-tired">עייף</span>' : '') + (p.on ? `<span class="dc-pill dc-pill-on" dir="ltr">⬆${derbyEsc(p.on)}'</span>` : '');
+    const pills = (p.on ? `<span class="dc-pill dc-pill-on" dir="ltr">⬆${derbyEsc(p.on)}'</span>` : '');
     const inner = `<div class="slot-circle filled-circle${oop ? ' circle-oop' : ''}">
         <span class="slot-ovr${f > 0 ? ' dc-ovr-tired' : ''}">${Math.round(rt[i])}</span>
         ${oop ? '<span class="slot-oop" title="מחוץ לעמדה — 93%">⇄</span>' : ''}
         <span class="slot-player-short">${derbyShort(p)}</span>${pills}</div>
+      ${derbyEnergyBar(en)}
       <div class="slot-name-label${oop ? ' dc-oop-lbl' : ''}"${oop ? ' title="מחוץ לעמדה — 93%"' : ''}>${derbyEsc(slot.label || slot.pos)}</div>`;
     const st = `left:${+slot.x}%;top:${+slot.y}%;${derbyTeamVars(p.squad)}`;
     return live
       ? `<button type="button" class="slot-token filled dc-tok${cls}" style="${st}" data-slot="${i}" aria-label="${derbyEsc(p.player.name)}">${inner}</button>`
       : `<div class="slot-token filled dc-tok${cls}" style="${st}">${inner}</div>`;
   }).join('')}</div></div>
-    <div class="dc-legend"><span class="dc-legend-oop">⇄ כתום = מחוץ לעמדה (93%)</span> · <span class="dc-pill-tired">עייף</span> · <span class="dc-in">⬆ נכנס</span></div>`;
+    <div class="dc-legend"><span class="dc-legend-oop">⇄ כתום = מחוץ לעמדה (93%)</span> · <span class="dc-in">⬆ נכנס</span></div>
+    ${DERBY_ENERGY_LEGEND}`;
 }
 // The bench as a row of tokens. With a pitch slot picked, the men who fit it
 // naturally are lit; the others show the 93% they would play at.
@@ -290,10 +320,12 @@ function derbyBenchHtml(ctx, live, benchOk) {
   const slot = sel && sel.k === 'slot' ? me.slots[sel.i] : null;
   return `<div class="dc-bench">${me.bench.map((b, bi) => {
     const fit = slot ? derbyInPos(b, slot) : true;
-    const ovr = Math.round(playerOVR(b.player) * (fit ? 1 : OUT_OF_POS));
+    // what he would be worth coming on now: rating less his energy penalty (93% out of position)
+    const ovr = Math.round((playerOVR(b.player) - derbyEnergyPenalty(b.e0 ?? 100)) * (fit ? 1 : OUT_OF_POS));
     const cls = (sel && sel.k === 'bench' && sel.i === bi ? ' sel' : '') + (slot && fit ? ' fit' : '');
     const inner = `<div class="slot-circle filled-circle${slot && !fit ? ' circle-oop' : ''}">
         <span class="slot-ovr">${ovr}</span><span class="slot-player-short">${derbyShort(b)}</span></div>
+      ${derbyEnergyBar(b.e0 ?? 100)}
       <span class="dc-btok-pos${slot && !fit ? ' dc-oop-lbl' : ''}">${slot && !fit ? 'מחוץ לעמדה' : derbyEsc(derbyPosHe(b.player))}</span>`;
     return live
       ? `<button type="button" class="dc-btok${cls}" style="${derbyTeamVars(b.squad)}" data-bench="${bi}"${benchOk ? '' : ' disabled'} aria-label="${derbyEsc(b.player.name)}">${inner}</button>`
@@ -325,6 +357,10 @@ function derbyPaintPanel(ctx) {
     const pre = m.min === 0, block = derbySubBlock(m), benchOk = pre || !block;
     const sel = _derbySel;
     const free = pre ? 'לפני השריקה זה לא נספר כחילוף.' : 'החלפת מקומות ומערך — חינם; כניסה מהספסל נספרת כחילוף.';
+    const selMan = sel ? (sel.k === 'slot' ? m.me.picks[sel.i] : m.me.bench[sel.i]) : null;
+    const selEn = selMan ? (sel.k === 'slot' ? derbyEnergyAt(selMan, m.min) : (selMan.e0 ?? 100)) : 0;
+    const who = selMan ? `<b>${derbyEsc(selMan.player.name)}</b> · כושר: ${derbyEnergyWord(selEn)}. ` : '';
+    const undo = derbyCanUndo(m);
     const why = sel && sel.k === 'slot'
         ? (benchOk ? 'עכשיו לחץ על שחקן אחר במגרש להחלפת מקומות, או על שחקן מהספסל (ירוק = מתאים לעמדה).'
                    : `עכשיו לחץ על שחקן אחר במגרש להחלפת מקומות. ${block}`)
@@ -338,11 +374,13 @@ function derbyPaintPanel(ctx) {
       <div class="dc-tactics">${TACTIC_KEYS.map(k => `<button type="button" class="dc-tac${m.me.tactic === k ? ' on' : ''}" data-t="${k}">
         <b>${DERBY_TACTIC_HE[k]}</b><small>${tacticTrade(k) || 'ללא שינוי'}</small></button>`).join('')}</div>
       ${pre ? '' : `<div class="dc-counts">חילופים ${m.me.subs}/${DERBY_SUBS} · עצירות ${m.me.windows}/${DERBY_SUB_WINDOWS} (המחצית לא נספרת)</div>`}
-      <div class="dc-hint" id="dc-hint">${why}</div>
+      ${pre ? derbyRestHtml(m.me) : ''}
+      <div class="dc-hint" id="dc-hint">${who}${why}</div>
       ${derbyPitchHtml(ctx, true)}
       <div class="dc-sub-head">ספסל</div>
       ${derbyBenchHtml(ctx, true, benchOk)}
       ${derbyOffHtml(m.me)}
+      <button type="button" class="btn-secondary dc-undo" id="dc-undo"${undo ? '' : ' disabled'}>↺ בטל שינויים</button>
       <button type="button" class="btn-primary dc-go" id="dc-cont">${pre ? 'שריקת פתיחה ▶' : 'המשך ▶'}</button>
     </div>`;
     ctl.querySelectorAll('.dc-form').forEach(b => {
@@ -356,6 +394,12 @@ function derbyPaintPanel(ctx) {
     });
     ctl.querySelectorAll('[data-slot]').forEach(b => { b.onclick = () => derbyTapSlot(ctx, +b.dataset.slot); });
     ctl.querySelectorAll('[data-bench]').forEach(b => { b.onclick = () => derbyTapBench(ctx, +b.dataset.bench); });
+    document.getElementById('dc-undo').onclick = () => {
+      if (!derbyUndoMine(run, m)) return;
+      derbyLogDropMine(m, m.min);
+      _derbySel = null;
+      derbyPaintBoard(ctx); derbyPaintPanel(ctx);
+    };
     document.getElementById('dc-cont').onclick = () => { if (derbyBusy()) return; _derbySel = null; derbyRunClock(ctx); };
   } else if (ctx.mode === 'playing') {
     ctl.innerHTML = `<section class="dc-card mine">${head}${derbyPitchHtml(ctx, false)}
@@ -414,11 +458,11 @@ function derbyPaintOpp(ctx) {
   const rt = derbyRatings(m.opp, m.min);
   const row = (p, i) => {
     if (!p) return '';
-    const f = derbyFatigue(p, m.min), slot = m.opp.slots[i];
+    const f = derbyFatigue(p, m.min), slot = m.opp.slots[i], en = derbyEnergyAt(p, m.min);
     const mark = p.on ? `<span class="dc-in" dir="ltr">⬆${derbyEsc(p.on)}'</span>` : '';
     return `<li class="dc-xi-row"><span class="dc-pos">${derbyEsc(slot.label || slot.pos)}</span>
       <span class="dc-nm">${derbyEsc(p.player.name)} ${mark}</span>
-      <span class="dc-ov${f > 0 ? ' tired' : ''}">${derbyNum(Math.round(rt[i] * 10) / 10)}${f > 0 ? '<i class="dc-tired">עייף</i>' : ''}</span></li>`;
+      <span class="dc-ov${f > 0 ? ' tired' : ''}">${en < 80 ? derbyEnergyWord(en) : ''} ${derbyNum(Math.round(rt[i] * 10) / 10)}</span></li>`;
   };
   const was = oppEl.querySelector('details');
   if (was) _derbyOppOpen = was.open;     // a folded rival card stays folded
@@ -441,6 +485,7 @@ function derbyRunClock(ctx) {
   const gen = _derbyGen;
   document.querySelector('.dc-prev')?.remove();   // the previous game's line belongs to kick-off only
   _derbySel = null;
+  m.snap = null;                  // "המשך" commits the stop: nothing left to undo (saved with the next minute)
   ctx.mode = 'playing'; ctx.shown = m.min;
   derbyPaintBoard(ctx);
   derbyPaintPanel(ctx);
@@ -467,12 +512,13 @@ function derbyTick(ctx) {
   if (m.over) ctx.mode = 'over';
   else if (m.min === 45) ctx.mode = 'paused';
   if (ctx.mode !== 'playing') { derbyStopClock(); _derbySel = null; }
+  if (ctx.mode === 'paused') derbyMarkStop(run, m);
   derbyPaintBoard(ctx);
   // Every 45 ms only the score, the clock and the events move. The line-ups are
-  // redrawn when what they show changes: a man on or off, a rival's tactic, or
-  // (past DERBY_FATIGUE_FROM) the tiredness, once a minute.
-  const sig = ctx.mode + '|' + (m.min > DERBY_FATIGUE_FROM ? m.min : 0) + '|' + m.opp.tactic + '|'
-    + m.me.picks.concat(m.opp.picks).map(p => p ? p.player.name : '-').join(',');
+  // redrawn when what they show changes: a man on or off, a rival's tactic, a
+  // shown rating, or an energy bar by a visible step (5 points).
+  const sig = ctx.mode + '|' + m.opp.tactic + '|'
+    + m.me.picks.concat(m.opp.picks).map(p => p ? p.player.name + ':' + Math.round(derbyFatigue(p, m.min) * 10) + ':' + Math.round(derbyEnergyAt(p, m.min) / 5) : '-').join(',');
   if (ctx.mode !== 'playing' || sig !== ctx.sig) { ctx.sig = sig; derbyPaintPanel(ctx); }
 }
 
@@ -513,7 +559,7 @@ function derbyRenderEnd(run) {
   derbyRoot().innerHTML = `
     <div class="dc-end ${sum.title ? 'w' : 'l'}">${derbyCrest(run.club, 'dc-crest-lg')}
       <div class="dc-end-title">${sum.title ? '🏆 אלופי הדרבי!' : `ניצחת ${sum.seriesWon} מתוך 3 סדרות`}</div>
-      <div class="dc-end-sub">${derbyEsc(club)} · רמה ${DERBY_DIFF_HE[run.difficulty] || ''}${sum.title ? ' · ניצחת בשלוש הסדרות' : ''}</div></div>
+      <div class="dc-end-sub">${derbyEsc(club)} · ${derbyDiffText(run.difficulty)}${sum.title ? ' · ניצחת בשלוש הסדרות' : ''}</div></div>
     <ul class="dc-end-rows">${rows}</ul>
     <div class="dc-end-btns">
       <button class="btn-primary" id="dc-share">שתף</button>

@@ -152,6 +152,7 @@ function derbyFinishSquad(run) {
     run.rivals[id] = { xi: d.picks.map(derbyEntryKey), bench: d.bench.map(derbyEntryKey) };
   }
   run.series = [{ rival: derbySeriesRival(run.club, 0), games: [] }];
+  derbyEnergyMaps(run);
   run.phase = 'rivals';
   return true;
 }
@@ -219,30 +220,64 @@ function derbyBeginPlay(run) {
   derbySave(run);
 }
 
+// ── Energy (spec §11.1) ─────────────────────────────────────────────────────
+// run.energy: { name: 0–100 } for the player's 18; run.rivalEnergy: { rivalId:
+// { name: 0–100 } } for each rival's. Everyone starts at 100; a run saved before
+// energy existed gets its maps here, full.
+function derbyEnergyMaps(run) {
+  const fill = (map, keys) => { (keys || []).forEach(k => { if (k && map[k.name] == null) map[k.name] = 100; }); return map; };
+  run.energy = fill(run.energy || {}, (run.xi || []).concat(run.bench || []));
+  run.rivalEnergy = run.rivalEnergy || {};
+  for (const id of Object.keys(run.rivals || {})) {
+    const r = run.rivals[id];
+    run.rivalEnergy[id] = fill(run.rivalEnergy[id] || {}, r.xi.concat(r.bench));
+  }
+  return run;
+}
+const _withE = map => e => (e ? Object.assign(e, { e0: (map && map[e.player.name]) ?? 100 }) : e);
+
 // ── Sides ───────────────────────────────────────────────────────────────────
 function derbyMySide(run) {
   derbyApplyMine(run);
-  return { picks: run.xi.map(derbyEntry), bench: run.bench.map(derbyEntry),
+  const en = _withE(run.energy);
+  return { picks: run.xi.map(derbyEntry).map(en), bench: run.bench.map(derbyEntry).map(en),
            slots: formationSlots(run.formationId, run.tactic), tactic: run.tactic,
            formationId: run.formationId, slotTac: run.tactic };
 }
 function derbyRivalSide(run, id) {
   const r = run.rivals[id];
   const fid = run.rivalFormationId || run.formationId;
-  return { picks: r.xi.map(derbyEntry), bench: r.bench.map(derbyEntry),
+  const en = _withE(run.rivalEnergy && run.rivalEnergy[id]);
+  return { picks: r.xi.map(derbyEntry).map(en), bench: r.bench.map(derbyEntry).map(en),
            slots: formationSlots(fid, 'bal'), tactic: 'bal', formationId: fid, slotTac: 'bal' };
 }
 
 // ── The live match, saved at every segment boundary ─────────────────────────
-const _dk = e => e ? { squadId: e.squad.id, name: e.player.name, on: e.on || 0 } : null;
-const _de = k => { const e = derbyEntry(k); return e ? (k.on ? Object.assign(e, { on: k.on }) : e) : null; };
+// Each man with his energy: e0 (kick-off or coming on), on, and offAt if he went off.
+const _dk = e => {
+  if (!e) return null;
+  const k = { squadId: e.squad.id, name: e.player.name, on: e.on || 0, e0: e.e0 ?? 100 };
+  if (e.offAt != null) k.offAt = e.offAt;
+  return k;
+};
+const _de = k => {
+  const e = derbyEntry(k);
+  if (!e) return null;
+  if (k.on) e.on = k.on;
+  e.e0 = k.e0 ?? 100;
+  if (k.offAt != null) e.offAt = k.offAt;
+  return e;
+};
 function derbyLiveSave(m) {
   const side = s => ({ picks: s.picks.map(_dk), bench: s.bench.map(_dk), off: s.off.map(_dk),
     tactic: s.tactic, formationId: s.formationId || null, slotTac: s.slotTac || null, chances: s.chances.slice(), subs: s.subs, windows: s.windows, lastWin: s.lastWin });
+  const snap = m.snap ? { min: m.snap.min, picks: m.snap.picks.map(_dk), bench: m.snap.bench.map(_dk), off: m.snap.off.map(_dk),
+    tactic: m.snap.tactic, formationId: m.snap.formationId || null, slotTac: m.snap.slotTac || null,
+    subs: m.snap.subs, windows: m.snap.windows, lastWin: m.snap.lastWin } : null;
   return { min: m.min, gf: m.gf, ga: m.ga, home: m.home, seed: m.seed,
     events: JSON.parse(JSON.stringify(m.events)), over: m.over, won: m.won,
     pens: m.pens ? { gf: m.pens.gf, ga: m.pens.ga } : null,
-    rival: m.rival, me: side(m.me), opp: side(m.opp) };
+    rival: m.rival, me: side(m.me), opp: side(m.opp), snap };
 }
 // The inverse; slots are rebuilt from the run (the two side builders).
 function derbyLiveLoad(run) {
@@ -253,10 +288,15 @@ function derbyLiveLoad(run) {
     tactic: saved.tactic, chances: saved.chances.slice(), subs: saved.subs, windows: saved.windows, lastWin: saved.lastWin },
     saved.formationId && FORMATIONS[saved.formationId]
       ? { formationId: saved.formationId, slotTac: saved.slotTac || 'bal', slots: formationSlots(saved.formationId, saved.slotTac || 'bal') } : {});
+  const me = side(L.me, derbyMySide(run));
+  const S = L.snap;
+  const snap = S ? { min: S.min, picks: S.picks.map(_de), bench: S.bench.map(_de).filter(Boolean), off: S.off.map(_de).filter(Boolean),
+    tactic: S.tactic, formationId: S.formationId, slotTac: S.slotTac, subs: S.subs, windows: S.windows, lastWin: S.lastWin,
+    slots: S.formationId && FORMATIONS[S.formationId] ? formationSlots(S.formationId, S.slotTac || 'bal') : me.slots } : null;
   return { min: L.min, gf: L.gf, ga: L.ga, home: L.home, seed: L.seed,
     events: JSON.parse(JSON.stringify(L.events)), over: L.over, won: L.won,
     pens: L.pens ? { gf: L.pens.gf, ga: L.pens.ga } : null, rival,
-    me: side(L.me, derbyMySide(run)), opp: side(L.opp, derbyRivalSide(run, rival)) };
+    me, opp: side(L.opp, derbyRivalSide(run, rival)), snap };
 }
 
 // ── Flow ────────────────────────────────────────────────────────────────────
@@ -274,9 +314,12 @@ function derbyGameStart(run) {
   const cur = derbyCurrent(run);
   if (!cur) return null;
   const rival = run.series[cur.s].rival;
+  derbyEnergyMaps(run);
   const m = derbyMatchNew(derbyMySide(run), derbyRivalSide(run, rival), DERBY_GAME_HOME[cur.g],
     (run.seed + (cur.s + 1) * 7919 + (cur.g + 1) * 104729) | 0);
   m.rival = rival;
+  derbyRotate(m.opp);              // the computer rests its tired men (spec §11.1)
+  m.snap = null;
   run.live = derbyLiveSave(m);
   derbySave(run);
   return m;
@@ -286,11 +329,17 @@ function derbyGameStart(run) {
 function derbyGameStep(run, m, to) {
   if (m.over) return [];
   const cur = derbyCurrent(run);
+  m.snap = null;                   // playing on commits the stop: nothing left to undo
   const ev = derbyMatchStep(m, false, to);
   if (m.over && cur) {
     const ser = run.series[cur.s];
     ser.games.push({ gf: m.gf, ga: m.ga, home: m.home, won: m.won, pens: m.pens, events: m.events });
     run.live = null;
+    // Energy carried to the next game: +30 within a series, +60 into the next one.
+    derbyEnergyMaps(run);
+    const rec = derbySeriesStatus(ser.games).over ? DERBY_RECOVER_SERIES : DERBY_RECOVER_GAME;
+    derbyEnergyAfter(m.me, run.energy, rec);
+    if (run.rivalEnergy[m.rival]) derbyEnergyAfter(m.opp, run.rivalEnergy[m.rival], rec);
     if (derbySeriesStatus(ser.games).over && cur.s < 2) {
       run.series.push({ rival: derbySeriesRival(run.club, cur.s + 1), games: [] });
     }
@@ -314,6 +363,26 @@ function derbySetTactic(run, m, tactic) {
 }
 function derbyMakeSub(run, m, slotIdx, benchIdx) {
   if (m.over || !derbySub(m.me, slotIdx, benchIdx, m.min)) return false;
+  run.live = derbyLiveSave(m); derbySave(run);
+  return true;
+}
+
+// Undo at a stop (spec §11.2). A stop — or the pre-kick screen — begins with a
+// snapshot of the player's side; "↺ בטל שינויים" puts it back until play goes
+// on (derbyGameStep drops it). A refresh at the same stop keeps the snapshot.
+function derbyMarkStop(run, m) {
+  if (m.over) return false;
+  if (m.snap && m.snap.min === m.min) return false;
+  m.snap = derbySnapshot(m.me, m.min);
+  run.live = derbyLiveSave(m); derbySave(run);
+  return true;
+}
+function derbyCanUndo(m) {
+  return !!(m && !m.over && m.snap && m.snap.min === m.min && derbySnapChanged(m.me, m.snap));
+}
+function derbyUndoMine(run, m) {
+  if (!derbyCanUndo(m) || !derbyRestore(m.me, m.snap)) return false;
+  derbyRememberMine(run, m);       // at 0': the run's default line-up and shape go back too
   run.live = derbyLiveSave(m); derbySave(run);
   return true;
 }

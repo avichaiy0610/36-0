@@ -36,7 +36,10 @@ const EXPORTS = ['state', 'SQUADS', 'TEAMS', 'formationSlots', 'playerFitsSlot',
   'derbyFatigue', 'derbyMatchNew', 'derbyMatchStep', 'derbySub', 'derbyCanSub', 'derbyAutoManage', 'derbySeriesRival', 'derbyRunSummary', 'playerOVR', 'SIM2', 'simulateMatchV2', 'withSeededRandom', 'DERBY_UNDERDOGS',
   'derbyEntryKey', 'derbyEntry', 'derbySave', 'derbyLoad', 'derbyBenchAdd', 'derbyFinishSquad', 'derbyInBench',
   'derbyBeginPlay', 'derbyCurrent', 'derbyGameStart', 'derbyGameStep', 'derbyLiveSave', 'derbyLiveLoad', 'derbySetTactic', 'derbyMakeSub',
-  'FORMATIONS', 'derbySetFormation', 'derbySwap', 'derbyPreSwap', 'derbySetFormationMine', 'derbySwapMine', 'derbyPreSwapMine', 'derbyAutoTactic', 'localStorage'];
+  'FORMATIONS', 'derbySetFormation', 'derbySwap', 'derbyPreSwap', 'derbySetFormationMine', 'derbySwapMine', 'derbyPreSwapMine', 'derbyAutoTactic', 'localStorage',
+  'DERBY_ENERGY_DRAIN', 'DERBY_ENERGY_FREE', 'DERBY_RECOVER_GAME', 'DERBY_RECOVER_SERIES', 'DERBY_ROTATE_BELOW',
+  'derbyEnergyPenalty', 'derbyEnergyLevel', 'derbyEnergyAt', 'derbyEnergyAfter', 'derbyRotate', 'derbyEnergyMaps',
+  'derbySnapshot', 'derbyRestore', 'derbySnapChanged', 'derbyMarkStop', 'derbyCanUndo', 'derbyUndoMine', 'inNaturalPos'];
 
 function load() {
   return new Function(STUB + FILES.map(read).join('\n') +
@@ -142,7 +145,7 @@ if (require.main === module) {
     assert.ok(def.atk < bal.atk && def.def > bal.def, 'def');
     const late = G.derbyLinesFor(d.picks, d.slots, 'bal', 85);
     assert.ok(late.ovr < bal.ovr, 'no tiredness at 85\'');
-    assert.strictEqual(G.derbyFatigue({ on: 0 }, 90), 3);
+    assert.ok(Math.abs(G.derbyFatigue({ on: 0 }, 90) - 2) <= 0.5, 'fresh 90\' ≈ −2');
     assert.strictEqual(G.derbyFatigue({ on: 60 }, 90), 0);
   });
 
@@ -223,7 +226,7 @@ if (require.main === module) {
     assert.ok(sub(m.me, 3, 60));
     assert.strictEqual(m.me.picks[subSlot].on, 60);
     assert.strictEqual(G.derbyFatigue(m.me.picks[subSlot], 85), 0);
-    const other = m.me.picks.findIndex((p, i) => i !== subSlot && !p.on);
+    const other = m.me.picks.findIndex((p, i) => i > 0 && i !== subSlot && !p.on);   // an outfielder (a keeper drains slower)
     assert.ok(G.derbyFatigue(m.me.picks[other], 85) > 0);
   });
   t('the computer chases when behind and protects when ahead', () => {
@@ -543,6 +546,171 @@ if (require.main === module) {
     assert.ok(/<> trunc\(\(v_el->>'w'\)::numeric\)/.test(code));
     assert.ok(/VALUES \(uid, v_club, v_diff, v_clean,/.test(code), 'raw series stored');
     assert.ok(/v_supersub AND v_sum_w >= 1/.test(code));
+  });
+
+  // ── V4 (spec §11): energy carried between games, undo at a stop ──────────
+  const GK = G.SQUADS[0].players.find(p => p.position === 'GK') || { position: 'GK' };
+  const OUT = { position: 'CM' };
+  t('energy drains 0.45 a minute on the pitch, a keeper a third of that; off the pitch it stops', () => {
+    assert.strictEqual(G.derbyEnergyAt({ player: OUT, e0: 100, on: 0 }, 10), 95.5);
+    assert.ok(Math.abs(G.derbyEnergyAt({ player: OUT, e0: 100, on: 0 }, 90) - 59.5) < 1e-9);
+    assert.ok(Math.abs(G.derbyEnergyAt({ player: GK, e0: 100, on: 0 }, 90) - 86.5) < 1e-9);
+    assert.strictEqual(G.derbyEnergyAt({ player: OUT, e0: 80, on: 60 }, 60), 80);
+    assert.ok(Math.abs(G.derbyEnergyAt({ player: OUT, e0: 80, on: 60 }, 90) - 66.5) < 1e-9);
+    assert.ok(Math.abs(G.derbyEnergyAt({ player: OUT, e0: 100, on: 0, offAt: 60 }, 90) - 73) < 1e-9);
+    assert.strictEqual(G.derbyEnergyAt({ player: OUT }, 0), 100);                 // no e0: fresh
+    assert.strictEqual(G.derbyEnergyAt({ player: OUT, e0: 10, on: 0 }, 90), 0);   // never below 0
+  });
+  t('penalty: 0 at 75 and above, growing and steepening below; fresh 90\' ≈ −2', () => {
+    for (const e of [75, 80, 100]) assert.strictEqual(G.derbyEnergyPenalty(e), 0);
+    let prev = 0, prevStep = 0;
+    for (let e = 74; e >= 0; e--) {
+      const p = G.derbyEnergyPenalty(e);
+      assert.ok(p > prev, 'monotonic at ' + e);
+      assert.ok(p - prev >= prevStep - 1e-12, 'steepening at ' + e);
+      prevStep = p - prev; prev = p;
+    }
+    const fresh = G.derbyFatigue({ player: OUT, e0: 100, on: 0 }, 90);
+    assert.ok(Math.abs(fresh - 2) <= 0.5, 'fresh 90\' ' + fresh);
+    const from70 = G.derbyFatigue({ player: OUT, e0: 70, on: 0 }, 90);
+    assert.ok(from70 > 5 && from70 < 8, 'from 70: ' + from70);
+    assert.deepStrictEqual([85, 79, 60, 59, 40, 39].map(e => G.derbyEnergyLevel(e).word),
+      ['רענן', 'עייף', 'עייף', 'עייף מאוד', 'עייף מאוד', 'מותש']);
+  });
+  t('recovery: +30 between games (cap 100), a man who did not play back to 100, +60 between series', () => {
+    const m = G.derbyMatchNew(xiA, xiB, true, 5);
+    const sid = 3, bi = 0;
+    assert.ok(G.derbySub(m.me, sid, bi, 60));
+    while (!m.over) G.derbyMatchStep(m, false);
+    const map = {};
+    [...xiA.picks, ...xiA.bench].forEach(p => { map[p.player.name] = 100; });
+    const full = m.me.picks.find((p, i) => i > 0 && !p.on), sub = m.me.picks[sid], off = m.me.off[0];
+    const unused = m.me.bench[0];
+    G.derbyEnergyAfter(m.me, map, G.DERBY_RECOVER_GAME);
+    assert.strictEqual(map[full.player.name], 89.5);            // ended 59.5 → 89.5: not exhausted next game
+    assert.strictEqual(map[sub.player.name], 100);              // 30' on: 86.5 + 30, capped
+    assert.strictEqual(map[off.player.name], 100);              // off at 60: 73 + 30, capped
+    assert.strictEqual(map[unused.player.name], 100);
+    assert.strictEqual(map[m.me.picks[0].player.name], 100);    // the keeper: 86.5 + 30
+    const map2 = {}; Object.keys(map).forEach(k => { map2[k] = 100; });
+    const m2 = G.derbyMatchNew(Object.assign({}, xiA, { picks: xiA.picks.map(p => Object.assign({}, p, { e0: 50 })) }), xiB, true, 6);
+    while (!m2.over) G.derbyMatchStep(m2, false);
+    const a = Object.assign({}, map2), b = Object.assign({}, map2);
+    G.derbyEnergyAfter(m2.me, a, G.DERBY_RECOVER_GAME); G.derbyEnergyAfter(m2.me, b, G.DERBY_RECOVER_SERIES);
+    const st = m2.me.picks[5].player.name;
+    assert.strictEqual(a[st], 39.5);                           // 50 − 40.5 + 30
+    assert.strictEqual(b[st], 69.5);                           // 50 − 40.5 + 60
+  });
+  t('the computer rests a tired starter for a better-rested bench man who fits; never a sub', () => {
+    const m = G.derbyMatchNew(xiA, xiB, true, 5);
+    // a starter at 30 whose slot a bench man fits
+    let si = -1, bi = -1;
+    for (let i = 1; i < 11 && si < 0; i++) {
+      const j = m.opp.bench.findIndex(b => G.inNaturalPos(b.player, m.opp.slots[i].pos));
+      if (j >= 0) { si = i; bi = j; }
+    }
+    assert.ok(si > 0);
+    const tired = m.opp.picks[si].player.name, fresh = m.opp.bench[bi].player.name;
+    m.opp.picks[si].e0 = 20;
+    m.opp.picks.forEach((p, i) => { if (i !== si) p.e0 = 90; });
+    assert.ok(G.derbyRotate(m.opp) >= 1);
+    assert.ok(m.opp.bench.some(b => b.player.name === tired), 'the tired man is on the bench');
+    assert.ok(m.opp.picks.every(p => p.player.name !== tired));
+    assert.ok(G.inNaturalPos(m.opp.picks[si].player, m.opp.slots[si].pos));
+    assert.strictEqual(m.opp.picks[si].on, 0);
+    assert.strictEqual(m.opp.subs, 0); assert.strictEqual(m.opp.windows, 0);
+    assert.ok(fresh);
+    // nobody under 55: nothing moves
+    const m2 = G.derbyMatchNew(xiA, xiB, true, 5);
+    const names = m2.opp.picks.map(p => p.player.name).join();
+    m2.opp.picks.forEach(p => { p.e0 = 60; });
+    assert.strictEqual(G.derbyRotate(m2.opp), 0);
+    assert.strictEqual(m2.opp.picks.map(p => p.player.name).join(), names);
+  });
+  t('a run carries energy: game 2 starts from game 1\'s end + 30, both sides; series end → +60', () => {
+    const run = newRun('maccabi-haifa', 314); draftBench(run); G.derbyBeginPlay(run);
+    assert.ok(Object.values(run.energy).every(e => e === 100) && Object.keys(run.energy).length === 18);
+    Object.values(run.rivalEnergy).forEach(mp => assert.strictEqual(Object.keys(mp).length, 18));
+    let m = G.derbyGameStart(run);
+    while (!m.over) G.derbyGameStep(run, m);
+    const starters = m.me.picks.filter((p, i) => i > 0 && !p.on).map(p => p.player.name);
+    starters.forEach(n => assert.strictEqual(run.energy[n], 89.5, n));
+    m = G.derbyGameStart(run);
+    m.me.picks.forEach(p => assert.strictEqual(p.e0, run.energy[p.player.name]));
+    m.me.bench.forEach(b => assert.strictEqual(b.e0, run.energy[b.player.name]));
+    const rv = run.rivalEnergy[m.rival];
+    m.opp.picks.forEach(p => assert.strictEqual(p.e0, rv[p.player.name]));
+    // play the series out; between series everyone gets +60
+    let guard = 0;
+    while (run.series.length < 2 && guard++ < 10) { while (!m.over) G.derbyGameStep(run, m); if (run.series.length < 2) m = G.derbyGameStart(run); }
+    // m is the series' last game: its men got +60, not +30
+    m.me.picks.concat(m.me.off).forEach(p => assert.strictEqual(run.energy[p.player.name],
+      Math.min(100, Math.round((G.derbyEnergyAt(p, 90) + G.DERBY_RECOVER_SERIES) * 10) / 10), p.player.name));
+    assert.ok(m.me.picks.some(p => G.derbyEnergyAt(p, 90) + 30 < 100), 'someone for whom +30 and +60 differ');
+    m.me.bench.forEach(b => assert.strictEqual(run.energy[b.player.name], 100));
+  });
+  t('save + reload mid-match keeps every man\'s e0, on and offAt', () => {
+    const run = newRun('hapoel-tlv', 77); draftBench(run); G.derbyBeginPlay(run);
+    run.energy[G.derbyEntry(run.xi[4]).player.name] = 63;
+    run.energy[G.derbyEntry(run.bench[1]).player.name] = 71;
+    const m = G.derbyGameStart(run);
+    G.derbyGameStep(run, m, 45);
+    let done = false;
+    m.me.bench.forEach((b, bi) => m.me.picks.forEach((p, si) => {
+      if (!done && si > 0 && G.playerFitsSlot(b.player, G.slotFitPos(m.me.slots[si])) && G.derbyMakeSub(run, m, si, bi)) done = true;
+    }));
+    G.derbyGameStep(run, m, 52);
+    const m2 = G.derbyGameStart(G.derbyLoad());
+    const k = s => s.picks.concat(s.bench, s.off).map(p => [p.player.name, p.e0, p.on || 0, p.offAt ?? null]);
+    assert.deepStrictEqual(k(m2.me), k(m.me)); assert.deepStrictEqual(k(m2.opp), k(m.opp));
+    assert.ok(m2.me.picks.some(p => p.e0 === 63));
+    assert.strictEqual(m2.me.off[0].offAt, 45);
+  });
+  t('undo at a stop restores the side exactly; an all-undone stop uses no window', () => {
+    const run = newRun('maccabi-haifa', 909); draftBench(run); G.derbyBeginPlay(run);
+    const m = G.derbyGameStart(run);
+    G.derbyGameStep(run, m, 30);
+    assert.ok(G.derbyMarkStop(run, m));
+    assert.ok(!G.derbyCanUndo(m), 'nothing to undo yet');
+    const before = JSON.stringify(G.derbyLiveSave(m).me);
+    assert.ok(G.derbySetTactic(run, m, 'att'));
+    assert.ok(G.derbySetFormationMine(run, m, '4-4-2'));
+    assert.ok(G.derbySwapMine(run, m, 2, 3));
+    assert.ok(G.derbyMakeSub(run, m, 5, 0) || G.derbyMakeSub(run, m, 6, 1));
+    assert.strictEqual(m.me.windows, 1); assert.strictEqual(m.me.subs, 1);
+    assert.ok(G.derbyCanUndo(m));
+    assert.ok(G.derbyUndoMine(run, m));
+    assert.strictEqual(JSON.stringify(G.derbyLiveSave(m).me), before);
+    assert.strictEqual(m.me.windows, 0); assert.strictEqual(m.me.subs, 0); assert.strictEqual(m.me.lastWin, -1);
+    assert.strictEqual(JSON.stringify(G.derbyLoad().live.me), before, 'saved too');
+    // three more stops with a sub each still possible: the undone stop cost nothing
+    for (const min of [35, 50, 70]) {
+      while (m.min < min) G.derbyGameStep(run, m, min);
+      G.derbyMarkStop(run, m);
+      let ok = false;
+      m.me.bench.forEach((b, bi) => { if (!ok) for (let si = 1; si < 11 && !ok; si++) ok = G.derbyMakeSub(run, m, si, bi); });
+      assert.ok(ok, 'sub at ' + min);
+    }
+    assert.strictEqual(m.me.windows, 3);
+    // a stop with no snapshot of this minute (play went on) cannot be undone
+    G.derbyGameStep(run, m, 72);
+    assert.ok(!G.derbyCanUndo(m) && !G.derbyUndoMine(run, m));
+  });
+  t('undo before kick-off restores the line-up, shape and the run default', () => {
+    const run = newRun('maccabi-tlv', 4343); draftBench(run); G.derbyBeginPlay(run);
+    const m = G.derbyGameStart(run);
+    G.derbyMarkStop(run, m);
+    const xi = JSON.stringify(run.xi), bench = JSON.stringify(run.bench), f = run.formationId;
+    assert.ok(G.derbyPreSwapMine(run, m, 5, 0));
+    assert.ok(G.derbySetFormationMine(run, m, '3-5-2'));
+    assert.strictEqual(run.formationId, '3-5-2');
+    assert.ok(G.derbyUndoMine(run, m));
+    assert.strictEqual(JSON.stringify(run.xi), xi); assert.strictEqual(JSON.stringify(run.bench), bench);
+    assert.strictEqual(run.formationId, f); assert.strictEqual(m.me.formationId, f);
+    // the snapshot survives a refresh at the same stop
+    assert.ok(G.derbyPreSwapMine(run, m, 6, 1));
+    const m2 = G.derbyGameStart(G.derbyLoad());
+    assert.ok(G.derbyCanUndo(m2));
   });
 
   console.log(`\n${n} passed`);
