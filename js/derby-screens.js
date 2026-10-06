@@ -279,7 +279,7 @@ const DERBY_ENERGY_LEGEND = `<div class="dc-legend dc-en-legend">כושר: ${DER
 // Before kick-off: who of the 18 is not fresh, most tired first.
 function derbyRestHtml(side) {
   const men = side.picks.concat(side.bench).filter(Boolean).map(p => ({ p, e: p.e0 ?? 100, on: side.picks.includes(p) }))
-    .filter(x => x.e < 80).sort((a, b) => a.e - b.e);
+    .filter(x => Math.round(x.e) < 80).sort((a, b) => a.e - b.e);
   if (!men.length) return '<div class="dc-rest dc-rest-ok">כל ה-18 רעננים.</div>';
   return `<div class="dc-rest"><b>צריכים מנוחה:</b> ${men.map(x =>
     `<span class="dc-rest-man">${derbyShort(x.p)}${x.on ? '' : ' <small>(ספסל)</small>'} ${derbyEnergyWord(x.e)}</span>`).join(' ')}</div>`;
@@ -313,10 +313,27 @@ function derbyPitchHtml(ctx, live) {
     ${DERBY_ENERGY_LEGEND}`;
 }
 // The bench as a row of tokens. With a pitch slot picked, the men who fit it
-// naturally are lit; the others show the 93% they would play at.
+// naturally are lit; the others show the 93% they would play at. The men taken
+// off follow, greyed with the minute they went off: they cannot come back —
+// except one taken off at THIS stop, whose substitution can still be undone.
+function derbyOffUndoable(m, o) { return !!(o && o.inName && o.offAt === m.min && m.min > 0 && !m.over); }
+function derbyGoneHtml(ctx, live) {
+  const { m } = ctx, sel = _derbySel;
+  return m.me.off.map((o, oi) => {
+    const can = live && derbyOffUndoable(m, o);
+    const inner = `<div class="slot-circle filled-circle"><span class="slot-ovr">${playerOVR(o.player)}</span>
+        <span class="slot-player-short">${derbyShort(o)}</span></div>
+      ${derbyEnergyBar(derbyEnergyAt(o, 90))}
+      <span class="dc-btok-pos dc-gone-mark">יצא <bdi dir="ltr">${derbyEsc(o.offAt)}'</bdi></span>`;
+    const cls = ' dc-gone' + (sel && sel.k === 'off' && sel.i === oi ? ' sel' : '') + (can ? ' dc-gone-undo' : '');
+    return can
+      ? `<button type="button" class="dc-btok${cls}" style="${derbyTeamVars(o.squad)}" data-off="${oi}" aria-label="${derbyEsc(o.player.name)} — יצא, אפשר להחזיר">${inner}</button>`
+      : `<div class="dc-btok dc-ro${cls}" style="${derbyTeamVars(o.squad)}" aria-disabled="true" title="יצא — לא יכול לחזור">${inner}</div>`;
+  }).join('');
+}
 function derbyBenchHtml(ctx, live, benchOk) {
   const { m } = ctx, me = m.me, sel = _derbySel;
-  if (!me.bench.length) return '<div class="dc-bench-empty">הספסל ריק.</div>';
+  if (!me.bench.length && !me.off.length) return '<div class="dc-bench-empty">הספסל ריק.</div>';
   const slot = sel && sel.k === 'slot' ? me.slots[sel.i] : null;
   return `<div class="dc-bench">${me.bench.map((b, bi) => {
     const fit = slot ? derbyInPos(b, slot) : true;
@@ -330,7 +347,7 @@ function derbyBenchHtml(ctx, live, benchOk) {
     return live
       ? `<button type="button" class="dc-btok${cls}" style="${derbyTeamVars(b.squad)}" data-bench="${bi}"${benchOk ? '' : ' disabled'} aria-label="${derbyEsc(b.player.name)}">${inner}</button>`
       : `<div class="dc-btok dc-ro" style="${derbyTeamVars(b.squad)}">${inner}</div>`;
-  }).join('')}</div>`;
+  }).join('')}${derbyGoneHtml(ctx, live)}</div>`;
 }
 function derbyFormationsHtml(m) {
   return `<div class="dc-forms">${Object.entries(FORMATIONS).map(([k, f]) =>
@@ -354,14 +371,20 @@ function derbyPaintPanel(ctx) {
   const head = `<div class="dc-card-head">${derbyEsc(derbyTeamName(run.club))} · ההרכב שלך
     <span class="dc-dim">· ${derbyEsc((FORMATIONS[m.me.formationId] || {}).label || '')} · ${DERBY_TACTIC_HE[m.me.tactic] || ''}</span></div>`;
   if (ctx.mode === 'paused') {
-    const pre = m.min === 0, block = derbySubBlock(m), benchOk = pre || !block;
     const sel = _derbySel;
+    const selOff = sel && sel.k === 'off' ? m.me.off[sel.i] : null;
+    // a man taken off at this stop is picked: any bench man may replace his replacement
+    const pre = m.min === 0, block = derbySubBlock(m), benchOk = pre || !block || derbyOffUndoable(m, selOff);
     const free = pre ? 'לפני השריקה זה לא נספר כחילוף.' : 'החלפת מקומות ומערך — חינם; כניסה מהספסל נספרת כחילוף.';
-    const selMan = sel ? (sel.k === 'slot' ? m.me.picks[sel.i] : m.me.bench[sel.i]) : null;
+    const selMan = sel && !selOff ? (sel.k === 'slot' ? m.me.picks[sel.i] : m.me.bench[sel.i]) : null;
     const selEn = selMan ? (sel.k === 'slot' ? derbyEnergyAt(selMan, m.min) : (selMan.e0 ?? 100)) : 0;
     const who = selMan ? `<b>${derbyEsc(selMan.player.name)}</b> · כושר: ${derbyEnergyWord(selEn)}. ` : '';
     const undo = derbyCanUndo(m);
-    const why = sel && sel.k === 'slot'
+    const why = selOff
+        ? `<b>${derbyEsc(selOff.player.name)}</b> יצא בדקה ${derbyEsc(selOff.offAt)} ו-<b>${derbyEsc(selOff.inName)}</b> נכנס במקומו.
+           <button type="button" class="btn-secondary dc-back" id="dc-back">↩ החזר למגרש</button>
+           או לחץ על שחקן מהספסל שייכנס במקום ${derbyEsc(selOff.inName)} (אותו חילוף).`
+      : sel && sel.k === 'slot'
         ? (benchOk ? 'עכשיו לחץ על שחקן אחר במגרש להחלפת מקומות, או על שחקן מהספסל (ירוק = מתאים לעמדה).'
                    : `עכשיו לחץ על שחקן אחר במגרש להחלפת מקומות. ${block}`)
       : sel && sel.k === 'bench' ? 'עכשיו לחץ על השחקן במגרש שיפנה לו מקום (ירוק = עמדה מתאימה).'
@@ -379,7 +402,6 @@ function derbyPaintPanel(ctx) {
       ${derbyPitchHtml(ctx, true)}
       <div class="dc-sub-head">ספסל</div>
       ${derbyBenchHtml(ctx, true, benchOk)}
-      ${derbyOffHtml(m.me)}
       <button type="button" class="btn-secondary dc-undo" id="dc-undo"${undo ? '' : ' disabled'}>↺ בטל שינויים</button>
       <button type="button" class="btn-primary dc-go" id="dc-cont">${pre ? 'שריקת פתיחה ▶' : 'המשך ▶'}</button>
     </div>`;
@@ -394,6 +416,13 @@ function derbyPaintPanel(ctx) {
     });
     ctl.querySelectorAll('[data-slot]').forEach(b => { b.onclick = () => derbyTapSlot(ctx, +b.dataset.slot); });
     ctl.querySelectorAll('[data-bench]').forEach(b => { b.onclick = () => derbyTapBench(ctx, +b.dataset.bench); });
+    ctl.querySelectorAll('[data-off]').forEach(b => { b.onclick = () => derbyTapOff(ctx, +b.dataset.off); });
+    const bk = document.getElementById('dc-back');
+    if (bk) bk.onclick = () => {
+      if (!selOff || !derbyUndoSubMine(run, m, sel.i)) return;
+      _derbySel = null;
+      derbyPaintBoard(ctx); derbyPaintPanel(ctx);
+    };
     document.getElementById('dc-undo').onclick = () => {
       if (!derbyUndoMine(run, m)) return;
       derbyLogDropMine(m, m.min);
@@ -403,7 +432,7 @@ function derbyPaintPanel(ctx) {
     document.getElementById('dc-cont').onclick = () => { if (derbyBusy()) return; _derbySel = null; derbyRunClock(ctx); };
   } else if (ctx.mode === 'playing') {
     ctl.innerHTML = `<section class="dc-card mine">${head}${derbyPitchHtml(ctx, false)}
-      <div class="dc-sub-head">ספסל</div>${derbyBenchHtml(ctx, false, false)}${derbyOffHtml(m.me)}</section>`;
+      <div class="dc-sub-head">ספסל</div>${derbyBenchHtml(ctx, false, false)}</section>`;
   } else {
     ctl.innerHTML = derbyAfterHtml(ctx) + `<section class="dc-card mine">${head}${derbyPitchHtml(ctx, false)}${derbyOffHtml(m.me)}</section>`;
     const hs = document.getElementById('dc-head-ser'); if (hs) hs.innerHTML = derbySeriesLine(ctx.ser.games);
@@ -419,7 +448,7 @@ function derbyPaintPanel(ctx) {
 function derbyTapSlot(ctx, i) {
   const { m, run } = ctx, sel = _derbySel;
   if (!m.me.picks[i]) return;
-  if (!sel) { _derbySel = { k: 'slot', i }; }
+  if (!sel || sel.k === 'off') { _derbySel = { k: 'slot', i }; }
   else if (sel.k === 'slot') {
     if (sel.i !== i) derbySwapMine(run, m, sel.i, i);
     _derbySel = null;
@@ -430,7 +459,24 @@ function derbyTapBench(ctx, bi) {
   const { m } = ctx, sel = _derbySel;
   if (!m.me.bench[bi]) return;
   if (sel && sel.k === 'slot') { derbyBenchIn(ctx, sel.i, bi); return; }
+  if (sel && sel.k === 'off') {
+    // replace the replacement: the same substitution, another man coming on
+    const { run } = ctx, o = m.me.off[sel.i], inn = m.me.bench[bi];
+    if (o && derbyResubMine(run, m, sel.i, bi)) {
+      derbyLogAdd(m, { min: m.min, cls: 'mine', team: derbyTeamName(run.club), inn: inn.player.name, out: o.player.name });
+      _derbySel = null;
+      derbyPaintBoard(ctx); derbyPaintPanel(ctx);
+    }
+    return;
+  }
   _derbySel = sel && sel.k === 'bench' && sel.i === bi ? null : { k: 'bench', i: bi };
+  derbyPaintPanel(ctx);
+}
+// A man taken off at this stop: pick him to bring him back or replace his replacement.
+function derbyTapOff(ctx, oi) {
+  const { m } = ctx, sel = _derbySel;
+  if (!derbyOffUndoable(m, m.me.off[oi])) return;
+  _derbySel = sel && sel.k === 'off' && sel.i === oi ? null : { k: 'off', i: oi };
   derbyPaintPanel(ctx);
 }
 function derbyBenchIn(ctx, si, bi) {
@@ -462,7 +508,7 @@ function derbyPaintOpp(ctx) {
     const mark = p.on ? `<span class="dc-in" dir="ltr">⬆${derbyEsc(p.on)}'</span>` : '';
     return `<li class="dc-xi-row"><span class="dc-pos">${derbyEsc(slot.label || slot.pos)}</span>
       <span class="dc-nm">${derbyEsc(p.player.name)} ${mark}</span>
-      <span class="dc-ov${f > 0 ? ' tired' : ''}">${en < 80 ? derbyEnergyWord(en) : ''} ${derbyNum(Math.round(rt[i] * 10) / 10)}</span></li>`;
+      <span class="dc-ov${f > 0 ? ' tired' : ''}">${Math.round(en) < 80 ? derbyEnergyWord(en) : ''} ${derbyNum(Math.round(rt[i] * 10) / 10)}</span></li>`;
   };
   const was = oppEl.querySelector('details');
   if (was) _derbyOppOpen = was.open;     // a folded rival card stays folded

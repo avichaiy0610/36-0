@@ -39,7 +39,7 @@ const EXPORTS = ['state', 'SQUADS', 'TEAMS', 'formationSlots', 'playerFitsSlot',
   'FORMATIONS', 'derbySetFormation', 'derbySwap', 'derbyPreSwap', 'derbySetFormationMine', 'derbySwapMine', 'derbyPreSwapMine', 'derbyAutoTactic', 'localStorage',
   'DERBY_ENERGY_DRAIN', 'DERBY_ENERGY_FREE', 'DERBY_RECOVER_GAME', 'DERBY_RECOVER_SERIES', 'DERBY_ROTATE_BELOW',
   'derbyEnergyPenalty', 'derbyEnergyLevel', 'derbyEnergyAt', 'derbyEnergyAfter', 'derbyRotate', 'derbyEnergyMaps',
-  'derbySnapshot', 'derbyRestore', 'derbySnapChanged', 'derbyMarkStop', 'derbyCanUndo', 'derbyUndoMine', 'inNaturalPos'];
+  'derbySnapshot', 'derbyRestore', 'derbySnapChanged', 'derbyMarkStop', 'derbyCanUndo', 'derbyUndoMine', 'inNaturalPos', 'derbyUndoSub', 'derbyResub', 'derbyUndoSubMine', 'derbyResubMine'];
 
 function load() {
   return new Function(STUB + FILES.map(read).join('\n') +
@@ -711,6 +711,87 @@ if (require.main === module) {
     assert.ok(G.derbyPreSwapMine(run, m, 6, 1));
     const m2 = G.derbyGameStart(G.derbyLoad());
     assert.ok(G.derbyCanUndo(m2));
+  });
+
+  // ── after v4: a single sub undone at its stop; re-sub ──────────────────────
+  // Two like-for-like subs at the same minute (outfield, fitting): returns [slot, slot].
+  const twoSubs = (side, min) => {
+    const done = [];
+    for (let si = 1; si < 11 && done.length < 2; si++) {
+      const bi = side.bench.findIndex(b => G.playerFitsSlot(b.player, G.slotFitPos(side.slots[si])));
+      if (bi >= 0 && G.derbySub(side, si, bi, min)) done.push(si);
+    }
+    return done;
+  };
+  const sideKey = s => JSON.stringify([s.picks.map(p => [p.player.name, p.on || 0, p.e0]), s.bench.map(b => [b.player.name, b.e0]),
+    s.off.map(o => o.player.name), s.subs, s.windows, s.lastWin]);
+  t('undo one of two subs at a stop restores exactly that one; undoing both gives the window back', () => {
+    const m = G.derbyMatchNew(xiA, xiB, true, 5);
+    m.me.picks.forEach((p, i) => { p.e0 = 70 + i; }); m.me.bench.forEach((b, i) => { b.e0 = 80 + i; });
+    assert.ok(G.derbySub(m.me, 2, 0, 20));                       // an earlier stop
+    const before = sideKey(m.me);
+    const slots = twoSubs(m.me, 33);
+    assert.strictEqual(slots.length, 2);
+    const mid = JSON.parse(JSON.stringify([m.me.picks[slots[0]].player.name]));
+    assert.strictEqual(m.me.subs, 3); assert.strictEqual(m.me.windows, 2);
+    // swap the second replacement to another slot first: undo still finds him
+    assert.ok(G.derbySwap(m.me, slots[1], 9));
+    const o2 = m.me.off.findIndex(o => o.offAt === 33 && o.inName === m.me.picks[9].player.name);
+    const name2 = m.me.off[o2].player.name, e2 = m.me.off[o2].e0, in2 = m.me.off[o2].inName;
+    assert.ok(G.derbyUndoSub(m.me, o2, 33));
+    assert.strictEqual(m.me.picks[9].player.name, name2); assert.strictEqual(m.me.picks[9].e0, e2); assert.strictEqual(m.me.picks[9].on, 0);
+    assert.ok(m.me.bench.some(b => b.player.name === in2));
+    assert.strictEqual(m.me.subs, 2); assert.strictEqual(m.me.windows, 2, 'the other sub still holds the window');
+    assert.strictEqual(m.me.picks[slots[0]].player.name, mid[0]);
+    G.derbySwap(m.me, slots[1], 9);                              // put the swap back
+    const o1 = m.me.off.findIndex(o => o.offAt === 33);
+    assert.ok(G.derbyUndoSub(m.me, o1, 33));
+    assert.strictEqual(sideKey(m.me), before, 'exactly as before the stop');
+    assert.strictEqual(m.me.windows, 1); assert.strictEqual(m.me.lastWin, 20);
+  });
+  t('a sub from an earlier stop cannot be undone; a half-time sub undone leaves the windows alone', () => {
+    const m = G.derbyMatchNew(xiA, xiB, true, 5);
+    assert.ok(G.derbySub(m.me, 2, 0, 20));
+    assert.ok(!G.derbyUndoSub(m.me, 0, 33) && !G.derbyUndoSub(m.me, 0, 21));
+    assert.strictEqual(m.me.subs, 1);
+    assert.ok(G.derbySub(m.me, 3, 0, 45));
+    assert.ok(G.derbyUndoSub(m.me, 1, 45));
+    assert.strictEqual(m.me.windows, 1); assert.strictEqual(m.me.lastWin, 20); assert.strictEqual(m.me.subs, 1);
+  });
+  t('replace the replacement: one sub, one window, the first replacement back on the bench', () => {
+    const m = G.derbyMatchNew(xiA, xiB, true, 5);
+    assert.ok(G.derbySub(m.me, 4, 0, 33));
+    const first = m.me.picks[4].player.name, out = m.me.off[0].player.name;
+    const nb = m.me.bench[2].player.name;
+    assert.ok(G.derbyResub(m.me, 0, 2, 33));
+    assert.strictEqual(m.me.picks[4].player.name, nb); assert.strictEqual(m.me.picks[4].on, 33);
+    assert.strictEqual(m.me.off.length, 1); assert.strictEqual(m.me.off[0].player.name, out); assert.strictEqual(m.me.off[0].inName, nb);
+    assert.ok(m.me.bench.some(b => b.player.name === first));
+    assert.strictEqual(m.me.subs, 1); assert.strictEqual(m.me.windows, 1);
+    assert.ok(G.derbyUndoSub(m.me, 0, 33));                      // and that one undoes cleanly too
+    assert.strictEqual(m.me.subs, 0); assert.strictEqual(m.me.windows, 0); assert.strictEqual(m.me.picks[4].player.name, out);
+    assert.strictEqual(m.me.bench.length, G.DERBY_BENCH);
+  });
+  t('a single-sub undo and a re-sub survive save/reload at the stop', () => {
+    let run = newRun('maccabi-haifa', 515); draftBench(run); G.derbyBeginPlay(run);
+    let m = G.derbyGameStart(run);
+    G.derbyGameStep(run, m, 37); G.derbyMarkStop(run, m);
+    let ok = 0;
+    m.me.bench.forEach((b, bi) => { for (let si = 1; si < 11 && ok < 2; si++) if (G.playerFitsSlot(b.player, G.slotFitPos(m.me.slots[si])) && G.derbyMakeSub(run, m, si, bi)) { ok++; break; } });
+    assert.strictEqual(ok, 2);
+    m = G.derbyGameStart(G.derbyLoad());                        // refresh at the stop
+    assert.ok(m.me.off[0].inName); assert.strictEqual(m.me.off[0].prevWindows, 0); assert.strictEqual(m.me.off[1].prevWindows, 0);
+    assert.ok(G.derbyUndoSubMine(run = G.derbyLoad(), m, 0));
+    m = G.derbyGameStart(G.derbyLoad()); run = G.derbyLoad();
+    assert.strictEqual(m.me.subs, 1); assert.strictEqual(m.me.windows, 1);
+    assert.ok(G.derbyResubMine(run, m, 0, 0));
+    m = G.derbyGameStart(G.derbyLoad()); run = G.derbyLoad();
+    assert.strictEqual(m.me.subs, 1); assert.strictEqual(m.me.windows, 1);
+    assert.ok(G.derbyUndoSubMine(run, m, 0));
+    m = G.derbyGameStart(G.derbyLoad());
+    assert.strictEqual(m.me.subs, 0); assert.strictEqual(m.me.windows, 0); assert.strictEqual(m.me.lastWin, -1);
+    G.derbyGameStep(run = G.derbyLoad(), m, 50);
+    assert.ok(!G.derbyUndoSubMine(run, m, 0));
   });
 
   console.log(`\n${n} passed`);

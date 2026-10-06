@@ -224,3 +224,8 @@ details.dc-card > summary::-webkit-details-marker { display: none; }
 .dc-rest small { color: var(--dim); }
 .dc-undo { width: 100%; }
 .dc-undo:disabled { opacity: .4; cursor: default; }
+.dc-btok.dc-gone { filter: grayscale(1); opacity: .45; cursor: default; border-style: dashed; }
+.dc-btok.dc-gone-undo { opacity: .75; cursor: pointer; border-color: var(--accent2); }
+.dc-btok.dc-gone.sel { opacity: 1; filter: grayscale(.6); border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.dc-gone-mark { color: #f85149; font-weight: 700; white-space: nowrap; }
+.dc-back { min-height: 36px !important; padding: 2px 10px; margin: 4px 0; font-size: 13px; }

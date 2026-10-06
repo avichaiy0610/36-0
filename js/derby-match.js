@@ -22,6 +22,8 @@ function derbyMan(e, on) {
   const out = { player: e.player, squad: e.squad, e0: e.e0 ?? 100 };
   if (on !== undefined) out.on = on;
   if (e.offAt != null) out.offAt = e.offAt;
+  // a man taken off remembers his sub, so it can be undone at the same stop (derbyUndoSub)
+  for (const k of ['inName', 'benchIdx', 'prevWindows', 'prevLastWin']) if (e[k] != null) out[k] = e[k];
   return out;
 }
 function derbySide(xi) {
@@ -60,12 +62,47 @@ function derbyCanSub(side, minute) {
 function derbySub(side, slotIdx, benchIdx, minute) {
   const inE = side.bench[benchIdx];
   if (!inE || !side.picks[slotIdx] || !derbyCanSub(side, minute)) return false;
+  // The counters as they were before this stop's first substitution: what an
+  // undo of the stop's last remaining one gives back.
+  const first = side.off.find(o => o.offAt === minute && o.prevWindows != null);
+  const prevWindows = first ? first.prevWindows : side.windows;
+  const prevLastWin = first ? first.prevLastWin : side.lastWin;
   if (minute !== 45 && side.lastWin !== minute) { side.windows++; side.lastWin = minute; }
   side.subs++;
-  side.off.push(Object.assign({}, side.picks[slotIdx], { offAt: minute }));
+  side.off.push(Object.assign({}, side.picks[slotIdx], { offAt: minute, inName: inE.player.name, benchIdx, prevWindows, prevLastWin }));
   side.picks[slotIdx] = { player: inE.player, squad: inE.squad, on: minute, e0: inE.e0 ?? 100 };
   side.bench.splice(benchIdx, 1);
   return true;
+}
+
+// Undo ONE substitution made at this stop (the owner, after v4): the man who
+// went off at `minute` comes back to wherever his replacement now stands, with
+// his own on/e0; the replacement returns to the bench where he sat, with his e0.
+// When no other substitution of this minute remains, the window comes back.
+// Never for a substitution of an earlier stop — those men cannot come back.
+function derbyUndoSub(side, offIdx, minute) {
+  const o = side.off[offIdx];
+  if (!o || o.offAt !== minute || !o.inName || minute <= 0 || minute >= 90) return false;
+  const si = side.picks.findIndex(p => p && p.player.name === o.inName && p.on === minute);
+  if (si < 0) return false;
+  const inn = side.picks[si];
+  const back = { player: o.player, squad: o.squad, on: o.on || 0, e0: o.e0 ?? 100 };
+  side.picks[si] = back;
+  side.bench.splice(Math.min(o.benchIdx ?? side.bench.length, side.bench.length), 0,
+    { player: inn.player, squad: inn.squad, e0: inn.e0 ?? 100 });
+  side.off.splice(offIdx, 1);
+  side.subs--;
+  if (!side.off.some(x => x.offAt === minute && x.inName)) { side.windows = o.prevWindows; side.lastWin = o.prevLastWin; }
+  return true;
+}
+// "Replace the replacement": undo that substitution and bring another bench man
+// on in the same place — still one substitution, in the same window.
+function derbyResub(side, offIdx, benchIdx, minute) {
+  const o = side.off[offIdx], nb = side.bench[benchIdx];
+  if (!o || !nb || nb.player.name === o.inName) return false;
+  const si = side.picks.findIndex(p => p && p.player.name === o.inName && p.on === minute);
+  if (si < 0 || !derbyUndoSub(side, offIdx, minute)) return false;
+  return derbySub(side, si, side.bench.indexOf(nb), minute);
 }
 
 // How the computer manages — and the calibration bot's rule for the player.

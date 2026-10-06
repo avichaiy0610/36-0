@@ -254,10 +254,12 @@ function derbyRivalSide(run, id) {
 
 // ── The live match, saved at every segment boundary ─────────────────────────
 // Each man with his energy: e0 (kick-off or coming on), on, and offAt if he went off.
+const _SUBK = ['inName', 'benchIdx', 'prevWindows', 'prevLastWin'];   // a sub's own record, on the man who went off
 const _dk = e => {
   if (!e) return null;
   const k = { squadId: e.squad.id, name: e.player.name, on: e.on || 0, e0: e.e0 ?? 100 };
   if (e.offAt != null) k.offAt = e.offAt;
+  _SUBK.forEach(x => { if (e[x] != null) k[x] = e[x]; });
   return k;
 };
 const _de = k => {
@@ -266,6 +268,7 @@ const _de = k => {
   if (k.on) e.on = k.on;
   e.e0 = k.e0 ?? 100;
   if (k.offAt != null) e.offAt = k.offAt;
+  _SUBK.forEach(x => { if (k[x] != null) e[x] = k[x]; });
   return e;
 };
 function derbyLiveSave(m) {
@@ -363,6 +366,29 @@ function derbySetTactic(run, m, tactic) {
 }
 function derbyMakeSub(run, m, slotIdx, benchIdx) {
   if (m.over || !derbySub(m.me, slotIdx, benchIdx, m.min)) return false;
+  run.live = derbyLiveSave(m); derbySave(run);
+  return true;
+}
+
+// Undo ONE substitution of this stop, or swap its replacement for another
+// bench man (one substitution still). The match log loses that sub's line; the
+// screen writes the new one for a re-sub.
+function derbyDropSubLog(m, o) {
+  if (typeof derbyLogLoad !== 'function' || !o) return;
+  const rows = derbyLogLoad(m.seed).filter(r => !(r && r.cls === 'mine' && r.min === o.offAt && r.out === o.player.name));
+  try { localStorage.setItem(DERBY_LOG_KEY, JSON.stringify({ seed: m.seed, rows })); } catch (e) {}
+}
+function derbyUndoSubMine(run, m, offIdx) {
+  const o = m.me.off[offIdx];
+  if (m.over || !derbyUndoSub(m.me, offIdx, m.min)) return false;
+  derbyDropSubLog(m, o);
+  run.live = derbyLiveSave(m); derbySave(run);
+  return true;
+}
+function derbyResubMine(run, m, offIdx, benchIdx) {
+  const o = m.me.off[offIdx];
+  if (m.over || !derbyResub(m.me, offIdx, benchIdx, m.min)) return false;
+  derbyDropSubLog(m, o);
   run.live = derbyLiveSave(m); derbySave(run);
   return true;
 }
