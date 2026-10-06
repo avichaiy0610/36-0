@@ -35,7 +35,8 @@ const EXPORTS = ['state', 'SQUADS', 'TEAMS', 'formationSlots', 'playerFitsSlot',
   'derbyPlayMatch', 'derbySeriesStatus',
   'derbyFatigue', 'derbyMatchNew', 'derbyMatchStep', 'derbySub', 'derbyCanSub', 'derbyAutoManage', 'derbySeriesRival', 'derbyRunSummary', 'playerOVR', 'SIM2', 'simulateMatchV2', 'withSeededRandom', 'DERBY_UNDERDOGS',
   'derbyEntryKey', 'derbyEntry', 'derbySave', 'derbyLoad', 'derbyBenchDraw', 'derbyBenchCandidates', 'derbyBenchPick', 'derbyBenchReroll',
-  'derbyBeginPlay', 'derbyCurrent', 'derbyGameStart', 'derbyGameStep', 'derbyLiveSave', 'derbyLiveLoad', 'derbySetTactic', 'derbyMakeSub', 'localStorage'];
+  'derbyBeginPlay', 'derbyCurrent', 'derbyGameStart', 'derbyGameStep', 'derbyLiveSave', 'derbyLiveLoad', 'derbySetTactic', 'derbyMakeSub',
+  'FORMATIONS', 'derbySetFormation', 'derbySwap', 'derbyPreSwap', 'derbySetFormationMine', 'derbySwapMine', 'derbyPreSwapMine', 'derbyAutoTactic', 'localStorage'];
 
 function load() {
   return new Function(STUB + FILES.map(read).join('\n') +
@@ -191,12 +192,16 @@ if (require.main === module) {
     assert.ok(!sub(s2, 4, 75), 'a 4th window');
     assert.ok(sub(s2, 4, 45), 'half-time is still free');
   });
-  t('a sub must fit the slot, and only strictly inside the match', () => {
+  t('a sub may go in any slot (93% out of position); only strictly inside the match', () => {
     const m = G.derbyMatchNew(xiA, xiB, true, 5);
-    const cbIdx = m.me.bench.findIndex(b => G.slotFitPos({ pos: 'GK' }) && !G.playerFitsSlot(b.player, 'GK'));
-    assert.ok(cbIdx >= 0);
-    assert.ok(!G.derbySub(m.me, 0, cbIdx, 60), 'an outfielder in goal');
-    assert.ok(!sub(m.me, 3, 0) && !sub(m.me, 3, 90), 'minute bounds');
+    const bi = m.me.bench.findIndex(b => !G.playerFitsSlot(b.player, 'GK'));
+    assert.ok(bi >= 0);
+    const before = G.derbyLinesFor(m.me.picks, m.me.slots, 'bal', 60);
+    assert.ok(G.derbySub(m.me, 0, bi, 60), 'an outfielder in goal is allowed');
+    const after = G.derbyLinesFor(m.me.picks, m.me.slots, 'bal', 60);
+    assert.ok(after.gk < before.gk && after.ovr < before.ovr, 'the out-of-position penalty shows in the lines');
+    const m2 = G.derbyMatchNew(xiA, xiB, true, 5);
+    assert.ok(!sub(m2.me, 3, 0) && !sub(m2.me, 3, 90), 'minute bounds');
   });
   t('chance-slots: no side beyond SIM2.CHANCES goals, and the scoring level matches the one-shot engine', () => {
     const lines = x => G.derbyLinesFor(x.picks, x.slots, 'bal', 0);
@@ -357,6 +362,115 @@ if (require.main === module) {
     for (const side of ['me', 'opp']) for (const k of ['chances', 'subs', 'windows', 'lastWin', 'tactic'])
       assert.deepStrictEqual(m2[side][k], m[side][k], side + k);
     assert.deepStrictEqual(G.derbyLiveSave(m2), L);
+  });
+
+  // ── V3: stop at any minute, chance-seeded, formations and line-ups ─────────
+  t('1-minute steps and 15-minute steps give the identical match (autoMe or not)', () => {
+    for (const auto of [false, true]) for (let s = 1; s <= 150; s++) {
+      const a = G.derbyMatchNew(xiA, xiB, s % 2 === 0, s), b = G.derbyMatchNew(xiA, xiB, s % 2 === 0, s);
+      while (!a.over) G.derbyMatchStep(a, auto);
+      while (!b.over) G.derbyMatchStep(b, auto, b.min + 1);
+      assert.deepStrictEqual([b.gf, b.ga, b.won, b.pens, b.events, b.me.subs, b.opp.subs],
+        [a.gf, a.ga, a.won, a.pens, a.events, a.me.subs, a.opp.subs], 'seed ' + s + ' auto ' + auto);
+    }
+  });
+  t('an odd step pattern (7-minute steps, then to the end) is identical too', () => {
+    for (let s = 1; s <= 60; s++) {
+      const a = G.derbyMatchNew(xiA, xiB, true, s), b = G.derbyMatchNew(xiA, xiB, true, s);
+      while (!a.over) G.derbyMatchStep(a, true);
+      while (!b.over) G.derbyMatchStep(b, true, b.min < 56 ? b.min + 7 : 90);
+      assert.deepStrictEqual([b.gf, b.ga, b.events], [a.gf, a.ga, a.events], 'seed ' + s);
+    }
+  });
+  t('a step never jumps over 45, 60, 75 or 90', () => {
+    const m = G.derbyMatchNew(xiA, xiB, true, 3);
+    G.derbyMatchStep(m, false, 40); assert.strictEqual(m.min, 40);
+    G.derbyMatchStep(m, false, 80); assert.strictEqual(m.min, 45);
+    G.derbyMatchStep(m, false, 90); assert.strictEqual(m.min, 60);
+    G.derbyMatchStep(m, false, 90); assert.strictEqual(m.min, 75);
+    G.derbyMatchStep(m, false, 89); assert.strictEqual(m.min, 89);
+    G.derbyMatchStep(m, false, 90); assert.strictEqual(m.min, 90); assert.ok(m.over);
+    const d = G.derbyMatchNew(xiA, xiB, true, 3);        // no `to`: the next 15-minute boundary
+    G.derbyMatchStep(d, false, 22); G.derbyMatchStep(d, false); assert.strictEqual(d.min, 30);
+    G.derbyMatchStep(d, false, 22); assert.strictEqual(d.min, 45);   // to <= from is ignored: the default boundary
+  });
+  t('derbySetFormation: the same eleven men re-seated, slots match the new shape', () => {
+    for (const f of Object.keys(G.FORMATIONS)) {
+      const m = G.derbyMatchNew(xiA, xiB, true, 5);
+      const names = m.me.picks.map(p => p.player.name).sort();
+      assert.ok(G.derbySetFormation(m.me, f, 0), f);
+      assert.strictEqual(m.me.picks.length, 11);
+      assert.ok(m.me.picks.every(Boolean), f);
+      assert.deepStrictEqual(m.me.picks.map(p => p.player.name).sort(), names, f);
+      assert.deepStrictEqual(m.me.slots, G.formationSlots(f, 'bal'));
+      assert.strictEqual(m.me.formationId, f);
+      assert.strictEqual(m.me.subs, 0); assert.strictEqual(m.me.windows, 0);
+      assert.ok(G.playerFitsSlot(m.me.picks[0].player, 'GK'), 'keeper stays in goal ' + f);
+    }
+    const m = G.derbyMatchNew(xiA, xiB, true, 5);
+    assert.ok(G.derbySetFormation(m.me, '4-4-2', 59));
+    assert.ok(!G.derbySetFormation(m.me, '4-4-2', 90) && !G.derbySetFormation(m.me, 'nope', 10));
+  });
+  t('a formation change keeps a sub\'s fresh legs', () => {
+    const m = G.derbyMatchNew(xiA, xiB, true, 5);
+    assert.ok(sub(m.me, 3, 60));
+    const subName = m.me.picks[subSlot].player.name;
+    G.derbySetFormation(m.me, '3-5-2', 60);
+    assert.strictEqual(m.me.picks.find(p => p.player.name === subName).on, 60);
+  });
+  t('derbySwap swaps two men on the pitch, free', () => {
+    const m = G.derbyMatchNew(xiA, xiB, true, 5);
+    const a = m.me.picks[3], b = m.me.picks[9];
+    assert.ok(G.derbySwap(m.me, 3, 9));
+    assert.strictEqual(m.me.picks[3], b); assert.strictEqual(m.me.picks[9], a);
+    assert.strictEqual(m.me.subs, 0); assert.strictEqual(m.me.windows, 0);
+    assert.ok(!G.derbySwap(m.me, 3, 3) && !G.derbySwap(m.me, 3, 11));
+  });
+  t('derbyPreSwap: only at 0 minutes, not a sub, the man in starts, the starter goes to the bench', () => {
+    const m = G.derbyMatchNew(xiA, xiB, true, 5);
+    const out = m.me.picks[4].player.name, inn = m.me.bench[2].player.name;
+    assert.ok(G.derbyPreSwap(m.me, 4, 2, m.min));
+    assert.strictEqual(m.me.picks[4].player.name, inn); assert.strictEqual(m.me.picks[4].on, 0);
+    assert.strictEqual(m.me.bench[2].player.name, out);
+    assert.strictEqual(m.me.bench.length, G.DERBY_BENCH); assert.strictEqual(m.me.off.length, 0);
+    assert.strictEqual(m.me.subs, 0); assert.strictEqual(m.me.windows, 0);
+    G.derbyMatchStep(m, false, 10);
+    assert.ok(!G.derbyPreSwap(m.me, 4, 2, m.min), 'refused after kick-off');
+    assert.ok(!G.derbyPreSwap(G.derbyMatchNew(xiA, xiB, true, 5).me, 4, 99, 0));
+  });
+  t('v3 run layer: pre-kick changes become the run default; mid-match save/reload after a formation change + swap is exact', () => {
+    for (const seed of [7, 99, 2024]) {
+      const base = newRun('maccabi-haifa', seed); draftBench(base); G.derbyBeginPlay(base);
+      const snap = JSON.stringify(base);
+      const play = (run, interrupt) => {
+        let m = G.derbyGameStart(run);
+        assert.ok(G.derbyPreSwapMine(run, m, 5, 0));
+        assert.ok(G.derbySetFormationMine(run, m, '4-4-2'));
+        assert.strictEqual(run.formationId, '4-4-2');
+        assert.deepStrictEqual(run.xi, m.me.picks.map(G.derbyEntryKey));
+        assert.deepStrictEqual(run.bench, m.me.bench.map(G.derbyEntryKey));
+        G.derbyGameStep(run, m, 38); assert.strictEqual(m.min, 38);
+        G.derbyGameStep(run, m, 80); assert.strictEqual(m.min, 45);
+        assert.ok(G.derbySetFormationMine(run, m, '3-5-2'));
+        assert.ok(G.derbySwapMine(run, m, 2, 8));
+        assert.strictEqual(run.formationId, '4-4-2', 'a mid-match change is not the default');
+        assert.ok(!G.derbyPreSwapMine(run, m, 5, 0), 'no free swap after kick-off');
+        G.derbyGameStep(run, m, 52);
+        if (interrupt) { run = G.derbyLoad(); m = G.derbyGameStart(run); assert.strictEqual(m.me.formationId, '3-5-2'); }
+        assert.deepStrictEqual(m.me.slots, G.formationSlots('3-5-2', 'bal'));
+        assert.strictEqual(m.opp.formationId, '4-3-3');
+        while (!m.over) G.derbyGameStep(run, m, m.min + 1);
+        assert.strictEqual(G.derbySwapMine(run, m, 1, 2), false);
+        assert.strictEqual(G.derbySetFormationMine(run, m, '4-3-3'), false);
+        return { run, m };
+      };
+      G.derbySave(JSON.parse(snap)); const a = play(G.derbyLoad(), false);
+      G.derbySave(JSON.parse(snap)); const b = play(G.derbyLoad(), true);
+      assert.strictEqual(b.m.gf, a.m.gf); assert.strictEqual(b.m.ga, a.m.ga);
+      assert.deepStrictEqual(b.m.events, a.m.events);
+      assert.deepStrictEqual(b.run.series, a.run.series);
+      assert.strictEqual(b.run.formationId, '4-4-2');
+    }
   });
 
   // ── Task 8: the migration knows the same clubs ─────────────────────────────

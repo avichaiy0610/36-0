@@ -9,8 +9,9 @@
 // own per-chance probability. Tactic, tiredness and substitutions therefore act
 // through that probability for the chances still to come. Between segments the manager may change the
 // tactic or bring men on, and tiredness (derbyFatigue) is what makes that worth
-// doing. Each segment is seeded from the match seed and its first minute, so a
-// match replays identically from any saved boundary given the same decisions.
+// doing. Each chance is seeded by itself (seed, side, index): the result does not
+// depend on where the steps fall, and a
+// match replays identically from any saved minute given the same decisions.
 // Both sides' clean-sheet tags count (simulateMatchV2 only applies the
 // player's — its opponents are real clubs without tags).
 
@@ -18,7 +19,7 @@ function derbySide(xi) {
   return {
     picks: xi.picks.map(e => (e ? { player: e.player, squad: e.squad, on: e.on || 0 } : null)),
     bench: (xi.bench || []).map(e => ({ player: e.player, squad: e.squad })),
-    slots: xi.slots, tactic: xi.tactic || 'bal',
+    slots: xi.slots, tactic: xi.tactic || 'bal', formationId: xi.formationId || null, slotTac: xi.slotTac || null,
     chances: (xi.chances || []).slice(),
     subs: xi.subs || 0, windows: xi.windows || 0, lastWin: xi.lastWin ?? -1, off: (xi.off || []).slice(),
   };
@@ -49,7 +50,6 @@ function derbyCanSub(side, minute) {
 function derbySub(side, slotIdx, benchIdx, minute) {
   const inE = side.bench[benchIdx];
   if (!inE || !side.picks[slotIdx] || !derbyCanSub(side, minute)) return false;
-  if (!playerFitsSlot(inE.player, slotFitPos(side.slots[slotIdx]))) return false;
   if (minute !== 45 && side.lastWin !== minute) { side.windows++; side.lastWin = minute; }
   side.subs++;
   side.off.push(side.picks[slotIdx]);
@@ -92,18 +92,75 @@ function derbyScorer(side, rng) {
   return list.find((e, i) => w[i] > 0) || list[0];
 }
 
-// Play the next segment. The player's decisions must already be applied to
-// m.me; the computer decides here (and, with autoMe, the calibration bot for
-// the player). Returns the goal events of this segment.
-function derbyMatchStep(m, autoMe) {
+// The computer's tactic rule, pure: chase from 60', protect from 70'.
+function derbyAutoTactic(minute, lead) {
+  return (minute >= 60 && lead < 0) ? 'att' : (minute >= 70 && lead > 0) ? 'def' : 'bal';
+}
+
+// Formation, line-up and bench changes (spec §10.2). None of them costs a
+// substitution or a window; only a bench man coming on in the match does.
+// Re-seat the same men in `slots`: the scarcest slot first, the best natural fit
+// for it, and when nobody left fits, the best man left (out of position, 93%) —
+// the keeper last of all.
+function derbyAssign(entries, slots) {
+  const pool = entries.slice().sort((a, b) => playerOVR(b.player) - playerOVR(a.player));
+  const fits = (e, i) => playerFitsSlot(e.player, slotFitPos(slots[i]));
+  const order = slots.map((_, i) => i).sort((a, b) =>
+    (pool.filter(e => fits(e, a)).length - pool.filter(e => fits(e, b)).length) || (a - b));
+  const used = new Set(), out = new Array(slots.length).fill(null);
+  const isGK = e => normalizePos(e.player.position) === 'GK';
+  for (const i of order) {
+    const pick = pool.find(e => !used.has(e) && fits(e, i)) ||
+      pool.find(e => !used.has(e) && !isGK(e)) || pool.find(e => !used.has(e));
+    if (pick) { out[i] = pick; used.add(pick); }
+  }
+  return out;
+}
+function derbySetFormation(side, formationId, minute) {
+  if (!FORMATIONS[formationId] || (minute || 0) >= 90) return false;
+  const men = side.picks.filter(Boolean);
+  const slots = formationSlots(formationId, 'bal');
+  if (men.length !== slots.length) return false;
+  side.picks = derbyAssign(men, slots);
+  side.slots = slots; side.formationId = formationId; side.slotTac = 'bal';
+  return true;
+}
+function derbySwap(side, i, j) {
+  if (i === j || !side.picks[i] || !side.picks[j]) return false;
+  const t = side.picks[i]; side.picks[i] = side.picks[j]; side.picks[j] = t;
+  return true;
+}
+// Before the whistle only: a starter and a bench man trade places for free, and
+// the man coming in starts (on 0). The starter goes to the bench.
+function derbyPreSwap(side, slotIdx, benchIdx, minute) {
+  const inE = side.bench[benchIdx], out = side.picks[slotIdx];
+  if ((minute || 0) > 0 || !inE || !out) return false;
+  side.picks[slotIdx] = { player: inE.player, squad: inE.squad, on: 0 };
+  side.bench[benchIdx] = { player: out.player, squad: out.squad };
+  return true;
+}
+
+// Play the next segment, up to minute `to` (m.min < to <= 90); left out, to the
+// next DERBY_CHUNK boundary. A step never jumps a decision point (45, 60, 75,
+// 90). The player's decisions must already be applied to m.me; the computer
+// decides here (and, with autoMe, the calibration bot for the player).
+//
+// The outcome does not depend on where the steps fall: each chance is drawn by
+// its own seed (side + index), priced at its own minute with the tactics in
+// force then (an auto-managed side's tactic follows the running score), and the
+// computer's substitutions happen only at 60' and 75', which no step skips.
+// Returns the goal events of this segment.
+const DERBY_STOPS = [45, 60, 75, 90];
+function derbyMatchStep(m, autoMe, to) {
   if (m.over) return [];
-  const from = m.min, to = Math.min(90, from + DERBY_CHUNK);
-  const mid = (from + to) / 2;
-  derbyAutoManage(m.opp, from, m.ga - m.gf);
-  if (autoMe) derbyAutoManage(m.me, from, m.gf - m.ga);
-  const a = derbyLinesFor(m.me.picks, m.me.slots, m.me.tactic, mid);
-  const b = derbyLinesFor(m.opp.picks, m.opp.slots, m.opp.tactic, mid);
-  const seg = (m.seed + (from + 1) * 104729) | 0;
+  const from = m.min;
+  const next = DERBY_STOPS.find(x => x > from);
+  let end = (Number.isInteger(to) && to > from && to <= 90) ? to : (Math.floor(from / DERBY_CHUNK) + 1) * DERBY_CHUNK;
+  end = Math.min(end, next, 90);
+  if (from === 60 || from === 75) {
+    derbyAutoManage(m.opp, from, m.ga - m.gf);
+    if (autoMe) derbyAutoManage(m.me, from, m.gf - m.ga);
+  }
   // Per-chance conversion, solved exactly as simDrawGoals does (clamp, then the
   // clean-sheet tag scales P(0), then clamp again) — from the FULL-match xG.
   const conv = (xg, cs) => {
@@ -111,25 +168,38 @@ function derbyMatchStep(m, autoMe) {
     if (cs && cs !== 1) p = Math.min(0.97, Math.max(0, 1 - Math.pow(cs, 1 / SIM2.CHANCES) * (1 - p)));
     return p;
   };
-  const pf = conv(simExpectedGoals(simShrinkLines(a), simShrinkLines(b), m.home), b.cs);
-  const pa = conv(simExpectedGoals(simShrinkLines(b), simShrinkLines(a), !m.home), a.cs);
-  const rng = derbyRng(seg ^ 0x9e3779b9), out = [];
-  const inSeg = x => x > from && x <= to;
-  withSeededRandom(seg, () => {
-    m.me.chances.filter(inSeg).forEach(min => {
-      if (Math.random() < pf) out.push({ min, mine: true, e: derbyScorer(m.me, rng) });
-    });
-    m.opp.chances.filter(inSeg).forEach(min => {
-      if (Math.random() < pa) out.push({ min, mine: false, e: derbyScorer(m.opp, rng) });
-    });
-  });
-  const goals = out.map(o => ({ min: o.min, mine: o.mine, name: o.e.player.name, sub: (o.e.on || 0) > 0 }));
-  out.length = 0; out.push(...goals);
-  const g = { gf: out.filter(o => o.mine).length, ga: out.filter(o => !o.mine).length };
-  out.sort((x, y) => x.min - y.min);
-  m.gf += g.gf; m.ga += g.ga; m.min = to;
+  const linesAt = (minute, tacMe, tacOpp) => ({
+    a: derbyLinesFor(m.me.picks, m.me.slots, tacMe, minute),
+    b: derbyLinesFor(m.opp.picks, m.opp.slots, tacOpp, minute) });
+  const todo = [];
+  m.me.chances.forEach((min, k) => { if (min > from && min <= end) todo.push({ min, mine: true, k }); });
+  m.opp.chances.forEach((min, k) => { if (min > from && min <= end) todo.push({ min, mine: false, k }); });
+  todo.sort((x, y) => (x.min - y.min) || (x.mine ? -1 : 1) - (y.mine ? -1 : 1) || (x.k - y.k));
+  const out = [];
+  let gf = m.gf, ga = m.ga;
+  for (const c of todo) {
+    const tacMe = autoMe ? derbyAutoTactic(c.min, gf - ga) : m.me.tactic;
+    const tacOpp = derbyAutoTactic(c.min, ga - gf);
+    const { a, b } = linesAt(c.min, tacMe, tacOpp);
+    const p = c.mine
+      ? conv(simExpectedGoals(simShrinkLines(a), simShrinkLines(b), m.home), b.cs)
+      : conv(simExpectedGoals(simShrinkLines(b), simShrinkLines(a), !m.home), a.cs);
+    const rng = derbyRng(((m.seed ^ (c.mine ? 0x3c6ef372 : 0x1f83d9ab)) + c.k * 2654435761) | 0);
+    if (rng() < p) {
+      const e = derbyScorer(c.mine ? m.me : m.opp, rng);
+      out.push({ min: c.min, mine: c.mine, name: e.player.name, sub: (e.on || 0) > 0 });
+      if (c.mine) gf++; else ga++;
+    }
+  }
+  m.gf = gf; m.ga = ga; m.min = end;
   m.events.push(...out);
-  if (to >= 90) derbyMatchEnd(m, a, b);
+  // Shown tactic of an auto-managed side: what the rule says now.
+  m.opp.tactic = derbyAutoTactic(end, m.ga - m.gf);
+  if (autoMe) m.me.tactic = derbyAutoTactic(end, m.gf - m.ga);
+  if (end >= 90) {
+    const { a, b } = linesAt(90, m.me.tactic, m.opp.tactic);
+    derbyMatchEnd(m, a, b);
+  }
   return out;
 }
 

@@ -128,6 +128,7 @@ function derbyBenchPick(run, name) {
     run.rivals = {};
     for (const id of DERBY_RIVALS[run.club]) {
       const d = derbyAiDraft(id, run.formationId, run.difficulty, rng);
+      run.rivalFormationId = run.formationId;      // the rivals keep their shape whatever the player changes later
       run.rivals[id] = { xi: d.picks.map(derbyEntryKey), bench: d.bench.map(derbyEntryKey) };
     }
     run.series = [{ rival: derbySeriesRival(run.club, 0), games: [] }];
@@ -154,12 +155,14 @@ function derbyBeginPlay(run) {
 function derbyMySide(run) {
   derbyApplyMine(run);
   return { picks: run.xi.map(derbyEntry), bench: run.bench.map(derbyEntry),
-           slots: formationSlots(run.formationId, run.tactic), tactic: run.tactic };
+           slots: formationSlots(run.formationId, run.tactic), tactic: run.tactic,
+           formationId: run.formationId, slotTac: run.tactic };
 }
 function derbyRivalSide(run, id) {
   const r = run.rivals[id];
+  const fid = run.rivalFormationId || run.formationId;
   return { picks: r.xi.map(derbyEntry), bench: r.bench.map(derbyEntry),
-           slots: formationSlots(run.formationId, 'bal'), tactic: 'bal' };
+           slots: formationSlots(fid, 'bal'), tactic: 'bal', formationId: fid, slotTac: 'bal' };
 }
 
 // ── The live match, saved at every segment boundary ─────────────────────────
@@ -167,7 +170,7 @@ const _dk = e => e ? { squadId: e.squad.id, name: e.player.name, on: e.on || 0 }
 const _de = k => { const e = derbyEntry(k); return e ? (k.on ? Object.assign(e, { on: k.on }) : e) : null; };
 function derbyLiveSave(m) {
   const side = s => ({ picks: s.picks.map(_dk), bench: s.bench.map(_dk), off: s.off.map(_dk),
-    tactic: s.tactic, chances: s.chances.slice(), subs: s.subs, windows: s.windows, lastWin: s.lastWin });
+    tactic: s.tactic, formationId: s.formationId || null, slotTac: s.slotTac || null, chances: s.chances.slice(), subs: s.subs, windows: s.windows, lastWin: s.lastWin });
   return { min: m.min, gf: m.gf, ga: m.ga, home: m.home, seed: m.seed,
     events: JSON.parse(JSON.stringify(m.events)), over: m.over, won: m.won,
     pens: m.pens ? { gf: m.pens.gf, ga: m.pens.ga } : null,
@@ -179,7 +182,9 @@ function derbyLiveLoad(run) {
   const rival = L.rival || (cur && run.series[cur.s].rival);
   const side = (saved, base) => Object.assign(base, {
     picks: saved.picks.map(_de), bench: saved.bench.map(_de).filter(Boolean), off: saved.off.map(_de).filter(Boolean),
-    tactic: saved.tactic, chances: saved.chances.slice(), subs: saved.subs, windows: saved.windows, lastWin: saved.lastWin });
+    tactic: saved.tactic, chances: saved.chances.slice(), subs: saved.subs, windows: saved.windows, lastWin: saved.lastWin },
+    saved.formationId && FORMATIONS[saved.formationId]
+      ? { formationId: saved.formationId, slotTac: saved.slotTac || 'bal', slots: formationSlots(saved.formationId, saved.slotTac || 'bal') } : {});
   return { min: L.min, gf: L.gf, ga: L.ga, home: L.home, seed: L.seed,
     events: JSON.parse(JSON.stringify(L.events)), over: L.over, won: L.won,
     pens: L.pens ? { gf: L.pens.gf, ga: L.pens.ga } : null, rival,
@@ -208,11 +213,12 @@ function derbyGameStart(run) {
   derbySave(run);
   return m;
 }
-// Play one segment (the player's decisions are already on m.me). Returns its goal events.
-function derbyGameStep(run, m) {
+// Play one segment, to minute `to` (default: the next 15-minute boundary; never
+// past 45/60/75/90). The player's decisions are already on m.me. Returns its goal events.
+function derbyGameStep(run, m, to) {
   if (m.over) return [];
   const cur = derbyCurrent(run);
-  const ev = derbyMatchStep(m, false);
+  const ev = derbyMatchStep(m, false, to);
   if (m.over && cur) {
     const ser = run.series[cur.s];
     ser.games.push({ gf: m.gf, ga: m.ga, home: m.home, won: m.won, pens: m.pens, events: m.events });
@@ -242,6 +248,32 @@ function derbyMakeSub(run, m, slotIdx, benchIdx) {
   if (m.over || !derbySub(m.me, slotIdx, benchIdx, m.min)) return false;
   run.live = derbyLiveSave(m); derbySave(run);
   return true;
+}
+
+// Formation and line-up changes (spec §10.2). Before the whistle they also
+// become the run's default for the next game.
+function derbyRememberMine(run, m) {
+  if (m.min !== 0) return;
+  if (m.me.formationId && FORMATIONS[m.me.formationId]) run.formationId = m.me.formationId;
+  run.xi = m.me.picks.map(derbyEntryKey);
+  run.bench = m.me.bench.map(derbyEntryKey);
+}
+function derbyMineChanged(run, m) {
+  derbyRememberMine(run, m);
+  run.live = derbyLiveSave(m); derbySave(run);
+  return true;
+}
+function derbySetFormationMine(run, m, f) {
+  if (m.over || !derbySetFormation(m.me, f, m.min)) return false;
+  return derbyMineChanged(run, m);
+}
+function derbySwapMine(run, m, i, j) {
+  if (m.over || m.min >= 90 || !derbySwap(m.me, i, j)) return false;
+  return derbyMineChanged(run, m);
+}
+function derbyPreSwapMine(run, m, slotIdx, benchIdx) {
+  if (m.over || !derbyPreSwap(m.me, slotIdx, benchIdx, m.min)) return false;
+  return derbyMineChanged(run, m);
 }
 
 function derbyFinish(run) {
