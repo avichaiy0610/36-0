@@ -451,6 +451,7 @@ function mgaPlaySeason() {
   state.leagueCode = null; state.duelCode = null; state.gauntlet = null; state.career = null;
   state.challenge = null; state.challengeDeck = null; state.challengeReqs = null;
   state.deck = null; state.mgw = null;
+  state.derby = null;
   // ...and a flag of its OWN. Nulling everybody else's field left this season
   // indistinguishable from a free draft: daMode() fell through to 'draft', so
   // the draft archive has been filing auctions as ordinary drafts (DA_MODE_HE

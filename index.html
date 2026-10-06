@@ -87,6 +87,7 @@
   <link rel="stylesheet" href="css/europe.css?v=285fafa7" />
   <link rel="stylesheet" href="css/cup.css?v=829ec7e1" />
   <link rel="stylesheet" href="css/club.css?v=f97ac89b" />
+  <link rel="stylesheet" href="css/derby.css?v=e5929a5d" />
   <link rel="stylesheet" href="css/crowd.css?v=54f20ee9" />
   <link rel="stylesheet" href="css/players-index.css?v=00720430" />
 </head>
@@ -371,6 +372,15 @@
         <span class="smc-arrow">←</span>
       </button>
 
+      <button class="setup-mode-card" id="setup-derby-card">
+        <span class="smc-icon">🏆</span>
+        <span class="smc-body">
+          <span class="smc-title">אלופי הדרבי <span class="smc-new">חדש</span></span>
+          <span class="smc-sub">הרכב הנצח של המועדון שלך, מול היריבות, בסדרת הטוב מ-5</span>
+        </span>
+        <span class="smc-arrow">←</span>
+      </button>
+
       <button class="setup-mode-card" id="setup-salary-card">
         <span class="smc-icon">💰</span>
         <span class="smc-body">
@@ -636,6 +646,8 @@
           <div id="pitch-slots"></div>
         </div>
       </div>
+      <!-- אלופי הדרבי only: the 7 bench slots (js/derby.js derbyBenchRender) -->
+      <div id="derby-bench-slots" class="derby-bench-slots" style="display:none"></div>
       <div id="chem-summary"></div>
     </div>
 
@@ -1032,6 +1044,17 @@
     </div>
   </div>
 
+  <!-- ══ DERBY (js/derby.js, js/derby-screens.js) ═════════════════════════════ -->
+  <div id="screen-derby" class="screen screen-page">
+    <div class="page-inner">
+      <div class="page-header">
+        <button class="back-btn" id="derby-back">→ חזרה</button>
+        <h2 class="page-title">🏆 אלופי הדרבי</h2>
+      </div>
+      <div id="derby-root"></div>
+    </div>
+  </div>
+
   <!-- ══ MINI GAMES ════════════════════════════════════════════════════════════ -->
   <div id="screen-minigames" class="screen screen-page">
     <div class="page-inner">
@@ -1170,14 +1193,14 @@
   <script src="js/errorlog.js?v=1da53f7f"></script>
   <script src="js/track.js?v=7ce56253"></script>
   <script src="js/texts.js?v=1cab6ae8"></script>
-  <script src="js/club.js?v=0ca849a4"></script>
+  <script src="js/club.js?v=94db52f2"></script>
   <script src="js/auth.js?v=0e52a3af"></script>
   <script src="js/achievements.js?v=cfc1c564"></script>
   <script src="js/leaderboard.js?v=2f83278b"></script>
-  <script src="js/draft-archive.js?v=be1b713e"></script>
+  <script src="js/draft-archive.js?v=903cdcd2"></script>
   <script src="js/profile.js?v=7f431072"></script>
   <script src="js/gauntlet-map.js?v=53e83fb5"></script>
-  <script src="js/gauntlet.js?v=8affe351"></script>
+  <script src="js/gauntlet.js?v=324a1e03"></script>
   <script src="js/gauntlet-managers.js?v=52c63a22"></script>
   <script src="js/gauntlet-mods.js?v=da554b63"></script>
   <script src="js/gauntlet-europe.js?v=61b907f5"></script>
@@ -1197,7 +1220,7 @@
   <script src="js/chemistry.js?v=0b080a52"></script>
   <script src="js/data.js?v=e2436bbd"></script>
   <script src="js/sim-engine.js?v=784ec7b1"></script>
-  <script src="js/game.js?v=8ea5f6be"></script>
+  <script src="js/game.js?v=052d5b71"></script>
   <script src="js/club-media.js?v=68951881"></script>
   <!-- after club.js and draft-archive.js (its crest and its daMode), and it is
        only ever called from a click or from the end of a season, so career.js
@@ -1209,22 +1232,22 @@
   <script src="js/europe-screens.js?v=92adcb97"></script>
   <script src="js/europe-super.js?v=4a55d7e8"></script>
   <script src="js/cup-data.js?v=c72c5a27"></script>
-  <script src="js/cup.js?v=dd2eae5d"></script>
-  <script src="js/whatsnew.js?v=78b83297"></script>
+  <script src="js/cup.js?v=4e208517"></script>
+  <script src="js/whatsnew.js?v=137e8f2c"></script>
   <script src="js/europe-admin.js?v=19ab9628"></script>
   <script src="js/season-admin.js?v=1f37a0db"></script>
   <script src="js/league-sim.js?v=178f8a92"></script>
   <script src="js/player_nats.js?v=a527d5f3"></script>
-  <script src="js/challenges.js?v=b1acda28"></script>
+  <script src="js/challenges.js?v=0978f2ae"></script>
   <script src="js/trophy-art.js?v=88e7e81c"></script>
   <script src="js/trophies.js?v=f21ba035"></script>
-  <script src="js/career.js?v=6d50a9aa"></script>
+  <script src="js/career.js?v=4e1e30f6"></script>
   <script src="js/career-admin.js?v=8d02ae14"></script>
   <script src="js/minigames.js?v=8cafa492"></script>
   <script src="js/mg-guess.js?v=98f90f25"></script>
   <script src="js/mg-versus.js?v=c8bf9b7b"></script>
-  <script src="js/mg-auction.js?v=6641a0ac"></script>
-  <script src="js/mg-wordle.js?v=7d3fcd39"></script>
+  <script src="js/mg-auction.js?v=439c290b"></script>
+  <script src="js/mg-wordle.js?v=f9b52b0a"></script>
   <script src="js/mg-grid.js?v=4bda27d5"></script>
   <script src="js/attr-data.js?v=8bb8940e"></script>
   <script src="js/attrs.js?v=aa09fd77"></script>
@@ -1238,16 +1261,21 @@
   <script src="js/theme.js?v=061d5509"></script>
   <script src="js/nav-drawer.js?v=d459aa88"></script>
   <script src="js/salary.js?v=e7056dfe"></script>
-  <script src="js/january.js?v=b54f7225"></script>
+  <script src="js/january.js?v=c1998af0"></script>
   <script src="js/coach-data.js?v=ba8934e1"></script>
-  <script src="js/coach.js?v=d1b4fd16"></script>
+  <script src="js/coach.js?v=320b8699"></script>
   <script src="js/story-facts.js?v=7bae6630"></script>
   <script src="js/story-data.js?v=9e4c9251"></script>
   <script src="js/story-market.js?v=2dbd648a"></script>
   <script src="js/story-season.js?v=b595d2be"></script>
   <script src="js/story-europe.js?v=2b85fb94"></script>
-  <script src="js/story.js?v=841131a5"></script>
+  <script src="js/story.js?v=a3348218"></script>
   <script src="js/story-screens.js?v=25fe937d"></script>
+  <script src="js/derby-data.js?v=63e4cb40"></script>
+  <script src="js/derby-ai.js?v=88dd5c1a"></script>
+  <script src="js/derby-match.js?v=2fb81b81"></script>
+  <script src="js/derby.js?v=7af99c78"></script>
+  <script src="js/derby-screens.js?v=f567bc76"></script>
   <script src="js/install.js?v=6b792604"></script>
 </body>
 </html>

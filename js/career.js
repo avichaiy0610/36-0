@@ -805,7 +805,7 @@ function crApplyStateFor(run) {
   const year = crYear(run);
   state.leagueCode = null; state.duelCode = null; state.gauntlet = null;
   state.challenge = null; state.challengeDeck = null; state.challengeReqs = null;
-  state.deck = null; state.mgw = null; state.mga = null;
+  state.deck = null; state.mgw = null; state.mga = null; state.derby = null;
   window._leagueReviewMode = null; window._duelReviewMode = null;
   window._restoredSeason = null; window._presetSeason = null;
   document.getElementById('league-review-back')?.remove();
@@ -926,6 +926,7 @@ function crRefreshCoachCard(run) {
 function crStartDraft() {
   const run = crRun();
   crApplyStateFor(run);
+  state.derby = null;          // a derby's one-club pool must not follow us here
   const kept = run.pending ? crRebuildPicks(run.pending, state.formationId, state.tactic) : null;
   if (kept && kept.some(Boolean)) crBeginDraftWithKept(kept);
   else beginDraftWithState({ classic: state.classic, tactic: state.tactic });

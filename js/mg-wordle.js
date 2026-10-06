@@ -118,6 +118,7 @@ function mgwPlay() {
   state.oppSeason = null; state.oppSeasonChoice = 'latest';
   state.leagueFormat = 'modern';          // the same league for everyone
   state.formationId  = MGW_FORMATION;
+  state.derby = null;          // a derby's one-club pool must not follow us here
   beginDraftWithState();
   // one attempt means one deal: no rerolls, whatever the difficulty says
   state.teamRerollsLeft = 0; state.seasonRerollsLeft = 0;

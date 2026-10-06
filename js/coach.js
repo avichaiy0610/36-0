@@ -203,7 +203,7 @@
   function coachBarredMode() {
     if (typeof state === 'undefined' || !state) return true;
     return !!(state.challenge || state.leagueCode || state.duelCode ||
-              state.gauntlet || state.salaryCap);
+              state.gauntlet || state.salaryCap || state.derby);
   }
 
   function coachEligible() {

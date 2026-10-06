@@ -293,13 +293,16 @@ function clubAdoptRemote(remote) {
    everything that saves never sees it. Display code asks clubShown(). */
 function clubStory() {
   try {
-    if (typeof state === 'undefined' || !state || !state.story || typeof storyChapter !== 'function') return null;
-    const ch = storyChapter(state.story.chapterId);
-    const t = ch && typeof TEAMS !== 'undefined' ? TEAMS[ch.teamId] : null;
+    if (typeof state === 'undefined' || !state) return null;
+    // A story chapter's club, or a derby's: both are a real club you play AS.
+    const teamId = state.story && typeof storyChapter === 'function'
+      ? (storyChapter(state.story.chapterId) || {}).teamId
+      : (state.derby ? state.derby.club : null);
+    const t = teamId && typeof TEAMS !== 'undefined' ? TEAMS[teamId] : null;
     if (!t) return null;
     const c1 = t.primaryColor || '#1e6f3c', c2 = t.secondaryColor || '#f5f5f5';
     return { ...CLUB_DEFAULT, name: t.name, city: '', story: true,
-             crest: { ...CLUB_DEFAULT.crest, source: 'club', clubId: ch.teamId, c1, c2 },
+             crest: { ...CLUB_DEFAULT.crest, source: 'club', clubId: teamId, c1, c2 },
              kit: { pattern: 'solid', c1, c2 }, kitGK: { ...CLUB_DEFAULT.kitGK } };
   } catch (e) { return null; }
 }
