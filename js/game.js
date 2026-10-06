@@ -1863,7 +1863,8 @@ function startRound() {
     document.getElementById('players-list').innerHTML = '';
     animateRoulette(squad, () => {
       renderSquadPlayers(squad);
-      setHint('בחר שחקן מהרשימה');
+      // the derby's bench rounds (js/derby.js): every man here goes to the bench
+      setHint(state.derby && typeof derbyInBench === 'function' && derbyInBench() ? 'בחר שחקן לספסל' : 'בחר שחקן מהרשימה');
     });
   }
   saveDraftState();

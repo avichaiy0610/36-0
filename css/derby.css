@@ -155,3 +155,54 @@ details.dc-card > summary::-webkit-details-marker { display: none; }
 .dbs-nm { font-size: 12px; font-weight: 600; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dbs-meta { font-size: 10px; color: var(--dim); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dbs-gap { color: var(--accent2); font-size: 12px; text-align: center; padding: 4px 8px; border: 1px dashed var(--accent2); border-radius: 8px; }
+
+/* ── v3 (spec §10.2–§10.3): pitch line-up, formations, pinned pause bar ───── */
+.dc-crest-sm { width: 24px; height: 24px; object-fit: contain; }
+.dc-panel .dc-sub-head { padding: 0 2px; margin-bottom: -4px; }
+.dc-forms { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+.dc-form { min-height: 40px; padding: 4px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface2);
+  color: var(--text); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; font-variant-numeric: tabular-nums; }
+.dc-form.on { border-color: var(--accent); color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+
+.dc-pitch-wrap { position: relative; width: 100%; max-width: 420px; margin: 0 auto; aspect-ratio: 3 / 4; }
+.dc-pitch { top: 0; right: 0; bottom: 0; left: 0; }
+.dc-card .dc-pitch-wrap { width: calc(100% - 20px); }
+.dc-tok { background: none; border: 0; padding: 0; margin: 0; font: inherit; color: inherit; min-width: 44px; min-height: 44px; gap: 2px; }
+.dc-tok .slot-circle { width: 42px; height: 42px; }
+.dc-tok .slot-player-short { font-size: 9px; max-width: 36px; }
+.dc-tok .slot-name-label { font-size: 9px; max-width: 64px; padding: 1px 4px; }
+.dc-tok.dc-ro { cursor: default; }
+.dc-tok.dc-ro:hover { transform: translate(-50%, -50%); }
+.dc-oop-lbl { color: #fdba74 !important; }
+.dc-pill { position: absolute; bottom: -6px; font-size: 8px; line-height: 11px; padding: 0 3px; border-radius: 6px; background: #000000d9;
+  font-weight: 700; white-space: nowrap; z-index: 1; }
+.dc-pill-tired { color: var(--accent2); }
+.dc-pill.dc-pill-tired { inset-inline-start: -12px; border: 1px solid var(--accent2); }
+.dc-pill.dc-pill-on { inset-inline-end: -12px; color: #3fb950; border: 1px solid #3fb950; }
+.dc-legend { color: var(--dim); font-size: 11px; text-align: center; padding: 4px 10px 0; }
+.dc-legend-oop { color: #fdba74; }
+.slot-ovr.dc-ovr-tired { color: var(--accent2); border-color: var(--accent2); }
+
+.dc-bench { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.dc-btok { display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 0; min-height: 66px; padding: 6px 2px 4px;
+  border-radius: 10px; border: 1px solid var(--border); background: var(--surface2); color: var(--text); font: inherit; cursor: pointer; }
+.dc-btok .slot-circle { width: 34px; height: 34px; background: var(--tc, #003087); border: 2px solid var(--ts, #FFD700); }
+.dc-btok .slot-player-short { font-size: 8px; max-width: 32px; }
+.dc-btok-pos { font-size: 9px; line-height: 1.15; color: var(--dim); max-width: 100%; text-align: center; overflow-wrap: anywhere; }
+.dc-btok.fit { border-color: #4CAF50; box-shadow: inset 0 0 0 1px #4CAF50; }
+.dc-btok.sel { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); background: var(--surface); }
+.dc-btok:disabled { opacity: .45; cursor: default; }
+.dc-btok.dc-ro { cursor: default; }
+.dc-bench-empty { color: var(--dim); font-size: 13px; text-align: center; }
+.dc-card .dc-bench { padding: 0 10px 6px; }
+
+/* the pause bar: pinned to the bottom of the viewport, so goals listed above never move it */
+#derby-root.dc-has-bar { padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px)); }
+.dc-bar { position: fixed; z-index: 40; bottom: 0; left: 0; right: 0; margin: 0 auto; max-width: 640px;
+  display: flex; align-items: center; gap: 10px; padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px));
+  background: var(--surface); border-top: 1px solid var(--border); box-shadow: 0 -6px 18px #00000066; }
+.dc-bar[hidden] { display: none; }
+.dc-bar-score { display: flex; align-items: center; gap: 6px; font-weight: 800; flex: 0 0 auto; }
+.dc-bar-sc { direction: ltr; font-size: 20px; font-variant-numeric: tabular-nums; }
+.dc-bar-min { color: var(--accent); font-size: 14px; min-width: 32px; text-align: center; font-variant-numeric: tabular-nums; }
+#derby-root .dc-bar .dc-pause { flex: 1; width: auto; min-height: 48px; font-size: 16px; font-weight: 700; }

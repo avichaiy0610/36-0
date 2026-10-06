@@ -2,8 +2,8 @@
 // Spec: docs/superpowers/specs/2026-10-05-derby-champions-design.md
 // v3 flow (spec §10.1): pick club → XI draft then 7-man bench draft, both in the
 // normal draft screen (one-club pool) → the three rivals → three best-of-5 series, each game
-// played live in 15-minute segments. The run lives in localStorage and is saved
-// after every step, a live match at every segment boundary, so a refresh resumes.
+// played live minute by minute (stop at any minute). The run lives in localStorage and is saved
+// after every step, a live match after every minute, so a refresh resumes.
 
 const DERBY_KEY = '36-0-derby';
 
