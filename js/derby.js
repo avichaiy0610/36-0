@@ -76,6 +76,7 @@ function derbyAfterDraft() {
     // The bench rounds begin. A v2 run left in its old bench screen brings the
     // men it had already taken (those still valid and not in the XI).
     state.derby.bench = [];
+    derbyTrack('progress', run.club + '|bench');
     (run.bench || []).forEach(k => {
       const e = derbyEntry(k);
       if (e && !state.usedPlayerKeys.has(e.player.name) && derbyBenchAdd(state.derby, e)) state.usedPlayerKeys.add(e.player.name);
@@ -122,6 +123,11 @@ function derbyApplyMine(run) {
 // guarded points (player tap, slot tap, progress line) and leaves the rest here.
 function derbyInBench() {
   return !!(state.derby && Array.isArray(state.derby.bench) && state.derby.bench.length < DERBY_BENCH);
+}
+// The bench rounds have begun, including the moment after the seventh man while
+// the hand-off to the rivals is on its way: the pitch must take no taps then either.
+function derbyBenchPhase() {
+  return !!(state.derby && Array.isArray(state.derby.bench));
 }
 // Pure: append one man to holder.bench (a run, or state.derby). Refused (false,
 // nothing changed) for a full bench, an unknown man, or one already in the XI

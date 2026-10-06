@@ -1640,7 +1640,7 @@ function clearAllHighlights() {
 // ─── Move mode ─────────────────────────────────────────────────────────────────
 // Move mode only touches pitch tokens, so it stays usable during the roulette animation
 function toggleMoveMode() {
-  if (state.derby && typeof derbyInBench === 'function' && derbyInBench()) return;   // derby bench rounds: no moves
+  if (state.derby && typeof derbyBenchPhase === 'function' && derbyBenchPhase()) return;   // derby bench rounds (and their hand-off): no moves
   state.moveMode = !state.moveMode;
   state.movingFromIdx = null;
   if (state.moveMode) {
@@ -2070,7 +2070,7 @@ function renderSquadPlayers(squad, filterSlotIdx = null) {
 function handlePlayerClick(player, cardEl) {
   if (state.isAnimating) return;
   // אלופי הדרבי bench rounds: a tap puts him straight on the bench (js/derby.js)
-  if (state.derby && typeof derbyInBench === 'function' && derbyInBench()) { derbyBenchTake(player); return; }
+  if (state.derby && typeof derbyBenchPhase === 'function' && derbyBenchPhase()) { derbyBenchTake(player); return; }
   if (state.moveMode) {
     state.moveMode = false;
     clearAllHighlights(); updateMoveButton();
@@ -2091,7 +2091,7 @@ function handlePlayerClick(player, cardEl) {
 
 function handleSlotClick(slotIdx) {
   // אלופי הדרבי bench rounds: the eleven are fixed, the pitch takes no taps
-  if (state.derby && typeof derbyInBench === 'function' && derbyInBench()) return;
+  if (state.derby && typeof derbyBenchPhase === 'function' && derbyBenchPhase()) return;
   // A move in progress, move mode, or a click on a placed player → move flow.
   // Clicking a placed player directly highlights the slots he can move to.
   if (state.moveMode || state.movingFromIdx !== null || state.picks[slotIdx]) {
@@ -2267,7 +2267,8 @@ function rerollTeam() {
   const filterSlot = state.draftMode === 'pos-first' ? state.selectedSlotIdx : null;
   animateRoulette(newSquad, () => {
     renderSquadPlayers(newSquad, filterSlot);
-    setHint(filterSlot !== null ? `בחר שחקן עבור: ${state.slots[filterSlot].label}` : 'בחר שחקן מהרשימה');
+    setHint(filterSlot !== null ? `בחר שחקן עבור: ${state.slots[filterSlot].label}`
+      : state.derby && typeof derbyInBench === 'function' && derbyInBench() ? 'בחר שחקן לספסל' : 'בחר שחקן מהרשימה');
   });
 }
 
