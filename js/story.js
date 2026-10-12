@@ -11,6 +11,7 @@
  *   open      the chapter hub                     (storyShowHub)
  *   progress  '<chapter>|start'                   a chapter begun
  *   finish    '<chapter>|<stars>'                 a chapter ended, 0-3 stars
+ *   progress  '<chapter>|pens-w' / '|pens-l'      a penalty shootout won / lost (v1.60)
  * admin.html's "📖 מצב סיפור" reads these back through usage_detail.
  */
 (function (global) {
@@ -137,6 +138,7 @@
     const ch = run && storyChapter(run.chapterId);
     if (!ch || !run.eu) return null;
     const out = storyEuPens(ch, run, names);
+    if (out) storyTrack('progress', ch.id + '|pens-' + (out.closed.won ? 'w' : 'l'));
     if (out && storyEuOver(ch, run)) storyEuFinish(ch, run);
     storySave();
     return out;

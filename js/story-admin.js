@@ -9,6 +9,7 @@
  *   open      the chapter hub
  *   progress  '<chapter>|start'     went into a chapter
  *   finish    '<chapter>|<stars>'   reached its end, with 0-3 stars
+ *   progress  '<chapter>|pens-w|l'  a penalty shootout won / lost (v1.60)
  * No new RPC and no raw rows: usage_events stays unreadable to every role.
  * Empty until migration 20260923000001 is applied (track() drops 'story'
  * before it) and the mode is live.
@@ -37,12 +38,14 @@ async function storyAdminLoad(outEl, statusEl, days) {
 function storyAdminHTML(rows, days) {
   const hub = rows.filter(r => r.event === 'open').reduce((a, r) => a + Number(r.people || 0), 0);
   const per = {};
-  const get = id => per[id] || (per[id] = { inP: 0, inE: 0, outP: 0, outE: 0, stars: [0, 0, 0, 0] });
+  const get = id => per[id] || (per[id] = { inP: 0, inE: 0, outP: 0, outE: 0, stars: [0, 0, 0, 0], pensW: 0, pensL: 0 });
   for (const r of rows) {
     const [id, what] = String(r.detail || '').split('|');
     if (!id || r.detail === '—') continue;
     const c = get(id);
     if (r.event === 'progress' && what === 'start') { c.inP += Number(r.people); c.inE += Number(r.events); }
+    if (r.event === 'progress' && what === 'pens-w') c.pensW += Number(r.events);
+    if (r.event === 'progress' && what === 'pens-l') c.pensL += Number(r.events);
     if (r.event === 'finish') {
       const n = Math.max(0, Math.min(3, parseInt(what, 10) || 0));
       c.stars[n] += Number(r.events);
@@ -66,7 +69,8 @@ function storyAdminHTML(rows, days) {
       <td><b>${stNum(c.inP)}</b></td><td><b>${stNum(c.outP)}</b></td><td>${pct(c.outE, c.inE)}</td>
       <td>${stNum(c.inE)}</td><td>${stNum(c.outE)}</td>
       <td>${stNum(c.stars[0])}</td><td>${stNum(c.stars[1])}</td><td>${stNum(c.stars[2])}</td><td>${stNum(c.stars[3])}</td>
-      <td>${pct(one, c.outE)}</td></tr>`;
+      <td>${pct(one, c.outE)}</td>
+      <td>${c.pensW + c.pensL ? `${c.pensW}/${c.pensW + c.pensL}` : '<span class="us-zero">·</span>'}</td></tr>`;
   }).join('');
   const went = Object.values(per).reduce((a, c) => a + c.inP, 0);
   const done = Object.values(per).reduce((a, c) => a + c.outP, 0);
@@ -74,8 +78,8 @@ function storyAdminHTML(rows, days) {
       ${went} כניסות לפרקים · ${done} סיומים</div>
     <div class="us-wrap"><table class="us-table">
       <thead><tr><th>פרק</th><th>רמה</th><th>נכנסו (אנשים)</th><th>סיימו (אנשים)</th><th>השלימו</th>
-        <th>התחלות</th><th>סיומים</th><th>0 ⭐</th><th>⭐</th><th>⭐⭐</th><th>⭐⭐⭐</th><th>לפחות ⭐</th></tr></thead>
+        <th>התחלות</th><th>סיומים</th><th>0 ⭐</th><th>⭐</th><th>⭐⭐</th><th>⭐⭐⭐</th><th>לפחות ⭐</th><th>פנדלים (נוצחו/היו)</th></tr></thead>
       <tbody>${body}</tbody></table></div>
     <div class="chal-note">"נכנסו" = התחילו את הפרק (לחצו "להתחיל את הפרק"). "סיימו" = הגיעו לסוף העונה או המסע.
-      "השלימו" = סיומים חלקי התחלות. יעד הכוכבים: פרק "רגיל" ⭐ ב-30-45% מהסיומים, "קשה" 20-30%, "הכי קשה" 10-20%.</div>`;
+      "השלימו" = סיומים חלקי התחלות. "פנדלים" = דו-קרבות פנדלים שנוצחו מתוך כל הדו-קרבות בפרק (נספר מגרסה 1.60). 🏆 = פרק גביע, 🇪🇺 = פרק אירופה. יעד הכוכבים: פרק "רגיל" ⭐ ב-30-45% מהסיומים, "קשה" 20-30%, "הכי קשה" 10-20%.</div>`;
 }
