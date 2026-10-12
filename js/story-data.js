@@ -870,6 +870,50 @@ const STORY_CHAPTERS = [
       { type: 'cupUnbeaten', in90: true, label: 'לזכות בלי הפסד, בלי הארכה ובלי פנדלים' },
     ],
   },
+  // The State Cup, verified 2026-10-12 in sources that agree: RSSSF
+  // tablesi/isra2024.html, en.wikipedia "2023–24 Israel State Cup" and the Hebrew
+  // press (Sport1/Walla): every Maccabi Petah Tikva row, dates and venues.
+  {
+    id: 'mpt-2023',
+    kind: 'cup',
+    teamId: 'maccabi-pt',
+    season: '2023/24',
+    comp: 'גביע המדינה',
+    title: 'הפנדל בדקה ה-86',
+    level: 'hardest',
+    budget: 1000,           // measured 2026-10-12, 400 runs: ⭐ 18.0% ⭐⭐ 7.3% ⭐⭐⭐ 1.8% (K=0.5, ⭐⭐⭐ in 90; 500 to 3,000 within noise)
+    intro: 'גביע המדינה 2023/24. מכבי פתח תקווה סיימה שמינית בליגה, עם 40 נקודות. ' +
+           'בגביע היא ניצחה 0:3 את הפועל חיפה בסמי עופר, הדיחה ברבע הגמר את מכבי תל אביב, ' +
+           'אלופת אותה עונה, 2:4 בהארכה, ובגמר בבלומפילד ניצחה את הפועל באר שבע 0:1, מפנדל בדקה ה-86.',
+    europe: {
+      awayGoals: true,
+      window: 'r32',        // the January window, before the first round
+      realOut: 'final',
+      realText: 'זכתה בגביע: 0:1 על הפועל באר שבע',
+      endLabel: 'זכייה בגביע',
+      rounds: [
+        { id: 'r32', label: 'שלב ה-32', kind: 'tie', oneLeg: true, home: true,
+          club: { name: 'מכבי יבנה', ovr: 64 }, real: 'בבית 1:3 בהארכה' },
+        { id: 'r16', label: 'שמינית הגמר', kind: 'tie', oneLeg: true, home: false,
+          club: { teamId: 'hapoel-haifa', name: 'הפועל חיפה', ovr: 80 }, real: 'בסמי עופר 0:3' },
+        { id: 'qf', label: 'רבע הגמר', kind: 'tie', oneLeg: true, home: true,
+          club: { teamId: 'maccabi-tlv', name: 'מכבי תל אביב', ovr: 84 }, real: 'בבית 2:4 בהארכה' },
+        { id: 'sf', label: 'חצי הגמר', kind: 'tie', oneLeg: true, home: null,
+          // in the second tier that season: no squad, a lower-league rating
+          club: { teamId: 'hapoel-galil', name: 'הפועל נוף הגליל', ovr: 72 }, real: 'בנתניה 0:3' },
+        { id: 'final', label: 'הגמר', kind: 'tie', oneLeg: true, home: null,
+          club: { teamId: 'hapoel-beersheba', name: 'הפועל באר שבע', ovr: 83 },
+          real: 'בבלומפילד: 0:1, פנדל בדקה ה-86' },
+      ],
+    },
+    stars: [
+      { type: 'euReach', round: 'final', label: 'להגיע לגמר' },
+      { type: 'euChampion', label: 'לזכות בגביע' },
+      // Every tie is one match, so plain unbeaten is the cup itself. In reality two
+      // ties took extra time — do it in 90.
+      { type: 'cupUnbeaten', in90: true, label: 'לזכות בלי הפסד, בלי הארכה ובלי פנדלים' },
+    ],
+  },
   // ── round four, the league (2026-10-12): facts from js/league_tables.js and,
   // for mta-2019's one defeat, RSSSF. Squad ranks from storyOpponents (summer).
   {
