@@ -83,6 +83,7 @@
     if (storyIsCampaign(ch)) {
       // No league season: the campaign is the chapter.
       if (!run.eu) storyEuStart(run);
+      if (ch.kind === 'cup') run.eu.windowDone = true;   // the opening market WAS January
       run.phase = 'europe';
       storySave();
       storyShowEurope();
@@ -125,6 +126,18 @@
     storyResetState(ch);
     const out = storyEuPlay(ch, run, tactic);
     if (storyEuOver(ch, run)) storyEuFinish(ch, run);
+    storySave();
+    return out;
+  }
+
+  // The shootout of the tie that is waiting for one: `names` in kicking order.
+  // Saved before anything is shown, so a refresh cannot buy a second try.
+  function storyEuPensAct(names) {
+    const run = storyRun();
+    const ch = run && storyChapter(run.chapterId);
+    if (!ch || !run.eu) return null;
+    const out = storyEuPens(ch, run, names);
+    if (out && storyEuOver(ch, run)) storyEuFinish(ch, run);
     storySave();
     return out;
   }
@@ -264,7 +277,7 @@
 
   Object.assign(global, {
     storyRun, storySave, storyBest, storySyncBest, storyStart, storyEnterSeason, storyOppForState,
-    storyEuAct, storyEuWindowClose, storyTrack,
+    storyEuAct, storyEuPensAct, storyEuWindowClose, storyTrack,
     storyPrepare, storyOpen, storyOnSeasonEnd, storyRenderLast, storyExit,
   });
 })(typeof window !== 'undefined' ? window : globalThis);
