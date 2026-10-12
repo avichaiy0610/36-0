@@ -825,6 +825,51 @@ const STORY_CHAPTERS = [
       { type: 'cupUnbeaten', in90: true, label: 'לזכות בלי הפסד, בלי הארכה ובלי פנדלים' },
     ],
   },
+  // The State Cup, verified 2026-10-12 in sources that agree: RSSSF
+  // tablesi/isra04.html, en.wikipedia "2003–04 Israel State Cup" and the Hebrew
+  // press (Walla): every Bnei Sakhnin row, dates and venues.
+  {
+    id: 'sakhnin-2003',
+    kind: 'cup',
+    teamId: 'bnei-sakhnin',
+    season: '2003/04',
+    comp: 'גביע המדינה',
+    title: 'העונה הראשונה',
+    level: 'hardest',
+    budget: 1000,           // measured 2026-10-12, 400 runs: ⭐ 12.3% ⭐⭐ 9.8% ⭐⭐⭐ 4.5% (K=0.5, ⭐⭐⭐ in 90; 500 to 3,000 within noise)
+    intro: 'גביע המדינה 2003/04, העונה הראשונה של בני סכנין בליגת העל, שבה סיימה עשירית. ' +
+           'בדרך לגמר היא עברה שתי סדרות פנדלים, מול הפועל נצרת עילית בחוץ ומול מכבי תל אביב בבית, ' +
+           'וניצחה 0:1 את מ.ס. אשדוד ברמת גן. בגמר, גם הוא ברמת גן, חיכתה הפועל חיפה מהליגה הלאומית.',
+    europe: {
+      awayGoals: true,
+      window: 'r32',        // the January window, before the first round
+      realOut: 'final',
+      realText: 'זכתה בגביע: 1:4 על הפועל חיפה',
+      endLabel: 'זכייה בגביע',
+      rounds: [
+        { id: 'r32', label: 'שלב ה-32', kind: 'tie', oneLeg: true, home: false,
+          club: { name: 'הפועל הרצליה', ovr: 63 }, real: 'בחוץ 0:2' },
+        { id: 'r16', label: 'שמינית הגמר', kind: 'tie', oneLeg: true, home: false,
+          // hapoel-galil under the name it had then; second tier, no squad
+          club: { teamId: 'hapoel-galil', name: 'הפועל נצרת עילית', ovr: 71 }, real: '1-1 אחרי הארכה, 4:5 בפנדלים' },
+        { id: 'qf', label: 'רבע הגמר', kind: 'tie', oneLeg: true, home: true,
+          club: { teamId: 'maccabi-tlv', name: 'מכבי תל אביב', ovr: 83 }, real: '1-1 אחרי הארכה, 3:4 בפנדלים' },
+        { id: 'sf', label: 'חצי הגמר', kind: 'tie', oneLeg: true, home: null,
+          club: { teamId: 'ms-ashdod', name: 'מ.ס. אשדוד', ovr: 82 }, real: 'ברמת גן 0:1' },
+        { id: 'final', label: 'הגמר', kind: 'tie', oneLeg: true, home: null,
+          // in the second tier that season: no squad, a lower-league rating
+          club: { teamId: 'hapoel-haifa', name: 'הפועל חיפה', ovr: 74 },
+          real: 'ברמת גן: 1:4' },
+      ],
+    },
+    stars: [
+      { type: 'euReach', round: 'final', label: 'להגיע לגמר' },
+      { type: 'euChampion', label: 'לזכות בגביע' },
+      // Every tie is one match, so plain unbeaten is the cup itself. In reality it
+      // went to penalties twice — do it in 90.
+      { type: 'cupUnbeaten', in90: true, label: 'לזכות בלי הפסד, בלי הארכה ובלי פנדלים' },
+    ],
+  },
   // ── round four, the league (2026-10-12): facts from js/league_tables.js and,
   // for mta-2019's one defeat, RSSSF. Squad ranks from storyOpponents (summer).
   {

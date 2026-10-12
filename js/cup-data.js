@@ -49,6 +49,7 @@ const CUP_ALEF = [
   { id: 'cup-yeruham',     name: 'הפועל ירוחם',          ovr: 60 },
   { id: 'cup-sderot',      name: 'הפועל שדרות',          ovr: 62 },
   { id: 'cup-ofakim',      name: 'מ.ס. אופקים',          ovr: 60 },
+  { id: 'cup-herzliya',    name: 'הפועל הרצליה',         ovr: 63 },
 ];
 
 // The five rounds the top flight actually plays. The cup runs to twelve rounds
