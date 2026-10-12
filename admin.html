@@ -255,6 +255,7 @@
 <div class="wrap">
   <h1>⚙️ ניהול טקסטים — 36-0</h1>
   <div class="sub"><a href="admin-story.html" style="color:#FFD700">📖 מצב סיפור: מי נכנס ומי סיים כל פרק ←</a></div>
+  <div class="sub"><a href="admin-derby.html" style="color:#FFD700">🏆 אלופי הדרבי: משפך לכל מועדון ומי שיחק ←</a></div>
   <div class="sub">כל טקסט באתר מופיע כאן עם הערך הנוכחי שלו. ערוך ולחץ שמור — השינוי חל על כל הגולשים אחרי רענון. הכתיבה מוגנת ב-RLS: רק חשבון המנהל יכול לשמור.</div>
 
   <div id="login-box">
@@ -295,6 +296,21 @@
         <span id="story-status" class="chal-status"></span>
       </div>
       <div id="story-out"></div>
+    </div>
+
+    <div id="derby-section" style="display:none">
+      <h2>🏆 אלופי הדרבי</h2>
+      <div class="chal-note">
+        א. משפך לכל מועדון (כולל מי שבלי חשבון): נכנסו, סיימו דראפט, סיימו ואיפה. ב. "מי שיחק": כל ריצה של מחוברים, מהחדשה לישנה.
+        אותו טווח ימים כמו "מה משחקים". יש לזה גם עמוד משלו: <a href="admin-derby.html" style="color:#FFD700">admin-derby.html ←</a>
+      </div>
+      <div class="us-controls">
+        <button id="derby-refresh" class="seo-btn ghost">↻ רענן</button>
+        <span id="derby-status" class="chal-status"></span>
+      </div>
+      <div id="derby-out"></div>
+      <div class="us-h3">מי שיחק</div>
+      <div id="derby-runs"></div>
     </div>
 
     <div id="hist-section" style="display:none">
@@ -454,6 +470,7 @@
 <script src="js/player_nats.js?v=a527d5f3"></script>
 <script src="js/story-data.js?v=9e4c9251"></script>
 <script src="js/story-admin.js?v=109615d1"></script>
+<script src="js/derby-admin.js?v=63ef2356"></script>
 <script src="js/league_tables.js?v=7b63e16c"></script>
 <script src="js/challenges.js?v=0978f2ae"></script>
 <!-- crowd.js comes first and is not optional: crowd-admin.js builds its
@@ -874,6 +891,8 @@ async function init() {
     document.getElementById('usage-section').style.display = 'block';
     document.getElementById('story-section').style.display = 'block';
     initStoryAdmin();
+    document.getElementById('derby-section').style.display = 'block';
+    initDerbyAdmin();
     initUsage();
     document.getElementById('hist-section').style.display = 'block';
     initHistViewer();
@@ -895,7 +914,7 @@ const US_MODES = {
   draft: 'דראפט', challenge: 'אתגר', career: 'קריירה', minigame: 'משחקונים',
   gauntlet: 'גאונטלט', europe: 'אירופה', duel: 'דו-קרב', league: 'ליגות',
   salarycap: 'תקרת שכר', install: 'התקנת אפליקציה', january: 'חלון החורף',
-  entry: 'מאיפה הגיעו', story: 'מצב סיפור',
+  entry: 'מאיפה הגיעו', story: 'מצב סיפור', derby: 'אלופי הדרבי',
 };
 
 function initUsage() {
@@ -1000,6 +1019,16 @@ function initStoryAdmin() {
   const load = () => storyAdminLoad(document.getElementById('story-out'), document.getElementById('story-status'),
     Number(document.getElementById('usage-days').value) || 30);
   document.getElementById('story-refresh').onclick = load;
+  document.getElementById('usage-days').addEventListener('change', load);
+  load();
+}
+
+/* ─── אלופי הדרבי (admin only) ───────────────────────────────────────────── */
+// The tables live in js/derby-admin.js; admin-derby.html shows them on their own.
+function initDerbyAdmin() {
+  const load = () => derbyAdminLoad(document.getElementById('derby-out'), document.getElementById('derby-runs'),
+    document.getElementById('derby-status'), Number(document.getElementById('usage-days').value) || 30);
+  document.getElementById('derby-refresh').onclick = load;
   document.getElementById('usage-days').addEventListener('change', load);
   load();
 }

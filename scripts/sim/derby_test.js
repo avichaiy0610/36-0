@@ -26,7 +26,7 @@ t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
 // Node, drop it from FILES: both sides then read 0 from it, which is still fair.
 const FILES = ['js/data.js', 'js/league_tables.js', 'js/sim-engine.js', 'js/game.js',
   'js/league-sim.js', 'js/chem-data.js', 'js/chemistry.js', 'js/tag-data.js', 'js/tags.js',
-  'js/derby-data.js', 'js/derby-ai.js', 'js/derby-match.js', 'js/derby.js'];
+  'js/derby-data.js', 'js/derby-ai.js', 'js/derby-match.js', 'js/derby.js', 'js/derby-admin.js'];
 const EXPORTS = ['state', 'SQUADS', 'TEAMS', 'formationSlots', 'playerFitsSlot', 'slotFitPos',
   'myLineRatings', 'teamOVR', 'getEraFilteredSquads',
   'DERBY_RIVALS', 'DERBY_MIN_SEASONS', 'DERBY_MIN_RIVAL_SEASONS', 'DERBY_SERIES_ORDER', 'DERBY_GAME_HOME', 'DERBY_BENCH', 'DERBY_SUBS', 'DERBY_SUB_WINDOWS', 'DERBY_CHUNK', 'DERBY_AI', 'DERBY_REROLLS',
@@ -39,7 +39,8 @@ const EXPORTS = ['state', 'SQUADS', 'TEAMS', 'formationSlots', 'playerFitsSlot',
   'FORMATIONS', 'derbySetFormation', 'derbySwap', 'derbyPreSwap', 'derbySetFormationMine', 'derbySwapMine', 'derbyPreSwapMine', 'derbyAutoTactic', 'localStorage',
   'DERBY_ENERGY_DRAIN', 'DERBY_ENERGY_FREE', 'DERBY_RECOVER_GAME', 'DERBY_RECOVER_SERIES', 'DERBY_ROTATE_BELOW',
   'derbyEnergyPenalty', 'derbyEnergyLevel', 'derbyEnergyAt', 'derbyEnergyAfter', 'derbyRotate', 'derbyEnergyMaps',
-  'derbySnapshot', 'derbyRestore', 'derbySnapChanged', 'derbyMarkStop', 'derbyCanUndo', 'derbyUndoMine', 'inNaturalPos', 'derbyUndoSub', 'derbyResub', 'derbyUndoSubMine', 'derbyResubMine', 'derbyOffFor'];
+  'derbySnapshot', 'derbyRestore', 'derbySnapChanged', 'derbyMarkStop', 'derbyCanUndo', 'derbyUndoMine', 'inNaturalPos', 'derbyUndoSub', 'derbyResub', 'derbyUndoSubMine', 'derbyResubMine', 'derbyOffFor',
+  'derbyAdminSummary', 'derbyAdminRunsRows', 'derbyAdminRunsHTML', 'derbyAdminFunnelHTML', 'derbyAdminMissing'];
 
 function load() {
   return new Function(STUB + FILES.map(read).join('\n') +
@@ -822,6 +823,56 @@ if (require.main === module) {
       G.derbyGameStep(run, m, stop + 1);
       assert.strictEqual(G.derbyOffFor(m, 4), -1);
     }
+  });
+
+  // ── admin view ─────────────────────────────────────────────────────────────
+  t('derbyAdminSummary: funnel per club, sorted, totals', () => {
+    const U = (mode, event, detail, events, people) => ({ mode, event, detail, events, people });
+    const rows = [
+      U('derby', 'open', '—', 9, 7), U('story', 'open', '—', 50, 40),
+      U('derby', 'progress', 'maccabi-haifa|start', 6, 5), U('derby', 'progress', 'maccabi-haifa|drafted', 4, 4),
+      U('derby', 'progress', 'maccabi-haifa|series', 3, 3),
+      U('derby', 'finish', 'maccabi-haifa|3', 1, 1), U('derby', 'finish', 'maccabi-haifa|1', 2, 2),
+      U('derby', 'share', 'maccabi-haifa', 1, 1),
+      U('derby', 'progress', 'beitar-jerusalem|start', 8, 7), U('derby', 'finish', 'beitar-jerusalem|0', 1, 1),
+    ];
+    const s = G.derbyAdminSummary(rows);
+    assert.strictEqual(s.hub, 7);
+    assert.deepStrictEqual(s.clubs.map(c => c.club), ['beitar-jerusalem', 'maccabi-haifa']);
+    const h = s.clubs[1];
+    assert.strictEqual(h.startP, 5); assert.strictEqual(h.draftedP, 4); assert.strictEqual(h.seriesP, 3);
+    assert.deepStrictEqual(h.won, [0, 2, 0, 1]); assert.strictEqual(h.finishE, 3); assert.strictEqual(h.shareE, 1);
+    assert.strictEqual(s.totals.startP, 12); assert.deepStrictEqual(s.totals.won, [1, 2, 0, 1]);
+    const html = G.derbyAdminFunnelHTML(rows, 30);
+    assert.ok(html.includes('33%') && html.includes('סה&quot;כ'));
+    assert.ok(G.derbyAdminFunnelHTML([], 30).includes('עוד אין נתונים'));
+  });
+  t('derbyAdminRunsRows: series text, filter, per-user, escaping', () => {
+    const runs = [
+      { created_at: '2026-10-10T09:30:00Z', username: 'dan', club: 'maccabi-haifa', difficulty: 'hard', series_won: 3, title: true,
+        series: [{ rival: 'beitar-jerusalem', w: 3, l: 1 }, { rival: 'hapoel-haifa', w: 3, l: 0 }, { rival: 'maccabi-tlv', w: 3, l: 2 }] },
+      { created_at: '2026-10-09T09:30:00Z', username: '<b>x</b>', club: 'beitar-jerusalem', difficulty: 'easy', series_won: 1, title: false,
+        series: [{ rival: 'maccabi-haifa', w: 3, l: 0 }, { rival: 'hapoel-tlv', w: 1, l: 3 }, { rival: 'maccabi-tlv', w: 0, l: 3 }] },
+      { created_at: '2026-10-08T09:30:00Z', username: 'dan', club: 'beitar-jerusalem', difficulty: 'normal', series_won: 0, title: false, series: [] },
+    ];
+    const r = G.derbyAdminRunsRows(runs);
+    assert.strictEqual(r.rows.length, 3);
+    assert.strictEqual(r.rows[0].level, 'קשה'); assert.ok(r.rows[0].title);
+    assert.ok(/3:1 · .* 3:0 · .* 3:2$/.test(r.rows[0].series));
+    assert.deepStrictEqual(r.users[0], { user: 'dan', runs: 2, titles: 1 });
+    assert.strictEqual(G.derbyAdminRunsRows(runs, { club: 'beitar-jerusalem' }).rows.length, 2);
+    const html = G.derbyAdminRunsHTML(runs, {});
+    assert.ok(!html.includes('<b>x</b>') && html.includes('&lt;b&gt;x&lt;/b&gt;'));
+    assert.ok(G.derbyAdminMissing({ code: 'PGRST202', message: 'x' }));
+    assert.ok(!G.derbyAdminMissing({ message: 'forbidden' }));
+  });
+  t('derby_admin migration: admin-gated, pinned, granted, no array concat', () => {
+    const sql = read('supabase/migrations/20261012000001_derby_admin.sql');
+    assert.ok(sql.includes('is_site_admin()') && sql.includes('SET search_path = public, pg_temp'));
+    assert.ok(/SECURITY DEFINER/.test(sql) && /REVOKE ALL ON FUNCTION derby_admin_runs\(int, int\) FROM anon/.test(sql));
+    assert.ok(/GRANT EXECUTE ON FUNCTION derby_admin_runs\(int, int\) TO authenticated/.test(sql));
+    assert.ok(!sql.includes("|| '"));
+    assert.ok('20261012000001' > '20261005000002');
   });
 
   console.log(`\n${n} passed`);
