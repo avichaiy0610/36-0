@@ -61,17 +61,27 @@ function storyAdminHTML(rows, days) {
     return `${t} ${ch.season} · ${ch.title}`;
   };
   const pct = (a, b) => b ? Math.round(100 * a / b) + '%' : '<span class="us-zero">·</span>';
-  const body = chapters.map(ch => {
+  // The newest chapters first, under their own heading, so a release can be
+  // followed on its own; `since` is set on each chapter in js/story-data.js.
+  const newest = chapters.reduce((v, ch) => (ch.since && ch.since > v ? ch.since : v), '');
+  const fresh = chapters.filter(ch => newest && ch.since === newest);
+  const rest = chapters.filter(ch => !fresh.includes(ch));
+  const group = label => `<tr><td colspan="13" style="font-weight:700;padding-top:10px">${label}</td></tr>`;
+  const row = ch => {
     const c = per[ch.id] || get(ch.id);
     const one = c.stars[1] + c.stars[2] + c.stars[3];          // at least ⭐ (stars are graded)
     return `<tr>
-      <td>${stEsc(name(ch))}${ch.kind === 'europe' ? ' 🇪🇺' : ch.kind === 'cup' ? ' 🏆' : ''}</td><td>${ST_LEVEL[ch.level] || ''}</td>
+      <td>${fresh.includes(ch) ? '🆕 ' : ''}${stEsc(name(ch))}${ch.kind === 'europe' ? ' 🇪🇺' : ch.kind === 'cup' ? ' 🏆' : ''}</td><td>${ST_LEVEL[ch.level] || ''}</td>
       <td><b>${stNum(c.inP)}</b></td><td><b>${stNum(c.outP)}</b></td><td>${pct(c.outE, c.inE)}</td>
       <td>${stNum(c.inE)}</td><td>${stNum(c.outE)}</td>
       <td>${stNum(c.stars[0])}</td><td>${stNum(c.stars[1])}</td><td>${stNum(c.stars[2])}</td><td>${stNum(c.stars[3])}</td>
       <td>${pct(one, c.outE)}</td>
       <td>${c.pensW + c.pensL ? `${c.pensW}/${c.pensW + c.pensL}` : '<span class="us-zero">·</span>'}</td></tr>`;
-  }).join('');
+  };
+  const body = fresh.length
+    ? group(`🆕 חדשים בגרסה ${stEsc(newest)} (${fresh.length})`) + fresh.map(row).join('') +
+      group(`כל השאר (${rest.length})`) + rest.map(row).join('')
+    : chapters.map(row).join('');
   const went = Object.values(per).reduce((a, c) => a + c.inP, 0);
   const done = Object.values(per).reduce((a, c) => a + c.outP, 0);
   return `<div class="us-h3">${days} הימים האחרונים · ${hub} אנשים פתחו את מסך הפרקים ·
