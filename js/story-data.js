@@ -773,4 +773,22 @@ const STORY_CHAPTERS = [
       { type: 'rank', max: 4, label: 'לסיים ברביעייה הראשונה' },
     ],
   },
+  {
+    id: 'mta-2019',
+    teamId: 'maccabi-tlv',
+    season: '2019/20',
+    title: '26-9-1',
+    level: 'normal',
+    // Above 1,500 the money stops mattering (2,000 and 3,000 measure the same).
+    budget: 1000,   // measured 2026-10-12, 400 runs: ⭐ 68% ⭐⭐ 13.5% ⭐⭐⭐ 3.0%
+    rivalBudget: 3000,   // at 2,000 the title came 73-79%
+    intro: 'מכבי תל אביב 2019/20: הסגל החזק בליגה. היא זכתה באליפות עם 87 נקודות, 14 לפני מכבי חיפה, ' +
+           'וספגה 10 שערים בלבד ב-36 משחקים. ההפסד היחיד שלה הגיע במחזור האחרון, 2-0 להפועל באר שבע ' +
+           'בבאר שבע. והפעם היריבות קונות.',
+    stars: [
+      { type: 'rank', max: 1, label: 'אליפות' },
+      { type: 'margin', min: 10, label: 'אליפות בפער של 10 נקודות לפחות' },
+      { type: 'rank', max: 1, maxLosses: 0, label: 'אליפות בלי אף הפסד' },
+    ],
+  },
 ];

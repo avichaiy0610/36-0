@@ -17,7 +17,7 @@ DECLARE
                               'hta-2001','haifa-2002','haifa-2009','mta-2002','mta-2004',
                               'hta-2009','beitar-2007','aco-2017','reineh-2025','b7-2016','mta-2013',
                               'sakhnin-2007','rhs-2012','by-2011','hpt-1999','hta-2010',
-                              'hhaifa-2017', 'mpt-2004', 'ashdod-2020'];
+                              'hhaifa-2017', 'mpt-2004', 'ashdod-2020', 'mta-2019'];
   v_chapter  text    := COALESCE(p->>'chapter', '');
   v_stars    int     := LEAST(GREATEST(COALESCE((p->>'stars')::int, 0), 0), 3);
   v_cup      boolean := COALESCE((p->>'champion')::boolean, false);
@@ -71,7 +71,7 @@ DECLARE
                               'hta-2001','haifa-2002','haifa-2009','mta-2002','mta-2004',
                               'hta-2009','beitar-2007','aco-2017','reineh-2025','b7-2016','mta-2013',
                               'sakhnin-2007','rhs-2012','by-2011','hpt-1999','hta-2010',
-                              'hhaifa-2017', 'mpt-2004', 'ashdod-2020'];
+                              'hhaifa-2017', 'mpt-2004', 'ashdod-2020', 'mta-2019'];
   v_chapter text := COALESCE(p->>'chapter', '');
   v_stars   int  := LEAST(GREATEST(COALESCE((p->>'stars')::int, 0), 0), 3);
   -- a score is stars × 1000 plus a few hundred either way; nothing real passes these
