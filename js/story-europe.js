@@ -36,7 +36,9 @@ function storyEuClub(run, club, key, ch) {
     // simTeamsForSeason(y, 0) returns [] (it slices to `count`), so read the squad directly
     const sq = SQUADS.find(s => parseInt(s.season, 10) === parseInt(ch.season, 10) && s.teamId === club.teamId);
     if (sq) {
-      const real = storyClubRating(club.teamId, sq.players);
+      // less whoever you bought from them, as in the league (storyClubPlayers)
+      const players = run.bought ? storyClubPlayers(ch, run, club.teamId, 'all') : sq.players;
+      const real = storyClubRating(club.teamId, players);
       return { name: club.name, ovr: real.ovr, atk: real.atk, mid: real.mid, def: real.def, gk: real.gk, cs: 1 };
     }
   }

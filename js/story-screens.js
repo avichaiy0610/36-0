@@ -825,7 +825,7 @@ body.eu-blue #screen-story{background:transparent}
       if (r.kind === 'tie') {
         const i = cur.legs.length;
         const home = r.oneLeg ? r.home : (i === 0) === !!r.firstHome;
-        body = `<h3>${esc(r.label)}: ${oppMark(r.club)} ${esc(r.club.name)} <span class="st-tag">${r.club.ovr}</span></h3>
+        body = `<h3>${esc(r.label)}: ${oppMark(r.club)} ${esc(r.club.name)} <span class="st-tag">${storyEuClub(run, r.club, r.id).ovr}</span></h3>
           ${cur.legs.map(l => euLegLine(us, l, r.club.name)).join('')}
           <p class="eu-next">${r.oneLeg ? 'משחק יחיד' : `משחק ${i + 1} מתוך 2`} · ${venue(r, home)}</p>
           ${storyEuNeed(ch, r, cur.legs) ? `<p class="eu-need">${esc(storyEuNeed(ch, r, cur.legs))}</p>` : ''}

@@ -21,16 +21,21 @@ function storyPenRng(a) {
     t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
 }
 
+// A European giant's rating says little about twelve yards: past this, an
+// opponent's rating and keeper count no more. Without it a 92 won 66% of
+// shootouts against an Israeli side — a coin is closer to the truth.
+const STORY_PEN_OPP_CAP = 84;
+
 const storyPenClamp = p => Math.max(0.55, Math.min(0.88, p));
 
 // Our kick: the taker { position, ovr } against their keeper's rating.
 function storyPenP(taker, oppGk) {
   const base = STORY_PEN_BASE[storyGroupOf(taker.position)] ?? STORY_PEN_BASE.cm;
-  return storyPenClamp(base + STORY_PEN_K * (taker.ovr - 80) - STORY_PEN_K * (oppGk - 80));
+  return storyPenClamp(base + STORY_PEN_K * (taker.ovr - 80) - STORY_PEN_K * (Math.min(oppGk, STORY_PEN_OPP_CAP) - 80));
 }
 // Their kick: the club's rating against our keeper.
 function storyOppPenP(oppOvr, ourGk) {
-  return storyPenClamp(STORY_PEN_OPP + STORY_PEN_K * (oppOvr - 80) - STORY_PEN_K * (ourGk - 80));
+  return storyPenClamp(STORY_PEN_OPP + STORY_PEN_K * (Math.min(oppOvr, STORY_PEN_OPP_CAP) - 80) - STORY_PEN_K * (ourGk - 80));
 }
 
 // The best takers first and the keeper last: what the bot and the "auto"

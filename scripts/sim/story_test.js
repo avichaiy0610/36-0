@@ -458,6 +458,17 @@ if (require.main === module) {
     assert.deepStrictEqual(G.storyStars(c, res(idx('r4'))), [false, false, false]);
     assert.strictEqual(G.storyEuRealReach(c), idx('qf'));
   });
+  t('a cup opponent you bought from is weaker by the men you took', () => {
+    const c = G.storyChapter('hhaifa-2017');
+    const run = G.storyNewRun(c, 3);
+    run.budget = 99999;
+    const before = G.storyEuClub(run, c.europe.rounds[2].club, 'qf');              // Maccabi Haifa
+    const best = G.storyMarketPool(run, c).filter(e => e.squad.teamId === 'maccabi-haifa')
+      .sort((a, b) => b.player.ovr - a.player.ovr)[0];
+    G.storyBuy(run, c, best, 1);
+    const after = G.storyEuClub(run, c.europe.rounds[2].club, 'qf');
+    assert.ok(after.atk + after.mid + after.def + after.gk < before.atk + before.mid + before.def + before.gk);
+  });
   t('cupUnbeaten: a loss inside 120 minutes breaks it, a shootout does not', () => {
     const ch = { stars: [{ type: 'cupUnbeaten', label: 'x' }], europe: { rounds: [] } };
     const res = losses => ({ budget: 0, eu: { reached: 0, champion: true, losses } });

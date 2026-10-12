@@ -1,8 +1,10 @@
--- מצב סיפור, round four: State Cup chapters (hhaifa-2017, and the rest of
--- round four as they are added). Both server functions check the chapter against
--- a list, so both are redefined — each body COPIED from 20260928000001 with only
+-- מצב סיפור, round four: five State Cup chapters (hhaifa-2017, b7-2021,
+-- beitar-2022, sakhnin-2003, mpt-2023) and three league chapters (mpt-2004,
+-- ashdod-2020, mta-2019). Both server functions check the chapter against a
+-- list, so both are redefined — each body COPIED from 20260928000001 with only
 -- v_known extended. scripts/sim/story_test.js compares the newest list with
--- STORY_CHAPTERS. NOT applied yet: extend v_known here while the round is built.
+-- STORY_CHAPTERS. Apply BEFORE the code goes live: otherwise the new chapters'
+-- boards stay empty and `starred` overshoots the old 22-chapter total.
 
 CREATE OR REPLACE FUNCTION award_story_achievements(p jsonb)
 RETURNS jsonb
