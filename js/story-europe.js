@@ -103,7 +103,7 @@ function storyEuNeed(ch, round, legs) {
   return `${t.gf}-${t.ga} בסיכום. ${t.awayA > t.awayF ? 'שער החוץ שלהם שווה כפול: צריך לנצח.' : 'צריך לנצח.'}`;
 }
 
-function storyEuCloseTie(ch, run, round, legs) {
+function storyEuCloseTie(ch, run, round, legs, shootout) {
   const t = storyEuTieState(ch, round, legs);
   let gf = t.gf, ga = t.ga, won = null, et = null, pens = null, how = '';
   if (gf !== ga) { won = gf > ga; how = 'agg'; }
@@ -115,9 +115,12 @@ function storyEuCloseTie(ch, run, round, legs) {
     gf += et.gf; ga += et.ga;
     if (gf !== ga) { won = gf > ga; how = 'et'; }
     else {
-      const mine = storyRand(run, 'pens', round.id) < 0.5;
-      pens = mine ? { gf: 4, ga: 3 } : { gf: 3, ga: 4 };
-      won = mine; how = 'pens';
+      how = 'pens';
+      // No coin any more: the player runs the shootout (js/story-pens.js).
+      // Without one yet, the tie waits for it.
+      if (!shootout) return { id: round.id, kind: 'tie', legs, agg: { gf, ga }, et, pens: null, won: null, how, pending: true };
+      pens = shootout;
+      won = shootout.won;
     }
   }
   return { id: round.id, kind: 'tie', legs, agg: { gf, ga }, et, pens, won, how };
@@ -146,6 +149,7 @@ function storyEuGroupTable(round, played) {
 function storyEuPlay(ch, run, tactic) {
   const round = storyEuRound(ch, run);
   if (!round || run.eu.out) return null;
+  if (run.eu.cur && run.eu.cur.pensDue) return null;      // a shootout is waiting
   const cur = run.eu.cur || (run.eu.cur = { id: round.id, legs: [], played: [] });
   storyApplyXI(run, storyEuWhen(run, round), tactic);
 
@@ -158,6 +162,12 @@ function storyEuPlay(ch, run, tactic) {
     cur.legs.push(leg);
     if (cur.legs.length < (round.oneLeg ? 1 : 2)) return { leg, round };
     const closed = storyEuCloseTie(ch, run, round, cur.legs);
+    if (closed.pending) {
+      // the eleven who finished the match take the kicks
+      cur.pensDue = true;
+      cur.pensXI = state.picks.filter(Boolean).map(e => ({ name: e.player.name, position: e.player.position, ovr: e.player.ovr }));
+      return { leg, round, pensDue: true };
+    }
     run.eu.done.push(closed);
     run.eu.cur = null;
     storyEuAdvance(ch, run, round, closed);
@@ -189,6 +199,26 @@ function storyEuPlay(ch, run, tactic) {
   run.eu.cur = null;
   storyEuAdvance(ch, run, round, closed);
   return { leg, round, closed };
+}
+
+// The shootout of a tie that is waiting for one. `names`: the takers in order,
+// any subset of the eleven; the rest of the eleven follow in the auto order.
+// Returns { round, closed } — or null when no shootout is waiting.
+function storyEuPens(ch, run, names) {
+  const round = storyEuRound(ch, run);
+  const cur = run.eu && run.eu.cur;
+  if (!round || !cur || !cur.pensDue) return null;
+  const xi = cur.pensXI;
+  const chosen = names.map(n => xi.find(p => p.name === n)).filter(Boolean);
+  const order = chosen.concat(storyPensAutoOrder(xi.filter(p => !chosen.includes(p))));
+  const opp = storyEuClub(run, round.club, round.id);
+  const ourGk = (xi.find(p => p.position === 'GK') || { ovr: 70 }).ovr;
+  const shootout = storyShootout(storyEuSeed(run, round.id, 'pens'), order, { ovr: round.club.ovr, gk: opp.gk }, ourGk);
+  const closed = storyEuCloseTie(ch, run, round, cur.legs, shootout);
+  run.eu.done.push(closed);
+  run.eu.cur = null;
+  storyEuAdvance(ch, run, round, closed);
+  return { round, closed };
 }
 
 // Where a finished round sends the campaign.

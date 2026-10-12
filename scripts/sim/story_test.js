@@ -384,17 +384,37 @@ if (require.main === module) {
     assert.strictEqual(x.b.leg.home, false);
     assert.ok(x.run.eu.at === 1 || x.run.eu.out);
   });
-  t('away goals decide a level tie, then extra time and penalties', () => {
+  t('away goals decide a level tie, then extra time, then penalties wait for an order', () => {
     const c = G.storyChapter('hta-2001');
     const run = G.storyNewRun(c, 5);
     const round = c.europe.rounds[0];
-    // 1-2 at home, 1-0 away: 2-2, but their two away goals beat our one
     const r = G.storyEuCloseTie(c, run, round, [{ gf: 1, ga: 2, home: true }, { gf: 1, ga: 0, home: false }]);
     assert.deepStrictEqual([r.agg.gf, r.agg.ga, r.how, r.won], [2, 2, 'away', false]);
-    // 1-1 and 1-1: level on away goals too, so extra time, then penalties
     const s = G.storyEuCloseTie(c, run, round, [{ gf: 1, ga: 1, home: true }, { gf: 1, ga: 1, home: false }]);
     assert.ok(['et', 'pens'].includes(s.how));
-    assert.strictEqual(s.won, s.pens ? s.pens.gf > s.pens.ga : s.agg.gf > s.agg.ga);
+    if (s.how === 'pens') assert.strictEqual(s.pending, true);
+    else assert.strictEqual(s.won, s.agg.gf > s.agg.ga);
+  });
+  t('a shootout closes a pending tie once, from the order given, and the run moves on', () => {
+    const c = G.storyChapter('hta-2001');
+    // find a seed whose first round, forced level, goes to penalties
+    for (let seed = 1; seed < 400; seed++) {
+      const run = G.storyNewRun(c, seed); G.storyEuStart(run); euSet(c, run);
+      const round = c.europe.rounds[0];
+      const legs = [{ gf: 0, ga: 0, home: true }, { gf: 0, ga: 0, home: false }];
+      const probe = G.storyEuCloseTie(c, run, round, legs);
+      if (probe.how !== 'pens') continue;
+      run.eu.cur = { id: round.id, legs, played: [], pensDue: true,
+                     pensXI: [{ name: 'a', position: 'ST', ovr: 85 }, { name: 'k', position: 'GK', ovr: 80 }] };
+      assert.strictEqual(G.storyEuPlay(c, run, 'bal'), null);          // no third leg while pens wait
+      const out = G.storyEuPens(c, run, ['a', 'k']);
+      assert.ok(out.closed && out.closed.how === 'pens' && out.closed.pens.kicks.length >= 6);
+      assert.strictEqual(out.closed.won, out.closed.pens.gf > out.closed.pens.ga);
+      assert.strictEqual(run.eu.cur, null);
+      assert.strictEqual(G.storyEuPens(c, run, ['a', 'k']), null);     // cannot shoot twice
+      return;
+    }
+    assert.fail('no seed reached penalties');
   });
   t('the need line reads the tie', () => {
     const c = G.storyChapter('hta-2001');
