@@ -697,6 +697,7 @@ const STORY_CHAPTERS = [
   // (every Hapoel Haifa row, dates and venues).
   {
     id: 'hhaifa-2017',
+    since: '1.60',          // the release it came in: admin-story.html lists the newest first
     kind: 'cup',
     teamId: 'hapoel-haifa',
     season: '2017/18',
@@ -741,6 +742,7 @@ const STORY_CHAPTERS = [
   // press (Sport1/Walla): every Hapoel Be'er Sheva row, dates and venues.
   {
     id: 'b7-2021',
+    since: '1.60',          // the release it came in: admin-story.html lists the newest first
     kind: 'cup',
     teamId: 'hapoel-beersheba',
     season: '2021/22',
@@ -785,6 +787,7 @@ const STORY_CHAPTERS = [
   // press (Sport1/Walla): every Beitar Jerusalem row, dates and venues.
   {
     id: 'beitar-2022',
+    since: '1.60',          // the release it came in: admin-story.html lists the newest first
     kind: 'cup',
     teamId: 'beitar-jerusalem',
     season: '2022/23',
@@ -830,6 +833,7 @@ const STORY_CHAPTERS = [
   // press (Walla): every Bnei Sakhnin row, dates and venues.
   {
     id: 'sakhnin-2003',
+    since: '1.60',          // the release it came in: admin-story.html lists the newest first
     kind: 'cup',
     teamId: 'bnei-sakhnin',
     season: '2003/04',
@@ -875,6 +879,7 @@ const STORY_CHAPTERS = [
   // press (Sport1/Walla): every Maccabi Petah Tikva row, dates and venues.
   {
     id: 'mpt-2023',
+    since: '1.60',          // the release it came in: admin-story.html lists the newest first
     kind: 'cup',
     teamId: 'maccabi-pt',
     season: '2023/24',
@@ -918,6 +923,7 @@ const STORY_CHAPTERS = [
   // for mta-2019's one defeat, RSSSF. Squad ranks from storyOpponents (summer).
   {
     id: 'mpt-2004',
+    since: '1.60',          // the release it came in: admin-story.html lists the newest first
     teamId: 'maccabi-pt',
     season: '2004/05',
     title: 'סגנית האלופה',
@@ -935,6 +941,7 @@ const STORY_CHAPTERS = [
   },
   {
     id: 'ashdod-2020',
+    since: '1.60',          // the release it came in: admin-story.html lists the newest first
     teamId: 'ms-ashdod',
     season: '2020/21',
     title: 'הסגל החמישי',
@@ -953,6 +960,7 @@ const STORY_CHAPTERS = [
   },
   {
     id: 'mta-2019',
+    since: '1.60',          // the release it came in: admin-story.html lists the newest first
     teamId: 'maccabi-tlv',
     season: '2019/20',
     title: '26-9-1',
