@@ -458,6 +458,18 @@ if (require.main === module) {
     assert.deepStrictEqual(G.storyStars(c, res(idx('r4'))), [false, false, false]);
     assert.strictEqual(G.storyEuRealReach(c), idx('qf'));
   });
+  t('cupUnbeaten: a loss inside 120 minutes breaks it, a shootout does not', () => {
+    const ch = { stars: [{ type: 'cupUnbeaten', label: 'x' }], europe: { rounds: [] } };
+    const res = losses => ({ budget: 0, eu: { reached: 0, champion: true, losses } });
+    assert.deepStrictEqual(G.storyStars(ch, res(0)), [true]);
+    assert.deepStrictEqual(G.storyStars(ch, res(1)), [false]);
+    const run = { eu: { out: false, at: 1, done: [
+      { id: 'a', kind: 'tie', legs: [{ gf: 0, ga: 0 }], how: 'pens', won: true },
+      { id: 'b', kind: 'tie', legs: [{ gf: 1, ga: 1 }], how: 'et', won: false },
+      { id: 'c', kind: 'tie', legs: [{ gf: 0, ga: 1 }, { gf: 2, ga: 0 }], how: 'agg', won: true },
+    ] } };
+    assert.strictEqual(G.storyEuResult({ europe: { rounds: [{ id: 'a' }] } }, run).losses, 2);
+  });
   t('a picked eleven: your choice holds, the rest is filled, a sold man drops out', () => {
     const run = G.storyNewRun(ks, 2);
     const slots = G.formationSlots('4-3-3', 'bal');

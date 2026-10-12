@@ -287,7 +287,10 @@ function storyEuResult(ch, run) {
   // branches, where "the group" and "how far" depend on which way it went
   const groups = {};
   run.eu.done.filter(d => d.kind === 'group').forEach(d => { groups[d.id] = { pos: d.pos, pts: d.pts, gf: d.gf, ga: d.ga }; });
-  return { reached, group, groups, played: run.eu.done.map(d => d.id),
+  // every match lost inside 120 minutes: a leg lost, or extra time lost
+  const losses = run.eu.done.reduce((n, d) =>
+    n + (d.legs || []).filter(l => l.gf < l.ga).length + (d.how === 'et' && !d.won ? 1 : 0), 0);
+  return { reached, group, groups, losses, played: run.eu.done.map(d => d.id),
            champion: !run.eu.out && run.eu.at >= rounds.length, endText: run.eu.endText || null };
 }
 function storyEuReachedRound(ch, res, roundId) {
