@@ -22,7 +22,7 @@ function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;var t=Math.imul(a
 t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
 `;
 const FILES = ['js/data.js', 'js/league_tables.js', 'js/sim-engine.js', 'js/game.js',
-  'js/league-sim.js', 'js/story-facts.js', 'js/story-data.js', 'js/story-market.js', 'js/story-season.js', 'js/story-europe.js'];
+  'js/league-sim.js', 'js/story-facts.js', 'js/story-data.js', 'js/story-market.js', 'js/story-season.js', 'js/story-pens.js', 'js/story-europe.js'];
 const EXPORTS = ['state', 'SQUADS', 'LEAGUE_TABLES', 'FORMATIONS', 'formationSlots',
   'simTeamsForSeason', 'withSeededRandom', 'generateMatches', 'generateLeagueTable',
   'seasonFormat', 'myLineRatings', 'teamOVR', 'simulatePlayerStats', 'SIM_ENGINE_CURRENT',
@@ -35,7 +35,8 @@ const EXPORTS = ['state', 'SQUADS', 'LEAGUE_TABLES', 'FORMATIONS', 'formationSlo
   'storyApplyXI', 'storyXiOvr', 'storyStatsFor', 'storyMergeStats', 'storySimulateFn',
   'storySeasonPrepare', 'storySeasonResim', 'storyOppForSim',
   'storyEuStart', 'storyEuPlay', 'storyEuCloseTie', 'storyEuNeed', 'storyEuResult', 'storyEuRealReach',
-  'storyEuWindowDue', 'storyEuOver', 'storyEuRound', 'storyEuLiveTable', 'storyJanValue'];
+  'storyEuWindowDue', 'storyEuOver', 'storyEuRound', 'storyEuLiveTable', 'storyJanValue',
+  'storyPenP', 'storyOppPenP', 'storyShootout', 'storyPensAutoOrder', 'storyEuPens', 'storyIsCampaign', 'storyEuClub'];
 
 function load() {
   return new Function(STUB + MULBERRY + FILES.map(read).join('\n') +
@@ -309,6 +310,51 @@ if (require.main === module) {
     Object.assign(G.state, { story: { chapterId: c.id }, peakMode: false, classic: false, coach: null });
     G.storyApplyXI(run);
   };
+  // ── Penalties ──────────────────────────────────────────────────────────────
+  t('a kick: forwards over defenders over keepers, rating up, their keeper down, clamped', () => {
+    const st = G.storyPenP({ position: 'ST', ovr: 80 }, 80);
+    const cb = G.storyPenP({ position: 'CB', ovr: 80 }, 80);
+    const gk = G.storyPenP({ position: 'GK', ovr: 80 }, 80);
+    assert.ok(st > cb && cb > gk, [st, cb, gk].join());
+    assert.ok(G.storyPenP({ position: 'ST', ovr: 88 }, 80) > st);
+    assert.ok(G.storyPenP({ position: 'ST', ovr: 80 }, 90) < st);
+    for (const o of [40, 99]) for (const k of [40, 99]) {
+      const p = G.storyPenP({ position: 'ST', ovr: o }, k);
+      assert.ok(p >= 0.55 && p <= 0.88, 'clamp ' + p);
+    }
+    assert.ok(G.storyOppPenP(80, 90) < G.storyOppPenP(80, 70));     // our keeper matters
+  });
+  t('a shootout: same seed and order → same result; five each unless decided early', () => {
+    const order = ['ST', 'LW', 'CAM', 'CM', 'CB', 'RB', 'LB', 'CDM', 'RW', 'CB', 'GK']
+      .map((position, i) => ({ name: 'p' + i, position, ovr: 80 }));
+    const a = G.storyShootout(12345, order, { ovr: 80, gk: 80 }, 80);
+    const b = G.storyShootout(12345, order, { ovr: 80, gk: 80 }, 80);
+    assert.deepStrictEqual(a, b);
+    assert.notStrictEqual(a.gf, a.ga);
+    assert.strictEqual(a.won, a.gf > a.ga);
+    assert.ok(a.kicks.length >= 6 && a.kicks.length <= 2 * 11 * 3);
+    // a shootout decided before ten kicks stopped when it could no longer be caught
+    let early = 0;
+    for (let s = 1; s <= 200; s++) if (G.storyShootout(s, order, { ovr: 80, gk: 80 }, 80).kicks.length < 10) early++;
+    assert.ok(early > 0, 'never ended early in 200 seeds');
+  });
+  t('a shootout is close to a coin between equals, and the order matters', () => {
+    const mk = pos => pos.map((position, i) => ({ name: 'p' + i, position, ovr: 80 }));
+    const good = mk(['ST', 'ST', 'CAM', 'LW', 'CM', 'CB', 'CB', 'RB', 'LB', 'CDM', 'GK']);
+    const bad = mk(['GK', 'CB', 'CB', 'RB', 'LB', 'CDM', 'CM', 'LW', 'CAM', 'ST', 'ST']);
+    let wg = 0, wb = 0;
+    for (let s = 1; s <= 2000; s++) {
+      if (G.storyShootout(s, good, { ovr: 80, gk: 80 }, 80).won) wg++;
+      if (G.storyShootout(s, bad, { ovr: 80, gk: 80 }, 80).won) wb++;
+    }
+    assert.ok(wg / 2000 > 0.42 && wg / 2000 < 0.62, 'good ' + wg / 2000);
+    assert.ok(wg > wb, `order did not matter: ${wg} vs ${wb}`);
+  });
+  t('the auto order: best takers first, the keeper last', () => {
+    const xi = [{ name: 'g', position: 'GK', ovr: 90 }, { name: 's', position: 'ST', ovr: 80 },
+                { name: 'c', position: 'CB', ovr: 85 }];
+    assert.deepStrictEqual(G.storyPensAutoOrder(xi).map(p => p.name), ['s', 'c', 'g']);
+  });
   t('europe chapters: rounds are well formed, stars point at real rounds', () => {
     for (const c of G.STORY_CHAPTERS.filter(c => c.kind === 'europe')) {
       const ids = c.europe.rounds.map(r => r.id);
