@@ -736,4 +736,23 @@ const STORY_CHAPTERS = [
       { type: 'cupUnbeaten', in90: true, label: 'לזכות בלי הפסד, בלי הארכה ובלי פנדלים' },
     ],
   },
+  // ── round four, the league (2026-10-12): facts from js/league_tables.js and,
+  // for mta-2019's one defeat, RSSSF. Squad ranks from storyOpponents (summer).
+  {
+    id: 'mpt-2004',
+    teamId: 'maccabi-pt',
+    season: '2004/05',
+    title: 'סגנית האלופה',
+    level: 'normal',
+    // The plan's "survive" ⭐ came 100% of the time, so the ladder is three finishes.
+    budget: 1000,   // measured 2026-10-12, 400 runs: ⭐ 54% ⭐⭐ 17% ⭐⭐⭐ 3.8%
+    intro: 'מכבי פתח תקווה 2004/05: על הנייר מכבי חיפה חזקה מכולן, ומאחוריה שלושה סגלים שקולים: ' +
+           'מכבי פתח תקווה, הפועל תל אביב ומכבי תל אביב. פתח תקווה סיימה שנייה עם 60 נקודות והפסידה ' +
+           'רק 5 משחקים, והשתיים מתל אביב סיימו במקומות 8 ו-9. חיפה לקחה את האליפות עם 71.',
+    stars: [
+      { type: 'rank', max: 4, label: 'לסיים ברביעייה הראשונה' },
+      { type: 'rank', max: 3, label: 'לסיים בשלישייה הראשונה' },
+      { type: 'rank', max: 2, label: 'מקום שני, כמו במציאות, או טוב ממנו' },
+    ],
+  },
 ];
