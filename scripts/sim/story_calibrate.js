@@ -124,7 +124,8 @@ function playEurope(run, honor) {
       run.phase = 'europe';
       continue;
     }
-    G.storyEuPlay(ch, run, euTactic(run));
+    const out = G.storyEuPlay(ch, run, euTactic(run));
+    if (out && out.pensDue) G.storyEuPens(ch, run, G.storyPensAutoOrder(run.eu.cur.pensXI).map(p => p.name));
   }
   const res = { budget: run.budget, eu: G.storyEuResult(ch, run), sold: run.sold.map(s => s.name),
                 boughtTeams: run.bought.map(b => (G.SQUADS.find(s => s.id === b.squadId) || {}).teamId) };
