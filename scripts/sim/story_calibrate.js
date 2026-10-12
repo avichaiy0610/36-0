@@ -113,6 +113,7 @@ function euTactic(run) {
 }
 function playEurope(run, honor) {
   G.storyEuStart(run);
+  if (ch.kind === 'cup') run.eu.windowDone = true;
   Object.assign(G.state, { story: { chapterId: ch.id }, peakMode: false, classic: false, coach: null });
   for (let guard = 0; guard < 40 && !G.storyEuOver(ch, run); guard++) {
     if (G.storyEuWindowDue(ch, run)) {

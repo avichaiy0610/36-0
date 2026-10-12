@@ -34,7 +34,7 @@ const EXPORTS = ['state', 'SQUADS', 'LEAGUE_TABLES', 'FORMATIONS', 'formationSlo
   'storyBuy', 'storySell', 'storyOpponents', 'storyBestXI', 'storyStars', 'storyScore', 'storyCoreNames', 'storyResolveOvr', 'storyResult',
   'storyApplyXI', 'storyXiOvr', 'storyStatsFor', 'storyMergeStats', 'storySimulateFn',
   'storySeasonPrepare', 'storySeasonResim', 'storyOppForSim',
-  'storyEuStart', 'storyEuPlay', 'storyEuCloseTie', 'storyEuNeed', 'storyEuResult', 'storyEuRealReach',
+  'storyClubRating', 'storyEuStart', 'storyEuPlay', 'storyEuCloseTie', 'storyEuNeed', 'storyEuResult', 'storyEuRealReach',
   'storyEuWindowDue', 'storyEuOver', 'storyEuRound', 'storyEuLiveTable', 'storyJanValue',
   'storyPenP', 'storyOppPenP', 'storyShootout', 'storyPensAutoOrder', 'storyEuPens', 'storyIsCampaign', 'storyEuClub'];
 
@@ -623,6 +623,20 @@ if (require.main === module) {
     assert.deepStrictEqual(Object.values(G.storyReal(ks)), [1, 73, 16]);
     assert.strictEqual(G.storyOpponents(ks, G.storyNewRun(ks, 1), 'summer').length, 15);
     assert.strictEqual(G.storyCoreNames(ks).length, 11);
+  });
+
+  t('cup chapters: every Israeli club with a squad that season carries its real ovr', () => {
+    for (const c of G.STORY_CHAPTERS.filter(c => c.kind === 'cup')) {
+      const year = parseInt(c.season, 10);
+      for (const r of c.europe.rounds) {
+        assert.ok(r.kind === 'tie', c.id + ' ' + r.id);
+        const sq = r.club.teamId && G.SQUADS.find(s => parseInt(s.season, 10) === year && s.teamId === r.club.teamId);
+        if (sq) assert.strictEqual(r.club.ovr, G.storyClubRating(r.club.teamId, sq.players).ovr, c.id + ' ' + r.id + ' ovr');
+        else assert.ok(r.club.ovr >= 60 && r.club.ovr <= 78, c.id + ' ' + r.id + ' lower league ovr');
+      }
+      assert.ok(c.stars.some(s => s.type === 'cupUnbeaten'));
+    }
+    assert.ok(G.storyChapter('hhaifa-2017'));
   });
 
   if (process.argv.includes('--season')) require('./story_test_season.js')(G, t);

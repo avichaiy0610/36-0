@@ -692,4 +692,46 @@ const STORY_CHAPTERS = [
       { type: 'euGroupPos', max: 2, label: 'לעלות מהבית' },
     ],
   },
+  // The State Cup, verified 2026-10-12 in two sources that agree: RSSSF
+  // tablesi/isra2018.html and en.wikipedia "2017–18 Israel State Cup"
+  // (every Hapoel Haifa row, dates and venues).
+  {
+    id: 'hhaifa-2017',
+    kind: 'cup',
+    teamId: 'hapoel-haifa',
+    season: '2017/18',
+    comp: 'גביע המדינה',
+    title: 'הגביע של חיפה האדומה',
+    level: 'hard',
+    budget: 1500,           // set by Task 7's measurement
+    intro: 'גביע המדינה 2017/18. הפועל חיפה ניצחה בחוץ את הפועל פתח תקווה ואת הפועל עכו, ' +
+           'הדיחה את מכבי חיפה ברבע הגמר בזכות שער חוץ (2-2 ו-1-1, ושני המשחקים בסמי עופר), ' +
+           'עברה את הפועל רעננה בפנדלים, ובגמר בטדי ניצחה את בית"ר ירושלים 1:3 בהארכה.',
+    europe: {
+      awayGoals: true,
+      window: 'r32',        // the January window, before the first round
+      realOut: 'final',
+      realText: 'זכתה בגביע: 1:3 על בית"ר בהארכה',
+      endLabel: 'זכייה בגביע',
+      rounds: [
+        { id: 'r32', label: 'שלב ה-32', kind: 'tie', oneLeg: true, home: false,
+          club: { teamId: 'hapoel-pt', name: 'הפועל פתח תקווה', ovr: 73 }, real: 'בחוץ 1:2' },
+        { id: 'r16', label: 'שמינית הגמר', kind: 'tie', oneLeg: true, home: false,
+          club: { teamId: 'hapoel-aco', name: 'הפועל עכו', ovr: 75 }, real: 'בחוץ 1:2, טורגמן בדקה ה-90' },
+        { id: 'qf', label: 'רבע הגמר', kind: 'tie', firstHome: false,
+          club: { teamId: 'maccabi-haifa', name: 'מכבי חיפה', ovr: 82 },
+          real: '2-2 ו-1-1, שניהם בסמי עופר. עלתה בזכות שער החוץ' },
+        { id: 'sf', label: 'חצי הגמר', kind: 'tie', oneLeg: true, home: true,
+          club: { teamId: 'hapoel-raanana', name: 'הפועל רעננה', ovr: 78 }, real: '0-0 אחרי הארכה, 3:4 בפנדלים' },
+        { id: 'final', label: 'הגמר', kind: 'tie', oneLeg: true, home: false, ko: false,
+          club: { teamId: 'beitar-jerusalem', name: 'בית"ר ירושלים', ovr: 83 },
+          real: 'בטדי: 1:3 בהארכה (פלקושצ\'נקו, שיימן 105\', טורגמן 120\')' },
+      ],
+    },
+    stars: [
+      { type: 'euReach', round: 'final', label: 'להגיע לגמר' },
+      { type: 'euChampion', label: 'לזכות בגביע' },
+      { type: 'cupUnbeaten', label: 'לזכות בלי להפסיד אף משחק' },
+    ],
+  },
 ];
