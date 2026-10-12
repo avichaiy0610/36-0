@@ -468,7 +468,11 @@ if (require.main === module) {
       { id: 'b', kind: 'tie', legs: [{ gf: 1, ga: 1 }], how: 'et', won: false },
       { id: 'c', kind: 'tie', legs: [{ gf: 0, ga: 1 }, { gf: 2, ga: 0 }], how: 'agg', won: true },
     ] } };
-    assert.strictEqual(G.storyEuResult({ europe: { rounds: [{ id: 'a' }] } }, run).losses, 2);
+    const r = G.storyEuResult({ europe: { rounds: [{ id: 'a' }] } }, run);
+    assert.deepStrictEqual([r.losses, r.extra], [2, 2]);
+    const in90 = { stars: [{ type: 'cupUnbeaten', in90: true, label: 'x' }], europe: { rounds: [] } };
+    assert.deepStrictEqual(G.storyStars(in90, { budget: 0, eu: { losses: 0, extra: 0 } }), [true]);
+    assert.deepStrictEqual(G.storyStars(in90, { budget: 0, eu: { losses: 0, extra: 1 } }), [false]);
   });
   t('a picked eleven: your choice holds, the rest is filled, a sold man drops out', () => {
     const run = G.storyNewRun(ks, 2);

@@ -290,7 +290,9 @@ function storyEuResult(ch, run) {
   // every match lost inside 120 minutes: a leg lost, or extra time lost
   const losses = run.eu.done.reduce((n, d) =>
     n + (d.legs || []).filter(l => l.gf < l.ga).length + (d.how === 'et' && !d.won ? 1 : 0), 0);
-  return { reached, group, groups, losses, played: run.eu.done.map(d => d.id),
+  // ties that needed extra time or penalties: what a star with `in90` forbids
+  const extra = run.eu.done.filter(d => d.how === 'et' || d.how === 'pens').length;
+  return { reached, group, groups, losses, extra, played: run.eu.done.map(d => d.id),
            champion: !run.eu.out && run.eu.at >= rounds.length, endText: run.eu.endText || null };
 }
 function storyEuReachedRound(ch, res, roundId) {

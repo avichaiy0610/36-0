@@ -703,7 +703,7 @@ const STORY_CHAPTERS = [
     comp: 'גביע המדינה',
     title: 'הגביע של חיפה האדומה',
     level: 'hard',
-    budget: 1500,           // measured 2026-10-12, 400 runs: ⭐ 35% ⭐⭐ 16% ⭐⭐⭐ 12% (K=0.5; 500 to 3,000 within noise)
+    budget: 1500,           // measured 2026-10-12, 800 runs: ⭐ 32% ⭐⭐ 14% ⭐⭐⭐ 4.1% (K=0.5, ⭐⭐⭐ in 90; 500 to 3,000 within noise)
     intro: 'גביע המדינה 2017/18. הפועל חיפה ניצחה בחוץ את הפועל פתח תקווה ואת הפועל עכו, ' +
            'הדיחה את מכבי חיפה ברבע הגמר בזכות שער חוץ (2-2 ו-1-1, ושני המשחקים בסמי עופר), ' +
            'עברה את הפועל רעננה בפנדלים, ובגמר בטדי ניצחה את בית"ר ירושלים 1:3 בהארכה.',
@@ -731,7 +731,9 @@ const STORY_CHAPTERS = [
     stars: [
       { type: 'euReach', round: 'final', label: 'להגיע לגמר' },
       { type: 'euChampion', label: 'לזכות בגביע' },
-      { type: 'cupUnbeaten', label: 'לזכות בלי להפסיד אף משחק' },
+      // Plain "unbeaten" was 12% (3 in 4 winners): a shootout is no loss. In
+      // reality it took extra time twice and penalties once — do it in 90.
+      { type: 'cupUnbeaten', in90: true, label: 'לזכות בלי הפסד, בלי הארכה ובלי פנדלים' },
     ],
   },
 ];

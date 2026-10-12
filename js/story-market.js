@@ -326,7 +326,8 @@ function storyStars(ch, res) {
     // Europe: how far the campaign went, and what the group gave
     if (s.type === 'euReach') return !!res.eu && storyEuReachedRound(ch, res, s.round);
     if (s.type === 'euChampion') return !!res.eu && res.eu.champion;
-    if (s.type === 'cupUnbeaten') return !!res.eu && res.eu.losses === 0;
+    // `in90`: and every tie settled inside 90 minutes — no extra time, no penalties
+    if (s.type === 'cupUnbeaten') return !!res.eu && res.eu.losses === 0 && (!s.in90 || res.eu.extra === 0);
     if (s.type === 'euGroupPos') {
       // `round` names which group, in a campaign with two
       const g = res.eu && (s.round ? (res.eu.groups || {})[s.round] : res.eu.group);
