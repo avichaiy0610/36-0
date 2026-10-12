@@ -92,6 +92,8 @@
     const field = cupField();
     return {
       v: CUP_SAVE_V,
+      localJourney: !!state.journey,
+      journeyId: state.journey ? (state.journey.id || null) : null,
       rounds: [{ id: CUP_ROUNDS[0].id, ties: cupDraw(field) }],
       out: null,          // the round the player went out in
       champion: null,
@@ -601,7 +603,7 @@
     s.submitted = true;
     cupSave();
     if (typeof track === 'function') track('finish', 'draft', s.won ? 'isc-won' : 'isc-lost');
-    if (!s.won || typeof getCurrentUser !== 'function' || !getCurrentUser()) return;
+    if (state.journey || (_run && _run.localJourney) || !s.won || typeof getCurrentUser !== 'function' || !getCurrentUser()) return;
     try {
       const r = await _supabase.rpc('submit_israel_super', { p: { won: true } });
       const got = (r && r.data && r.data.achievements) || [];
@@ -648,6 +650,7 @@
     if (!_run.champion) return;
     _run.submitted = true;
     cupSave();
+    if (state.journey || _run.localJourney) return;
     if (typeof getCurrentUser !== 'function' || !getCurrentUser()) return;
     // which tier knocked me out, for the badge nobody wants
     let byTier = 0;
@@ -687,6 +690,7 @@
       const raw = localStorage.getItem(DRAFT_SAVE_KEY);
       if (!raw || !_run) return;
       const d = JSON.parse(raw);
+      if (_run.localJourney && (!d.journey || _run.journeyId !== (d.journey.id || null))) return;
       d[CUP_KEY] = _run;
       localStorage.setItem(DRAFT_SAVE_KEY, JSON.stringify(d));
     } catch (e) {}
@@ -694,7 +698,13 @@
   function cupLoad() {
     try {
       const d = JSON.parse(localStorage.getItem(DRAFT_SAVE_KEY));
-      return d && d[CUP_KEY] && d[CUP_KEY].v === CUP_SAVE_V ? d[CUP_KEY] : null;
+      if (!d || !d[CUP_KEY] || d[CUP_KEY].v !== CUP_SAVE_V) return null;
+      if (d.journey) {
+        if (d[CUP_KEY].journeyId && d[CUP_KEY].journeyId !== d.journey.id) return null;
+        d[CUP_KEY].localJourney = true;
+        d[CUP_KEY].journeyId = d.journey.id || null;
+      }
+      return d[CUP_KEY];
     } catch (e) { return null; }
   }
   function cupClear() {

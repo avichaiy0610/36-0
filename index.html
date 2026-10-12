@@ -88,6 +88,7 @@
   <link rel="stylesheet" href="css/cup.css?v=829ec7e1" />
   <link rel="stylesheet" href="css/club.css?v=f97ac89b" />
   <link rel="stylesheet" href="css/derby.css?v=e5929a5d" />
+  <link rel="stylesheet" href="css/journey.css?v=4b746448" />
   <link rel="stylesheet" href="css/crowd.css?v=54f20ee9" />
   <link rel="stylesheet" href="css/players-index.css?v=00720430" />
 </head>
@@ -381,6 +382,15 @@
         <span class="smc-arrow">←</span>
       </button>
 
+      <button class="setup-mode-card" id="setup-journey-card">
+        <span class="smc-icon">🧭</span>
+        <span class="smc-body">
+          <span class="smc-title">מסע ה־11 <span class="smc-new">חדש</span></span>
+          <span class="smc-sub">כל שחקן פותח דרך חדשה — בנה הרכב במסע בין מועדונים ועונות</span>
+        </span>
+        <span class="smc-arrow">←</span>
+      </button>
+
       <button class="setup-mode-card" id="setup-salary-card">
         <span class="smc-icon">💰</span>
         <span class="smc-body">
@@ -611,12 +621,14 @@
       <div id="chal-reqs-panel" class="chal-reqs-panel" style="display:none"></div>
       <button id="btn-move-player" class="btn-move-player" style="display:none">⇄ הזז שחקן</button>
       <div class="pick-hint" id="pick-hint">ממתין להגרלה...</div>
+      <div id="journey-draft-note" hidden></div>
       <div id="players-list"></div>
       <button id="btn-draft-restart" class="btn-draft-restart">↩ התחל מחדש</button>
     </div>
 
     <div class="pitch-panel">
       <button id="btn-draft-exit" class="btn-draft-exit">← יציאה למסך הראשי</button>
+      <div id="journey-draft-route" hidden></div>
       <div class="progress-bar-wrap">
         <div class="progress-top-row">
           <div class="progress-text" id="progress-text">שחקן 1 מתוך 11</div>
@@ -696,6 +708,7 @@
       </div>
 
       <div id="chal-reqs-pre" class="chal-reqs-pre" style="display:none"></div>
+      <div id="journey-pre-summary" hidden></div>
 
       <div id="pre-signin-prompt" class="pre-signin-prompt" style="display:none">
         <div class="pre-signin-icon">🏆</div>
@@ -1045,6 +1058,12 @@
   </div>
 
   <!-- ══ DERBY (js/derby.js, js/derby-screens.js) ═════════════════════════════ -->
+  <div id="screen-journey" class="screen screen-page">
+    <div class="page-inner journey-page">
+      <div id="journey-root"></div>
+    </div>
+  </div>
+
   <div id="screen-derby" class="screen screen-page">
     <div class="page-inner">
       <div class="page-header">
@@ -1191,13 +1210,13 @@
   <script src="js/config.js?v=3dd47ca1"></script>
   <script src="js/supabase-client.js?v=e9102a02"></script>
   <script src="js/errorlog.js?v=1da53f7f"></script>
-  <script src="js/track.js?v=7ce56253"></script>
+  <script src="js/track.js?v=69bd074f"></script>
   <script src="js/texts.js?v=1cab6ae8"></script>
   <script src="js/club.js?v=94db52f2"></script>
   <script src="js/auth.js?v=0e52a3af"></script>
   <script src="js/achievements.js?v=cfc1c564"></script>
   <script src="js/leaderboard.js?v=2f83278b"></script>
-  <script src="js/draft-archive.js?v=903cdcd2"></script>
+  <script src="js/draft-archive.js?v=70064070"></script>
   <script src="js/profile.js?v=7f431072"></script>
   <script src="js/gauntlet-map.js?v=53e83fb5"></script>
   <script src="js/gauntlet.js?v=324a1e03"></script>
@@ -1220,7 +1239,7 @@
   <script src="js/chemistry.js?v=0b080a52"></script>
   <script src="js/data.js?v=e2436bbd"></script>
   <script src="js/sim-engine.js?v=784ec7b1"></script>
-  <script src="js/game.js?v=052d5b71"></script>
+  <script src="js/game.js?v=47ba40a0"></script>
   <script src="js/club-media.js?v=68951881"></script>
   <!-- after club.js and draft-archive.js (its crest and its daMode), and it is
        only ever called from a click or from the end of a season, so career.js
@@ -1228,11 +1247,11 @@
   <script src="js/club-records.js?v=902c5072"></script>
   <script src="js/europe-data.js?v=48af5122"></script>
   <script src="js/eu-caps-data.js?v=ed8899a2"></script>
-  <script src="js/europe.js?v=53abf49a"></script>
+  <script src="js/europe.js?v=7434b543"></script>
   <script src="js/europe-screens.js?v=92adcb97"></script>
-  <script src="js/europe-super.js?v=4a55d7e8"></script>
+  <script src="js/europe-super.js?v=8766b989"></script>
   <script src="js/cup-data.js?v=c72c5a27"></script>
-  <script src="js/cup.js?v=4e208517"></script>
+  <script src="js/cup.js?v=d89a2376"></script>
   <script src="js/whatsnew.js?v=137e8f2c"></script>
   <script src="js/europe-admin.js?v=19ab9628"></script>
   <script src="js/season-admin.js?v=1f37a0db"></script>
@@ -1269,13 +1288,17 @@
   <script src="js/story-market.js?v=2dbd648a"></script>
   <script src="js/story-season.js?v=b595d2be"></script>
   <script src="js/story-europe.js?v=2b85fb94"></script>
-  <script src="js/story.js?v=a3348218"></script>
+  <script src="js/story.js?v=b0a77a80"></script>
   <script src="js/story-screens.js?v=25fe937d"></script>
   <script src="js/derby-data.js?v=63e4cb40"></script>
   <script src="js/derby-ai.js?v=88dd5c1a"></script>
   <script src="js/derby-match.js?v=2fb81b81"></script>
   <script src="js/derby.js?v=7af99c78"></script>
   <script src="js/derby-screens.js?v=f567bc76"></script>
+  <script src="js/journey-engine.js?v=e8832d62"></script>
+  <script src="js/journey-facts.js?v=54cc21b9"></script>
+  <script src="js/journey.js?v=dc0cecb4"></script>
+  <script src="js/journey-screens.js?v=a1016104"></script>
   <script src="js/install.js?v=6b792604"></script>
 </body>
 </html>

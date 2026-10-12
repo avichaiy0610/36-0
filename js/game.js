@@ -496,6 +496,7 @@ const state = {
   challenge: null, challengeDeck: null, challengeReqs: null,   // { period, key } + missions for challenge runs
   story: null,                                                 // { chapterId } while a מצב סיפור chapter is being played
   derby: null,                                                 // { club } while an אלופי הדרבי run is being drafted
+  journey: null,                                               // local מסע ה־11 route
 };
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
@@ -591,6 +592,7 @@ function playerFitsSlot(player, slotPos) {
 }
 
 function compatibleEmptySlots(player) {
+  if (state.journey && typeof journeyAllowedSlots === 'function') return journeyAllowedSlots(player);
   return emptySlotIndices().filter(i => playerFitsSlot(player, slotFitPos(state.slots[i])));
 }
 
@@ -826,7 +828,7 @@ const TRACK_SCREENS = {
 let _salaryCapPick = false;
 
 function trackDraftMode() {
-  if (state.career || state.derby) return null;
+  if (state.career || state.derby || state.journey) return null;
   return state.challenge ? 'challenge'
        : state.leagueCode ? 'league'
        : state.duelCode ? 'duel' : 'draft';
@@ -858,6 +860,16 @@ function styleProfile() {
 }
 
 function showScreen(id) {
+  if (state.journey && id === 'welcome') {
+    if (state.journey.phase !== 'season') saveDraftState();
+    window._restoredSeason = null; window._presetSeason = null;
+    state.journey = null;
+  }
+  if (state.journey && ['setup', 'minigames', 'career', 'story', 'gauntlet', 'duel', 'leagues', 'daily'].includes(id)) {
+    window._restoredSeason = null; window._presetSeason = null;
+    state.journey = null;
+  }
+  if (typeof journeySyncSurfaces === 'function') journeySyncSurfaces(id);
   // state.derby marks "this session is a derby" (clubShown, cup, january read it) and
   // derbyApplyMine re-sets it on every derby render. Leaving the derby for any
   // other screen must drop it, or the derby club leaks in as "your club".
@@ -890,6 +902,8 @@ function showScreen(id) {
 
 // ─── Welcome ───────────────────────────────────────────────────────────────────
 function startGame() {
+  if (state.journey) { window._restoredSeason = null; window._presetSeason = null; }
+  state.journey = null;
   state.leagueCode = null;   // a normal game from the welcome screen isn't for a league
   state.duelCode = null;
   state.derby = null;
@@ -1219,6 +1233,7 @@ function beginDraft() {
   const tacticPick  = (!classicPick && formationTactical(_selectedFormationKey)) ? _selectedTactic : 'bal';
   state.challenge   = null; state.challengeDeck = null; state.challengeReqs = null;   // the setup screen never starts a challenge run
   state.derby       = null;              // ...nor a derby (the derby starts its draft itself)
+  state.journey     = null;
 
   // Opponents league — league drafts always face the latest season (shared fairness)
   const oppChoice = state.leagueCode ? 'latest'
@@ -1247,6 +1262,7 @@ function beginDraftWithState(style) {
   state.classic = !!(style && style.classic);
   state.tactic  = tacticOf(style && style.tactic);
   state.story   = null;       // every draft path goes through here; a chapter never does
+  state.journey = (style && style.journey) || null;
 
   const rerolls = { easy:3, normal:1, hard:0 };
   state.teamRerollsLeft   = rerolls[state.difficulty] ?? 1;
@@ -1295,6 +1311,7 @@ function saveDraftState() {
       challengeReqs: state.challengeReqs || null,
       story: state.story || null,
       derby: state.derby || null,
+      journey: state.journey || null,
       difficulty: state.difficulty,
       showRatings: state.showRatings,
       draftMode: state.draftMode,
@@ -1400,6 +1417,7 @@ function restoreDraftState() {
   });
   // a referenced squad/player no longer exists (data updated since the save)
   if (d.picks.some((p, i) => p && !picks[i])) return false;
+  if (d.journey && (typeof journeyValidSave !== 'function' || !journeyValidSave(d, picks))) return false;
 
   Object.assign(state, {
     formationId: d.formationId, tactic, classic, slots, picks,
@@ -1410,6 +1428,7 @@ function restoreDraftState() {
     challenge: d.challenge ?? null,
     story: d.story ?? null,
     derby: d.derby ?? null,
+    journey: d.journey ?? null,
     difficulty: d.difficulty, showRatings: d.showRatings,
     draftMode: d.draftMode, peakMode: d.peakMode,
     // A save from before managers existed carries neither field. It restores
@@ -1431,6 +1450,15 @@ function restoreDraftState() {
   // was stored carry no ids, so those fall back to rebuilding it from the key —
   // which is what dealt them in the first place, so they resume correctly too.
   state.challengeReqs = d.challengeReqs ?? null;
+  if (state.journey) {
+    state.januaryOn = false;
+    buildPitch('pitch-slots', true);
+    if (d.season) { window._restoredSeason = d.season; showResults(); }
+    else if (state.journey.phase === 'season') showPreseason(teamOVR());
+    else journeyStartRound();
+    refreshAllTokens(); updateDraftOVR();
+    return true;
+  }
   if (!state.challenge || typeof challengeDeckFor !== 'function') {
     state.challengeDeck = null;
   } else if (Array.isArray(d.challengeDeckIds)) {
@@ -1640,6 +1668,7 @@ function clearAllHighlights() {
 // ─── Move mode ─────────────────────────────────────────────────────────────────
 // Move mode only touches pitch tokens, so it stays usable during the roulette animation
 function toggleMoveMode() {
+  if (state.journey) return; // Route safety is proved for the positions already chosen.
   if (state.derby && typeof derbyBenchPhase === 'function' && derbyBenchPhase()) return;   // derby bench rounds (and their hand-off): no moves
   state.moveMode = !state.moveMode;
   state.movingFromIdx = null;
@@ -1827,6 +1856,7 @@ function pickNextSquad() {
 }
 
 function startRound() {
+  if (state.journey && typeof journeyStartRound === 'function') { journeyStartRound(); return; }
   state.selectedPlayer = null; state.selectedSlotIdx = null;
   // The one-time crowd hint lives above the players list and belongs to the round
   // that drew it. Clearing it here is what keeps it to a single round: it is only
@@ -1871,6 +1901,7 @@ function startRound() {
 }
 
 function animateRoulette(finalSquad, onDone) {
+  const picksAtSpin = state.picks;
   state.isAnimating = true;
   document.getElementById('players-list').innerHTML = '';
   const card = document.getElementById('squad-card');
@@ -1883,6 +1914,7 @@ function animateRoulette(finalSquad, onDone) {
   let i = 0;
 
   function tick() {
+    if (state.picks !== picksAtSpin) { card.classList.remove('spinning'); return; }
     if (i >= delays.length) {
       showSquadCardData(finalSquad);
       card.classList.remove('spinning');
@@ -1986,6 +2018,7 @@ function renderSquadPlayers(squad, filterSlotIdx = null) {
     const card = document.createElement('div');
     card.className = 'player-card' + (unavailable ? ' card-unavailable' : '') + (tooDear ? ' card-toodear' : '');
     card.dataset.pos = playerPositions(player).join(',');
+    if (state.journey) card.dataset.name = player.name;
     const dispOVR = playerOVR(player);
     const peakTag = state.peakMode && player.peak_ovr && player.peak_ovr > player.ovr ? '⚡' : '';
     const ovrHTML = state.showRatings ? `<span class="pc-ovr" dir="ltr">${peakTag}${dispOVR}</span>` : '';
@@ -2069,6 +2102,7 @@ function renderSquadPlayers(squad, filterSlotIdx = null) {
 // ─── Draft: Selection logic ────────────────────────────────────────────────────
 function handlePlayerClick(player, cardEl) {
   if (state.isAnimating) return;
+  if (state.journey && typeof pcHide === 'function') pcHide(true);
   // אלופי הדרבי bench rounds: a tap puts him straight on the bench (js/derby.js)
   if (state.derby && typeof derbyBenchPhase === 'function' && derbyBenchPhase()) { derbyBenchTake(player); return; }
   if (state.moveMode) {
@@ -2090,6 +2124,7 @@ function handlePlayerClick(player, cardEl) {
 }
 
 function handleSlotClick(slotIdx) {
+  if (state.journey && state.picks[slotIdx]) return;
   // אלופי הדרבי bench rounds: the eleven are fixed, the pitch takes no taps
   if (state.derby && typeof derbyBenchPhase === 'function' && derbyBenchPhase()) return;
   // A move in progress, move mode, or a click on a placed player → move flow.
@@ -2145,6 +2180,14 @@ function handleSlotClick(slotIdx) {
 }
 
 function assignPlayer(slotIdx, player) {
+  const journeyAtPick = state.journey;
+  const picksAtPick = state.picks;
+  const sameDraft = () => state.picks === picksAtPick && state.journey === journeyAtPick;
+  const defer = (fn, ms) => setTimeout(() => { if (sameDraft()) fn(); }, ms);
+  if (state.journey && !journeyCanAssign(slotIdx, player)) {
+    setHint('מהעמדה הזאת אין מסלול בטוח להשלמת ההרכב — בחר עמדה מוארת');
+    return;
+  }
   // The round is over the moment a player is taken, but the previous squad's
   // list stays on screen for the 400ms before the next roulette starts. Without
   // this the player could take a SECOND player from the same squad, which queues
@@ -2160,9 +2203,10 @@ function assignPlayer(slotIdx, player) {
   clearAllHighlights();
   state.selectedPlayer = null; state.selectedSlotIdx = null;
   state.currentRound++;
+  if (state.journey) journeyRecordPick(slotIdx, player);
   saveDraftState();
   const moveBtn = document.getElementById('btn-move-player');
-  if (moveBtn) moveBtn.style.display = '';
+  if (moveBtn) moveBtn.style.display = state.journey ? 'none' : '';
   updateDraftOVR();
   if (state.currentRound >= state.slots.length) {
     // Squad complete — no further roulette will run, so release the gate here.
@@ -2172,24 +2216,25 @@ function assignPlayer(slotIdx, player) {
     // your weakest man would be a free upgrade — the exact opposite of the mode.
     if (typeof salFillEmptySlots === 'function') salFillEmptySlots();
     // A duel draft skips the solo preseason — it submits the squad and waits.
-    if (state.duelCode && typeof submitDuelSquad === 'function') setTimeout(() => submitDuelSquad(), 500);
+    if (state.journey) defer(journeyAfterDraft, 500);
+    else if (state.duelCode && typeof submitDuelSquad === 'function') defer(submitDuelSquad, 500);
     // a gauntlet draft skips the pre-season too — the XI goes straight into a fight
-    else if (state.gauntlet && typeof gtFight === 'function') setTimeout(() => gtFight(), 500);
+    else if (state.gauntlet && typeof gtFight === 'function') defer(gtFight, 500);
     // אלופי הדרבי: no season — the XI goes to the rivals and the series
-    else if (state.derby && typeof derbyAfterDraft === 'function') setTimeout(() => derbyAfterDraft(), 500);
+    else if (state.derby && typeof derbyAfterDraft === 'function') defer(derbyAfterDraft, 500);
     // Salary cap pauses on a complete XI instead of simulating: the one swap is
     // only worth anything once you can see all eleven together.
     else if (typeof salActive === 'function' && salActive() && typeof salShowReview === 'function')
-      setTimeout(() => salShowReview(), 500);
+      defer(salShowReview, 500);
     // The manager is appointed here and only here: with the eleven complete and
     // before a ball is kicked. coachOpen falls straight through to the preseason
     // when it is switched off or the mode is one that never gets a manager, so
     // this stays a single path rather than a branch.
-    else setTimeout(() => {
-      const go = () => showPreseason(teamOVR());
+    else defer(() => {
+      const go = () => { if (sameDraft()) showPreseason(teamOVR()); };
       if (typeof coachOpen === 'function') coachOpen(go); else go();
     }, 500);
-  } else setTimeout(startRound, 400);
+  } else defer(startRound, 400);
 }
 
 function updateDraftOVR() {
@@ -2315,11 +2360,11 @@ function updateRerollButtons() {
   document.getElementById('season-reroll-count').textContent = state.seasonRerollsLeft;
   document.getElementById('btn-reroll-team').disabled   = state.teamRerollsLeft   <= 0 || noSquad;
   // A derby draws from one club only, so a club reroll is just a season reroll.
-  document.getElementById('btn-reroll-team').style.display = state.derby ? 'none' : '';
+  document.getElementById('btn-reroll-team').style.display = (state.derby || state.journey) ? 'none' : '';
   // A draft locked to a single season — a career year — has no other season to
   // swap to: the button could only ever redraw the same one.
   const seasonBtn = document.getElementById('btn-reroll-season');
-  seasonBtn.style.display = state.eraMin === state.eraMax ? 'none' : '';
+  seasonBtn.style.display = (state.journey || state.eraMin === state.eraMax) ? 'none' : '';
   seasonBtn.disabled = state.seasonRerollsLeft <= 0 || noSquad;
 }
 
@@ -2996,7 +3041,7 @@ function showPreseason(ovr) {
 
   const signinPrompt = document.getElementById('pre-signin-prompt');
   if (signinPrompt) {
-    signinPrompt.style.display = getCurrentUser() ? 'none' : 'flex';
+    signinPrompt.style.display = (state.journey || getCurrentUser()) ? 'none' : 'flex';
     document.getElementById('pre-signin-btn').onclick = () => {
       document.getElementById('auth-modal').style.display = 'flex';
     };
@@ -3221,6 +3266,7 @@ function wireEuropeButton(rank, table) {
 }
 
 function showResults() {
+  const journeyAtSeason = state.journey;
   const ovr = teamOVR();
   // Every season starts by taking last season's crowd hint off the pitch panel.
   // The results screen is entered by six different owners (career, challenge,
@@ -3238,7 +3284,7 @@ function showResults() {
   buildResultsPitch();
   showScreen('results');
   wireEuropeButton(null);   // hidden until animateResults knows where we finished
-  setTimeout(() => animateResults(ovr), 400);
+  setTimeout(() => { if (!journeyAtSeason || state.journey === journeyAtSeason) animateResults(ovr); }, 400);
 }
 
 // Club names on the pitch have ~80px to live in. Long ones are abbreviated the
@@ -3298,6 +3344,8 @@ function buildPitchInContainer(containerId) {
 function buildResultsPitch() { buildPitchInContainer('results-pitch-slots'); }
 
 function animateResults(ovr) {
+  const journeyAtSeason = state.journey;
+  const revealActive = () => !journeyAtSeason || state.journey === journeyAtSeason;
   // Reuse a season restored from storage; otherwise simulate once and persist,
   // so refreshing cannot re-roll a different outcome for the same squad.
   // _restoredSeason → replay instantly (page refresh). _presetSeason → a season
@@ -3368,7 +3416,7 @@ function animateResults(ovr) {
     window._resultSubmitted = false;   // a new season may be saved again
     // count every finished season (for the games_N achievements) — once per
     // season: restored seasons skip this block
-    if (typeof getCurrentUser === 'function' && getCurrentUser()) {
+    if (!state.journey && typeof getCurrentUser === 'function' && getCurrentUser()) {
       _supabase.rpc('increment_games_played').then(() => {}, () => {});
     }
     if (typeof track === 'function') {
@@ -3538,7 +3586,7 @@ function animateResults(ovr) {
     // engine comes from the season itself (restored/preset seasons carry their
     // own; league/duel presets have none → 1), so this rebuild can't lose it.
     window._lastResult = { wins, draws, losses, gfTotal, gaTotal, matches, ovr, inTopSix, spec: seasonSpec,
-                           engine: season.engine ?? 1 };
+                           engine: season.engine ?? 1, journey: !!journeyAtSeason };
     window._lastTier   = tier;
     const diffMapR = {
       easy:   siteText('label-diff-easy', 'קל'),
@@ -3687,6 +3735,7 @@ function animateResults(ovr) {
   // Open whatever the seam is, and give each kind the same contract: call
   // `resume` when it is done, and the reveal continues from the next row.
   function openSeam(s) {
+    if (!revealActive()) return;
     clearTimeout(timer);
     if (skipBtn) skipBtn.style.display = 'none';
     // Both skips have to go quiet while a seam owns the screen. The cup opens a
@@ -3695,6 +3744,7 @@ function animateResults(ovr) {
     // stacked on top of each other.
     if (janSkip) janSkip.style.display = 'none';
     const resume = () => {
+      if (!revealActive()) return;
       seamI++;                        // this seam is spent
       // A skip that was already asked for carries through the seam it stopped at
       if (skipping) { endReveal(); return; }
@@ -3740,6 +3790,7 @@ function animateResults(ovr) {
   }
 
   function revealOne(sync) {
+    if (!revealActive()) return;
     const s = nextSeam();
     if (s && s.at === idx) { if (!sync) openSeam(s); return; }
     // The cup final is a seam AT matches.length — after the last league row.
@@ -3760,6 +3811,7 @@ function animateResults(ovr) {
   }
 
   function endReveal() {
+    if (!revealActive()) return;
     clearTimeout(timer);
     skipping = true;
     // Skipping fast-forwards to the next DECISION, not to the next event. A cup
@@ -4191,6 +4243,7 @@ function populateShareCard() {
   document.getElementById('sc-p-formation').textContent = formation;
   document.getElementById('sc-p-ovr').textContent = `OVR ${r.ovr}`;
   const modeParts = [];
+  if (state.journey) modeParts.push('🧭 מסע ה־11');
   const diffMap = { easy: 'קל', normal: 'רגיל', hard: 'קשה' };
   if (state.challenge && typeof challengeNumber === 'function')
     modeParts.push(`${CHAL_PERIODS[state.challenge.period]?.icon ?? '🗓️'} ${CHAL_PERIODS[state.challenge.period]?.short ?? ''} #${challengeNumber(state.challenge.period, state.challenge.key)}`);
@@ -4275,6 +4328,7 @@ function generateShareText() {
     : fillTemplate(st('share-title', '🇮🇱 36–0 | ליגת העל'), vars);
   return [
     title,
+    state.journey && typeof journeyShareLine === 'function' ? journeyShareLine() : null,
     fillTemplate(st('share-line-formation', 'מערך: {formation} | דירוג: {ovr}'), vars),
     (() => {
       const c = typeof coachActive === 'function' ? coachActive() : null;
@@ -4412,6 +4466,7 @@ async function downloadShareImage() {
 
 // ─── Restart ───────────────────────────────────────────────────────────────────
 function restartGame() {
+  if (state.journey) { journeyRestart(); return; }
   const { difficulty, showRatings, draftMode, peakMode, formationId, oppSeason, oppSeasonChoice } = state;
   const rerolls = { easy:3, normal:1, hard:0 };
   Object.assign(state, {
@@ -4452,6 +4507,7 @@ function restartGame() {
 
 // ─── Leaderboard integration ───────────────────────────────────────────────────
 async function submitResult() {
+  if (state.journey || (window._lastResult && window._lastResult.journey)) return false; // A different pool never enters the ordinary board.
   const user = getCurrentUser();
   if (!user) return false;
   if (window._resultSubmitted) return true;   // already saved this season
@@ -4567,7 +4623,7 @@ function setupSaveSection() {
   const loginPrompt = document.getElementById('save-login-prompt');
   if (!saveSection || !loginPrompt) return;
   // A chapter is scored against its own start, not against free drafts.
-  if (state.story) { saveSection.style.display = 'none'; loginPrompt.style.display = 'none'; return; }
+  if (state.story || state.journey || (window._lastResult && window._lastResult.journey)) { saveSection.style.display = 'none'; loginPrompt.style.display = 'none'; return; }
 
   // Reviewing a league/duel season — nothing to save (it isn't a fresh single-player draft).
   if (window._leagueReviewMode || window._duelReviewMode) { saveSection.style.display = 'none'; loginPrompt.style.display = 'none'; return; }
@@ -4649,6 +4705,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-restart').addEventListener('click', restartGame);
   document.getElementById('btn-draft-restart').addEventListener('click', restartGame);
   document.getElementById('btn-draft-exit')?.addEventListener('click', () => {
+    if (state.journey) { journeyPause(); return; }
     if (state.currentRound > 0 && !confirm('לצאת מהדראפט? ההתקדמות לא תישמר.')) return;
     clearDraftState();
     state.derby = null;
