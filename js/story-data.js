@@ -736,6 +736,50 @@ const STORY_CHAPTERS = [
       { type: 'cupUnbeaten', in90: true, label: 'לזכות בלי הפסד, בלי הארכה ובלי פנדלים' },
     ],
   },
+  // The State Cup, verified 2026-10-12 in sources that agree: RSSSF
+  // tablesi/isra2022.html, en.wikipedia "2021–22 Israel State Cup" and the Hebrew
+  // press (Sport1/Walla): every Hapoel Be'er Sheva row, dates and venues.
+  {
+    id: 'b7-2021',
+    kind: 'cup',
+    teamId: 'hapoel-beersheba',
+    season: '2021/22',
+    comp: 'גביע המדינה',
+    title: 'הפנדלים בטדי',
+    level: 'hard',
+    budget: 1000,           // measured 2026-10-12, 400 runs: ⭐ 22.5% ⭐⭐ 9.3% ⭐⭐⭐ 6.8% (K=0.5; 1,500 and up measure the same)
+    intro: 'גביע המדינה 2021/22. הפועל באר שבע סיימה שנייה בליגה, שמונה נקודות אחרי מכבי חיפה. ' +
+           'בגביע היא ניצחה בחוץ את בית"ר תל אביב בת ים ואת מכבי נתניה, הפכה בטרנר בהארכה הפסד 1:0 ' +
+           'מפתח תקווה, ניצחה את מכבי תל אביב 1:3 בבלומפילד, ובגמר בטדי פגשה שוב את מכבי חיפה.',
+    europe: {
+      awayGoals: true,
+      window: 'r32',        // the January window, before the first round
+      realOut: 'final',
+      realText: 'זכתה בגביע: 2-2 עם מכבי חיפה, 1:3 בפנדלים',
+      endLabel: 'זכייה בגביע',
+      rounds: [
+        { id: 'r32', label: 'שלב ה-32', kind: 'tie', oneLeg: true, home: false,
+          club: { name: 'בית"ר תל אביב בת ים', ovr: 70 }, real: 'בחוץ 0:3' },
+        { id: 'r16', label: 'שמינית הגמר', kind: 'tie', oneLeg: true, home: false,
+          club: { teamId: 'maccabi-netanya', name: 'מכבי נתניה', ovr: 81 }, real: 'בחוץ 1:2 בהארכה' },
+        { id: 'qf', label: 'רבע הגמר', kind: 'tie', firstHome: false,
+          club: { teamId: 'maccabi-pt', name: 'מכבי פתח תקווה', ovr: 79 },
+          real: 'בחוץ 1:0, ובטרנר 0:2 בהארכה' },
+        { id: 'sf', label: 'חצי הגמר', kind: 'tie', oneLeg: true, home: false,
+          club: { teamId: 'maccabi-tlv', name: 'מכבי תל אביב', ovr: 84 }, real: 'בבלומפילד 1:3' },
+        { id: 'final', label: 'הגמר', kind: 'tie', oneLeg: true, home: null,
+          club: { teamId: 'maccabi-haifa', name: 'מכבי חיפה', ovr: 87 },
+          real: 'בטדי: 2-2 אחרי הארכה, 1:3 בפנדלים' },
+      ],
+    },
+    stars: [
+      { type: 'euReach', round: 'final', label: 'להגיע לגמר' },
+      { type: 'euChampion', label: 'לזכות בגביע' },
+      // Plain unbeaten is 7%: a shootout is no loss, a leg lost is. In reality it
+      // lost one, 1:0 in Petah Tikva.
+      { type: 'cupUnbeaten', label: 'לזכות בגביע בלי להפסיד אף משחק' },
+    ],
+  },
   // ── round four, the league (2026-10-12): facts from js/league_tables.js and,
   // for mta-2019's one defeat, RSSSF. Squad ranks from storyOpponents (summer).
   {
