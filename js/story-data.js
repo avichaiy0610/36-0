@@ -65,6 +65,10 @@ const STORY_VALUE_TIERS = [
   { min: 0,  v: 80 },
 ];
 
+// A chapter with no league season: a European campaign or a State Cup run.
+// Both live in ch.europe and play on js/story-europe.js.
+function storyIsCampaign(ch) { return !!ch && (ch.kind === 'europe' || ch.kind === 'cup'); }
+
 const STORY_CHAPTERS = [
   {
     id: 'b7-2015',
@@ -686,6 +690,283 @@ const STORY_CHAPTERS = [
       { type: 'euGroupPoints', min: 5, label: '5 נקודות בבית, כמו במציאות' },
       { type: 'euGroupPos', max: 3, label: 'מקום שלישי: כרטיס לליגה האירופית' },
       { type: 'euGroupPos', max: 2, label: 'לעלות מהבית' },
+    ],
+  },
+  // The State Cup, verified 2026-10-12 in two sources that agree: RSSSF
+  // tablesi/isra2018.html and en.wikipedia "2017–18 Israel State Cup"
+  // (every Hapoel Haifa row, dates and venues).
+  {
+    id: 'hhaifa-2017',
+    kind: 'cup',
+    teamId: 'hapoel-haifa',
+    season: '2017/18',
+    comp: 'גביע המדינה',
+    title: 'הגביע של חיפה האדומה',
+    level: 'hard',
+    budget: 1500,           // measured 2026-10-12, 800 runs: ⭐ 32% ⭐⭐ 14% ⭐⭐⭐ 4.1% (K=0.5, ⭐⭐⭐ in 90; 500 to 3,000 within noise)
+    intro: 'גביע המדינה 2017/18. הפועל חיפה ניצחה בחוץ את הפועל פתח תקווה ואת הפועל עכו, ' +
+           'הדיחה את מכבי חיפה ברבע הגמר בזכות שער חוץ (2-2 ו-1-1, ושני המשחקים בסמי עופר), ' +
+           'עברה את הפועל רעננה בפנדלים, ובגמר בטדי ניצחה את בית"ר ירושלים 1:3 בהארכה.',
+    europe: {
+      awayGoals: true,
+      window: 'r32',        // the January window, before the first round
+      realOut: 'final',
+      realText: 'זכתה בגביע: 1:3 על בית"ר בהארכה',
+      endLabel: 'זכייה בגביע',
+      rounds: [
+        { id: 'r32', label: 'שלב ה-32', kind: 'tie', oneLeg: true, home: false,
+          club: { teamId: 'hapoel-pt', name: 'הפועל פתח תקווה', ovr: 73 }, real: 'בחוץ 1:2' },
+        { id: 'r16', label: 'שמינית הגמר', kind: 'tie', oneLeg: true, home: false,
+          club: { teamId: 'hapoel-aco', name: 'הפועל עכו', ovr: 75 }, real: 'בחוץ 1:2, טורגמן בדקה ה-90' },
+        { id: 'qf', label: 'רבע הגמר', kind: 'tie', firstHome: false,
+          club: { teamId: 'maccabi-haifa', name: 'מכבי חיפה', ovr: 82 },
+          real: '2-2 ו-1-1, שניהם בסמי עופר. עלתה בזכות שער החוץ' },
+        { id: 'sf', label: 'חצי הגמר', kind: 'tie', oneLeg: true, home: true,
+          club: { teamId: 'hapoel-raanana', name: 'הפועל רעננה', ovr: 78 }, real: '0-0 אחרי הארכה, 3:4 בפנדלים' },
+        { id: 'final', label: 'הגמר', kind: 'tie', oneLeg: true, home: false, ko: false,
+          club: { teamId: 'beitar-jerusalem', name: 'בית"ר ירושלים', ovr: 83 },
+          real: 'בטדי: 1:3 בהארכה (פלקושצ\'נקו, שיימן 105\', טורגמן 120\')' },
+      ],
+    },
+    stars: [
+      { type: 'euReach', round: 'final', label: 'להגיע לגמר' },
+      { type: 'euChampion', label: 'לזכות בגביע' },
+      // Plain "unbeaten" was 12% (3 in 4 winners): a shootout is no loss. In
+      // reality it took extra time twice and penalties once — do it in 90.
+      { type: 'cupUnbeaten', in90: true, label: 'לזכות בלי הפסד, בלי הארכה ובלי פנדלים' },
+    ],
+  },
+  // The State Cup, verified 2026-10-12 in sources that agree: RSSSF
+  // tablesi/isra2022.html, en.wikipedia "2021–22 Israel State Cup" and the Hebrew
+  // press (Sport1/Walla): every Hapoel Be'er Sheva row, dates and venues.
+  {
+    id: 'b7-2021',
+    kind: 'cup',
+    teamId: 'hapoel-beersheba',
+    season: '2021/22',
+    comp: 'גביע המדינה',
+    title: 'הפנדלים בטדי',
+    level: 'hard',
+    budget: 1000,           // measured 2026-10-12, 400 runs: ⭐ 22.5% ⭐⭐ 9.3% ⭐⭐⭐ 6.8% (K=0.5; 1,500 and up measure the same)
+    intro: 'גביע המדינה 2021/22. הפועל באר שבע סיימה שנייה בליגה, שמונה נקודות אחרי מכבי חיפה. ' +
+           'בגביע היא ניצחה בחוץ את בית"ר תל אביב בת ים ואת מכבי נתניה, הפכה בטרנר בהארכה הפסד 1:0 ' +
+           'מפתח תקווה, ניצחה את מכבי תל אביב 1:3 בבלומפילד, ובגמר בטדי פגשה שוב את מכבי חיפה.',
+    europe: {
+      awayGoals: true,
+      window: 'r32',        // the January window, before the first round
+      realOut: 'final',
+      realText: 'זכתה בגביע: 2-2 עם מכבי חיפה, 1:3 בפנדלים',
+      endLabel: 'זכייה בגביע',
+      rounds: [
+        { id: 'r32', label: 'שלב ה-32', kind: 'tie', oneLeg: true, home: false,
+          club: { name: 'בית"ר תל אביב בת ים', ovr: 70 }, real: 'בחוץ 0:3' },
+        { id: 'r16', label: 'שמינית הגמר', kind: 'tie', oneLeg: true, home: false,
+          club: { teamId: 'maccabi-netanya', name: 'מכבי נתניה', ovr: 81 }, real: 'בחוץ 1:2 בהארכה' },
+        { id: 'qf', label: 'רבע הגמר', kind: 'tie', firstHome: false,
+          club: { teamId: 'maccabi-pt', name: 'מכבי פתח תקווה', ovr: 79 },
+          real: 'בחוץ 1:0, ובטרנר 0:2 בהארכה' },
+        { id: 'sf', label: 'חצי הגמר', kind: 'tie', oneLeg: true, home: false,
+          club: { teamId: 'maccabi-tlv', name: 'מכבי תל אביב', ovr: 84 }, real: 'בבלומפילד 1:3' },
+        { id: 'final', label: 'הגמר', kind: 'tie', oneLeg: true, home: null,
+          club: { teamId: 'maccabi-haifa', name: 'מכבי חיפה', ovr: 87 },
+          real: 'בטדי: 2-2 אחרי הארכה, 1:3 בפנדלים' },
+      ],
+    },
+    stars: [
+      { type: 'euReach', round: 'final', label: 'להגיע לגמר' },
+      { type: 'euChampion', label: 'לזכות בגביע' },
+      // Plain unbeaten is 7%: a shootout is no loss, a leg lost is. In reality it
+      // lost one, 1:0 in Petah Tikva.
+      { type: 'cupUnbeaten', label: 'לזכות בגביע בלי להפסיד אף משחק' },
+    ],
+  },
+  // The State Cup, verified 2026-10-12 in sources that agree: RSSSF
+  // tablesi/isra2023.html, en.wikipedia "2022–23 Israel State Cup" and the Hebrew
+  // press (Sport1/Walla): every Beitar Jerusalem row, dates and venues.
+  {
+    id: 'beitar-2022',
+    kind: 'cup',
+    teamId: 'beitar-jerusalem',
+    season: '2022/23',
+    comp: 'גביע המדינה',
+    title: 'פעמיים בסמי עופר',
+    level: 'hard',
+    budget: 1000,           // measured 2026-10-12, 400 runs: ⭐ 27.3% ⭐⭐ 12.5% ⭐⭐⭐ 4.8% (K=0.5, ⭐⭐⭐ in 90; 500 to 3,000 within noise)
+    intro: 'גביע המדינה 2022/23. בית"ר ירושלים סיימה שמינית בליגה, עם 40 נקודות. ' +
+           'בגביע היא עברה את מ.ס. כפר קאסם, את עירוני טבריה בפנדלים (6:7) ואת הפועל עפולה, ' +
+           'ובסמי עופר ניצחה פעמיים: 1:3 את מכבי תל אביב בחצי הגמר ו-0:3 את מכבי נתניה בגמר.',
+    europe: {
+      awayGoals: true,
+      window: 'r32',        // the January window, before the first round
+      realOut: 'final',
+      realText: 'זכתה בגביע: 0:3 על מכבי נתניה',
+      endLabel: 'זכייה בגביע',
+      rounds: [
+        { id: 'r32', label: 'שלב ה-32', kind: 'tie', oneLeg: true, home: true,
+          club: { name: 'מ.ס. כפר קאסם', ovr: 73 }, real: 'בבית 0:4' },
+        { id: 'r16', label: 'שמינית הגמר', kind: 'tie', oneLeg: true, home: true,
+          // in the second tier that season: no squad, a lower-league rating
+          club: { teamId: 'ironi-tiberias', name: 'עירוני טבריה', ovr: 71 }, real: '1-1 אחרי הארכה, 6:7 בפנדלים' },
+        { id: 'qf', label: 'רבע הגמר', kind: 'tie', firstHome: false,
+          club: { name: 'הפועל עפולה', ovr: 70 },
+          real: 'בחוץ 0:4, בבית 2:1' },
+        { id: 'sf', label: 'חצי הגמר', kind: 'tie', oneLeg: true, home: null,
+          club: { teamId: 'maccabi-tlv', name: 'מכבי תל אביב', ovr: 85 }, real: 'בסמי עופר 1:3' },
+        { id: 'final', label: 'הגמר', kind: 'tie', oneLeg: true, home: null,
+          club: { teamId: 'maccabi-netanya', name: 'מכבי נתניה', ovr: 81 },
+          real: 'בסמי עופר: 0:3' },
+      ],
+    },
+    stars: [
+      { type: 'euReach', round: 'final', label: 'להגיע לגמר' },
+      { type: 'euChampion', label: 'לזכות בגביע' },
+      // Plain unbeaten was 12.5%, the cup itself: the one two-legged tie is against
+      // Afula. In reality Tiberias took it to penalties — do it in 90.
+      { type: 'cupUnbeaten', in90: true, label: 'לזכות בלי הפסד, בלי הארכה ובלי פנדלים' },
+    ],
+  },
+  // The State Cup, verified 2026-10-12 in sources that agree: RSSSF
+  // tablesi/isra04.html, en.wikipedia "2003–04 Israel State Cup" and the Hebrew
+  // press (Walla): every Bnei Sakhnin row, dates and venues.
+  {
+    id: 'sakhnin-2003',
+    kind: 'cup',
+    teamId: 'bnei-sakhnin',
+    season: '2003/04',
+    comp: 'גביע המדינה',
+    title: 'העונה הראשונה',
+    level: 'hardest',
+    budget: 1000,           // measured 2026-10-12, 400 runs: ⭐ 12.3% ⭐⭐ 9.8% ⭐⭐⭐ 4.5% (K=0.5, ⭐⭐⭐ in 90; 500 to 3,000 within noise)
+    intro: 'גביע המדינה 2003/04, העונה הראשונה של בני סכנין בליגת העל, שבה סיימה עשירית. ' +
+           'בדרך לגמר היא עברה שתי סדרות פנדלים, מול הפועל נצרת עילית בחוץ ומול מכבי תל אביב בבית, ' +
+           'וניצחה 0:1 את מ.ס. אשדוד ברמת גן. בגמר, גם הוא ברמת גן, חיכתה הפועל חיפה מהליגה הלאומית.',
+    europe: {
+      awayGoals: true,
+      window: 'r32',        // the January window, before the first round
+      realOut: 'final',
+      realText: 'זכתה בגביע: 1:4 על הפועל חיפה',
+      endLabel: 'זכייה בגביע',
+      rounds: [
+        { id: 'r32', label: 'שלב ה-32', kind: 'tie', oneLeg: true, home: false,
+          club: { name: 'הפועל הרצליה', ovr: 63 }, real: 'בחוץ 0:2' },
+        { id: 'r16', label: 'שמינית הגמר', kind: 'tie', oneLeg: true, home: false,
+          // hapoel-galil under the name it had then; second tier, no squad
+          club: { teamId: 'hapoel-galil', name: 'הפועל נצרת עילית', ovr: 71 }, real: '1-1 אחרי הארכה, 4:5 בפנדלים' },
+        { id: 'qf', label: 'רבע הגמר', kind: 'tie', oneLeg: true, home: true,
+          club: { teamId: 'maccabi-tlv', name: 'מכבי תל אביב', ovr: 83 }, real: '1-1 אחרי הארכה, 3:4 בפנדלים' },
+        { id: 'sf', label: 'חצי הגמר', kind: 'tie', oneLeg: true, home: null,
+          club: { teamId: 'ms-ashdod', name: 'מ.ס. אשדוד', ovr: 82 }, real: 'ברמת גן 0:1' },
+        { id: 'final', label: 'הגמר', kind: 'tie', oneLeg: true, home: null,
+          // in the second tier that season: no squad, a lower-league rating
+          club: { teamId: 'hapoel-haifa', name: 'הפועל חיפה', ovr: 74 },
+          real: 'ברמת גן: 1:4' },
+      ],
+    },
+    stars: [
+      { type: 'euReach', round: 'final', label: 'להגיע לגמר' },
+      { type: 'euChampion', label: 'לזכות בגביע' },
+      // Every tie is one match, so plain unbeaten is the cup itself. In reality it
+      // went to penalties twice — do it in 90.
+      { type: 'cupUnbeaten', in90: true, label: 'לזכות בלי הפסד, בלי הארכה ובלי פנדלים' },
+    ],
+  },
+  // The State Cup, verified 2026-10-12 in sources that agree: RSSSF
+  // tablesi/isra2024.html, en.wikipedia "2023–24 Israel State Cup" and the Hebrew
+  // press (Sport1/Walla): every Maccabi Petah Tikva row, dates and venues.
+  {
+    id: 'mpt-2023',
+    kind: 'cup',
+    teamId: 'maccabi-pt',
+    season: '2023/24',
+    comp: 'גביע המדינה',
+    title: 'הפנדל בדקה ה-86',
+    level: 'hardest',
+    budget: 1000,           // measured 2026-10-12, 400 runs: ⭐ 18.0% ⭐⭐ 7.3% ⭐⭐⭐ 1.8% (K=0.5, ⭐⭐⭐ in 90; 500 to 3,000 within noise)
+    intro: 'גביע המדינה 2023/24. מכבי פתח תקווה סיימה שמינית בליגה, עם 40 נקודות. ' +
+           'בגביע היא ניצחה 0:3 את הפועל חיפה בסמי עופר, הדיחה ברבע הגמר את מכבי תל אביב, ' +
+           'אלופת אותה עונה, 2:4 בהארכה, ובגמר בבלומפילד ניצחה את הפועל באר שבע 0:1, מפנדל בדקה ה-86.',
+    europe: {
+      awayGoals: true,
+      window: 'r32',        // the January window, before the first round
+      realOut: 'final',
+      realText: 'זכתה בגביע: 0:1 על הפועל באר שבע',
+      endLabel: 'זכייה בגביע',
+      rounds: [
+        { id: 'r32', label: 'שלב ה-32', kind: 'tie', oneLeg: true, home: true,
+          club: { name: 'מכבי יבנה', ovr: 64 }, real: 'בבית 1:3 בהארכה' },
+        { id: 'r16', label: 'שמינית הגמר', kind: 'tie', oneLeg: true, home: false,
+          club: { teamId: 'hapoel-haifa', name: 'הפועל חיפה', ovr: 80 }, real: 'בסמי עופר 0:3' },
+        { id: 'qf', label: 'רבע הגמר', kind: 'tie', oneLeg: true, home: true,
+          club: { teamId: 'maccabi-tlv', name: 'מכבי תל אביב', ovr: 84 }, real: 'בבית 2:4 בהארכה' },
+        { id: 'sf', label: 'חצי הגמר', kind: 'tie', oneLeg: true, home: null,
+          // in the second tier that season: no squad, a lower-league rating
+          club: { teamId: 'hapoel-galil', name: 'הפועל נוף הגליל', ovr: 72 }, real: 'בנתניה 0:3' },
+        { id: 'final', label: 'הגמר', kind: 'tie', oneLeg: true, home: null,
+          club: { teamId: 'hapoel-beersheba', name: 'הפועל באר שבע', ovr: 83 },
+          real: 'בבלומפילד: 0:1, פנדל בדקה ה-86' },
+      ],
+    },
+    stars: [
+      { type: 'euReach', round: 'final', label: 'להגיע לגמר' },
+      { type: 'euChampion', label: 'לזכות בגביע' },
+      // Every tie is one match, so plain unbeaten is the cup itself. In reality two
+      // ties took extra time — do it in 90.
+      { type: 'cupUnbeaten', in90: true, label: 'לזכות בלי הפסד, בלי הארכה ובלי פנדלים' },
+    ],
+  },
+  // ── round four, the league (2026-10-12): facts from js/league_tables.js and,
+  // for mta-2019's one defeat, RSSSF. Squad ranks from storyOpponents (summer).
+  {
+    id: 'mpt-2004',
+    teamId: 'maccabi-pt',
+    season: '2004/05',
+    title: 'סגנית האלופה',
+    level: 'normal',
+    // The plan's "survive" ⭐ came 100% of the time, so the ladder is three finishes.
+    budget: 1000,   // measured 2026-10-12, 400 runs: ⭐ 54% ⭐⭐ 17% ⭐⭐⭐ 3.8%
+    intro: 'מכבי פתח תקווה 2004/05: על הנייר מכבי חיפה חזקה מכולן, ומאחוריה שלושה סגלים שקולים: ' +
+           'מכבי פתח תקווה, הפועל תל אביב ומכבי תל אביב. פתח תקווה סיימה שנייה עם 60 נקודות והפסידה ' +
+           'רק 5 משחקים, והשתיים מתל אביב סיימו במקומות 8 ו-9. חיפה לקחה את האליפות עם 71.',
+    stars: [
+      { type: 'rank', max: 4, label: 'לסיים ברביעייה הראשונה' },
+      { type: 'rank', max: 3, label: 'לסיים בשלישייה הראשונה' },
+      { type: 'rank', max: 2, label: 'מקום שני, כמו במציאות, או טוב ממנו' },
+    ],
+  },
+  {
+    id: 'ashdod-2020',
+    teamId: 'ms-ashdod',
+    season: '2020/21',
+    title: 'הסגל החמישי',
+    level: 'normal',
+    // The real 3rd came under 1% at any budget (2,500 → 0.8%; five signings is the
+    // ceiling, not the money), and "survive" 100%: so the upper play-off is ⭐.
+    budget: 2000,   // measured 2026-10-12, 400 runs: ⭐ 46% ⭐⭐ 8.5% ⭐⭐⭐ 2.8%
+    intro: 'מ.ס. אשדוד 2020/21: הסגל החמישי בכוחו בליגה של 14 קבוצות. היא סיימה שלישית עם 54 נקודות, ' +
+           'מעל הפועל באר שבע ובית"ר ירושלים, שהיו חזקות ממנה על הנייר. מכבי חיפה ומכבי תל אביב ' +
+           'ברחו למעלה, עם 79 ו-75.',
+    stars: [
+      { type: 'rank', max: 6, label: 'הפלייאוף העליון' },
+      { type: 'rank', max: 5, label: 'לסיים בחמישייה הראשונה' },
+      { type: 'rank', max: 4, label: 'לסיים ברביעייה הראשונה' },
+    ],
+  },
+  {
+    id: 'mta-2019',
+    teamId: 'maccabi-tlv',
+    season: '2019/20',
+    title: '26-9-1',
+    level: 'normal',
+    // Above 1,500 the money stops mattering (2,000 and 3,000 measure the same).
+    budget: 1000,   // measured 2026-10-12, 400 runs: ⭐ 68% ⭐⭐ 13.5% ⭐⭐⭐ 3.0%
+    rivalBudget: 3000,   // at 2,000 the title came 73-79%
+    intro: 'מכבי תל אביב 2019/20: הסגל החזק בליגה. היא זכתה באליפות עם 87 נקודות, 14 לפני מכבי חיפה, ' +
+           'וספגה 10 שערים בלבד ב-36 משחקים. ההפסד היחיד שלה הגיע במחזור האחרון, 2-0 להפועל באר שבע ' +
+           'בבאר שבע. והפעם היריבות קונות.',
+    stars: [
+      { type: 'rank', max: 1, label: 'אליפות' },
+      { type: 'margin', min: 10, label: 'אליפות בפער של 10 נקודות לפחות' },
+      { type: 'rank', max: 1, maxLosses: 0, label: 'אליפות בלי אף הפסד' },
     ],
   },
 ];

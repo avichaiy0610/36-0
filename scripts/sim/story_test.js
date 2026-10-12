@@ -22,7 +22,7 @@ function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;var t=Math.imul(a
 t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
 `;
 const FILES = ['js/data.js', 'js/league_tables.js', 'js/sim-engine.js', 'js/game.js',
-  'js/league-sim.js', 'js/story-facts.js', 'js/story-data.js', 'js/story-market.js', 'js/story-season.js', 'js/story-europe.js'];
+  'js/league-sim.js', 'js/story-facts.js', 'js/story-data.js', 'js/story-market.js', 'js/story-season.js', 'js/story-pens.js', 'js/story-europe.js'];
 const EXPORTS = ['state', 'SQUADS', 'LEAGUE_TABLES', 'FORMATIONS', 'formationSlots',
   'simTeamsForSeason', 'withSeededRandom', 'generateMatches', 'generateLeagueTable',
   'seasonFormat', 'myLineRatings', 'teamOVR', 'simulatePlayerStats', 'SIM_ENGINE_CURRENT',
@@ -34,8 +34,9 @@ const EXPORTS = ['state', 'SQUADS', 'LEAGUE_TABLES', 'FORMATIONS', 'formationSlo
   'storyBuy', 'storySell', 'storyOpponents', 'storyBestXI', 'storyStars', 'storyScore', 'storyCoreNames', 'storyResolveOvr', 'storyResult',
   'storyApplyXI', 'storyXiOvr', 'storyStatsFor', 'storyMergeStats', 'storySimulateFn',
   'storySeasonPrepare', 'storySeasonResim', 'storyOppForSim',
-  'storyEuStart', 'storyEuPlay', 'storyEuCloseTie', 'storyEuNeed', 'storyEuResult', 'storyEuRealReach',
-  'storyEuWindowDue', 'storyEuOver', 'storyEuRound', 'storyEuLiveTable', 'storyJanValue'];
+  'storyClubRating', 'storyEuStart', 'storyEuPlay', 'storyEuCloseTie', 'storyEuNeed', 'storyEuResult', 'storyEuRealReach',
+  'storyEuWindowDue', 'storyEuOver', 'storyEuRound', 'storyEuLiveTable', 'storyJanValue',
+  'storyPenP', 'storyOppPenP', 'storyShootout', 'storyPensAutoOrder', 'storyEuPens', 'storyIsCampaign', 'storyEuClub'];
 
 function load() {
   return new Function(STUB + MULBERRY + FILES.map(read).join('\n') +
@@ -309,8 +310,64 @@ if (require.main === module) {
     Object.assign(G.state, { story: { chapterId: c.id }, peakMode: false, classic: false, coach: null });
     G.storyApplyXI(run);
   };
+  // ── Penalties ──────────────────────────────────────────────────────────────
+  t('a kick: forwards over defenders over keepers, rating up, their keeper down, clamped', () => {
+    const st = G.storyPenP({ position: 'ST', ovr: 80 }, 80);
+    const cb = G.storyPenP({ position: 'CB', ovr: 80 }, 80);
+    const gk = G.storyPenP({ position: 'GK', ovr: 80 }, 80);
+    assert.ok(st > cb && cb > gk, [st, cb, gk].join());
+    assert.ok(G.storyPenP({ position: 'ST', ovr: 88 }, 80) > st);
+    assert.ok(G.storyPenP({ position: 'ST', ovr: 80 }, 90) < st);
+    for (const o of [40, 99]) for (const k of [40, 99]) {
+      const p = G.storyPenP({ position: 'ST', ovr: o }, k);
+      assert.ok(p >= 0.55 && p <= 0.88, 'clamp ' + p);
+    }
+    assert.ok(G.storyOppPenP(80, 90) < G.storyOppPenP(80, 70));     // our keeper matters
+  });
+  t('a shootout: same seed and order → same result; five each unless decided early', () => {
+    const order = ['ST', 'LW', 'CAM', 'CM', 'CB', 'RB', 'LB', 'CDM', 'RW', 'CB', 'GK']
+      .map((position, i) => ({ name: 'p' + i, position, ovr: 80 }));
+    const a = G.storyShootout(12345, order, { ovr: 80, gk: 80 }, 80);
+    const b = G.storyShootout(12345, order, { ovr: 80, gk: 80 }, 80);
+    assert.deepStrictEqual(a, b);
+    assert.notStrictEqual(a.gf, a.ga);
+    assert.strictEqual(a.won, a.gf > a.ga);
+    assert.ok(a.kicks.length >= 6 && a.kicks.length <= 2 * 11 * 3);
+    // a shootout decided before ten kicks stopped when it could no longer be caught
+    let early = 0;
+    for (let s = 1; s <= 200; s++) if (G.storyShootout(s, order, { ovr: 80, gk: 80 }, 80).kicks.length < 10) early++;
+    assert.ok(early > 0, 'never ended early in 200 seeds');
+  });
+  t('a shootout is close to a coin between equals, and the order matters', () => {
+    const mk = pos => pos.map((position, i) => ({ name: 'p' + i, position, ovr: 80 }));
+    const good = mk(['ST', 'ST', 'CAM', 'LW', 'CM', 'CB', 'CB', 'RB', 'LB', 'CDM', 'GK']);
+    const bad = mk(['GK', 'CB', 'CB', 'RB', 'LB', 'CDM', 'CM', 'LW', 'CAM', 'ST', 'ST']);
+    let wg = 0, wb = 0;
+    for (let s = 1; s <= 2000; s++) {
+      if (G.storyShootout(s, good, { ovr: 80, gk: 80 }, 80).won) wg++;
+      if (G.storyShootout(s, bad, { ovr: 80, gk: 80 }, 80).won) wb++;
+    }
+    assert.ok(wg / 2000 > 0.42 && wg / 2000 < 0.62, 'good ' + wg / 2000);
+    assert.ok(wg > wb, `order did not matter: ${wg} vs ${wb}`);
+  });
+  t('the auto order: best takers first, the keeper last', () => {
+    const xi = [{ name: 'g', position: 'GK', ovr: 90 }, { name: 's', position: 'ST', ovr: 80 },
+                { name: 'c', position: 'CB', ovr: 85 }];
+    assert.deepStrictEqual(G.storyPensAutoOrder(xi).map(p => p.name), ['s', 'c', 'g']);
+  });
+  t('a campaign is europe or cup; a cup club with a squad plays on its real lines', () => {
+    assert.ok(G.storyIsCampaign({ kind: 'europe' }) && G.storyIsCampaign({ kind: 'cup' }));
+    assert.ok(!G.storyIsCampaign({}));
+    const fake = { id: 'x', season: '2017/18', europe: { rounds: [] } };
+    const run = { seed: 1, chapterId: 'x' };
+    const real = G.simTeamsForSeason(2017, 13).find(t => t.teamId === 'maccabi-haifa');
+    const c = G.storyEuClub(run, { teamId: 'maccabi-haifa', name: 'מכבי חיפה', ovr: real.ovr }, 'qf', fake);
+    assert.deepStrictEqual([c.atk, c.mid, c.def, c.gk].map(Math.round), [real.atk, real.mid, real.def, real.gk].map(Math.round));
+    const lp = G.storyEuClub(run, { teamId: 'hapoel-pt', name: 'הפועל פ"ת', ovr: 73 }, 'r32', fake);   // no 2017 squad
+    assert.strictEqual(lp.atk + lp.mid + lp.def + lp.gk, 4 * 73);
+  });
   t('europe chapters: rounds are well formed, stars point at real rounds', () => {
-    for (const c of G.STORY_CHAPTERS.filter(c => c.kind === 'europe')) {
+    for (const c of G.STORY_CHAPTERS.filter(c => G.storyIsCampaign(c))) {
       const ids = c.europe.rounds.map(r => r.id);
       for (const w of [].concat(c.europe.window)) assert.ok(ids.includes(w), c.id + ' window ' + w);
       assert.ok(ids.includes(c.europe.realOut), c.id + ' realOut');
@@ -338,17 +395,37 @@ if (require.main === module) {
     assert.strictEqual(x.b.leg.home, false);
     assert.ok(x.run.eu.at === 1 || x.run.eu.out);
   });
-  t('away goals decide a level tie, then extra time and penalties', () => {
+  t('away goals decide a level tie, then extra time, then penalties wait for an order', () => {
     const c = G.storyChapter('hta-2001');
     const run = G.storyNewRun(c, 5);
     const round = c.europe.rounds[0];
-    // 1-2 at home, 1-0 away: 2-2, but their two away goals beat our one
     const r = G.storyEuCloseTie(c, run, round, [{ gf: 1, ga: 2, home: true }, { gf: 1, ga: 0, home: false }]);
     assert.deepStrictEqual([r.agg.gf, r.agg.ga, r.how, r.won], [2, 2, 'away', false]);
-    // 1-1 and 1-1: level on away goals too, so extra time, then penalties
     const s = G.storyEuCloseTie(c, run, round, [{ gf: 1, ga: 1, home: true }, { gf: 1, ga: 1, home: false }]);
     assert.ok(['et', 'pens'].includes(s.how));
-    assert.strictEqual(s.won, s.pens ? s.pens.gf > s.pens.ga : s.agg.gf > s.agg.ga);
+    if (s.how === 'pens') assert.strictEqual(s.pending, true);
+    else assert.strictEqual(s.won, s.agg.gf > s.agg.ga);
+  });
+  t('a shootout closes a pending tie once, from the order given, and the run moves on', () => {
+    const c = G.storyChapter('hta-2001');
+    // find a seed whose first round, forced level, goes to penalties
+    for (let seed = 1; seed < 400; seed++) {
+      const run = G.storyNewRun(c, seed); G.storyEuStart(run); euSet(c, run);
+      const round = c.europe.rounds[0];
+      const legs = [{ gf: 0, ga: 0, home: true }, { gf: 0, ga: 0, home: false }];
+      const probe = G.storyEuCloseTie(c, run, round, legs);
+      if (probe.how !== 'pens') continue;
+      run.eu.cur = { id: round.id, legs, played: [], pensDue: true,
+                     pensXI: [{ name: 'a', position: 'ST', ovr: 85 }, { name: 'k', position: 'GK', ovr: 80 }] };
+      assert.strictEqual(G.storyEuPlay(c, run, 'bal'), null);          // no third leg while pens wait
+      const out = G.storyEuPens(c, run, ['a', 'k']);
+      assert.ok(out.closed && out.closed.how === 'pens' && out.closed.pens.kicks.length >= 6);
+      assert.strictEqual(out.closed.won, out.closed.pens.gf > out.closed.pens.ga);
+      assert.strictEqual(run.eu.cur, null);
+      assert.strictEqual(G.storyEuPens(c, run, ['a', 'k']), null);     // cannot shoot twice
+      return;
+    }
+    assert.fail('no seed reached penalties');
   });
   t('the need line reads the tie', () => {
     const c = G.storyChapter('hta-2001');
@@ -380,6 +457,33 @@ if (require.main === module) {
     assert.deepStrictEqual(G.storyStars(c, res(idx('final'))), [true, true, true]);
     assert.deepStrictEqual(G.storyStars(c, res(idx('r4'))), [false, false, false]);
     assert.strictEqual(G.storyEuRealReach(c), idx('qf'));
+  });
+  t('a cup opponent you bought from is weaker by the men you took', () => {
+    const c = G.storyChapter('hhaifa-2017');
+    const run = G.storyNewRun(c, 3);
+    run.budget = 99999;
+    const before = G.storyEuClub(run, c.europe.rounds[2].club, 'qf');              // Maccabi Haifa
+    const best = G.storyMarketPool(run, c).filter(e => e.squad.teamId === 'maccabi-haifa')
+      .sort((a, b) => b.player.ovr - a.player.ovr)[0];
+    G.storyBuy(run, c, best, 1);
+    const after = G.storyEuClub(run, c.europe.rounds[2].club, 'qf');
+    assert.ok(after.atk + after.mid + after.def + after.gk < before.atk + before.mid + before.def + before.gk);
+  });
+  t('cupUnbeaten: a loss inside 120 minutes breaks it, a shootout does not', () => {
+    const ch = { stars: [{ type: 'cupUnbeaten', label: 'x' }], europe: { rounds: [] } };
+    const res = losses => ({ budget: 0, eu: { reached: 0, champion: true, losses } });
+    assert.deepStrictEqual(G.storyStars(ch, res(0)), [true]);
+    assert.deepStrictEqual(G.storyStars(ch, res(1)), [false]);
+    const run = { eu: { out: false, at: 1, done: [
+      { id: 'a', kind: 'tie', legs: [{ gf: 0, ga: 0 }], how: 'pens', won: true },
+      { id: 'b', kind: 'tie', legs: [{ gf: 1, ga: 1 }], how: 'et', won: false },
+      { id: 'c', kind: 'tie', legs: [{ gf: 0, ga: 1 }, { gf: 2, ga: 0 }], how: 'agg', won: true },
+    ] } };
+    const r = G.storyEuResult({ europe: { rounds: [{ id: 'a' }] } }, run);
+    assert.deepStrictEqual([r.losses, r.extra], [2, 2]);
+    const in90 = { stars: [{ type: 'cupUnbeaten', in90: true, label: 'x' }], europe: { rounds: [] } };
+    assert.deepStrictEqual(G.storyStars(in90, { budget: 0, eu: { losses: 0, extra: 0 } }), [true]);
+    assert.deepStrictEqual(G.storyStars(in90, { budget: 0, eu: { losses: 0, extra: 1 } }), [false]);
   });
   t('a picked eleven: your choice holds, the rest is filled, a sold man drops out', () => {
     const run = G.storyNewRun(ks, 2);
@@ -521,7 +625,7 @@ if (require.main === module) {
     assert.deepStrictEqual(G.storyStars(ch, G.storyResult(run, table, 1, 60)), [false, false, false]);
   });
   t('js/story-facts.js covers every chapter (else: node scripts/build_story_facts.js)', () => {
-    for (const c of G.STORY_CHAPTERS.filter(c => c.kind !== 'europe')) {
+    for (const c of G.STORY_CHAPTERS.filter(c => !G.storyIsCampaign(c))) {
       const r = G.storyReal(c);
       assert.ok(r, c.id + ' has no real table row');
       const t = G.LEAGUE_TABLES[c.season].find(x => x.teamId === c.teamId);
@@ -534,6 +638,20 @@ if (require.main === module) {
     assert.deepStrictEqual(Object.values(G.storyReal(ks)), [1, 73, 16]);
     assert.strictEqual(G.storyOpponents(ks, G.storyNewRun(ks, 1), 'summer').length, 15);
     assert.strictEqual(G.storyCoreNames(ks).length, 11);
+  });
+
+  t('cup chapters: every Israeli club with a squad that season carries its real ovr', () => {
+    for (const c of G.STORY_CHAPTERS.filter(c => c.kind === 'cup')) {
+      const year = parseInt(c.season, 10);
+      for (const r of c.europe.rounds) {
+        assert.ok(r.kind === 'tie', c.id + ' ' + r.id);
+        const sq = r.club.teamId && G.SQUADS.find(s => parseInt(s.season, 10) === year && s.teamId === r.club.teamId);
+        if (sq) assert.strictEqual(r.club.ovr, G.storyClubRating(r.club.teamId, sq.players).ovr, c.id + ' ' + r.id + ' ovr');
+        else assert.ok(r.club.ovr >= 60 && r.club.ovr <= 78, c.id + ' ' + r.id + ' lower league ovr');
+      }
+      assert.ok(c.stars.some(s => s.type === 'cupUnbeaten'));
+    }
+    assert.ok(G.storyChapter('hhaifa-2017'));
   });
 
   if (process.argv.includes('--season')) require('./story_test_season.js')(G, t);
