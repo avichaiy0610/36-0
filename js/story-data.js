@@ -755,4 +755,22 @@ const STORY_CHAPTERS = [
       { type: 'rank', max: 2, label: 'מקום שני, כמו במציאות, או טוב ממנו' },
     ],
   },
+  {
+    id: 'ashdod-2020',
+    teamId: 'ms-ashdod',
+    season: '2020/21',
+    title: 'אשדוד בפודיום',
+    level: 'normal',
+    // The real 3rd came under 1% at any budget (2,500 → 0.8%; five signings is the
+    // ceiling, not the money), and "survive" 100%: so the upper play-off is ⭐.
+    budget: 2000,   // measured 2026-10-12, 400 runs: ⭐ 46% ⭐⭐ 8.5% ⭐⭐⭐ 2.8%
+    intro: 'מ.ס. אשדוד 2020/21: הסגל החמישי בכוחו בליגה של 14 קבוצות. היא סיימה שלישית עם 54 נקודות, ' +
+           'מעל הפועל באר שבע ובית"ר ירושלים, שהיו חזקות ממנה על הנייר. מכבי חיפה ומכבי תל אביב ' +
+           'ברחו למעלה, עם 79 ו-75.',
+    stars: [
+      { type: 'rank', max: 6, label: 'הפלייאוף העליון' },
+      { type: 'rank', max: 5, label: 'לסיים בחמישייה הראשונה' },
+      { type: 'rank', max: 4, label: 'לסיים ברביעייה הראשונה' },
+    ],
+  },
 ];
