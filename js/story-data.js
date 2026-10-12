@@ -780,6 +780,51 @@ const STORY_CHAPTERS = [
       { type: 'cupUnbeaten', label: 'לזכות בגביע בלי להפסיד אף משחק' },
     ],
   },
+  // The State Cup, verified 2026-10-12 in sources that agree: RSSSF
+  // tablesi/isra2023.html, en.wikipedia "2022–23 Israel State Cup" and the Hebrew
+  // press (Sport1/Walla): every Beitar Jerusalem row, dates and venues.
+  {
+    id: 'beitar-2022',
+    kind: 'cup',
+    teamId: 'beitar-jerusalem',
+    season: '2022/23',
+    comp: 'גביע המדינה',
+    title: 'פעמיים בסמי עופר',
+    level: 'hard',
+    budget: 1000,           // measured 2026-10-12, 400 runs: ⭐ 27.3% ⭐⭐ 12.5% ⭐⭐⭐ 4.8% (K=0.5, ⭐⭐⭐ in 90; 500 to 3,000 within noise)
+    intro: 'גביע המדינה 2022/23. בית"ר ירושלים סיימה שמינית בליגה, עם 40 נקודות. ' +
+           'בגביע היא עברה את מ.ס. כפר קאסם, את עירוני טבריה בפנדלים (6:7) ואת הפועל עפולה, ' +
+           'ובסמי עופר ניצחה פעמיים: 1:3 את מכבי תל אביב בחצי הגמר ו-0:3 את מכבי נתניה בגמר.',
+    europe: {
+      awayGoals: true,
+      window: 'r32',        // the January window, before the first round
+      realOut: 'final',
+      realText: 'זכתה בגביע: 0:3 על מכבי נתניה',
+      endLabel: 'זכייה בגביע',
+      rounds: [
+        { id: 'r32', label: 'שלב ה-32', kind: 'tie', oneLeg: true, home: true,
+          club: { name: 'מ.ס. כפר קאסם', ovr: 73 }, real: 'בבית 0:4' },
+        { id: 'r16', label: 'שמינית הגמר', kind: 'tie', oneLeg: true, home: true,
+          // in the second tier that season: no squad, a lower-league rating
+          club: { teamId: 'ironi-tiberias', name: 'עירוני טבריה', ovr: 71 }, real: '1-1 אחרי הארכה, 6:7 בפנדלים' },
+        { id: 'qf', label: 'רבע הגמר', kind: 'tie', firstHome: false,
+          club: { name: 'הפועל עפולה', ovr: 70 },
+          real: 'בחוץ 0:4, בבית 2:1' },
+        { id: 'sf', label: 'חצי הגמר', kind: 'tie', oneLeg: true, home: null,
+          club: { teamId: 'maccabi-tlv', name: 'מכבי תל אביב', ovr: 85 }, real: 'בסמי עופר 1:3' },
+        { id: 'final', label: 'הגמר', kind: 'tie', oneLeg: true, home: null,
+          club: { teamId: 'maccabi-netanya', name: 'מכבי נתניה', ovr: 81 },
+          real: 'בסמי עופר: 0:3' },
+      ],
+    },
+    stars: [
+      { type: 'euReach', round: 'final', label: 'להגיע לגמר' },
+      { type: 'euChampion', label: 'לזכות בגביע' },
+      // Plain unbeaten was 12.5%, the cup itself: the one two-legged tie is against
+      // Afula. In reality Tiberias took it to penalties — do it in 90.
+      { type: 'cupUnbeaten', in90: true, label: 'לזכות בלי הפסד, בלי הארכה ובלי פנדלים' },
+    ],
+  },
   // ── round four, the league (2026-10-12): facts from js/league_tables.js and,
   // for mta-2019's one defeat, RSSSF. Squad ranks from storyOpponents (summer).
   {
