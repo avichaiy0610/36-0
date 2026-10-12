@@ -759,7 +759,7 @@ const STORY_CHAPTERS = [
     id: 'ashdod-2020',
     teamId: 'ms-ashdod',
     season: '2020/21',
-    title: 'אשדוד בפודיום',
+    title: 'הסגל החמישי',
     level: 'normal',
     // The real 3rd came under 1% at any budget (2,500 → 0.8%; five signings is the
     // ceiling, not the money), and "survive" 100%: so the upper play-off is ⭐.
