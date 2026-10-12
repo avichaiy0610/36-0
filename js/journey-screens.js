@@ -58,7 +58,8 @@ function journeyShowHub() {
     <div class="jr-start-panel"><div><span class="jr-eyebrow">לפני שיוצאים לדרך</span><h2>באיזה מערך יוצאים?</h2><p>העמדות ננעלות כשבוחרים שחקן. כל בחירה פתוחה משאירה דרך להשלמת הרכב.</p></div>
       <label class="jr-select-label" for="jr-formation">מערך ההרכב</label><select id="jr-formation" class="jr-select">${Object.keys(FORMATIONS).map(k => `<option value="${journeyEsc(k)}"${k === '4-3-3' ? ' selected' : ''}>${journeyEsc(FORMATIONS[k].label)}</option>`).join('')}</select>
       <button class="btn-primary btn-full" id="jr-start">${saved ? 'צא למסע חדש' : 'צא למסע'} ←</button>
-      <p class="jr-footnote">סגל ושחקן לא חוזרים במסע. שבירת שרשרת אחת מאפשרת לבחור דרך חדשה. ההרכב נשמר לאורך העונה, בלי חלון ינואר.</p></div>`;
+      <p class="jr-footnote">סגל ושחקן לא חוזרים במסע. שבירת שרשרת אחת מאפשרת לבחור דרך חדשה. ההרכב נשמר לאורך העונה, בלי חלון ינואר.</p></div>
+      <section class="jr-ach-section" data-journey-achievements>${journeyAchievementsHTML()}</section>`;
   box.querySelector('#jr-back').onclick = () => { startGame(); };
   const resume = box.querySelector('#jr-resume');
   if (resume) resume.onclick = () => {
@@ -147,13 +148,15 @@ function journeyRenderDraft() {
 function journeyShowComplete() {
   const j = state.journey;
   if (!j || j.path.length !== 11) return;
+  journeyAwardAchievements(j);
   state.isAnimating = false;
   showScreen('journey');
   const box = document.getElementById('journey-root');
   box.innerHTML = `<div class="jr-top"><button class="back-btn" id="jr-pause">→ שמור וצא</button><span class="jr-kicker">מסע ה־11 · הרכב מוכן</span></div>
     <div class="jr-travel-title"><span class="jr-eyebrow">11 בחירות שהביאו אותך לכאן</span><h1>הדרך שלך. <span>ההרכב שלך.</span></h1><p>עכשיו נראה מה המסע הזה שווה על הדשא.</p></div>
     ${journeyStatsHTML(j)}<div class="jr-finish-grid"><div class="jr-route-card" id="jr-route-share"><div class="jr-card-title"><b>36–0 · מסע ה־11</b><span>${FORMATIONS[state.formationId].label} · דירוג ${teamOVR()}</span></div>${journeyRouteHTML(j, true)}</div>
-      <div class="jr-finish-side"><div class="jr-overall"><span>דירוג ההרכב שלך</span><b>${teamOVR()}</b></div><p>המסלול מסתיים. העונה מתחילה.<br>ליגה, גביע והזדמנות להגיע לאירופה.</p><button class="btn-primary btn-full" id="jr-season">צא לעונה ←</button><button class="jr-outline btn-full" id="jr-share">↓ שמור תמונת מסלול</button><span id="jr-share-status" role="status"></span></div></div>`;
+      <div class="jr-finish-side"><div class="jr-overall"><span>דירוג ההרכב שלך</span><b>${teamOVR()}</b></div><p>המסלול מסתיים. העונה מתחילה.<br>ליגה, גביע והזדמנות להגיע לאירופה.</p><button class="btn-primary btn-full" id="jr-season">צא לעונה ←</button><button class="jr-outline btn-full" id="jr-share">↓ שמור תמונת מסלול</button><span id="jr-share-status" role="status"></span></div></div>
+      <section class="jr-ach-section" data-journey-achievements>${journeyAchievementsHTML()}</section>`;
   box.querySelector('#jr-pause').onclick = journeyPause;
   box.querySelector('#jr-season').onclick = journeyPlaySeason;
   box.querySelector('#jr-share').onclick = journeyDownloadRoute;

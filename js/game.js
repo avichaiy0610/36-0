@@ -2182,7 +2182,8 @@ function handleSlotClick(slotIdx) {
 function assignPlayer(slotIdx, player) {
   const journeyAtPick = state.journey;
   const picksAtPick = state.picks;
-  const sameDraft = () => state.picks === picksAtPick && state.journey === journeyAtPick;
+  const sameDraft = () => state.picks === picksAtPick && state.journey === journeyAtPick &&
+    (!journeyAtPick || !!document.querySelector('#screen-draft.active'));
   const defer = (fn, ms) => setTimeout(() => { if (sameDraft()) fn(); }, ms);
   if (state.journey && !journeyCanAssign(slotIdx, player)) {
     setHint('מהעמדה הזאת אין מסלול בטוח להשלמת ההרכב — בחר עמדה מוארת');
@@ -3345,7 +3346,7 @@ function buildResultsPitch() { buildPitchInContainer('results-pitch-slots'); }
 
 function animateResults(ovr) {
   const journeyAtSeason = state.journey;
-  const revealActive = () => !journeyAtSeason || state.journey === journeyAtSeason;
+  const revealActive = () => !journeyAtSeason || (state.journey === journeyAtSeason && !!document.querySelector('#screen-results.active'));
   // Reuse a season restored from storage; otherwise simulate once and persist,
   // so refreshing cannot re-roll a different outcome for the same squad.
   // _restoredSeason → replay instantly (page refresh). _presetSeason → a season
@@ -3588,6 +3589,7 @@ function animateResults(ovr) {
     window._lastResult = { wins, draws, losses, gfTotal, gaTotal, matches, ovr, inTopSix, spec: seasonSpec,
                            engine: season.engine ?? 1, journey: !!journeyAtSeason };
     window._lastTier   = tier;
+    if (journeyAtSeason && typeof journeyAwardAchievements === 'function') journeyAwardAchievements(journeyAtSeason, myRank);
     const diffMapR = {
       easy:   siteText('label-diff-easy', 'קל'),
       normal: siteText('label-diff-normal', 'רגיל'),

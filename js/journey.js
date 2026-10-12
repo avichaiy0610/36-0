@@ -82,6 +82,7 @@ function journeyRecordPick(idx, player) {
   j.phase = state.currentRound === state.slots.length ? 'complete' : 'travel';
   j.escapeIds = null;
   _journeyChoicesKey = null;
+  if (j.phase === 'complete' && typeof journeyAwardAchievements === 'function') journeyAwardAchievements(j);
 }
 function journeyDestinations() {
   const j = state.journey;
