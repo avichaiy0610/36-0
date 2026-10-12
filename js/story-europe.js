@@ -27,12 +27,32 @@ function storyEuSeed(run, ...parts) {
   return Math.floor(storyRand(run, 'eu', ...parts) * 4294967296) >>> 0;
 }
 
-// A club is four lines that average its rating, drawn once per run and round.
-function storyEuClub(run, club, key) {
+// A club is four lines that average its rating, drawn once per run and round —
+// or, for an Israeli club with a squad that season (a cup chapter), the four
+// lines of that real squad. `ch` defaults to the run's chapter.
+function storyEuClub(run, club, key, ch) {
+  ch = ch || (typeof storyChapter === 'function' ? storyChapter(run.chapterId) : null);
+  if (club.teamId && ch) {
+    // simTeamsForSeason(y, 0) returns [] (it slices to `count`), so read the squad directly
+    const sq = SQUADS.find(s => parseInt(s.season, 10) === parseInt(ch.season, 10) && s.teamId === club.teamId);
+    if (sq) {
+      const real = storyClubRating(club.teamId, sq.players);
+      return { name: club.name, ovr: real.ovr, atk: real.atk, mid: real.mid, def: real.def, gk: real.gk, cs: 1 };
+    }
+  }
   const d = [0, 1, 2].map(i => Math.round(storyRand(run, 'lines', key, club.name, i) * 6) - 3);
   d.push(-(d[0] + d[1] + d[2]));
   return { name: club.name, ovr: club.ovr, atk: club.ovr + d[0], mid: club.ovr + d[1],
            def: club.ovr + d[2], gk: club.ovr + d[3], cs: 1 };
+}
+
+// The State Cup's single matches: the weaker side, whichever it is, rises by a
+// share of the gap. Measured on the cup chapters (Task 7), never by feel.
+const STORY_CUP_MAGIC_K = 0.5;
+function storyCupMagic(me, opp) {
+  const gap = opp.ovr - me.ovr;
+  const lift = (x, by) => ({ ...x, ovr: x.ovr + by, atk: x.atk + by, mid: x.mid + by, def: x.def + by, gk: x.gk + by });
+  return gap > 0 ? [lift(me, STORY_CUP_MAGIC_K * gap), opp] : [me, lift(opp, -STORY_CUP_MAGIC_K * gap)];
 }
 
 function storyEuNight(me, oppOvr) {
@@ -69,11 +89,13 @@ function storyEuAddStats(run, players) {
 
 // One match against `club`. The XI and the tactic must already be on `state`
 // (storyApplyXI + state.tactic); `night` applies the knockout lift.
-function storyEuMatch(run, club, key, home, night, seed) {
+function storyEuMatch(run, club, key, home, night, seed, magic) {
   const opp = storyEuClub(run, club, key);
   let me = myLineRatings();
   if (night) me = storyEuNight(me, club.ovr);
-  const leg = withSeededRandom(seed, () => simulateMatchV2(me, opp, home));
+  let o = opp;
+  if (magic) [me, o] = storyCupMagic(me, opp);
+  const leg = withSeededRandom(seed, () => simulateMatchV2(me, o, home));
   leg.opponent = club.name;
   const stats = withSeededRandom(seed ^ 0x5bd1e995, () => simulatePlayerStats([leg]));
   storyEuAddStats(run, stats);
@@ -157,7 +179,8 @@ function storyEuPlay(ch, run, tactic) {
     const i = cur.legs.length;
     const home = round.oneLeg ? round.home : (i === 0) === !!round.firstHome;
     const seed = storyEuSeed(run, round.id, i, state.tactic);
-    const leg = storyEuMatch(run, round.club, round.id, home, !!round.ko, seed);
+    const magic = ch.kind === 'cup' && !!round.oneLeg;
+    const leg = storyEuMatch(run, round.club, round.id, home, !!round.ko, seed, magic);
     leg.tactic = state.tactic;
     cur.legs.push(leg);
     if (cur.legs.length < (round.oneLeg ? 1 : 2)) return { leg, round };

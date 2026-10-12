@@ -62,7 +62,7 @@ function storyAdminHTML(rows, days) {
     const c = per[ch.id] || get(ch.id);
     const one = c.stars[1] + c.stars[2] + c.stars[3];          // at least ⭐ (stars are graded)
     return `<tr>
-      <td>${stEsc(name(ch))}${ch.kind === 'europe' ? ' 🇪🇺' : ''}</td><td>${ST_LEVEL[ch.level] || ''}</td>
+      <td>${stEsc(name(ch))}${ch.kind === 'europe' ? ' 🇪🇺' : ch.kind === 'cup' ? ' 🏆' : ''}</td><td>${ST_LEVEL[ch.level] || ''}</td>
       <td><b>${stNum(c.inP)}</b></td><td><b>${stNum(c.outP)}</b></td><td>${pct(c.outE, c.inE)}</td>
       <td>${stNum(c.inE)}</td><td>${stNum(c.outE)}</td>
       <td>${stNum(c.stars[0])}</td><td>${stNum(c.stars[1])}</td><td>${stNum(c.stars[2])}</td><td>${stNum(c.stars[3])}</td>

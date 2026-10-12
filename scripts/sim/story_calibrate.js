@@ -138,7 +138,7 @@ function playOnce(budget, seed, honor) {
   const summerValue = e => G.storySummerValue(e.player, ch.season);
   sellBench(run, summerValue, honor);
   buyUpgrades(run, summerValue, honor);
-  if (ch.kind === 'europe') return playEurope(run, honor);
+  if (G.storyIsCampaign(ch)) return playEurope(run, honor);
 
   G.storyRivalShop(run, ch, 'summer');          // the rivals move after your window
   run.phase = 'season';

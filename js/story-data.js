@@ -65,6 +65,10 @@ const STORY_VALUE_TIERS = [
   { min: 0,  v: 80 },
 ];
 
+// A chapter with no league season: a European campaign or a State Cup run.
+// Both live in ch.europe and play on js/story-europe.js.
+function storyIsCampaign(ch) { return !!ch && (ch.kind === 'europe' || ch.kind === 'cup'); }
+
 const STORY_CHAPTERS = [
   {
     id: 'b7-2015',

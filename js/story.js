@@ -80,7 +80,7 @@
     // The rivals shop at the end of summer, from whatever your window left.
     storyRivalShop(run, ch, 'summer');
     storyResetState(ch);
-    if (ch.kind === 'europe') {
+    if (storyIsCampaign(ch)) {
       // No league season: the campaign is the chapter.
       if (!run.eu) storyEuStart(run);
       run.phase = 'europe';

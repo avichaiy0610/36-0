@@ -355,8 +355,19 @@ if (require.main === module) {
                 { name: 'c', position: 'CB', ovr: 85 }];
     assert.deepStrictEqual(G.storyPensAutoOrder(xi).map(p => p.name), ['s', 'c', 'g']);
   });
+  t('a campaign is europe or cup; a cup club with a squad plays on its real lines', () => {
+    assert.ok(G.storyIsCampaign({ kind: 'europe' }) && G.storyIsCampaign({ kind: 'cup' }));
+    assert.ok(!G.storyIsCampaign({}));
+    const fake = { id: 'x', season: '2017/18', europe: { rounds: [] } };
+    const run = { seed: 1, chapterId: 'x' };
+    const real = G.simTeamsForSeason(2017, 13).find(t => t.teamId === 'maccabi-haifa');
+    const c = G.storyEuClub(run, { teamId: 'maccabi-haifa', name: 'מכבי חיפה', ovr: real.ovr }, 'qf', fake);
+    assert.deepStrictEqual([c.atk, c.mid, c.def, c.gk].map(Math.round), [real.atk, real.mid, real.def, real.gk].map(Math.round));
+    const lp = G.storyEuClub(run, { teamId: 'hapoel-pt', name: 'הפועל פ"ת', ovr: 73 }, 'r32', fake);   // no 2017 squad
+    assert.strictEqual(lp.atk + lp.mid + lp.def + lp.gk, 4 * 73);
+  });
   t('europe chapters: rounds are well formed, stars point at real rounds', () => {
-    for (const c of G.STORY_CHAPTERS.filter(c => c.kind === 'europe')) {
+    for (const c of G.STORY_CHAPTERS.filter(c => G.storyIsCampaign(c))) {
       const ids = c.europe.rounds.map(r => r.id);
       for (const w of [].concat(c.europe.window)) assert.ok(ids.includes(w), c.id + ' window ' + w);
       assert.ok(ids.includes(c.europe.realOut), c.id + ' realOut');
@@ -587,7 +598,7 @@ if (require.main === module) {
     assert.deepStrictEqual(G.storyStars(ch, G.storyResult(run, table, 1, 60)), [false, false, false]);
   });
   t('js/story-facts.js covers every chapter (else: node scripts/build_story_facts.js)', () => {
-    for (const c of G.STORY_CHAPTERS.filter(c => c.kind !== 'europe')) {
+    for (const c of G.STORY_CHAPTERS.filter(c => !G.storyIsCampaign(c))) {
       const r = G.storyReal(c);
       assert.ok(r, c.id + ' has no real table row');
       const t = G.LEAGUE_TABLES[c.season].find(x => x.teamId === c.teamId);

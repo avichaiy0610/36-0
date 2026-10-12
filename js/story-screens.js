@@ -219,7 +219,7 @@ body.eu-blue #screen-story{background:transparent}
         const live = run && run.chapterId === ch.id && run.phase !== 'done';   // summer, season, jan or europe
         return `<button class="st-card" data-ch="${ch.id}">
           <h3>${crestImg(ch.teamId)}${esc(clubName(ch.teamId))} ${esc(ch.season)}: ${esc(titleOf(ch))}</h3>
-          <div class="st-meta">${ch.kind === 'europe' ? `${esc(ch.comp)} · במציאות: ${esc(realTextOf(ch))}`
+          <div class="st-meta">${storyIsCampaign(ch) ? `${esc(ch.comp)} · במציאות: ${esc(realTextOf(ch))}`
             : `במציאות: מקום ${real ? real.pos : '?'}, ${real ? real.pts : '?'} נק׳`}
             ${b ? ` · השיא שלך: ${num(b.score)}` : ''}${live ? ' · <b style="color:var(--accent)">בתהליך</b>' : ''}</div>
           ${starsHTML(b && b.stars)}
