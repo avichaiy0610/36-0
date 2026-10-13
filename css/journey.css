@@ -27,6 +27,9 @@
 .jr-select-label { color: #c3d0db; font-size: 13px; }
 .jr-select { color: #e6edf3; background: #0d1117; border: 1px solid #344454; border-radius: 8px; min-height: 46px; padding: 10px 12px; font: inherit; }
 .jr-footnote { font-size: 12px !important; }
+.jr-lb-levels { display: flex; gap: 6px; margin-bottom: 10px; direction: rtl; }
+.jr-lb-level { padding: 4px 14px; background: transparent; border: 1px solid var(--border, #30363d); color: var(--dim, #8b949e); border-radius: 20px; cursor: pointer; font-family: inherit; font-size: 0.8rem; }
+.jr-lb-level.selected { border-color: #4CAF50; color: #4CAF50; }
 .jr-levels { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .jr-level { display: grid; gap: 4px; text-align: start; background: #0d1117; border: 1px solid #344454; border-radius: 9px; padding: 10px 12px; color: #c3d0db; font: inherit; cursor: pointer; min-height: 44px; }
 .jr-level b { font-size: 15px; color: #e6edf3; }

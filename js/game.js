@@ -3589,7 +3589,7 @@ function animateResults(ovr) {
     window._lastResult = { wins, draws, losses, gfTotal, gaTotal, matches, ovr, inTopSix, spec: seasonSpec,
                            engine: season.engine ?? 1, journey: !!journeyAtSeason };
     window._lastTier   = tier;
-    if (journeyAtSeason && typeof journeyAwardAchievements === 'function') journeyAwardAchievements(journeyAtSeason, myRank);
+    if (journeyAtSeason && typeof journeyAwardAchievements === 'function') journeyAwardAchievements(journeyAtSeason, myRank, { wins, draws, losses, gf: gfTotal, ga: gaTotal });
     const diffMapR = {
       easy:   siteText('label-diff-easy', 'קל'),
       normal: siteText('label-diff-normal', 'רגיל'),

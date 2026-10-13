@@ -15,6 +15,7 @@ const G = new Function('document', 'window', 'localStorage', '_supabase', 'getCu
     { addEventListener() {}, getElementById() { return null; }, querySelectorAll() { return []; } }, {}, storage, server,
     () => (signedIn ? { id: userId } : null), (e, m, d) => tracked.push([e, m, d]));
 let n = 0;
+const SEASON = { wins: 25, draws: 6, losses: 5, gf: 70, ga: 25 };
 function test(name, fn) { fn(); n++; console.log('PASS  ' + name); }
 
 test('the migration grants exactly the live JS achievements, with the same names and icons', () => {
@@ -70,11 +71,20 @@ test('the run id journeyStart makes passes the server pattern', () => {
 });
 test('the season sends its rank, and its event is counted once per journey', () => {
   calls.length = 0; tracked.length = 0;
-  G.journeyAwardAchievements({ ...j, phase: 'season' }, 1);
-  G.journeyAwardAchievements({ ...j, phase: 'season' }, 1);   // a refreshed results screen
+  G.journeyAwardAchievements({ ...j, phase: 'season' }, 1, SEASON);
+  G.journeyAwardAchievements({ ...j, phase: 'season' }, 1, SEASON);   // a refreshed results screen
   assert.strictEqual(calls.length, 2);
   assert.strictEqual(calls[0].args.p.rank, 1);
   assert.deepStrictEqual(tracked, [['progress', 'journey', 'normal|season|1']]);
+});
+test('the season travels with its rank; a rank without a readable season is not sent', () => {
+  calls.length = 0; memory.delete('36-0-journey-pending');
+  G.journeyAwardAchievements({ ...j, id: 'season-run-1', phase: 'season' }, 2, SEASON);
+  assert.deepStrictEqual(calls[0].args.p.season, SEASON); assert.strictEqual(calls[0].args.p.rank, 2);
+  calls.length = 0;
+  G.journeyAwardAchievements({ ...j, id: 'season-run-2', phase: 'season' }, 2, { ...SEASON, wins: 2.5 });
+  assert.strictEqual(calls[0].args.p.rank, undefined); assert.strictEqual(calls[0].args.p.season, undefined);
+  memory.delete('36-0-journey-pending');
 });
 test('signed out, nothing reaches the server; a malformed route is never sent or queued', () => {
   memory.delete('36-0-journey-pending'); calls.length = 0;
@@ -161,7 +171,7 @@ test('admin rows name the squads and count seasons and titles per player', () =>
   });
   await atest('a queued season keeps its rank, and a later route call does not drop it', async () => {
     signedIn = false;
-    G.journeyAwardAchievements({ ...j, phase: 'season' }, 3);
+    G.journeyAwardAchievements({ ...j, phase: 'season' }, 3, SEASON);
     G.journeyAwardAchievements(j);            // the summary restored afterwards
     assert.strictEqual(G.journeyPendingLoad()[j.id].p.rank, 3);
     signedIn = true; calls.length = 0; reply = { data: { achievements: [] } };
@@ -176,7 +186,7 @@ test('admin rows name the squads and count seasons and titles per player', () =>
     assert.strictEqual(G.journeyPendingLoad()['owned-by-a'].owner, 'user-a');
     calls.length = 0; reply = { data: { achievements: [] } };
     userId = 'user-b'; G.journeyFlushPending(); await flush();
-    G.journeyAwardAchievements({ ...j, id: 'owned-by-a', phase: 'season' }, 1); await flush();
+    G.journeyAwardAchievements({ ...j, id: 'owned-by-a', phase: 'season' }, 1, SEASON); await flush();
     assert.deepStrictEqual(calls, [], 'B must not send A\'s route');
     assert.strictEqual(G.journeyPendingLoad()['owned-by-a'].owner, 'user-a');
     userId = 'user-a'; G.journeyFlushPending(); await flush();

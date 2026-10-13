@@ -56,8 +56,10 @@ function journeyAchievementKeys(metrics, rank) {
   if (metrics.phase === 'season' && rank === 1 && ['normal', 'hard'].includes(metrics.level)) keys.push('jx_title');
   return keys;
 }
-function journeyAwardAchievements(j, rank) {
-  journeyServerSubmit(j, rank);
+// `season` ({wins, draws, losses, gf, ga}) travels with the rank for the records
+// board (journey_board); the server computes the points itself.
+function journeyAwardAchievements(j, rank, season) {
+  journeyServerSubmit(j, rank, season);
   if (rank != null) journeyReportSeason(j, rank);
   const keys = journeyAchievementKeys(journeyAchievementMetrics(j), rank);
   const earned = journeyAchievementsLoad();
@@ -129,11 +131,22 @@ function journeyPendingSave(runs) {
   const kept = {}; ids.forEach(id => { kept[id] = runs[id]; });
   try { localStorage.setItem(JOURNEY_PENDING_KEY, JSON.stringify({ v: 1, runs: kept })); } catch (e) {}
 }
+// whole, non-negative numbers or nothing: the server refuses a season it cannot read
+function journeySeasonClean(season) {
+  if (!season) return null;
+  const out = {};
+  for (const k of ['wins', 'draws', 'losses', 'gf', 'ga']) {
+    const v = Number(season[k]);
+    if (!Number.isInteger(v) || v < 0) return null;
+    out[k] = v;
+  }
+  return out.wins + out.draws + out.losses > 0 ? out : null;
+}
 function journeyUserId() {
   const u = typeof getCurrentUser === 'function' ? getCurrentUser() : null;
   return u && u.id ? String(u.id) : null;
 }
-function journeyServerSubmit(j, rank) {
+function journeyServerSubmit(j, rank, season) {
   try {
     if (!journeyAchievementMetrics(j) || !j.id) return;
     const runs = journeyPendingLoad(), old = runs[j.id];
@@ -143,8 +156,9 @@ function journeyServerSubmit(j, rank) {
     const p = { run_id: String(j.id), level: journeyLevelKey(j), formation: state.formationId || '',
       route: j.path.map(s => ({ squadId: s.squadId, name: s.name })), broken: !!j.broken };
     if (typeof teamOVR === 'function') p.ovr = teamOVR();
-    if (rank != null) p.rank = rank;
-    else if (old && old.p && old.p.rank != null) p.rank = old.p.rank;
+    const s = journeySeasonClean(season);
+    if (rank != null && s) { p.rank = rank; p.season = s; }
+    else if (old && old.p && old.p.rank != null && old.p.season) { p.rank = old.p.rank; p.season = old.p.season; }
     const entry = { p, owner: (old && old.owner) || me, at: (old && old.at) || Date.now() };
     runs[j.id] = entry;
     journeyPendingSave(runs);

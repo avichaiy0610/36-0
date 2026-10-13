@@ -1,5 +1,6 @@
 -- מסע ה־11 (v1.61): one row per finished route, the six route achievements as
--- real ones, and the admin list of who played. 'journey' in track() is
+-- real ones, the public records board (journey_board), and the admin list of
+-- who played. 'journey' in track() is
 -- 20261013000001.
 --
 -- The mode runs in the browser, so what reaches the server is checked, never
@@ -36,11 +37,19 @@ CREATE TABLE IF NOT EXISTS journey_runs (
   backwards   int  NOT NULL,
   ovr         int,
   rank        int,
+  -- the season, written together with rank and never after it
+  wins        int,
+  draws       int,
+  losses      int,
+  gf          int,
+  ga          int,
+  points      int,
   created_at  timestamptz NOT NULL DEFAULT now(),
   season_at   timestamptz,
   UNIQUE (user_id, run_id)
 );
 CREATE INDEX IF NOT EXISTS journey_runs_created_idx ON journey_runs (created_at DESC);
+CREATE INDEX IF NOT EXISTS journey_runs_board_idx ON journey_runs (level, points DESC) WHERE points IS NOT NULL;
 ALTER TABLE journey_runs ENABLE ROW LEVEL SECURITY;
 -- no policies: rows are written by submit_journey_run only
 
@@ -154,6 +163,12 @@ DECLARE
   v_gap      int;
   v_back     int    := 0;
   v_row      journey_runs%ROWTYPE;
+  v_season   jsonb  := p->'season';
+  v_w        int;
+  v_d        int;
+  v_l        int;
+  v_gf       int;
+  v_ga       int;
   earned     text[] := '{}';
   fresh      text[] := '{}';
 BEGIN
@@ -204,6 +219,27 @@ BEGIN
      AND (p->>'rank')::numeric = trunc((p->>'rank')::numeric) THEN
     v_rank := (p->>'rank')::numeric::int;
   END IF;
+  -- A rank comes with its season or not at all. Read raw, judged, never clamped:
+  -- clamping once turned a 40-win claim into a "perfect" 36-0 on the salary board
+  -- (20260901000002). The points are the server's, 3W+D, not the client's.
+  IF v_rank IS NOT NULL THEN
+    IF jsonb_typeof(v_season) IS DISTINCT FROM 'object'
+       OR EXISTS (SELECT 1 FROM unnest(ARRAY['wins','draws','losses','gf','ga']) k
+                  WHERE jsonb_typeof(v_season->k) IS DISTINCT FROM 'number'
+                     OR (v_season->>k)::numeric <> trunc((v_season->>k)::numeric)
+                     OR (v_season->>k)::numeric < 0
+                     OR (v_season->>k)::numeric > 300) THEN
+      RETURN jsonb_build_object('error', 'bad season');
+    END IF;
+    v_w  := (v_season->>'wins')::numeric::int;
+    v_d  := (v_season->>'draws')::numeric::int;
+    v_l  := (v_season->>'losses')::numeric::int;
+    v_gf := (v_season->>'gf')::numeric::int;
+    v_ga := (v_season->>'ga')::numeric::int;
+    IF v_w + v_d + v_l NOT BETWEEN 1 AND 36 THEN
+      RETURN jsonb_build_object('error', 'bad season');
+    END IF;
+  END IF;
   IF jsonb_typeof(p->'ovr') = 'number' AND (p->>'ovr')::numeric BETWEEN 30 AND 99 THEN
     v_ovr := round((p->>'ovr')::numeric)::int;
   END IF;
@@ -213,8 +249,10 @@ BEGIN
   END IF;
 
   -- The first call writes the run; a concurrent or later one finds it here.
-  INSERT INTO journey_runs (user_id, run_id, level, formation, route, broken, clubs, year_gap, backwards, ovr, rank, season_at)
+  INSERT INTO journey_runs (user_id, run_id, level, formation, route, broken, clubs, year_gap, backwards, ovr, rank,
+                            wins, draws, losses, gf, ga, points, season_at)
   VALUES (uid, v_run, v_level, v_form, v_clean, v_broken, v_nclubs, v_gap, v_back, v_ovr, v_rank,
+          v_w, v_d, v_l, v_gf, v_ga, CASE WHEN v_rank IS NULL THEN NULL ELSE 3 * v_w + v_d END,
           CASE WHEN v_rank IS NULL THEN NULL ELSE now() END)
   ON CONFLICT (user_id, run_id) DO NOTHING;
   SELECT * INTO v_row FROM journey_runs WHERE user_id = uid AND run_id = v_run;
@@ -224,7 +262,8 @@ BEGIN
   -- UPDATE waits for the first, re-checks, finds a rank and changes nothing.
   -- Re-reading afterwards gives both callers the rank that was actually kept.
   IF v_row.rank IS NULL AND v_rank IS NOT NULL THEN
-    UPDATE journey_runs SET rank = v_rank, season_at = now(), ovr = COALESCE(ovr, v_ovr)
+    UPDATE journey_runs SET rank = v_rank, season_at = now(), ovr = COALESCE(ovr, v_ovr),
+           wins = v_w, draws = v_d, losses = v_l, gf = v_gf, ga = v_ga, points = 3 * v_w + v_d
      WHERE id = v_row.id AND rank IS NULL;
     SELECT * INTO v_row FROM journey_runs WHERE id = v_row.id;
   END IF;
@@ -253,6 +292,43 @@ END $$;
 REVOKE ALL ON FUNCTION submit_journey_run(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION submit_journey_run(jsonb) FROM anon;
 GRANT EXECUTE ON FUNCTION submit_journey_run(jsonb) TO authenticated;
+
+-- The records board: one row per player per level — their best season, by
+-- points, then goal difference, then whoever got there first. SECURITY DEFINER
+-- because journey_runs has no read policy (it holds routes and user ids); this
+-- returns only what a board shows. Open to anon, like the other boards.
+CREATE OR REPLACE FUNCTION journey_board(p_level text DEFAULT 'normal', p_limit int DEFAULT 100)
+RETURNS TABLE (
+  pos bigint, user_id uuid, username text, club jsonb,
+  level text, ovr int, league_rank int, points int,
+  wins int, draws int, losses int, gf int, ga int,
+  clubs int, year_gap int, broken boolean
+)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+  WITH best AS (
+    SELECT DISTINCT ON (r.user_id)
+           r.user_id, r.level, r.ovr, r.rank, r.points, r.wins, r.draws, r.losses, r.gf, r.ga,
+           r.clubs, r.year_gap, r.broken, r.season_at
+      FROM journey_runs r
+     WHERE r.points IS NOT NULL AND r.level = COALESCE(p_level, 'normal')
+     ORDER BY r.user_id, r.points DESC, (r.gf - r.ga) DESC, r.season_at ASC
+  )
+  SELECT row_number() OVER (ORDER BY b.points DESC, (b.gf - b.ga) DESC, b.season_at ASC),
+         b.user_id, p.username, p.club,
+         b.level, b.ovr, b.rank, b.points,
+         b.wins, b.draws, b.losses, b.gf, b.ga,
+         b.clubs, b.year_gap, b.broken
+    FROM best b
+    JOIN profiles p ON p.id = b.user_id
+   ORDER BY b.points DESC, (b.gf - b.ga) DESC, b.season_at ASC
+   LIMIT LEAST(GREATEST(COALESCE(p_limit, 100), 1), 200);
+$$;
+
+GRANT EXECUTE ON FUNCTION journey_board(text, int) TO anon, authenticated;
 
 -- The admin list of who played. Same shape as derby_admin_runs (20261012000001):
 -- is_site_admin() or 'forbidden', clamped days/limit, anon revoked.
