@@ -57,7 +57,7 @@ function journeyShowHub() {
       <div><span>03</span><h3>צא לעונה</h3><p>11 שחקנים, 11 תחנות. ההרכב שבנית ממשיך לליגה, לגביע ולאירופה.</p></div></div>
     <div class="jr-start-panel"><div><span class="jr-eyebrow">לפני שיוצאים לדרך</span><h2>באיזה מערך יוצאים?</h2><p>העמדות ננעלות כשבוחרים שחקן. כל בחירה פתוחה משאירה דרך להשלמת הרכב.</p></div>
       <span class="jr-select-label" id="jr-level-label">רמת קושי</span>
-      <div class="jr-levels" role="radiogroup" aria-labelledby="jr-level-label">${Object.entries(JOURNEY_LEVELS).map(([k, L]) =>
+      <div class="jr-levels" role="radiogroup" aria-labelledby="jr-level-label">${Object.entries(JOURNEY_LEVELS).filter(([, L]) => !L.hidden).map(([k, L]) =>
         `<button type="button" class="jr-level${k === 'normal' ? ' selected' : ''}" role="radio" aria-checked="${k === 'normal'}" data-jr-level="${k}"><b>${L.label}</b><span>${journeyLevelBlurb(L)}</span></button>`).join('')}</div>
       <label class="jr-select-label" for="jr-formation">מערך ההרכב</label><select id="jr-formation" class="jr-select">${Object.keys(FORMATIONS).map(k => `<option value="${journeyEsc(k)}"${k === '4-3-3' ? ' selected' : ''}>${journeyEsc(FORMATIONS[k].label)}</option>`).join('')}</select>
       <button class="btn-primary btn-full" id="jr-start">${saved ? 'צא למסע חדש' : 'צא למסע'} ←</button>

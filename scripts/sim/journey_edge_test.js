@@ -7,7 +7,7 @@ const storage = { getItem: k => memory.get(k) || null, setItem: (k, v) => memory
 const G = new Function('document', 'window', 'localStorage',
   ['js/data.js', 'js/sim-engine.js', 'js/game.js', 'js/journey-engine.js', 'js/journey.js'].map(read).join('\n') +
   ';journeyStartRound = () => {}; return {state,SQUADS,formationSlots,journeyEngine,journeyOptions,journeyAllowedSlots,' +
-  'journeyRecordPick,journeyPrepareEscape,journeyEnter,journeyValidSave,saveDraftState,journeyDestinations};')({ addEventListener() {} }, {}, storage);
+  'journeyRecordPick,journeyPrepareEscape,journeyEnter,journeyValidSave,saveDraftState,journeyDestinations,playerFitsSlot};')({ addEventListener() {} }, {}, storage);
 let n = 0;
 function test(name, fn) { fn(); n++; console.log('PASS  ' + name); }
 const slots = G.formationSlots('4-3-3', 'bal');
@@ -101,5 +101,41 @@ test('a squad outside the draw cannot be entered, and the drawn one can', () => 
   assert.strictEqual(G.state.journey.destIds, null);
   const clubs = G.state.journey.visited.map(id => G.journeyEngine().squad(id).teamId);
   assert.strictEqual(new Set(clubs).size, clubs.length);
+});
+// ── club limits on a real chain (Codex's review): בית"ר 1999 → גנון → בית"ר 2000 → קורנפיין → בית"ר 2005 → אלברמן
+function beitarSave(level, steps) {
+  const chain = [['beitar-jerusalem-1999', 'קובי גנון'], ['beitar-jerusalem-2000', 'איציק קורנפיין'], ['beitar-jerusalem-2005', 'גל אלברמן']].slice(0, steps);
+  const picks = slots.map(() => null), path = [];
+  chain.forEach(([id, name], i) => {
+    const squad = G.journeyEngine().squad(id), player = squad && squad.players.find(p => p.name === name);
+    assert.ok(player, id + ' / ' + name);
+    const idx = slots.findIndex((s, k) => !picks[k] && G.playerFitsSlot(player, s.role || s.pos));
+    picks[idx] = { squad, player };
+    path.push({ squadId: id, name, slotId: slots[idx].id, arrival: i ? 'career' : 'start' });
+  });
+  const journey = { v: 1, id: 'beitar', phase: 'travel', path, visited: chain.map(c => c[0]), broken: false,
+    arrival: 'career', escapeIds: null, destIds: null };
+  if (level) journey.level = level;
+  Object.assign(G.state, { formationId: '4-3-3', tactic: 'bal', slots, picks, currentRound: path.length,
+    currentSquad: G.journeyEngine().squad(chain[chain.length - 1][0]), journey,
+    usedPlayerKeys: new Set(path.map(p => p.name)), usedSquadIds: new Set(journey.visited) });
+  G.saveDraftState();
+  return { d: JSON.parse(storage.getItem('36-0-draft')), picks };
+}
+test('a pre-level save keeps its unlimited route; easy allows a club twice; normal once', () => {
+  let s = beitarSave(null, 3); assert.strictEqual(G.journeyValidSave(s.d, s.picks), true, 'legacy, three Beitar');
+  s = beitarSave('easy', 3);   assert.strictEqual(G.journeyValidSave(s.d, s.picks), false, 'easy, three Beitar');
+  s = beitarSave('easy', 2);   assert.strictEqual(G.journeyValidSave(s.d, s.picks), true, 'easy, two Beitar');
+  s = beitarSave('normal', 2); assert.strictEqual(G.journeyValidSave(s.d, s.picks), false, 'normal, two Beitar');
+});
+test('a stored door or escape into a club already used is rejected and cannot be entered', () => {
+  const s = beitarSave('normal', 1);
+  s.d.journey.destIds = ['beitar-jerusalem-2000'];
+  assert.strictEqual(G.journeyValidSave(s.d, s.picks), false, 'forged door');
+  s.d.journey.destIds = null; s.d.journey.escapeIds = ['beitar-jerusalem-2000'];
+  assert.strictEqual(G.journeyValidSave(s.d, s.picks), false, 'forged escape');
+  G.state.journey.destIds = ['beitar-jerusalem-2000'];
+  assert.strictEqual(G.journeyEnter('beitar-jerusalem-2000', false), false);
+  assert.strictEqual(G.state.journey.visited.length, 1);
 });
 console.log('\n' + n + ' passed');

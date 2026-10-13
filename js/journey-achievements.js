@@ -4,6 +4,8 @@ const JOURNEY_ACHIEVEMENTS = [
   { key: 'jx_finish', icon: '🧭', name_he: 'הדרך שלי', desc_he: 'השלם מסע של 11 שחקנים.' },
   { key: 'jx_chain', icon: '🔗', name_he: 'שרשרת ברזל', desc_he: 'השלם מסע בלי לשבור את השרשרת.' },
   // ברמה רגילה וקשה כל מועדון נכנס פעם אחת, כך ש"שמונה מועדונים" היה ניתן תמיד.
+  // jx_clubs כבר לא מוענק, אבל מי שזכה בו ממשיך לראות אותו.
+  { key: 'jx_clubs', icon: '🏟️', name_he: 'בכל מגרש', desc_he: 'השלם מסע שעובר בשמונה מועדונים שונים לפחות.', retired: true },
   { key: 'jx_hard', icon: '🙈', name_he: 'בלי מספרים', desc_he: 'השלם מסע ברמה קשה, בלי לראות דירוגים.' },
   { key: 'jx_time', icon: '⌛', name_he: 'מסע בזמן', desc_he: 'השלם מסע עם פער של עשרים שנה לפחות בין העונה המוקדמת למאוחרת.' },
   { key: 'jx_back', icon: '⏪', name_he: 'בחזרה לעבר', desc_he: 'השלם מסע עם לפחות ארבעה מעברים לעונה מוקדמת יותר.' },
@@ -48,7 +50,7 @@ function journeyAchievementKeys(metrics, rank) {
   if (metrics.level === 'hard') keys.push('jx_hard');
   if (metrics.yearGap >= 20) keys.push('jx_time');
   if (metrics.backwards >= 4) keys.push('jx_back');
-  if (metrics.phase === 'season' && rank === 1 && metrics.level !== 'easy') keys.push('jx_title');
+  if (metrics.phase === 'season' && rank === 1 && ['normal', 'hard'].includes(metrics.level)) keys.push('jx_title');
   return keys;
 }
 function journeyAwardAchievements(j, rank) {
@@ -68,10 +70,11 @@ function journeyAwardAchievements(j, rank) {
 }
 function journeyAchievementsHTML() {
   const earned = journeyAchievementsLoad();
-  const count = JOURNEY_ACHIEVEMENTS.filter(a => earned[a.key]).length;
-  return `<div class="jr-ach-head"><h2>הישגי מסע ה־11</h2><b dir="ltr">${count} / ${JOURNEY_ACHIEVEMENTS.length}</b></div>
+  const shown = JOURNEY_ACHIEVEMENTS.filter(a => !a.retired || earned[a.key]);
+  const count = shown.filter(a => earned[a.key]).length;
+  return `<div class="jr-ach-head"><h2>הישגי מסע ה־11</h2><b dir="ltr">${count} / ${shown.length}</b></div>
     <p class="jr-ach-note">הישגים אלה נשמרים במכשיר הזה, גם בלי להתחבר.</p>
-    <div class="jr-ach-grid">${JOURNEY_ACHIEVEMENTS.map(a => `<div class="ach-card ${earned[a.key] ? 'ach-unlocked' : 'ach-locked'}" data-jr-ach="${a.key}">
+    <div class="jr-ach-grid">${shown.map(a => `<div class="ach-card ${earned[a.key] ? 'ach-unlocked' : 'ach-locked'}" data-jr-ach="${a.key}">
       <div class="ach-icon">${a.icon}</div><div class="ach-info"><div class="ach-name">${a.name_he}${earned[a.key] ? ' ✓' : ''}</div>
         <div class="ach-desc">${a.desc_he}</div>${earned[a.key] ? `<div class="ach-date">${new Date(earned[a.key].at).toLocaleDateString('he-IL')}</div>` : ''}</div></div>`).join('')}</div>`;
 }

@@ -73,12 +73,14 @@ const JourneyEngine = (() => {
       const seen = new Set();
       return slots.filter(i => !seen.has(remaining[i]) && seen.add(remaining[i]));
     }
+    // Every offered slot is proved on its own. Twin positions are not interchangeable
+    // here: removing a different index changes the bounded search's order, so a proof
+    // for one CM can miss for the other (Codex's review, 2026-10-13). solve() may still
+    // skip twins, because a skipped proof only ever hides a route, never offers one.
     function choices(c) {
-      return candidates(c).map(({ player, slots }) => {
-        const ok = new Set(distinct(slots, c.remaining).filter(i =>
-          continuation(player.name, taken(c, player.name, i), { left: 300 })).map(i => c.remaining[i]));
-        return { name: player.name, slots: slots.filter(i => ok.has(c.remaining[i])), links: links(player.name, c) };
-      }).filter(p => p.slots.length);
+      return candidates(c).map(({ player, slots }) => ({ name: player.name,
+        slots: slots.filter(i => continuation(player.name, taken(c, player.name, i), { left: 300 })),
+        links: links(player.name, c) })).filter(p => p.slots.length);
     }
     // `order` (a shuffled copy of the pool) with `limit` stops at the first proven few,
     // which is all a draw of three needs; without them every squad is proved.

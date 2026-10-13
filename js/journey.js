@@ -7,14 +7,22 @@ const JOURNEY_LEVELS = {
   easy:   { clubLimit: 2, doors: 0, ratings: true,  label: 'קל' },
   normal: { clubLimit: 1, doors: 3, ratings: true,  label: 'רגיל' },
   hard:   { clubLimit: 1, doors: 3, ratings: false, label: 'קשה' },
+  // A save from before levels: the unlimited route Codex shipped. Never offered.
+  legacy: { clubLimit: 0, doors: 0, ratings: true,  label: 'קל', hidden: true },
 };
 const _journeyEngines = {};
 let _journeyChoicesKey = null;
 let _journeyChoices = [];
-// A save made before levels existed was an unlimited route: it is read as קל.
+// A save made before levels existed was an unlimited route, and stays one: reading
+// it as קל (a club twice at most) rejected routes that were legal when they were made.
 function journeyLevelKey(j) {
   const level = (j || state.journey || {}).level;
-  return JOURNEY_LEVELS[level] ? level : 'easy';
+  return JOURNEY_LEVELS[level] ? level : 'legacy';
+}
+// Whether one more squad of this club fits the level's limit, given the route so far.
+function journeyClubOpen(j, visited, id) {
+  const limit = journeyLevel(j).clubLimit, engine = journeyEngine(j), squad = engine.squad(id);
+  return !!squad && (!limit || visited.filter(v => engine.squad(v) && engine.squad(v).teamId === squad.teamId).length < limit);
 }
 function journeyLevel(j) { return JOURNEY_LEVELS[journeyLevelKey(j)]; }
 function journeyEngine(j) {
@@ -135,7 +143,8 @@ function journeyEnter(id, breaking) {
   if (j.phase !== 'travel') return false;
   const pool = breaking ? journeyPrepareEscape() : journeyDestinations();
   const next = pool.find(s => s.id === id);
-  if (!next || j.visited.includes(id)) return false;
+  // The pool can come from a stored draw, so the club limit is checked again here.
+  if (!next || j.visited.includes(id) || !journeyClubOpen(j, j.visited, id)) return false;
   if (breaking) j.broken = true;
   if (breaking && typeof track === 'function') track('progress', 'journey', 'break-' + j.path.length);
   j.arrival = breaking ? 'break' : 'career';
@@ -180,10 +189,10 @@ function journeyValidSave(d, picks) {
     d.currentSquadId !== j.visited[j.visited.length - 1]) return false;
   if (j.escapeIds != null && (!Array.isArray(j.escapeIds) || j.escapeIds.length > 3 ||
     new Set(j.escapeIds).size !== j.escapeIds.length ||
-    !j.escapeIds.every(id => engine.squad(id) && !j.visited.includes(id)))) return false;
+    !j.escapeIds.every(id => engine.squad(id) && !j.visited.includes(id) && journeyClubOpen(j, j.visited, id)))) return false;
   if (j.destIds != null && (!Array.isArray(j.destIds) || j.phase !== 'travel' || !level.doors ||
     j.destIds.length > level.doors || new Set(j.destIds).size !== j.destIds.length || !j.path.length ||
-    !j.destIds.every(id => !j.visited.includes(id) &&
+    !j.destIds.every(id => !j.visited.includes(id) && journeyClubOpen(j, j.visited, id) &&
       engine.career(j.path[j.path.length - 1].name).some(s => s.id === id)))) return false;
   if (level.clubLimit) {
     const perClub = {};

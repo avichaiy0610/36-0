@@ -13,8 +13,14 @@ let n = 0;
 function test(name, fn) { fn(); n++; console.log('PASS  ' + name); }
 const metrics = { broken: true, clubs: 1, yearGap: 0, backwards: 0, phase: 'complete', level: 'normal' };
 test('six unique achievements cover the journey and its season', () => {
-  assert.strictEqual(G.JOURNEY_ACHIEVEMENTS.length, 6);
-  assert.strictEqual(new Set(G.JOURNEY_ACHIEVEMENTS.map(a => a.key)).size, 6);
+  assert.strictEqual(G.JOURNEY_ACHIEVEMENTS.filter(a => !a.retired).length, 6);
+  assert.strictEqual(new Set(G.JOURNEY_ACHIEVEMENTS.map(a => a.key)).size, G.JOURNEY_ACHIEVEMENTS.length);
+});
+test('a retired award is never granted again, but one already earned stays on show', () => {
+  assert.ok(!G.journeyAchievementKeys({ ...metrics, clubs: 11, level: 'legacy' }).includes('jx_clubs'));
+  memory.set('36-0-journey-achievements', JSON.stringify({ v: 1, earned: { jx_clubs: { at: new Date().toISOString() } } }));
+  assert.ok(G.journeyAchievementsLoad().jx_clubs);
+  memory.delete('36-0-journey-achievements');
 });
 test('a completed journey earns the first route award', () => {
   assert.deepStrictEqual(G.journeyAchievementKeys(metrics), ['jx_finish']);
@@ -32,6 +38,7 @@ test('the hard award needs the hard level, and an easy season wins no title awar
   assert.ok(G.journeyAchievementKeys({ ...metrics, level: 'hard' }).includes('jx_hard'));
   assert.ok(!G.journeyAchievementKeys(metrics).includes('jx_hard'));
   assert.ok(!G.journeyAchievementKeys({ ...metrics, level: 'easy', phase: 'season' }, 1).includes('jx_title'));
+  assert.ok(!G.journeyAchievementKeys({ ...metrics, level: 'legacy', phase: 'season' }, 1).includes('jx_title'));
   assert.ok(G.journeyAchievementKeys({ ...metrics, level: 'hard', phase: 'season' }, 1).includes('jx_title'));
 });
 test('a league title is awarded only for rank one in the season phase', () => {
@@ -94,13 +101,6 @@ test('a completed season adds the title once and keeps earlier route awards', ()
   assert.ok(G.journeyAchievementsLoad().jx_finish);
   assert.ok(G.journeyAchievementsLoad().jx_title);
   assert.deepStrictEqual(G.journeyAwardAchievements(season, 1), []);
-});
-test('a normal route that enters one club twice cannot unlock awards', () => {
-  const twice = JSON.parse(JSON.stringify(route));
-  const engine = G.journeyEngine(twice), clubOf = id => engine.squad(id).teamId;
-  const other = G.SQUADS.find(s => s.teamId === clubOf(twice.visited[0]) && !twice.visited.includes(s.id));
-  twice.visited[1] = other.id; twice.path[1].squadId = other.id;
-  assert.strictEqual(G.journeyAchievementMetrics(twice), null);
 });
 test('a route with two broken links cannot unlock awards', () => {
   const bad = JSON.parse(JSON.stringify(route));
