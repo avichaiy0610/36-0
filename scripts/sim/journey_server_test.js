@@ -208,6 +208,30 @@ test('admin rows name the squads and count seasons and titles per player', () =>
     finally { storage.setItem = setItem; }
     assert.strictEqual(calls.length, 1); assert.strictEqual(calls[0].args.p.run_id, 'quota-run-1');
   });
+  await atest('sign-in flushes every queued route belonging to this account', async () => {
+    memory.delete('36-0-journey-pending'); calls.length = 0;
+    const runs = {};
+    for (let i = 0; i < 3; i++) {
+      const id = 'flush-run-' + i;
+      runs[id] = { owner: userId, at: i + 1, p: { run_id: id } };
+    }
+    storage.setItem('36-0-journey-pending', JSON.stringify({ v: 1, runs }));
+    reply = { data: { achievements: [] } };
+    G.journeyFlushPending(); await flush();
+    assert.deepStrictEqual(calls.map(c => c.args.p.run_id), Object.keys(runs));
+    assert.deepStrictEqual(G.journeyPendingLoad(), {});
+  });
+  await atest('another account at the front cannot block this account later in the queue', async () => {
+    memory.delete('36-0-journey-pending'); calls.length = 0;
+    const runs = {
+      'foreign-first': { owner: 'another-user', at: 1, p: { run_id: 'foreign-first' } },
+      'mine-second': { owner: userId, at: 2, p: { run_id: 'mine-second' } },
+    };
+    storage.setItem('36-0-journey-pending', JSON.stringify({ v: 1, runs }));
+    G.journeyFlushPending(); await flush();
+    assert.deepStrictEqual(calls.map(c => c.args.p.run_id), ['mine-second']);
+    assert.deepStrictEqual(Object.keys(G.journeyPendingLoad()), ['foreign-first']);
+  });
   await atest('the queue keeps only the newest ten routes', async () => {
     signedIn = false; memory.delete('36-0-journey-pending');
     for (let i = 0; i < 14; i++) G.journeyAwardAchievements({ ...j, id: 'queued-run-' + i });

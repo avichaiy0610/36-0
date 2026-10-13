@@ -185,7 +185,7 @@ function journeySendPending(id, given) {
   }, () => {});
 }
 function journeyFlushPending() {
-  try { Object.keys(journeyPendingLoad()).forEach(journeySendPending); } catch (e) {}
+  try { Object.keys(journeyPendingLoad()).forEach(id => journeySendPending(id)); } catch (e) {}
 }
 // One 'season' event per journey: a refreshed results screen replays the season,
 // and track()'s two-second guard would let the replay count it twice.

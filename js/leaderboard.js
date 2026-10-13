@@ -204,7 +204,12 @@ async function loadJourneyBoardTab(table) {
   const level = lbJourneyLevel;
   const { data: rows, error } = await _supabase.rpc('journey_board', { p_level: level, p_limit: 100 });
   if (level !== lbJourneyLevel || lbTab !== 'journey') return;   // another tab was asked for meanwhile
-  if (error || !rows || !rows.length) {
+  if (error) {
+    table.innerHTML = head + '<div class="page-note" role="alert">לא ניתן לטעון את לוח השיאים כרגע. נסה שוב בעוד רגע.</div>';
+    wire();
+    return;
+  }
+  if (!rows || !rows.length) {
     table.innerHTML = head + `<div class="page-note">
       עוד לא שוחקה עונה של מסע ה־11 ברמה הזאת — סיים מסע, צא לעונה והיה הראשון על הלוח 🧭
     </div>`;

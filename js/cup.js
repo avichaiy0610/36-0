@@ -259,8 +259,7 @@
   // with euMyCrest. Without one it stays the plain name — or "ההרכב שלי".
   function cupMine() {
     const name = myTeamName(siteTextOr('cup-you', 'ההרכב שלי'));
-    const club = (typeof clubHas === 'function' && (clubHas() || (typeof clubStory === 'function' && clubStory())) &&
-                  typeof clubCrestSVG === 'function') ? clubShown() : null;
+    const club = typeof myTeamCrestClub === 'function' ? myTeamCrestClub() : null;
     return club ? `<span class="cup-crest">${clubCrestSVG(club, 16)}</span>${name}` : name;
   }
 

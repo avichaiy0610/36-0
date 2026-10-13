@@ -236,7 +236,13 @@ BEGIN
     v_l  := (v_season->>'losses')::numeric::int;
     v_gf := (v_season->>'gf')::numeric::int;
     v_ga := (v_season->>'ga')::numeric::int;
-    IF v_w + v_d + v_l NOT BETWEEN 1 AND 36 THEN
+    -- Every win needs a goal, every loss a conceded goal. Without losses the
+    -- aggregate goal difference must cover the wins (and conversely without wins).
+    -- This also requires equal goals in a season made entirely of draws.
+    IF v_w + v_d + v_l NOT BETWEEN 1 AND 36
+       OR v_gf < v_w OR v_ga < v_l
+       OR (v_l = 0 AND v_gf - v_ga < v_w)
+       OR (v_w = 0 AND v_ga - v_gf < v_l) THEN
       RETURN jsonb_build_object('error', 'bad season');
     END IF;
   END IF;
