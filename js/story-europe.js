@@ -27,12 +27,34 @@ function storyEuSeed(run, ...parts) {
   return Math.floor(storyRand(run, 'eu', ...parts) * 4294967296) >>> 0;
 }
 
-// A club is four lines that average its rating, drawn once per run and round.
-function storyEuClub(run, club, key) {
+// A club is four lines that average its rating, drawn once per run and round —
+// or, for an Israeli club with a squad that season (a cup chapter), the four
+// lines of that real squad. `ch` defaults to the run's chapter.
+function storyEuClub(run, club, key, ch) {
+  ch = ch || (typeof storyChapter === 'function' ? storyChapter(run.chapterId) : null);
+  if (club.teamId && ch) {
+    // simTeamsForSeason(y, 0) returns [] (it slices to `count`), so read the squad directly
+    const sq = SQUADS.find(s => parseInt(s.season, 10) === parseInt(ch.season, 10) && s.teamId === club.teamId);
+    if (sq) {
+      // less whoever you bought from them, as in the league (storyClubPlayers)
+      const players = run.bought ? storyClubPlayers(ch, run, club.teamId, 'all') : sq.players;
+      const real = storyClubRating(club.teamId, players);
+      return { name: club.name, ovr: real.ovr, atk: real.atk, mid: real.mid, def: real.def, gk: real.gk, cs: 1 };
+    }
+  }
   const d = [0, 1, 2].map(i => Math.round(storyRand(run, 'lines', key, club.name, i) * 6) - 3);
   d.push(-(d[0] + d[1] + d[2]));
   return { name: club.name, ovr: club.ovr, atk: club.ovr + d[0], mid: club.ovr + d[1],
            def: club.ovr + d[2], gk: club.ovr + d[3], cs: 1 };
+}
+
+// The State Cup's single matches: the weaker side, whichever it is, rises by a
+// share of the gap. Measured on the cup chapters (Task 7), never by feel.
+const STORY_CUP_MAGIC_K = 0.5;
+function storyCupMagic(me, opp) {
+  const gap = opp.ovr - me.ovr;
+  const lift = (x, by) => ({ ...x, ovr: x.ovr + by, atk: x.atk + by, mid: x.mid + by, def: x.def + by, gk: x.gk + by });
+  return gap > 0 ? [lift(me, STORY_CUP_MAGIC_K * gap), opp] : [me, lift(opp, -STORY_CUP_MAGIC_K * gap)];
 }
 
 function storyEuNight(me, oppOvr) {
@@ -69,11 +91,13 @@ function storyEuAddStats(run, players) {
 
 // One match against `club`. The XI and the tactic must already be on `state`
 // (storyApplyXI + state.tactic); `night` applies the knockout lift.
-function storyEuMatch(run, club, key, home, night, seed) {
+function storyEuMatch(run, club, key, home, night, seed, magic) {
   const opp = storyEuClub(run, club, key);
   let me = myLineRatings();
   if (night) me = storyEuNight(me, club.ovr);
-  const leg = withSeededRandom(seed, () => simulateMatchV2(me, opp, home));
+  let o = opp;
+  if (magic) [me, o] = storyCupMagic(me, opp);
+  const leg = withSeededRandom(seed, () => simulateMatchV2(me, o, home));
   leg.opponent = club.name;
   const stats = withSeededRandom(seed ^ 0x5bd1e995, () => simulatePlayerStats([leg]));
   storyEuAddStats(run, stats);
@@ -103,7 +127,7 @@ function storyEuNeed(ch, round, legs) {
   return `${t.gf}-${t.ga} בסיכום. ${t.awayA > t.awayF ? 'שער החוץ שלהם שווה כפול: צריך לנצח.' : 'צריך לנצח.'}`;
 }
 
-function storyEuCloseTie(ch, run, round, legs) {
+function storyEuCloseTie(ch, run, round, legs, shootout) {
   const t = storyEuTieState(ch, round, legs);
   let gf = t.gf, ga = t.ga, won = null, et = null, pens = null, how = '';
   if (gf !== ga) { won = gf > ga; how = 'agg'; }
@@ -115,9 +139,12 @@ function storyEuCloseTie(ch, run, round, legs) {
     gf += et.gf; ga += et.ga;
     if (gf !== ga) { won = gf > ga; how = 'et'; }
     else {
-      const mine = storyRand(run, 'pens', round.id) < 0.5;
-      pens = mine ? { gf: 4, ga: 3 } : { gf: 3, ga: 4 };
-      won = mine; how = 'pens';
+      how = 'pens';
+      // No coin any more: the player runs the shootout (js/story-pens.js).
+      // Without one yet, the tie waits for it.
+      if (!shootout) return { id: round.id, kind: 'tie', legs, agg: { gf, ga }, et, pens: null, won: null, how, pending: true };
+      pens = shootout;
+      won = shootout.won;
     }
   }
   return { id: round.id, kind: 'tie', legs, agg: { gf, ga }, et, pens, won, how };
@@ -146,6 +173,7 @@ function storyEuGroupTable(round, played) {
 function storyEuPlay(ch, run, tactic) {
   const round = storyEuRound(ch, run);
   if (!round || run.eu.out) return null;
+  if (run.eu.cur && run.eu.cur.pensDue) return null;      // a shootout is waiting
   const cur = run.eu.cur || (run.eu.cur = { id: round.id, legs: [], played: [] });
   storyApplyXI(run, storyEuWhen(run, round), tactic);
 
@@ -153,11 +181,18 @@ function storyEuPlay(ch, run, tactic) {
     const i = cur.legs.length;
     const home = round.oneLeg ? round.home : (i === 0) === !!round.firstHome;
     const seed = storyEuSeed(run, round.id, i, state.tactic);
-    const leg = storyEuMatch(run, round.club, round.id, home, !!round.ko, seed);
+    const magic = ch.kind === 'cup' && !!round.oneLeg;
+    const leg = storyEuMatch(run, round.club, round.id, home, !!round.ko, seed, magic);
     leg.tactic = state.tactic;
     cur.legs.push(leg);
     if (cur.legs.length < (round.oneLeg ? 1 : 2)) return { leg, round };
     const closed = storyEuCloseTie(ch, run, round, cur.legs);
+    if (closed.pending) {
+      // the eleven who finished the match take the kicks
+      cur.pensDue = true;
+      cur.pensXI = state.picks.filter(Boolean).map(e => ({ name: e.player.name, position: e.player.position, ovr: e.player.ovr }));
+      return { leg, round, pensDue: true };
+    }
     run.eu.done.push(closed);
     run.eu.cur = null;
     storyEuAdvance(ch, run, round, closed);
@@ -189,6 +224,26 @@ function storyEuPlay(ch, run, tactic) {
   run.eu.cur = null;
   storyEuAdvance(ch, run, round, closed);
   return { leg, round, closed };
+}
+
+// The shootout of a tie that is waiting for one. `names`: the takers in order,
+// any subset of the eleven; the rest of the eleven follow in the auto order.
+// Returns { round, closed } — or null when no shootout is waiting.
+function storyEuPens(ch, run, names) {
+  const round = storyEuRound(ch, run);
+  const cur = run.eu && run.eu.cur;
+  if (!round || !cur || !cur.pensDue) return null;
+  const xi = cur.pensXI;
+  const chosen = names.map(n => xi.find(p => p.name === n)).filter(Boolean);
+  const order = chosen.concat(storyPensAutoOrder(xi.filter(p => !chosen.includes(p))));
+  const opp = storyEuClub(run, round.club, round.id);
+  const ourGk = (xi.find(p => p.position === 'GK') || { ovr: 70 }).ovr;
+  const shootout = storyShootout(storyEuSeed(run, round.id, 'pens'), order, { ovr: round.club.ovr, gk: opp.gk }, ourGk);
+  const closed = storyEuCloseTie(ch, run, round, cur.legs, shootout);
+  run.eu.done.push(closed);
+  run.eu.cur = null;
+  storyEuAdvance(ch, run, round, closed);
+  return { round, closed };
 }
 
 // Where a finished round sends the campaign.
@@ -234,7 +289,12 @@ function storyEuResult(ch, run) {
   // branches, where "the group" and "how far" depend on which way it went
   const groups = {};
   run.eu.done.filter(d => d.kind === 'group').forEach(d => { groups[d.id] = { pos: d.pos, pts: d.pts, gf: d.gf, ga: d.ga }; });
-  return { reached, group, groups, played: run.eu.done.map(d => d.id),
+  // every match lost inside 120 minutes: a leg lost, or extra time lost
+  const losses = run.eu.done.reduce((n, d) =>
+    n + (d.legs || []).filter(l => l.gf < l.ga).length + (d.how === 'et' && !d.won ? 1 : 0), 0);
+  // ties that needed extra time or penalties: what a star with `in90` forbids
+  const extra = run.eu.done.filter(d => d.how === 'et' || d.how === 'pens').length;
+  return { reached, group, groups, losses, extra, played: run.eu.done.map(d => d.id),
            champion: !run.eu.out && run.eu.at >= rounds.length, endText: run.eu.endText || null };
 }
 function storyEuReachedRound(ch, res, roundId) {

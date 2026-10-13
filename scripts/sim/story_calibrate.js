@@ -113,6 +113,7 @@ function euTactic(run) {
 }
 function playEurope(run, honor) {
   G.storyEuStart(run);
+  if (ch.kind === 'cup') run.eu.windowDone = true;
   Object.assign(G.state, { story: { chapterId: ch.id }, peakMode: false, classic: false, coach: null });
   for (let guard = 0; guard < 40 && !G.storyEuOver(ch, run); guard++) {
     if (G.storyEuWindowDue(ch, run)) {
@@ -124,7 +125,8 @@ function playEurope(run, honor) {
       run.phase = 'europe';
       continue;
     }
-    G.storyEuPlay(ch, run, euTactic(run));
+    const out = G.storyEuPlay(ch, run, euTactic(run));
+    if (out && out.pensDue) G.storyEuPens(ch, run, G.storyPensAutoOrder(run.eu.cur.pensXI).map(p => p.name));
   }
   const res = { budget: run.budget, eu: G.storyEuResult(ch, run), sold: run.sold.map(s => s.name),
                 boughtTeams: run.bought.map(b => (G.SQUADS.find(s => s.id === b.squadId) || {}).teamId) };
@@ -137,7 +139,7 @@ function playOnce(budget, seed, honor) {
   const summerValue = e => G.storySummerValue(e.player, ch.season);
   sellBench(run, summerValue, honor);
   buyUpgrades(run, summerValue, honor);
-  if (ch.kind === 'europe') return playEurope(run, honor);
+  if (G.storyIsCampaign(ch)) return playEurope(run, honor);
 
   G.storyRivalShop(run, ch, 'summer');          // the rivals move after your window
   run.phase = 'season';

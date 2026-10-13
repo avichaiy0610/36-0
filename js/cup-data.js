@@ -29,6 +29,7 @@ const CUP_LEUMIT = [
   { id: 'cup-kiryat-gat',  name: 'מכבי קריית גת',        ovr: 70 },
   { id: 'cup-umm-al-fahm', name: 'הפועל אום אל פאחם',    ovr: 69 },
   { id: 'cup-ramat-hasharon', name: 'הפועל ניר רמת השרון', ovr: 68 },
+  { id: 'cup-beitar-tlv',  name: 'בית"ר תל אביב בת ים',  ovr: 70 },
 ];
 
 const CUP_ALEF = [
@@ -48,6 +49,8 @@ const CUP_ALEF = [
   { id: 'cup-yeruham',     name: 'הפועל ירוחם',          ovr: 60 },
   { id: 'cup-sderot',      name: 'הפועל שדרות',          ovr: 62 },
   { id: 'cup-ofakim',      name: 'מ.ס. אופקים',          ovr: 60 },
+  { id: 'cup-herzliya',    name: 'הפועל הרצליה',         ovr: 63 },
+  { id: 'cup-yavne',       name: 'מכבי יבנה',            ovr: 64 },
 ];
 
 // The five rounds the top flight actually plays. The cup runs to twelve rounds
