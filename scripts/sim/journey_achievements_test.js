@@ -115,6 +115,10 @@ test('signed in, the main list shows the device section only while it holds an a
     jx_finish: { at: new Date().toISOString() }, jx_clubs: { at: new Date().toISOString() } } }));
   let b = box(); G.journeyAppendAchievements(b, { jx_finish: {} });
   assert.strictEqual(b.kids.length, 1, 'retired jx_clubs is not on the server: keep showing it');
+  // ...and only it: jx_finish is already on the server's own card
+  assert.ok(b.kids[0].innerHTML.includes('data-jr-ach="jx_clubs"'));
+  assert.ok(!b.kids[0].innerHTML.includes('data-jr-ach="jx_finish"'), 'listed twice');
+  assert.strictEqual(b.kids[0].dataset.journeyAchievements, undefined, 'a subset must not be repainted as the full list');
   memory.set('36-0-journey-achievements', JSON.stringify({ v: 1, earned: { jx_finish: { at: new Date().toISOString() } } }));
   b = box(); G.journeyAppendAchievements(b, { jx_finish: {} });
   assert.strictEqual(b.kids.length, 0, 'everything is in the account: no duplicate section');

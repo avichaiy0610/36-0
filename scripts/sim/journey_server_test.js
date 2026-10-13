@@ -8,12 +8,12 @@ const storage = { getItem: k => memory.get(k) || null, setItem: (k, v) => memory
 const calls = [], tracked = [];
 let reply = { data: { achievements: [] } };
 const server = { rpc(name, args) { calls.push({ name, args }); return Promise.resolve(reply); } };
-let signedIn = true;
+let signedIn = true, userId = 'u';
 const G = new Function('document', 'window', 'localStorage', '_supabase', 'getCurrentUser', 'track',
   ['js/data.js', 'js/sim-engine.js', 'js/game.js', 'js/journey-engine.js', 'js/journey.js', 'js/journey-achievements.js', 'js/journey-admin.js'].map(read).join('\n') +
   ';return {state,SQUADS,formationSlots,slotFitPos,journeyEngine,journeyAwardAchievements,JOURNEY_ACHIEVEMENTS,journeyAdminSummary,journeyAdminRunsRows,jaSquadName,journeyPendingLoad,journeyFlushPending};')(
     { addEventListener() {}, getElementById() { return null; }, querySelectorAll() { return []; } }, {}, storage, server,
-    () => (signedIn ? { id: 'u' } : null), (e, m, d) => tracked.push([e, m, d]));
+    () => (signedIn ? { id: userId } : null), (e, m, d) => tracked.push([e, m, d]));
 let n = 0;
 function test(name, fn) { fn(); n++; console.log('PASS  ' + name); }
 
@@ -96,9 +96,15 @@ test('a malformed detail never counts as a season, a title or a finish', () => {
     { mode: 'journey', event: 'progress', detail: 'normal|season|0', events: 5, people: 5 },
     { mode: 'journey', event: 'finish', detail: 'normal|unexpected', events: 5, people: 5 },
     { mode: 'journey', event: 'progress', detail: 'normal|season|12', events: 1, people: 1 },
+    { mode: 'journey', event: 'progress', detail: 'normal|season|1|unexpected', events: 5, people: 5 },
+    { mode: 'journey', event: 'finish', detail: 'normal|chain|unexpected', events: 5, people: 5 },
+    { mode: 'journey', event: 'progress', detail: 'normal|start|x', events: 5, people: 5 },
+    { mode: 'journey', event: 'share', detail: 'normal|png', events: 5, people: 5 },
+    { mode: 'journey', event: 'progress', detail: 'god|start', events: 5, people: 5 },
   ]);
   const nl = s.levels[0];
-  assert.deepStrictEqual([nl.seasonE, nl.titleE, nl.rankSum, nl.finishE], [1, 0, 12, 0]);
+  assert.deepStrictEqual([nl.seasonE, nl.titleE, nl.rankSum, nl.finishE, nl.chainE, nl.startE, nl.shareE], [1, 0, 12, 0, 0, 0, 0]);
+  assert.deepStrictEqual(s.levels.map(l => l.level), ['normal']);
 });
 test('the admin funnel adds up per level', () => {
   const rows = [
@@ -161,6 +167,36 @@ test('admin rows name the squads and count seasons and titles per player', () =>
     signedIn = true; calls.length = 0; reply = { data: { achievements: [] } };
     G.journeyFlushPending(); await flush();
     assert.strictEqual(calls[0].args.p.rank, 3);
+  });
+  await atest("a route finished in one account is never sent for another (shared device)", async () => {
+    memory.delete('36-0-journey-pending'); calls.length = 0;
+    reply = { data: null, error: { message: 'offline' } };
+    userId = 'user-a'; G.journeyAwardAchievements({ ...j, id: 'owned-by-a' }); await flush();
+    assert.strictEqual(calls.length, 1);
+    assert.strictEqual(G.journeyPendingLoad()['owned-by-a'].owner, 'user-a');
+    calls.length = 0; reply = { data: { achievements: [] } };
+    userId = 'user-b'; G.journeyFlushPending(); await flush();
+    G.journeyAwardAchievements({ ...j, id: 'owned-by-a', phase: 'season' }, 1); await flush();
+    assert.deepStrictEqual(calls, [], 'B must not send A\'s route');
+    assert.strictEqual(G.journeyPendingLoad()['owned-by-a'].owner, 'user-a');
+    userId = 'user-a'; G.journeyFlushPending(); await flush();
+    assert.strictEqual(calls.length, 1); assert.deepStrictEqual(G.journeyPendingLoad(), {});
+  });
+  await atest('a route finished signed out is adopted by the account that signs in', async () => {
+    calls.length = 0; signedIn = false;
+    G.journeyAwardAchievements({ ...j, id: 'anon-run-1' });
+    assert.strictEqual(G.journeyPendingLoad()['anon-run-1'].owner, null);
+    signedIn = true; userId = 'user-c'; G.journeyFlushPending(); await flush();
+    assert.strictEqual(calls.length, 1); assert.deepStrictEqual(G.journeyPendingLoad(), {});
+    userId = 'u';
+  });
+  await atest('a full localStorage still sends the route', async () => {
+    memory.delete('36-0-journey-pending'); calls.length = 0;
+    const setItem = storage.setItem;
+    storage.setItem = () => { throw new Error('QuotaExceededError'); };
+    try { G.journeyAwardAchievements({ ...j, id: 'quota-run-1' }); await flush(); }
+    finally { storage.setItem = setItem; }
+    assert.strictEqual(calls.length, 1); assert.strictEqual(calls[0].args.p.run_id, 'quota-run-1');
   });
   await atest('the queue keeps only the newest ten routes', async () => {
     signedIn = false; memory.delete('36-0-journey-pending');

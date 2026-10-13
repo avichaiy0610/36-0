@@ -218,10 +218,15 @@ BEGIN
           CASE WHEN v_rank IS NULL THEN NULL ELSE now() END)
   ON CONFLICT (user_id, run_id) DO NOTHING;
   SELECT * INTO v_row FROM journey_runs WHERE user_id = uid AND run_id = v_run;
-  -- a later call may only fill in a season that the row is still waiting for
+  -- A later call may only fill in a season the row is still waiting for. The
+  -- `rank IS NULL` is in the UPDATE itself, not only in the read above: two
+  -- seasons sent at once both read NULL, and under Read Committed the second
+  -- UPDATE waits for the first, re-checks, finds a rank and changes nothing.
+  -- Re-reading afterwards gives both callers the rank that was actually kept.
   IF v_row.rank IS NULL AND v_rank IS NOT NULL THEN
-    UPDATE journey_runs SET rank = v_rank, season_at = now(), ovr = COALESCE(ovr, v_ovr) WHERE id = v_row.id;
-    v_row.rank := v_rank;
+    UPDATE journey_runs SET rank = v_rank, season_at = now(), ovr = COALESCE(ovr, v_ovr)
+     WHERE id = v_row.id AND rank IS NULL;
+    SELECT * INTO v_row FROM journey_runs WHERE id = v_row.id;
   END IF;
 
   -- awards from the stored row only, never from this request

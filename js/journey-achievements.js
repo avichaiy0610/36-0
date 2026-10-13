@@ -73,12 +73,14 @@ function journeyAwardAchievements(j, rank) {
   journeyRefreshAchievements();
   return fresh;
 }
-function journeyAchievementsHTML() {
+// `only` (the main list, signed in): just the device's awards the account lacks,
+// so none is listed twice next to the server's own card.
+function journeyAchievementsHTML(only) {
   const earned = journeyAchievementsLoad();
-  const shown = JOURNEY_ACHIEVEMENTS.filter(a => !a.retired || earned[a.key]);
+  const shown = JOURNEY_ACHIEVEMENTS.filter(a => only ? only.includes(a.key) : (!a.retired || earned[a.key]));
   const count = shown.filter(a => earned[a.key]).length;
-  return `<div class="jr-ach-head"><h2>הישגי מסע ה־11</h2><b dir="ltr">${count} / ${shown.length}</b></div>
-    <p class="jr-ach-note">הישגים אלה נשמרים במכשיר הזה, גם בלי להתחבר.</p>
+  return `<div class="jr-ach-head"><h2>הישגי מסע ה־11${only ? ' · במכשיר הזה' : ''}</h2><b dir="ltr">${count} / ${shown.length}</b></div>
+    <p class="jr-ach-note">${only ? 'הישגים שהשגת במכשיר הזה ועוד לא נשמרו בחשבון שלך.' : 'הישגים אלה נשמרים במכשיר הזה, גם בלי להתחבר.'}</p>
     <div class="jr-ach-grid">${shown.map(a => `<div class="ach-card ${earned[a.key] ? 'ach-unlocked' : 'ach-locked'}" data-jr-ach="${a.key}">
       <div class="ach-icon">${a.icon}</div><div class="ach-info"><div class="ach-name">${a.name_he}${earned[a.key] ? ' ✓' : ''}</div>
         <div class="ach-desc">${a.desc_he}</div>${earned[a.key] ? `<div class="ach-date">${new Date(earned[a.key].at).toLocaleDateString('he-IL')}</div>` : ''}</div></div>`).join('')}</div>`;
@@ -89,16 +91,20 @@ function journeyRefreshAchievements() {
 }
 // `serverHas` (signed in): the keys the account already holds. The device section is
 // then shown only while it holds one the account lacks — a route still queued, or
-// the retired jx_clubs — so nothing earned ever disappears from the main list.
+// the retired jx_clubs — and lists only those, so nothing earned disappears from the
+// main list and nothing is listed twice.
 function journeyAppendAchievements(container, serverHas) {
   if (!container) return;
+  let only = null;
   if (serverHas) {
-    const earned = journeyAchievementsLoad();
-    if (!Object.keys(earned).some(key => !serverHas[key])) return;
+    only = Object.keys(journeyAchievementsLoad()).filter(key => !serverHas[key]);
+    if (!only.length) return;
   }
   const section = document.createElement('section');
-  section.className = 'jr-ach-section'; section.dataset.journeyAchievements = '';
-  section.innerHTML = journeyAchievementsHTML(); container.appendChild(section);
+  section.className = 'jr-ach-section';
+  // the refresher repaints the full list; this one is a fixed subset
+  if (!only) section.dataset.journeyAchievements = '';
+  section.innerHTML = journeyAchievementsHTML(only); container.appendChild(section);
 }
 
 // Every finished route waits in a device queue until the server has answered it.
@@ -106,6 +112,10 @@ function journeyAppendAchievements(container, serverHas) {
 // finished signed out has nobody to belong to yet: both are sent by
 // journeyFlushPending when onSignIn runs (js/auth.js). The server keeps the first
 // call's route and only ever adds a missing rank, so resending is harmless.
+// Each entry carries its `owner`: the account signed in when the route was
+// finished, or null. A signed-out route is adopted by whoever signs in next;
+// one finished in an account is only ever sent for that account (Codex's review
+// of ddded8f4: a shared device must not hand A's route to B).
 const JOURNEY_PENDING_KEY = '36-0-journey-pending';
 function journeyPendingLoad() {
   try {
@@ -119,27 +129,37 @@ function journeyPendingSave(runs) {
   const kept = {}; ids.forEach(id => { kept[id] = runs[id]; });
   try { localStorage.setItem(JOURNEY_PENDING_KEY, JSON.stringify({ v: 1, runs: kept })); } catch (e) {}
 }
+function journeyUserId() {
+  const u = typeof getCurrentUser === 'function' ? getCurrentUser() : null;
+  return u && u.id ? String(u.id) : null;
+}
 function journeyServerSubmit(j, rank) {
   try {
     if (!journeyAchievementMetrics(j) || !j.id) return;
     const runs = journeyPendingLoad(), old = runs[j.id];
+    const me = journeyUserId();
+    // an owned entry stays its owner's, even if this device now has someone else on it
+    if (old && old.owner && me && old.owner !== me) return;
     const p = { run_id: String(j.id), level: journeyLevelKey(j), formation: state.formationId || '',
       route: j.path.map(s => ({ squadId: s.squadId, name: s.name })), broken: !!j.broken };
     if (typeof teamOVR === 'function') p.ovr = teamOVR();
     if (rank != null) p.rank = rank;
     else if (old && old.p && old.p.rank != null) p.rank = old.p.rank;
-    runs[j.id] = { p, at: (old && old.at) || Date.now() };
+    const entry = { p, owner: (old && old.owner) || me, at: (old && old.at) || Date.now() };
+    runs[j.id] = entry;
     journeyPendingSave(runs);
-    journeySendPending(j.id);
+    // sent from memory: a full or blocked localStorage must not stop the award
+    journeySendPending(j.id, entry);
   } catch (e) { /* an award never breaks a run */ }
 }
 // Answered means the server took it or refused it for good; a sign-in, profile
 // or network failure keeps it queued for the next sign-in.
 const JOURNEY_RETRY = ['not signed in', 'no profile'];
-function journeySendPending(id) {
-  if (typeof getCurrentUser !== 'function' || !getCurrentUser() || typeof _supabase === 'undefined' || !_supabase) return;
-  const entry = journeyPendingLoad()[id];
-  if (!entry) return;
+function journeySendPending(id, given) {
+  const me = journeyUserId();
+  if (!me || typeof _supabase === 'undefined' || !_supabase) return;
+  const entry = given || journeyPendingLoad()[id];
+  if (!entry || !entry.p || (entry.owner && entry.owner !== me)) return;
   const sentRank = entry.p.rank;
   _supabase.rpc('submit_journey_run', { p: entry.p }).then(({ data, error }) => {
     if (error || !data || JOURNEY_RETRY.includes(data.error)) return;

@@ -39,25 +39,29 @@ function journeyAdminSummary(usageRows) {
   const per = {};
   for (const r of rows) {
     if (r.event === 'open' || !r.detail || r.detail === '—') continue;
-    const [level, what, rank] = String(r.detail).split('|');
+    // Exactly the shapes js/journey*.js send, field count included: a detail with
+    // a missing, malformed or extra field is not counted at all.
+    const parts = String(r.detail).split('|'), [level, what, rank] = parts;
     if (!JA_LEVELS[level]) continue;
+    const kind =
+      r.event === 'progress' && parts.length === 2 && (what === 'start' || what === 'break') ? what
+      : r.event === 'progress' && parts.length === 3 && what === 'season' && /^(?:[1-9]|1[0-9]|20)$/.test(rank) ? 'season'
+      : r.event === 'finish' && parts.length === 2 && (what === 'chain' || what === 'break') ? 'finish'
+      : r.event === 'share' && parts.length === 1 ? 'share' : null;
+    if (!kind) continue;
     const c = per[level] || (per[level] = blank(level));
     const p = Number(r.people || 0), e = Number(r.events || 0);
-    if (r.event === 'progress') {
-      if (what === 'start') { c.startP += p; c.startE += e; }
-      else if (what === 'break') c.breakE += e;
-      // only a whole rank 1-20 counts: '1oops' or a missing rank is not a season
-      else if (what === 'season' && /^(?:[1-9]|1[0-9]|20)$/.test(rank || '')) {
-        const n = Number(rank);
-        c.seasonE += e;
-        if (n === 1) c.titleE += e;
-        c.rankSum += n * e;
-      }
-    } else if (r.event === 'finish') {
-      if (what !== 'chain' && what !== 'break') continue;
+    if (kind === 'start') { c.startP += p; c.startE += e; }
+    else if (kind === 'break') c.breakE += e;
+    else if (kind === 'season') {
+      const n = Number(rank);
+      c.seasonE += e;
+      if (n === 1) c.titleE += e;
+      c.rankSum += n * e;
+    } else if (kind === 'finish') {
       c.finishE += e;
       if (what === 'chain') c.chainE += e;
-    } else if (r.event === 'share') c.shareE += e;
+    } else c.shareE += e;
   }
   const levels = JA_ORDER.filter(k => per[k]).map(k => per[k]);
   const totals = blank('סה"כ');
