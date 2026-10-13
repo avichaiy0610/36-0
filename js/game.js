@@ -4245,7 +4245,7 @@ function populateShareCard() {
   document.getElementById('sc-p-formation').textContent = formation;
   document.getElementById('sc-p-ovr').textContent = `OVR ${r.ovr}`;
   const modeParts = [];
-  if (state.journey) modeParts.push('🧭 מסע ה־11');
+  if (state.journey) modeParts.push('🧭 מסע ה־11' + (typeof journeyLevel === 'function' ? ' · ' + journeyLevel().label : ''));
   const diffMap = { easy: 'קל', normal: 'רגיל', hard: 'קשה' };
   if (state.challenge && typeof challengeNumber === 'function')
     modeParts.push(`${CHAL_PERIODS[state.challenge.period]?.icon ?? '🗓️'} ${CHAL_PERIODS[state.challenge.period]?.short ?? ''} #${challengeNumber(state.challenge.period, state.challenge.key)}`);

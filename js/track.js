@@ -58,7 +58,9 @@
 
   // track('open' | 'finish' | 'share', mode, detail?)
   window.track = function (event, mode, detail) {
-    if (typeof state !== 'undefined' && state.journey) return; // Local mode has no server telemetry yet.
+    // During a journey its cup, Europe and season would count as an ordinary draft:
+    // only the journey's own events (and the visit itself) leave the page.
+    if (typeof state !== 'undefined' && state.journey && !['journey', 'entry', 'install'].includes(mode)) return;
     try {
       if (!mode || typeof _supabase === 'undefined' || !_supabase) return;
       const key = event + '|' + mode + '|' + (detail == null ? '' : detail);

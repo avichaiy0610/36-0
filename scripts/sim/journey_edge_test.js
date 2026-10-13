@@ -7,7 +7,7 @@ const storage = { getItem: k => memory.get(k) || null, setItem: (k, v) => memory
 const G = new Function('document', 'window', 'localStorage',
   ['js/data.js', 'js/sim-engine.js', 'js/game.js', 'js/journey-engine.js', 'js/journey.js'].map(read).join('\n') +
   ';journeyStartRound = () => {}; return {state,SQUADS,formationSlots,journeyEngine,journeyOptions,journeyAllowedSlots,' +
-  'journeyRecordPick,journeyPrepareEscape,journeyEnter,journeyValidSave,saveDraftState};')({ addEventListener() {} }, {}, storage);
+  'journeyRecordPick,journeyPrepareEscape,journeyEnter,journeyValidSave,saveDraftState,journeyDestinations};')({ addEventListener() {} }, {}, storage);
 let n = 0;
 function test(name, fn) { fn(); n++; console.log('PASS  ' + name); }
 const slots = G.formationSlots('4-3-3', 'bal');
@@ -70,5 +70,36 @@ test('a save claiming two broken links is rejected', () => {
   assert.ok(G.journeyValidSave(d, G.state.picks));
   d.journey.path[2].arrival = 'break';
   assert.strictEqual(G.journeyValidSave(d, G.state.picks), false);
+});
+// ── a normal-level run: three doors drawn once, a club only once ──────────────
+const normalStart = G.journeyEngine({ level: 'normal' }).starts(slots.map(s => s.role || s.pos), null, 1)[0];
+Object.assign(G.state, { slots, picks: slots.map(() => null), currentRound: 0,
+  currentSquad: normalStart, usedPlayerKeys: new Set(), usedSquadIds: new Set([normalStart.id]),
+  journey: { v: 1, id: 'edge-normal', level: 'normal', phase: 'pick', path: [], visited: [normalStart.id],
+    broken: false, arrival: 'start', escapeIds: null, destIds: null } });
+take();
+let doors;
+test('a normal draw shows at most three doors and a refresh deals the same ones', () => {
+  doors = G.journeyDestinations().map(s => s.id);
+  assert.ok(doors.length >= 1 && doors.length <= 3);
+  assert.deepStrictEqual(G.journeyDestinations().map(s => s.id), doors);
+  const d = JSON.parse(storage.getItem('36-0-draft'));
+  assert.deepStrictEqual(d.journey.destIds, doors);
+  const picks = d.picks.map(p => { if (!p) return null; const squad = G.journeyEngine().squad(p.squadId);
+    return { squad, player: squad.players.find(x => x.name === p.name) }; });
+  assert.ok(G.journeyValidSave(d, picks));
+  d.journey.destIds = [G.SQUADS.find(s => !doors.includes(s.id) && !d.journey.visited.includes(s.id) &&
+    !G.journeyEngine().career(d.journey.path[0].name).some(x => x.id === s.id)).id];
+  assert.strictEqual(G.journeyValidSave(d, picks), false, 'a door outside his career is forged');
+});
+test('a squad outside the draw cannot be entered, and the drawn one can', () => {
+  const outside = G.journeyEngine().destinations(G.state.journey.path[0].name, {
+    currentId: G.state.currentSquad.id, remaining: G.state.slots.filter((_, i) => !G.state.picks[i]).map(s => s.role || s.pos),
+    usedNames: [...G.state.usedPlayerKeys], visited: G.state.journey.visited, breakLeft: 1 }).find(s => !doors.includes(s.id));
+  if (outside) assert.strictEqual(G.journeyEnter(outside.id, false), false);
+  assert.strictEqual(G.journeyEnter(doors[0], false), true);
+  assert.strictEqual(G.state.journey.destIds, null);
+  const clubs = G.state.journey.visited.map(id => G.journeyEngine().squad(id).teamId);
+  assert.strictEqual(new Set(clubs).size, clubs.length);
 });
 console.log('\n' + n + ' passed');

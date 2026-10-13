@@ -92,8 +92,37 @@ test('historical facts exactly match the original final league tables', () => {
   const facts = new Function(read('js/journey-facts.js') + ';return JOURNEY_FACTS;')();
   D.SQUADS.forEach(s => {
     const row = (tables[s.season] || []).find(r => r.teamId === s.teamId);
-    if (row) assert.deepStrictEqual(facts[s.id], { pos: row.pos, pts: row.pts });
-    else assert.strictEqual(facts[s.id], undefined);
+    if (row) {
+      assert.strictEqual(facts[s.id].pos, row.pos); assert.strictEqual(facts[s.id].pts, row.pts);
+      // halved seasons are exactly the two whose whole table breaks 3W+D
+      assert.strictEqual(!!facts[s.id].half, ['2009/10', '2010/11'].includes(s.season), s.id);
+    } else assert.strictEqual(facts[s.id], undefined);
+  });
+});
+test('a club limit of one never enters a club twice, and every formation still completes', () => {
+  const once = factory.create(D.SQUADS, D.playerFitsSlot, { clubLimit: 1 });
+  const shuffle = a => a.slice().sort(() => Math.random() - 0.5);
+  Object.keys(D.FORMATIONS).forEach(formation => {
+    for (let r = 0; r < 3; r++) {
+      const slots = D.formationSlots(formation, 'bal').map(D.slotFitPos);
+      const start = once.starts(slots, shuffle, 1);
+      assert.strictEqual(start.length, 1);
+      const c = { currentId: start[0].id, remaining: slots, usedNames: [], visited: [start[0].id], breakLeft: 1 };
+      while (c.remaining.length) {
+        const choices = once.choices(c);
+        assert.ok(choices.length, 'no dead end: ' + formation);
+        const choice = choices[Math.floor(Math.random() * choices.length)];
+        c.usedNames.push(choice.name); c.remaining.splice(choice.slots[0], 1);
+        if (!c.remaining.length) break;
+        let next = once.destinations(choice.name, c, shuffle, 3);
+        assert.ok(next.length <= 3);
+        if (!next.length) { next = once.escapes(c, shuffle, 3); c.breakLeft--; assert.ok(next.length <= 3); }
+        assert.ok(next.length && c.breakLeft >= 0);
+        c.currentId = next[0].id; c.visited.push(c.currentId);
+      }
+      const clubs = c.visited.map(id => once.squad(id).teamId);
+      assert.strictEqual(new Set(clubs).size, clubs.length);
+    }
   });
 });
 if (!process.argv.includes('--quick')) test('real data: every formation completes legal, non-repeating journeys', () => {

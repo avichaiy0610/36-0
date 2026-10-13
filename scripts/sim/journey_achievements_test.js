@@ -11,7 +11,7 @@ const G = new Function('document', 'window', 'localStorage',
     { addEventListener() {}, getElementById() { return null; } }, {}, storage);
 let n = 0;
 function test(name, fn) { fn(); n++; console.log('PASS  ' + name); }
-const metrics = { broken: true, clubs: 1, yearGap: 0, backwards: 0, phase: 'complete' };
+const metrics = { broken: true, clubs: 1, yearGap: 0, backwards: 0, phase: 'complete', level: 'normal' };
 test('six unique achievements cover the journey and its season', () => {
   assert.strictEqual(G.JOURNEY_ACHIEVEMENTS.length, 6);
   assert.strictEqual(new Set(G.JOURNEY_ACHIEVEMENTS.map(a => a.key)).size, 6);
@@ -24,9 +24,15 @@ test('only an unbroken route earns the chain award', () => {
   assert.ok(!G.journeyAchievementKeys(metrics).includes('jx_chain'));
 });
 test('club, year gap and backwards thresholds are exact', () => {
-  assert.deepStrictEqual(G.journeyAchievementKeys({ ...metrics, clubs: 7, yearGap: 19, backwards: 3 }), ['jx_finish']);
-  const keys = G.journeyAchievementKeys({ ...metrics, clubs: 8, yearGap: 20, backwards: 4 });
-  ['jx_clubs', 'jx_time', 'jx_back'].forEach(k => assert.ok(keys.includes(k)));
+  assert.deepStrictEqual(G.journeyAchievementKeys({ ...metrics, clubs: 11, yearGap: 19, backwards: 3 }), ['jx_finish']);
+  const keys = G.journeyAchievementKeys({ ...metrics, yearGap: 20, backwards: 4 });
+  ['jx_time', 'jx_back'].forEach(k => assert.ok(keys.includes(k)));
+});
+test('the hard award needs the hard level, and an easy season wins no title award', () => {
+  assert.ok(G.journeyAchievementKeys({ ...metrics, level: 'hard' }).includes('jx_hard'));
+  assert.ok(!G.journeyAchievementKeys(metrics).includes('jx_hard'));
+  assert.ok(!G.journeyAchievementKeys({ ...metrics, level: 'easy', phase: 'season' }, 1).includes('jx_title'));
+  assert.ok(G.journeyAchievementKeys({ ...metrics, level: 'hard', phase: 'season' }, 1).includes('jx_title'));
 });
 test('a league title is awarded only for rank one in the season phase', () => {
   assert.ok(!G.journeyAchievementKeys(metrics, 1).includes('jx_title'));
@@ -44,11 +50,11 @@ test('invalid stored achievement data is ignored', () => {
   assert.deepStrictEqual(G.journeyAchievementsLoad(), {});
 });
 function completedRoute() {
-  const engine = G.journeyEngine(), slots = G.formationSlots('4-3-3', 'bal');
+  const engine = G.journeyEngine({ level: 'normal' }), slots = G.formationSlots('4-3-3', 'bal');
   const remaining = slots.map((slot, i) => ({ pos: G.slotFitPos(slot), id: slot.id }));
   const first = engine.starts(remaining.map(s => s.pos))[0];
   const c = { currentId: first.id, remaining: remaining.map(s => s.pos), usedNames: [], visited: [first.id], breakLeft: 1 };
-  const j = { v: 1, id: 'achievement-test', phase: 'complete', path: [], visited: c.visited, broken: false };
+  const j = { v: 1, id: 'achievement-test', level: 'normal', phase: 'complete', path: [], visited: c.visited, broken: false };
   let arrival = 'start';
   while (remaining.length) {
     const pick = engine.choices(c)[0], i = pick.slots[0];
@@ -66,7 +72,7 @@ test('the final pick unlocks awards before the summary screen or any timer runs'
   memory.delete('36-0-journey-achievements');
   const j = JSON.parse(JSON.stringify(route)), last = j.path.pop();
   j.phase = 'pick'; j.arrival = last.arrival;
-  const squad = G.journeyEngine().squad(last.squadId);
+  const squad = G.journeyEngine(j).squad(last.squadId);
   G.state.slots = G.formationSlots('4-3-3', 'bal');
   Object.assign(G.state, { journey: j, currentRound: 11, currentSquad: squad });
   const idx = G.state.slots.findIndex(s => s.id === last.slotId);
@@ -88,6 +94,13 @@ test('a completed season adds the title once and keeps earlier route awards', ()
   assert.ok(G.journeyAchievementsLoad().jx_finish);
   assert.ok(G.journeyAchievementsLoad().jx_title);
   assert.deepStrictEqual(G.journeyAwardAchievements(season, 1), []);
+});
+test('a normal route that enters one club twice cannot unlock awards', () => {
+  const twice = JSON.parse(JSON.stringify(route));
+  const engine = G.journeyEngine(twice), clubOf = id => engine.squad(id).teamId;
+  const other = G.SQUADS.find(s => s.teamId === clubOf(twice.visited[0]) && !twice.visited.includes(s.id));
+  twice.visited[1] = other.id; twice.path[1].squadId = other.id;
+  assert.strictEqual(G.journeyAchievementMetrics(twice), null);
 });
 test('a route with two broken links cannot unlock awards', () => {
   const bad = JSON.parse(JSON.stringify(route));
