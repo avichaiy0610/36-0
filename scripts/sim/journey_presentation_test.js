@@ -51,9 +51,9 @@ async function board(reply) {
   });
   // The cup and Europe ask one helper (js/texts.js), so a career wears the same
   // crest — or none — in both. Test the helper, and that both callers use it.
-  const crestFor = (careerName, club, story = false) => new Function('state', 'crRun', 'clubHas', 'clubStory',
+  const crestFor = (careerName, club, story = false) => new Function('document', 'state', 'crRun', 'clubHas', 'clubStory',
     'clubShown', 'clubCrestSVG', read('js/texts.js') + ';return myTeamCrestClub();')(
-      { career: careerName ? {} : null }, () => ({ clubName: careerName }), () => !!club && !story,
+      { addEventListener() {} }, { career: careerName ? {} : null }, () => ({ clubName: careerName }), () => !!club && !story,
       () => story ? club : null, () => club, () => '<svg></svg>');
   await test('myTeamCrestClub: a different career name gets no crest, the same name keeps it', () => {
     assert.strictEqual(crestFor('Career A', { name: 'Personal B' }), null);
