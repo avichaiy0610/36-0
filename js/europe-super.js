@@ -85,11 +85,11 @@ function euUscPlay(c) {
 // Super Cup, because the server counts it.
 async function euUscSubmit(c) {
   const t = c.usc;
-  if (!t || !t.legs.length || t.submitted || c.sandbox) return;
+  if (!t || !t.legs.length || t.submitted || c.sandbox || c.localJourney) return;
   t.submitted = true;
   euSave(c);
   if (typeof track === 'function') track('finish', 'europe', t.won ? 'super-won' : 'super-lost');
-  if (!t.won || typeof getCurrentUser !== 'function' || !getCurrentUser()) return;
+  if (state.journey || !t.won || typeof getCurrentUser !== 'function' || !getCurrentUser()) return;
   try {
     const r = await _supabase.rpc('submit_super_cup', { p: { won: true, tier: c.tier } });
     const got = (r && r.data && r.data.achievements) || [];

@@ -92,6 +92,8 @@
     const field = cupField();
     return {
       v: CUP_SAVE_V,
+      localJourney: !!state.journey,
+      journeyId: state.journey ? (state.journey.id || null) : null,
       rounds: [{ id: CUP_ROUNDS[0].id, ties: cupDraw(field) }],
       out: null,          // the round the player went out in
       champion: null,
@@ -252,6 +254,15 @@
   // rating was the answer.
   const TIER_NAME = ['ליגת העל', 'ליגה לאומית', "ליגה א'"];
 
+  // The header's own side: the club's crest beside its name when there is a club
+  // (המועדון שלך, or the club a story chapter / derby plays as), as Europe does
+  // with euMyCrest. Without one it stays the plain name — or "ההרכב שלי".
+  function cupMine() {
+    const name = myTeamName(siteTextOr('cup-you', 'ההרכב שלי'));
+    const club = typeof myTeamCrestClub === 'function' ? myTeamCrestClub() : null;
+    return club ? `<span class="cup-crest">${clubCrestSVG(club, 16)}</span>${name}` : name;
+  }
+
   function cupShowMatch(i, tie, resume) {
     const meta = CUP_ROUNDS[i];
     const opp = tie.a.us ? tie.b : tie.a;
@@ -273,7 +284,7 @@
     frame(`
       <div class="cup-kicker">🏆 ${meta.roundLong}</div>
       <div class="cup-top">
-        <span class="cup-side">${myTeamName(siteTextOr('cup-you', 'ההרכב שלי'))}</span>
+        <span class="cup-side">${cupMine()}</span>
         <span class="cup-score" dir="ltr"><b id="cup-them">0</b> – <b id="cup-me">0</b></span>
         <span class="cup-side">${opp.name}<i>${TIER_NAME[opp.tier]}</i></span>
       </div>
@@ -536,7 +547,7 @@
         <div class="cup-kicker">🛡️ אלוף האלופים</div>
         <div class="cup-super-art">${art}</div>
         <div class="cup-top">
-          <span class="cup-side">${myTeamName(siteTextOr('cup-you', 'ההרכב שלי'))}<i>${s.mine}</i></span>
+          <span class="cup-side">${cupMine()}<i>${s.mine}</i></span>
           <span class="cup-vs">מול</span>
           <span class="cup-side">${s.club.name}<i>${s.role}</i></span>
         </div>
@@ -564,7 +575,7 @@
     frame(`
       <div class="cup-kicker">🛡️ אלוף האלופים</div>
       <div class="cup-top">
-        <span class="cup-side">${myTeamName(siteTextOr('cup-you', 'ההרכב שלי'))}</span>
+        <span class="cup-side">${cupMine()}</span>
         <span class="cup-score" dir="ltr"><b id="cup-them">0</b> – <b id="cup-me">0</b></span>
         <span class="cup-side">${s.club.name}<i>${s.role}</i></span>
       </div>
@@ -601,7 +612,7 @@
     s.submitted = true;
     cupSave();
     if (typeof track === 'function') track('finish', 'draft', s.won ? 'isc-won' : 'isc-lost');
-    if (!s.won || typeof getCurrentUser !== 'function' || !getCurrentUser()) return;
+    if (state.journey || (_run && _run.localJourney) || !s.won || typeof getCurrentUser !== 'function' || !getCurrentUser()) return;
     try {
       const r = await _supabase.rpc('submit_israel_super', { p: { won: true } });
       const got = (r && r.data && r.data.achievements) || [];
@@ -648,6 +659,7 @@
     if (!_run.champion) return;
     _run.submitted = true;
     cupSave();
+    if (state.journey || _run.localJourney) return;
     if (typeof getCurrentUser !== 'function' || !getCurrentUser()) return;
     // which tier knocked me out, for the badge nobody wants
     let byTier = 0;
@@ -687,6 +699,7 @@
       const raw = localStorage.getItem(DRAFT_SAVE_KEY);
       if (!raw || !_run) return;
       const d = JSON.parse(raw);
+      if (_run.localJourney && (!d.journey || _run.journeyId !== (d.journey.id || null))) return;
       d[CUP_KEY] = _run;
       localStorage.setItem(DRAFT_SAVE_KEY, JSON.stringify(d));
     } catch (e) {}
@@ -694,7 +707,13 @@
   function cupLoad() {
     try {
       const d = JSON.parse(localStorage.getItem(DRAFT_SAVE_KEY));
-      return d && d[CUP_KEY] && d[CUP_KEY].v === CUP_SAVE_V ? d[CUP_KEY] : null;
+      if (!d || !d[CUP_KEY] || d[CUP_KEY].v !== CUP_SAVE_V) return null;
+      if (d.journey) {
+        if (d[CUP_KEY].journeyId && d[CUP_KEY].journeyId !== d.journey.id) return null;
+        d[CUP_KEY].localJourney = true;
+        d[CUP_KEY].journeyId = d.journey.id || null;
+      }
+      return d[CUP_KEY];
     } catch (e) { return null; }
   }
   function cupClear() {

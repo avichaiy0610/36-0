@@ -58,6 +58,9 @@
 
   // track('open' | 'finish' | 'share', mode, detail?)
   window.track = function (event, mode, detail) {
+    // During a journey its cup, Europe and season would count as an ordinary draft:
+    // only the journey's own events (and the visit itself) leave the page.
+    if (typeof state !== 'undefined' && state.journey && !['journey', 'entry', 'install'].includes(mode)) return;
     try {
       if (!mode || typeof _supabase === 'undefined' || !_supabase) return;
       const key = event + '|' + mode + '|' + (detail == null ? '' : detail);

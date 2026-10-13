@@ -114,6 +114,8 @@ function euBuildCampaign(tier, opts) {
   if (typeof euForcedLines === 'function') me = euForcedLines(me);
   const c = {
     v: EU_SAVE_V,
+    localJourney: !!state.journey,
+    journeyId: state.journey ? (state.journey.id || null) : null,
     tier: EU_TIERS[tier] ? tier : 'ucl',   // which competition this summer is
     ovr: me.ovr,
     lines: { atk: me.atk, mid: me.mid, def: me.def, gk: me.gk },
@@ -487,7 +489,7 @@ function euRoad(c) {
 // Sending is cheap and the server clamps everything, so the guard is simply "has
 // anything new happened since the last send".
 async function euSubmit(c) {
-  if (c.sandbox) return;                 // a sandbox 👑 שמינית הגמר is not an achievement
+  if (c.sandbox || c.localJourney) return; // A local journey never submits even after navigation.
   const done = c.ties.length + (c.league ? 1 : 0) + (c.result ? 1 : 0);
   if (done <= (c.submitted || 0)) return;
   c.submitted = done;
@@ -504,7 +506,7 @@ async function euSubmit(c) {
       typeof state !== 'undefined' && state && state.career) {
     crRecordEuTrophy(state.career.year, c.tier || 'ucl', c.result === 'won');
   }
-  if (typeof getCurrentUser !== 'function' || !getCurrentUser()) return;
+  if (state.journey || typeof getCurrentUser !== 'function' || !getCurrentUser()) return;
 
   const L = c.league;
   const ko = c.ties.filter(t => t.kind === 'ko');
@@ -547,6 +549,7 @@ function euSave(c) {
     const raw = localStorage.getItem(DRAFT_SAVE_KEY);
     if (!raw) return;
     const d = JSON.parse(raw);
+    if (c.localJourney && (!d.journey || c.journeyId !== (d.journey.id || null))) return;
     d[EU_KEY] = c;
     localStorage.setItem(DRAFT_SAVE_KEY, JSON.stringify(d));
   } catch (e) {}
@@ -556,7 +559,13 @@ function euSave(c) {
 function euLoad() {
   try {
     const d = JSON.parse(localStorage.getItem(DRAFT_SAVE_KEY));
-    return d && d[EU_KEY] && d[EU_KEY].v === EU_SAVE_V ? d[EU_KEY] : null;
+    if (!d || !d[EU_KEY] || d[EU_KEY].v !== EU_SAVE_V) return null;
+    if (d.journey) {
+      if (d[EU_KEY].journeyId && d[EU_KEY].journeyId !== d.journey.id) return null;
+      d[EU_KEY].localJourney = true;
+      d[EU_KEY].journeyId = d.journey.id || null;
+    }
+    return d[EU_KEY];
   } catch (e) { return null; }
 }
 function euClear() {

@@ -15,7 +15,11 @@ async function showAchievementToasts(achievementKeys) {
     .from('achievements')
     .select('key, name_he, icon')
     .in('key', achievementKeys);
-  for (const ach of (achs ?? [])) {
+  await enqueueAchievementToasts(achs ?? []);
+}
+
+async function enqueueAchievementToasts(achs) {
+  for (const ach of achs) {
     if (_toastSeen.has(ach.key)) continue;
     _toastSeen.add(ach.key);
     _toastQueue.push(ach);
@@ -88,6 +92,8 @@ async function showAchievements() {
   showScreen('achievements');
   const grid = document.getElementById('achievements-grid');
   grid.innerHTML = '<div class="page-loading">טוען...</div>';
+  // Signed in, the journey's awards arrive as real ones from the server list below.
+  if (!getCurrentUser() && typeof journeyAppendAchievements === 'function') journeyAppendAchievements(grid);
 
   document.getElementById('achievements-back').onclick = () => {
     showScreen('welcome');
@@ -117,6 +123,7 @@ async function showAchievements() {
   });
 
   grid.innerHTML = '';
+  if (typeof journeyAppendAchievements === 'function') journeyAppendAchievements(grid, user ? unlockedMap : null);
 
   if (!user) {
     const note = document.createElement('p');

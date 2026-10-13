@@ -187,6 +187,53 @@ async function loadSalaryBoardTab(table) {
   }).join('');
 }
 
+// מסע ה־11 (v1.61, migration 20261013000002): a board per level, because a קל
+// route revisits clubs and sees every door — mixing it in would only rank the
+// levels. One row per player: their best season, by points (3W+D, counted on the
+// server), then goal difference.
+let lbJourneyLevel = 'normal';
+const LB_JOURNEY_LEVELS = [['normal', 'רגיל'], ['hard', 'קשה'], ['easy', 'קל']];
+async function loadJourneyBoardTab(table) {
+  const head = `<div class="jr-lb-levels">${LB_JOURNEY_LEVELS.map(([k, label]) =>
+    `<button class="jr-lb-level${k === lbJourneyLevel ? ' selected' : ''}" data-jr-lb="${k}">${label}</button>`).join('')}</div>`;
+  const wire = () => table.querySelectorAll('[data-jr-lb]').forEach(b => {
+    b.onclick = () => { lbJourneyLevel = b.dataset.jrLb; loadJourneyBoardTab(table); };
+  });
+  table.innerHTML = head + '<div class="page-loading">טוען...</div>';
+  wire();
+  const level = lbJourneyLevel;
+  const { data: rows, error } = await _supabase.rpc('journey_board', { p_level: level, p_limit: 100 });
+  if (level !== lbJourneyLevel || lbTab !== 'journey') return;   // another tab was asked for meanwhile
+  if (error) {
+    table.innerHTML = head + '<div class="page-note" role="alert">לא ניתן לטעון את לוח השיאים כרגע. נסה שוב בעוד רגע.</div>';
+    wire();
+    return;
+  }
+  if (!rows || !rows.length) {
+    table.innerHTML = head + `<div class="page-note">
+      עוד לא שוחקה עונה של מסע ה־11 ברמה הזאת — סיים מסע, צא לעונה והיה הראשון על הלוח 🧭
+    </div>`;
+    wire();
+    return;
+  }
+  const user = typeof getCurrentUser === 'function' ? getCurrentUser() : null;
+  table.innerHTML = head + rows.map(r => {
+    const me = user && r.user_id === user.id;
+    const gd = (r.gf || 0) - (r.ga || 0);
+    const finish = r.league_rank === 1 ? '🏆 אלופה' : `מקום ${r.league_rank}`;
+    return `
+      <div class="lb-row${me ? ' lgsim-me' : ''}">
+        <span class="lb-rank ${r.pos <= 3 ? 'lb-rank-top' : ''}">${r.pos}</span>
+        <span class="lb-name">${esc(r.username || 'אנונימי')}${me ? ' (אתה)' : ''}
+          ${lbClubTag(r.club)}
+          <span class="cr-board-club">${finish} · ${r.clubs} מועדונים · ${r.year_gap} שנות פער${r.broken ? ' · ✂' : ''}</span></span>
+        <span class="lb-stat">${r.points} נק׳</span>
+        <span class="lb-sub" dir="rtl"><bdi>OVR ${r.ovr ?? '–'}</bdi> · <bdi>${r.wins}-${r.draws}-${r.losses}</bdi> · <bdi dir="ltr">${gd > 0 ? '+' : ''}${gd}</bdi></span>
+      </div>`;
+  }).join('');
+  wire();
+}
+
 // One row per player, picked on the server (migration 20260917000001). Picking it
 // here, out of the top 200 runs, let the few players who replay the high banners
 // fill all 200 rows — the board showed three names and dropped everyone else.
@@ -240,8 +287,9 @@ async function loadLeaderboard() {
   // The gauntlet, a dynasty and a capped season have no seasons, formats or
   // periods. Leaving the filters up made them look broken: the salary board
   // ignores them, so every option redrew the same table.
-  lbToggleSeasonFilters(lbTab !== 'gauntlet' && lbTab !== 'career' && lbTab !== 'salary');
+  lbToggleSeasonFilters(lbTab !== 'gauntlet' && lbTab !== 'career' && lbTab !== 'salary' && lbTab !== 'journey');
   if (lbTab === 'gauntlet') return loadGauntletBoard(table);
+  if (lbTab === 'journey')  return loadJourneyBoardTab(table);
   if (lbTab === 'career')   return loadCareerBoardTab(table);
   if (lbTab === 'salary')   return loadSalaryBoardTab(table);
 

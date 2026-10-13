@@ -77,8 +77,8 @@ function euBigCrest(cid, flag, name) {
 // means no crest you chose, so the monogram stays.
 function euMyCrest(big) {
   const name = myTeamName(euText('eu-you', 'ההרכב שלי'));
-  const club = (typeof clubHas === 'function' && (clubHas() || (typeof clubStory === 'function' && clubStory())) &&
-                typeof clubCrestSVG === 'function') ? clubShown() : null;
+  // same rule as the cup: no personal crest beside a career's different name
+  const club = typeof myTeamCrestClub === 'function' ? myTeamCrestClub() : null;
   if (club) {
     return `<span class="eu-badge eu-badge-mine${big ? '' : ' sm'}">${clubCrestSVG(club, big ? 18 : 13)}</span>`;
   }

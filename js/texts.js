@@ -55,6 +55,27 @@ document.addEventListener('DOMContentLoaded', applySiteTexts);
    a later global identity override it would rename a run halfway through. So the
    order is career → club → the caller's own wording, and a player who never made
    a club still reads exactly what he always did. */
+// The club whose crest belongs beside myTeamName(): the club a story chapter or
+// a derby plays as, else the player's own club from המועדון שלך — but never beside
+// a career's name when the career was given a different one (a career's name is
+// free text, prefilled from the club: "Career A" must not wear club B's badge).
+// The cup headers (cupMine) and Europe (euMyCrest) both ask here, so one career
+// shows the same crest, or none, everywhere. null = draw no crest.
+function myTeamCrestClub() {
+  try {
+    if (typeof clubShown !== 'function' || typeof clubCrestSVG !== 'function') return null;
+    const story = typeof clubStory === 'function' ? clubStory() : null;
+    if (!story && !(typeof clubHas === 'function' && clubHas())) return null;
+    const club = clubShown();
+    if (!club) return null;
+    if (!story && typeof state !== 'undefined' && state && state.career && typeof crRun === 'function') {
+      const careerName = String(crRun().clubName || '').trim();
+      if (careerName && careerName !== String(club.name || '').trim()) return null;
+    }
+    return club;
+  } catch (e) { return null; }   // a crest is decoration: never break a header over it
+}
+
 function myTeamName(fallback) {
   try {
     if (typeof state !== 'undefined' && state && state.career && typeof crRun === 'function') {

@@ -105,6 +105,7 @@
     const year = parseInt(ch.season, 10);
     Object.assign(state, {
       story: { chapterId: ch.id },
+      journey: null,
       challenge: null, challengeDeck: null, challengeReqs: null,
       leagueCode: null, duelCode: null, career: null, gauntlet: null, derby: null,
       salaryCap: false, deck: null, mgw: null,
