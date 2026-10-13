@@ -87,28 +87,71 @@ function journeyRefreshAchievements() {
   if (typeof document === 'undefined' || !document.querySelectorAll) return;
   document.querySelectorAll('[data-journey-achievements]').forEach(el => { el.innerHTML = journeyAchievementsHTML(); });
 }
-function journeyAppendAchievements(container) {
+// `serverHas` (signed in): the keys the account already holds. The device section is
+// then shown only while it holds one the account lacks — a route still queued, or
+// the retired jx_clubs — so nothing earned ever disappears from the main list.
+function journeyAppendAchievements(container, serverHas) {
   if (!container) return;
+  if (serverHas) {
+    const earned = journeyAchievementsLoad();
+    if (!Object.keys(earned).some(key => !serverHas[key])) return;
+  }
   const section = document.createElement('section');
   section.className = 'jr-ach-section'; section.dataset.journeyAchievements = '';
   section.innerHTML = journeyAchievementsHTML(); container.appendChild(section);
 }
 
-// The server checks the route itself and only ever adds: a repeat (a restored
-// summary, a replayed season) returns no fresh keys and keeps the first rank.
+// Every finished route waits in a device queue until the server has answered it.
+// A refresh can restore the summary before initAuth knows the user, and a route
+// finished signed out has nobody to belong to yet: both are sent by
+// journeyFlushPending when onSignIn runs (js/auth.js). The server keeps the first
+// call's route and only ever adds a missing rank, so resending is harmless.
+const JOURNEY_PENDING_KEY = '36-0-journey-pending';
+function journeyPendingLoad() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(JOURNEY_PENDING_KEY));
+    return saved && saved.v === 1 && saved.runs && typeof saved.runs === 'object' ? saved.runs : {};
+  } catch (e) { return {}; }
+}
+function journeyPendingSave(runs) {
+  // the newest ten: an abandoned device must not grow the queue forever
+  const ids = Object.keys(runs).sort((a, b) => (runs[a].at || 0) - (runs[b].at || 0)).slice(-10);
+  const kept = {}; ids.forEach(id => { kept[id] = runs[id]; });
+  try { localStorage.setItem(JOURNEY_PENDING_KEY, JSON.stringify({ v: 1, runs: kept })); } catch (e) {}
+}
 function journeyServerSubmit(j, rank) {
   try {
-    if (!journeyAchievementMetrics(j) || typeof getCurrentUser !== 'function' || !getCurrentUser() ||
-      typeof _supabase === 'undefined' || !_supabase) return;
-    const p = { run_id: String(j.id || ''), level: journeyLevelKey(j), formation: state.formationId || '',
+    if (!journeyAchievementMetrics(j) || !j.id) return;
+    const runs = journeyPendingLoad(), old = runs[j.id];
+    const p = { run_id: String(j.id), level: journeyLevelKey(j), formation: state.formationId || '',
       route: j.path.map(s => ({ squadId: s.squadId, name: s.name })), broken: !!j.broken };
     if (typeof teamOVR === 'function') p.ovr = teamOVR();
     if (rank != null) p.rank = rank;
-    _supabase.rpc('submit_journey_run', { p }).then(({ data }) => {
-      const fresh = (data && data.achievements) || [];
-      if (fresh.length && typeof showAchievementToasts === 'function') showAchievementToasts(fresh);
-    }, () => {});
+    else if (old && old.p && old.p.rank != null) p.rank = old.p.rank;
+    runs[j.id] = { p, at: (old && old.at) || Date.now() };
+    journeyPendingSave(runs);
+    journeySendPending(j.id);
   } catch (e) { /* an award never breaks a run */ }
+}
+// Answered means the server took it or refused it for good; a sign-in, profile
+// or network failure keeps it queued for the next sign-in.
+const JOURNEY_RETRY = ['not signed in', 'no profile'];
+function journeySendPending(id) {
+  if (typeof getCurrentUser !== 'function' || !getCurrentUser() || typeof _supabase === 'undefined' || !_supabase) return;
+  const entry = journeyPendingLoad()[id];
+  if (!entry) return;
+  const sentRank = entry.p.rank;
+  _supabase.rpc('submit_journey_run', { p: entry.p }).then(({ data, error }) => {
+    if (error || !data || JOURNEY_RETRY.includes(data.error)) return;
+    const runs = journeyPendingLoad();
+    // a season that arrived while this was in flight stays queued for its own send
+    if (runs[id] && runs[id].p.rank === sentRank) { delete runs[id]; journeyPendingSave(runs); }
+    const fresh = data.achievements || [];
+    if (fresh.length && typeof showAchievementToasts === 'function') showAchievementToasts(fresh);
+  }, () => {});
+}
+function journeyFlushPending() {
+  try { Object.keys(journeyPendingLoad()).forEach(journeySendPending); } catch (e) {}
 }
 // One 'season' event per journey: a refreshed results screen replays the season,
 // and track()'s two-second guard would let the replay count it twice.

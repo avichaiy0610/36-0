@@ -46,13 +46,15 @@ function journeyAdminSummary(usageRows) {
     if (r.event === 'progress') {
       if (what === 'start') { c.startP += p; c.startE += e; }
       else if (what === 'break') c.breakE += e;
-      else if (what === 'season') {
-        const n = parseInt(rank, 10);
+      // only a whole rank 1-20 counts: '1oops' or a missing rank is not a season
+      else if (what === 'season' && /^(?:[1-9]|1[0-9]|20)$/.test(rank || '')) {
+        const n = Number(rank);
         c.seasonE += e;
         if (n === 1) c.titleE += e;
-        if (n > 0) c.rankSum += n * e;
+        c.rankSum += n * e;
       }
     } else if (r.event === 'finish') {
+      if (what !== 'chain' && what !== 'break') continue;
       c.finishE += e;
       if (what === 'chain') c.chainE += e;
     } else if (r.event === 'share') c.shareE += e;

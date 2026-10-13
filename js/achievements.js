@@ -123,7 +123,7 @@ async function showAchievements() {
   });
 
   grid.innerHTML = '';
-  if (!user && typeof journeyAppendAchievements === 'function') journeyAppendAchievements(grid);
+  if (typeof journeyAppendAchievements === 'function') journeyAppendAchievements(grid, user ? unlockedMap : null);
 
   if (!user) {
     const note = document.createElement('p');

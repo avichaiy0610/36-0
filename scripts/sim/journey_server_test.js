@@ -6,11 +6,12 @@ const read = f => fs.readFileSync(path.join(root, f), 'utf8');
 const memory = new Map();
 const storage = { getItem: k => memory.get(k) || null, setItem: (k, v) => memory.set(k, String(v)) };
 const calls = [], tracked = [];
-const server = { rpc(name, args) { calls.push({ name, args }); return Promise.resolve({ data: { achievements: [] } }); } };
+let reply = { data: { achievements: [] } };
+const server = { rpc(name, args) { calls.push({ name, args }); return Promise.resolve(reply); } };
 let signedIn = true;
 const G = new Function('document', 'window', 'localStorage', '_supabase', 'getCurrentUser', 'track',
   ['js/data.js', 'js/sim-engine.js', 'js/game.js', 'js/journey-engine.js', 'js/journey.js', 'js/journey-achievements.js', 'js/journey-admin.js'].map(read).join('\n') +
-  ';return {state,SQUADS,formationSlots,slotFitPos,journeyEngine,journeyAwardAchievements,JOURNEY_ACHIEVEMENTS,journeyAdminSummary,journeyAdminRunsRows,jaSquadName};')(
+  ';return {state,SQUADS,formationSlots,slotFitPos,journeyEngine,journeyAwardAchievements,JOURNEY_ACHIEVEMENTS,journeyAdminSummary,journeyAdminRunsRows,jaSquadName,journeyPendingLoad,journeyFlushPending};')(
     { addEventListener() {}, getElementById() { return null; }, querySelectorAll() { return []; } }, {}, storage, server,
     () => (signedIn ? { id: 'u' } : null), (e, m, d) => tracked.push([e, m, d]));
 let n = 0;
@@ -75,11 +76,29 @@ test('the season sends its rank, and its event is counted once per journey', () 
   assert.strictEqual(calls[0].args.p.rank, 1);
   assert.deepStrictEqual(tracked, [['progress', 'journey', 'normal|season|1']]);
 });
-test('signed out, nothing reaches the server; a malformed route is never sent', () => {
-  calls.length = 0;
+test('signed out, nothing reaches the server; a malformed route is never sent or queued', () => {
+  memory.delete('36-0-journey-pending'); calls.length = 0;
   signedIn = false; G.journeyAwardAchievements(j); signedIn = true;
-  G.journeyAwardAchievements({ ...j, path: j.path.slice(1) });
+  G.journeyAwardAchievements({ ...j, id: 'other-run-1', path: j.path.slice(1) });
   assert.deepStrictEqual(calls, []);
+  assert.deepStrictEqual(Object.keys(G.journeyPendingLoad()), [j.id]);
+});
+test('the server keeps the squad list the game has', () => {
+  const sql = read('supabase/migrations/20261013000002_journey_runs.sql');
+  const block = sql.slice(sql.indexOf('-- BEGIN journey_squads'), sql.indexOf('-- END journey_squads'));
+  const ids = [...block.matchAll(/\('([^']+)'\)/g)].map(m => m[1]).sort();
+  assert.deepStrictEqual(ids, G.SQUADS.map(x => x.id).sort(), 'run node scripts/build_journey_squads_sql.js');
+});
+test('a malformed detail never counts as a season, a title or a finish', () => {
+  const s = G.journeyAdminSummary([
+    { mode: 'journey', event: 'progress', detail: 'normal|season|1oops', events: 5, people: 5 },
+    { mode: 'journey', event: 'progress', detail: 'normal|season', events: 5, people: 5 },
+    { mode: 'journey', event: 'progress', detail: 'normal|season|0', events: 5, people: 5 },
+    { mode: 'journey', event: 'finish', detail: 'normal|unexpected', events: 5, people: 5 },
+    { mode: 'journey', event: 'progress', detail: 'normal|season|12', events: 1, people: 1 },
+  ]);
+  const nl = s.levels[0];
+  assert.deepStrictEqual([nl.seasonE, nl.titleE, nl.rankSum, nl.finishE], [1, 0, 12, 0]);
 });
 test('the admin funnel adds up per level', () => {
   const rows = [
@@ -111,4 +130,44 @@ test('admin rows name the squads and count seasons and titles per player', () =>
   assert.strictEqual(rows[0].level, 'קשה'); assert.strictEqual(rows[1].rank, null);
   assert.deepStrictEqual(users, [{ user: 'a', runs: 2, seasons: 1, titles: 1 }]);
 });
-console.log('\n' + n + ' passed');
+// ── the queue: a refresh before sign-in, a route finished signed out (async) ──
+(async () => {
+  const flush = () => new Promise(r => setTimeout(r, 0));
+  async function atest(name, fn) { await fn(); n++; console.log('PASS  ' + name); }
+  await atest('after sign-in the queued route is sent, and an answer clears it', async () => {
+    calls.length = 0; reply = { data: { achievements: ['jx_finish'] } };
+    G.journeyFlushPending(); await flush();
+    assert.strictEqual(calls.length, 1); assert.strictEqual(calls[0].args.p.run_id, j.id);
+    assert.deepStrictEqual(G.journeyPendingLoad(), {});
+  });
+  await atest('no profile yet, or a network error, keeps it queued for the next sign-in', async () => {
+    reply = { data: { error: 'no profile' } };
+    G.journeyAwardAchievements(j); await flush();
+    assert.ok(G.journeyPendingLoad()[j.id]);
+    reply = { data: null, error: { message: 'offline' } };
+    G.journeyFlushPending(); await flush();
+    assert.ok(G.journeyPendingLoad()[j.id]);
+  });
+  await atest('a route the server refuses for good leaves the queue', async () => {
+    reply = { data: { error: 'bad route' } };
+    G.journeyFlushPending(); await flush();
+    assert.deepStrictEqual(G.journeyPendingLoad(), {});
+  });
+  await atest('a queued season keeps its rank, and a later route call does not drop it', async () => {
+    signedIn = false;
+    G.journeyAwardAchievements({ ...j, phase: 'season' }, 3);
+    G.journeyAwardAchievements(j);            // the summary restored afterwards
+    assert.strictEqual(G.journeyPendingLoad()[j.id].p.rank, 3);
+    signedIn = true; calls.length = 0; reply = { data: { achievements: [] } };
+    G.journeyFlushPending(); await flush();
+    assert.strictEqual(calls[0].args.p.rank, 3);
+  });
+  await atest('the queue keeps only the newest ten routes', async () => {
+    signedIn = false; memory.delete('36-0-journey-pending');
+    for (let i = 0; i < 14; i++) G.journeyAwardAchievements({ ...j, id: 'queued-run-' + i });
+    const ids = Object.keys(G.journeyPendingLoad());
+    assert.strictEqual(ids.length, 10); assert.ok(ids.includes('queued-run-13')); assert.ok(!ids.includes('queued-run-0'));
+    signedIn = true;
+  });
+  console.log('\n' + n + ' passed');
+})().catch(e => { console.error(e); process.exitCode = 1; });

@@ -100,6 +100,8 @@ async function onSignIn(user) {
   // signed out gets published now, which is the only moment we know both that
   // there is a club and that there is somebody to attach it to.
   if (typeof clubAdoptRemote === 'function') clubAdoptRemote(profile?.club);
+  // מסע ה־11: routes finished before the session was known, or signed out
+  if (typeof journeyFlushPending === 'function') journeyFlushPending();
   if (!profile?.username) {
     document.getElementById('auth-modal').style.display = 'none';
     document.getElementById('username-modal').style.display = 'flex';

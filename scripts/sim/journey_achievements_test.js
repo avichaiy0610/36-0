@@ -7,8 +7,9 @@ const memory = new Map();
 const storage = { getItem: k => memory.get(k) || null, setItem: (k, v) => memory.set(k, String(v)) };
 const G = new Function('document', 'window', 'localStorage',
   ['js/data.js', 'js/sim-engine.js', 'js/game.js', 'js/journey-engine.js', 'js/journey.js', 'js/journey-achievements.js'].map(read).join('\n') +
-  ';return {journeyAchievementKeys,journeyAchievementMetrics,journeyAwardAchievements,journeyAchievementsLoad,JOURNEY_ACHIEVEMENTS,SQUADS,journeyEngine,formationSlots,slotFitPos,state,journeyRecordPick};')(
-    { addEventListener() {}, getElementById() { return null; } }, {}, storage);
+  ';return {journeyAchievementKeys,journeyAchievementMetrics,journeyAwardAchievements,journeyAchievementsLoad,JOURNEY_ACHIEVEMENTS,SQUADS,journeyEngine,formationSlots,slotFitPos,state,journeyRecordPick,journeyAppendAchievements};')(
+    { addEventListener() {}, getElementById() { return null; },
+      createElement: () => ({ dataset: {}, innerHTML: '' }) }, {}, storage);
 let n = 0;
 function test(name, fn) { fn(); n++; console.log('PASS  ' + name); }
 const metrics = { broken: true, clubs: 1, yearGap: 0, backwards: 0, phase: 'complete', level: 'normal' };
@@ -107,5 +108,20 @@ test('a route with two broken links cannot unlock awards', () => {
   bad.broken = true; bad.path[1].arrival = 'break'; bad.path[2].arrival = 'break';
   assert.strictEqual(G.journeyAchievementMetrics(bad), null);
   assert.deepStrictEqual(G.journeyAwardAchievements(bad, 1), []);
+});
+test('signed in, the main list shows the device section only while it holds an award the account lacks', () => {
+  const box = () => { const kids = []; return { kids, appendChild: c => kids.push(c) }; };
+  memory.set('36-0-journey-achievements', JSON.stringify({ v: 1, earned: {
+    jx_finish: { at: new Date().toISOString() }, jx_clubs: { at: new Date().toISOString() } } }));
+  let b = box(); G.journeyAppendAchievements(b, { jx_finish: {} });
+  assert.strictEqual(b.kids.length, 1, 'retired jx_clubs is not on the server: keep showing it');
+  memory.set('36-0-journey-achievements', JSON.stringify({ v: 1, earned: { jx_finish: { at: new Date().toISOString() } } }));
+  b = box(); G.journeyAppendAchievements(b, { jx_finish: {} });
+  assert.strictEqual(b.kids.length, 0, 'everything is in the account: no duplicate section');
+  b = box(); G.journeyAppendAchievements(b, {});
+  assert.strictEqual(b.kids.length, 1, 'a queued route the server has not granted yet');
+  b = box(); G.journeyAppendAchievements(b, null);
+  assert.strictEqual(b.kids.length, 1, 'signed out: always');
+  memory.delete('36-0-journey-achievements');
 });
 console.log('\n' + n + ' passed');
