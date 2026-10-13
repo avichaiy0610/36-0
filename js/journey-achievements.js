@@ -1,4 +1,7 @@
-// Device-local journey awards. Never read from or write to the production DB.
+// Journey awards are kept on the device (they work signed out), and a signed-in
+// player's route is also sent to submit_journey_run (migration 20261013000002),
+// which grants the same keys as real achievements. The toast queue drops a key it
+// has already shown, so the local and the server award announce themselves once.
 const JOURNEY_ACH_KEY = '36-0-journey-achievements';
 const JOURNEY_ACHIEVEMENTS = [
   { key: 'jx_finish', icon: '🧭', name_he: 'הדרך שלי', desc_he: 'השלם מסע של 11 שחקנים.' },
@@ -54,6 +57,8 @@ function journeyAchievementKeys(metrics, rank) {
   return keys;
 }
 function journeyAwardAchievements(j, rank) {
+  journeyServerSubmit(j, rank);
+  if (rank != null) journeyReportSeason(j, rank);
   const keys = journeyAchievementKeys(journeyAchievementMetrics(j), rank);
   const earned = journeyAchievementsLoad();
   const fresh = keys.filter(key => !earned[key]);
@@ -87,4 +92,35 @@ function journeyAppendAchievements(container) {
   const section = document.createElement('section');
   section.className = 'jr-ach-section'; section.dataset.journeyAchievements = '';
   section.innerHTML = journeyAchievementsHTML(); container.appendChild(section);
+}
+
+// The server checks the route itself and only ever adds: a repeat (a restored
+// summary, a replayed season) returns no fresh keys and keeps the first rank.
+function journeyServerSubmit(j, rank) {
+  try {
+    if (!journeyAchievementMetrics(j) || typeof getCurrentUser !== 'function' || !getCurrentUser() ||
+      typeof _supabase === 'undefined' || !_supabase) return;
+    const p = { run_id: String(j.id || ''), level: journeyLevelKey(j), formation: state.formationId || '',
+      route: j.path.map(s => ({ squadId: s.squadId, name: s.name })), broken: !!j.broken };
+    if (typeof teamOVR === 'function') p.ovr = teamOVR();
+    if (rank != null) p.rank = rank;
+    _supabase.rpc('submit_journey_run', { p }).then(({ data }) => {
+      const fresh = (data && data.achievements) || [];
+      if (fresh.length && typeof showAchievementToasts === 'function') showAchievementToasts(fresh);
+    }, () => {});
+  } catch (e) { /* an award never breaks a run */ }
+}
+// One 'season' event per journey: a refreshed results screen replays the season,
+// and track()'s two-second guard would let the replay count it twice.
+const JOURNEY_SEASONS_KEY = '36-0-journey-seasons';
+function journeyReportSeason(j, rank) {
+  try {
+    if (!j || !j.id || typeof track !== 'function') return;
+    let seen = [];
+    try { seen = JSON.parse(localStorage.getItem(JOURNEY_SEASONS_KEY)) || []; } catch (e) { seen = []; }
+    if (!Array.isArray(seen)) seen = [];
+    if (seen.includes(j.id)) return;
+    track('progress', 'journey', journeyLevelKey(j) + '|season|' + rank);
+    localStorage.setItem(JOURNEY_SEASONS_KEY, JSON.stringify(seen.concat(j.id).slice(-30)));
+  } catch (e) { /* a counter never breaks a game */ }
 }

@@ -79,7 +79,7 @@ function journeyStart(formationId, levelKey) {
     level, phase: 'pick', path: [], visited: [first.id], broken: false,
     arrival: 'start', escapeIds: null, destIds: null };
   beginDraftWithState({ classic: false, tactic: 'bal', journey });
-  if (typeof track === 'function') track('progress', 'journey', 'start-' + level);
+  if (typeof track === 'function') track('progress', 'journey', level + '|start');
 }
 function journeyStartRound() {
   state.selectedPlayer = null; state.selectedSlotIdx = null;
@@ -110,7 +110,7 @@ function journeyRecordPick(idx, player) {
   j.escapeIds = null; j.destIds = null;
   _journeyChoicesKey = null;
   if (j.phase === 'complete') {
-    if (typeof track === 'function') track('finish', 'journey', journeyLevelKey(j) + (j.broken ? '-break' : ''));
+    if (typeof track === 'function') track('finish', 'journey', journeyLevelKey(j) + '|' + (j.broken ? 'break' : 'chain'));
     if (typeof journeyAwardAchievements === 'function') journeyAwardAchievements(j);
   }
 }
@@ -146,7 +146,7 @@ function journeyEnter(id, breaking) {
   // The pool can come from a stored draw, so the club limit is checked again here.
   if (!next || j.visited.includes(id) || !journeyClubOpen(j, j.visited, id)) return false;
   if (breaking) j.broken = true;
-  if (breaking && typeof track === 'function') track('progress', 'journey', 'break-' + j.path.length);
+  if (breaking && typeof track === 'function') track('progress', 'journey', journeyLevelKey(j) + '|break');
   j.arrival = breaking ? 'break' : 'career';
   j.visited.push(id); j.phase = 'pick'; j.escapeIds = null; j.destIds = null;
   state.currentSquad = next;

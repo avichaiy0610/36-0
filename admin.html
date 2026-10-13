@@ -256,6 +256,7 @@
   <h1>⚙️ ניהול טקסטים — 36-0</h1>
   <div class="sub"><a href="admin-story.html" style="color:#FFD700">📖 מצב סיפור: מי נכנס ומי סיים כל פרק ←</a></div>
   <div class="sub"><a href="admin-derby.html" style="color:#FFD700">🏆 אלופי הדרבי: משפך לכל מועדון ומי שיחק ←</a></div>
+  <div class="sub"><a href="admin-journey.html" style="color:#FFD700">🧭 מסע ה־11 (1.61): משפך לפי רמה ומי שיחק ←</a></div>
   <div class="sub">כל טקסט באתר מופיע כאן עם הערך הנוכחי שלו. ערוך ולחץ שמור — השינוי חל על כל הגולשים אחרי רענון. הכתיבה מוגנת ב-RLS: רק חשבון המנהל יכול לשמור.</div>
 
   <div id="login-box">
@@ -311,6 +312,21 @@
       <div id="derby-out"></div>
       <div class="us-h3">מי שיחק</div>
       <div id="derby-runs"></div>
+    </div>
+
+    <div id="journey-section" style="display:none">
+      <h2>🧭 מסע ה־11 <span style="font-size:13px;color:#8b949e">· חדש בגרסה 1.61</span></h2>
+      <div class="chal-note">
+        א. משפך לפי רמה (כולל מי שבלי חשבון): התחילו, השלימו 11, שבירות, עונות ואליפויות. ב. "מי שיחק": כל מסלול שהושלם של מחוברים, עם המקום בעונה.
+        אותו טווח ימים כמו "מה משחקים". יש לזה גם עמוד משלו: <a href="admin-journey.html" style="color:#FFD700">admin-journey.html ←</a>
+      </div>
+      <div class="us-controls">
+        <button id="journey-refresh" class="seo-btn ghost">↻ רענן</button>
+        <span id="journey-status" class="chal-status"></span>
+      </div>
+      <div id="journey-out"></div>
+      <div class="us-h3">מי שיחק</div>
+      <div id="journey-runs"></div>
     </div>
 
     <div id="hist-section" style="display:none">
@@ -471,6 +487,7 @@
 <script src="js/story-data.js?v=061a16f6"></script>
 <script src="js/story-admin.js?v=02f582c6"></script>
 <script src="js/derby-admin.js?v=63ef2356"></script>
+<script src="js/journey-admin.js?v=0c409e40"></script>
 <script src="js/league_tables.js?v=7b63e16c"></script>
 <script src="js/challenges.js?v=0978f2ae"></script>
 <!-- crowd.js comes first and is not optional: crowd-admin.js builds its
@@ -893,6 +910,8 @@ async function init() {
     initStoryAdmin();
     document.getElementById('derby-section').style.display = 'block';
     initDerbyAdmin();
+    document.getElementById('journey-section').style.display = 'block';
+    initJourneyAdmin();
     initUsage();
     document.getElementById('hist-section').style.display = 'block';
     initHistViewer();
@@ -1029,6 +1048,16 @@ function initDerbyAdmin() {
   const load = () => derbyAdminLoad(document.getElementById('derby-out'), document.getElementById('derby-runs'),
     document.getElementById('derby-status'), Number(document.getElementById('usage-days').value) || 30);
   document.getElementById('derby-refresh').onclick = load;
+  document.getElementById('usage-days').addEventListener('change', load);
+  load();
+}
+
+/* ─── מסע ה־11 (admin only) ───────────────────────────────────────────────── */
+// The tables live in js/journey-admin.js; admin-journey.html shows them on their own.
+function initJourneyAdmin() {
+  const load = () => journeyAdminLoad(document.getElementById('journey-out'), document.getElementById('journey-runs'),
+    document.getElementById('journey-status'), Number(document.getElementById('usage-days').value) || 30);
+  document.getElementById('journey-refresh').onclick = load;
   document.getElementById('usage-days').addEventListener('change', load);
   load();
 }

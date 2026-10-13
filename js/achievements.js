@@ -92,7 +92,8 @@ async function showAchievements() {
   showScreen('achievements');
   const grid = document.getElementById('achievements-grid');
   grid.innerHTML = '<div class="page-loading">טוען...</div>';
-  if (typeof journeyAppendAchievements === 'function') journeyAppendAchievements(grid);
+  // Signed in, the journey's awards arrive as real ones from the server list below.
+  if (!getCurrentUser() && typeof journeyAppendAchievements === 'function') journeyAppendAchievements(grid);
 
   document.getElementById('achievements-back').onclick = () => {
     showScreen('welcome');
@@ -122,7 +123,7 @@ async function showAchievements() {
   });
 
   grid.innerHTML = '';
-  if (typeof journeyAppendAchievements === 'function') journeyAppendAchievements(grid);
+  if (!user && typeof journeyAppendAchievements === 'function') journeyAppendAchievements(grid);
 
   if (!user) {
     const note = document.createElement('p');

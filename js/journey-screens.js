@@ -185,7 +185,7 @@ async function journeyDownloadRoute() {
     const canvas = await html2canvas(card, { backgroundColor: '#0d1117', scale: 2 });
     const a = document.createElement('a'); a.download = '36-0-journey.png'; a.href = canvas.toDataURL('image/png'); a.click();
     if (status) status.textContent = 'תמונת המסלול נשמרה';
-    if (typeof track === 'function') track('share', 'journey', 'png');
+    if (typeof track === 'function') track('share', 'journey', journeyLevelKey());
   } catch (e) { if (status) status.textContent = 'לא ניתן לשמור תמונה כרגע. נסה שוב.'; }
 }
 function journeyShareLine() {
