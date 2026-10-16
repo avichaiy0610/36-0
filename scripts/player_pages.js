@@ -307,6 +307,14 @@ function slugFor(name) {
   return clean(name).replace(/["'׳״.()]/g, '').replace(/\s+/g, '-');
 }
 
+// The thin rule, in one place: pageHtml stamps noindex with it and writePlayer
+// refuses to create a page with it (see the comment in pageHtml for the rule).
+function isThinFacts(F) {
+  return F.seasons <= 3 && !F.titles.length && !F.goals.length && !F.assists.length
+    && !F.tags.length && !F.europe && !F.duos.length && !F.walls.length;
+}
+function isThin(e) { return isThinFacts(playerFacts(e)); }
+
 function pageHtml(TEAMS, e) {
   const name = e.name, mt = TEAMS[e.mainTeam], mtName = mt ? mt.name : e.mainTeam;
   const seasons = e.career.map(c => c.season);
@@ -337,8 +345,7 @@ function pageHtml(TEAMS, e) {
   // ad slot. They stay online and linked (a reader who searches the name still
   // finds him) and they keep passing link equity to the pages that earned it,
   // which is what `follow` is for.
-  const thin = F.seasons <= 3 && !F.titles.length && !F.goals.length && !F.assists.length
-    && !F.tags.length && !F.europe && !F.duos.length && !F.walls.length;
+  const thin = isThinFacts(F);
   // Hebrew, not a template: "ב-1 עונות" and a list joined by repeated "ו" are
   // exactly what makes generated prose read as generated.
   const inS  = n => (n === 1 ? 'בעונה אחת' : `ב-${n} עונות`);
@@ -617,6 +624,12 @@ function writePlayer(TEAMS, e, force) {
   // players in the news and must not rewrite the library every run. `force` is
   // for the times the TEMPLATE changed and every existing page is now stale.
   if (fs.existsSync(file) && !force) return { slug, created: false };
+  // A thin page is never CREATED. The September cleanup (2f599397, c5e605a2)
+  // deleted 625 of them, and the news engine's backfill then wrote 599 back in
+  // a month — noindexed, but the AdSense reviewer still crawls them, and it
+  // rejected the site a second time for low-value content. `force` only
+  // rewrites pages that already exist (--rebuild), so it doesn't need the gate.
+  if (!fs.existsSync(file) && isThin(e)) return { slug, created: false, thin: true };
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(file, pageHtml(TEAMS, e));
   return { slug, created: true };
@@ -806,7 +819,7 @@ function writeIndex() {
   writeSearchIndex();
 }
 
-module.exports = { load, buildIndex, slugFor, pageHtml, writePlayer, writeSitemap,
+module.exports = { load, buildIndex, slugFor, pageHtml, writePlayer, writeSitemap, isThin,
                    writeIndex, writeSearchIndex, allSlugs, BASE, FOOT_LINKS };
 
 // ── CLI ──────────────────────────────────────────────────────────────────────
