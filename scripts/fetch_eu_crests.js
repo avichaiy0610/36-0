@@ -184,7 +184,7 @@ const QUERY = {
 
 };
 
-const API = 'https://www.thesportsdb.com/api/v1/json/3/searchteams.php?t=';
+const API = 'https://www.thesportsdb.com/api/v1/json/123/searchteams.php?t=';
 
 // Anchored on word boundaries. An unanchored "B" alternative matched the b in
 // "Maribor", threw away every real candidate, and left the youth side as the

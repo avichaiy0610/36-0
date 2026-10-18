@@ -27,7 +27,9 @@ const {
   TELEGRAM_CHAL_BOT_TOKEN, TELEGRAM_CHAT_ID, DRY_RUN,
 } = process.env;
 
-const TSDB = 'https://www.thesportsdb.com/api/v1/json/3';
+// '3' was the old free key; TheSportsDB disabled it and now answers it with a
+// plain-text notice, so every fetch threw and the national team silently vanished.
+const TSDB = 'https://www.thesportsdb.com/api/v1/json/123';
 const S365 = 'https://webws.365scores.com/web/games/fixtures/?appTypeId=5&langId=2&timezoneName=Asia/Jerusalem&competitions=42';
 const LEAGUE_ID = 4644;        // Israeli Premier League
 const ISRAEL_NT = 135931;      // Israel national team
@@ -231,6 +233,10 @@ function score(f, period) {
   if (f.kind === 'nt') return period === 'daily' ? 100 : period === 'weekly' ? 60 : 30;
   if (f.kind === 'round' && period === 'daily') return 0;   // no date → can't be today's
   if (!f.homeId || !f.awayId) return 0;          // unmapped club — never guess
+  // An undated stand-in is two clubs, not a match: nobody has said they meet,
+  // so it earns no derby bonus — that bonus is what twice put a "קלאסיקו" that
+  // was never on the calendar above the week's real big game.
+  if (f.kind === 'round') return 10 + Math.max(prestige(f.homeId), prestige(f.awayId)) + 2 * Math.min(prestige(f.homeId), prestige(f.awayId));
   // The size of a fixture is set by its WEAKER side: a giant against a minnow is
   // not a big night, two mid-size rivals can be. So the smaller prestige counts
   // double, and the larger one only once.
@@ -272,10 +278,12 @@ function compose(period, f) {
     : [clubMission(big, 3), clubMission(other, 1)].filter(Boolean);
   if (!reqs.length) return null;
   const when = period === 'daily' ? 'ערב' : period === 'weekly' ? 'שבוע' : 'חודש';
-  const rivalry = f.undated ? derbyOf(f.homeId, f.awayId) : null;
   const label = f.undated
-    ? (rivalry ? `🔥 ${rivalry}` : `🔥 המשחקים הגדולים של המחזור`)
-    : (derby ? `🔥 ${when} ה${derby}` : `⚽ ${heb(f.homeId)} נגד ${heb(f.awayId)}`);
+    ? `🔥 המשחקים הגדולים של המחזור`
+    // "שבוע הקלאסיקו" reads right; "שבוע הפסגת הליגה" / "ערב הדרבי תל אביב" do
+    // not — a two-word name is already in construct state and takes no ה.
+    : (derby ? (derby.includes(' ') ? `🔥 ${derby}` : `🔥 ${when} ה${derby}`)
+             : `⚽ ${heb(f.homeId)} נגד ${heb(f.awayId)}`);
   const note = f.undated
     ? `מחזור ${f.round}: ${heb(f.homeId)} ו${heb(f.awayId)} עדיין בלי שעת פתיחה`
     : `${f.date} ${f.time} · ${f.home} vs ${f.away}`;
@@ -316,13 +324,11 @@ function undatedPair(inRange, all) {
   for (const r of roundsInWindow(inRange)) {
     const g = undatedClubs(r, all).filter(id => (FANBASE[id] || 0) >= 8);
     if (g.length < 2) continue;
-    // Several giants can be unscheduled at once and their prestige often ties.
-    // If two of them are known rivals, that is almost certainly the pairing the
-    // league held back — so prefer it over an arbitrary top-two.
-    let pick = [g[0], g[1]];
-    outer: for (let i = 0; i < g.length; i++)
-      for (let j = i + 1; j < g.length; j++)
-        if (derbyOf(g[i], g[j])) { pick = [g[i], g[j]]; break outer; }
+    // The two biggest — NOT a guessed pairing. This used to prefer two rivals as
+    // "almost certainly the game the league held back"; it wasn't: six clubs
+    // missing from round 9 made it announce מכבי חיפה–מכבי ת"א, which no source
+    // listed, and whose round was mostly played after the week ended anyway.
+    const pick = [g[0], g[1]];
     return { kind: 'round', round: r, homeId: pick[0], awayId: pick[1],
              home: heb(pick[0]), away: heb(pick[1]), date: '', time: '', undated: true,
              id: 'round-' + r + '-' + pick[0] + '-' + pick[1] };
@@ -525,7 +531,9 @@ async function processTaps() {
   for (const t of targets(now)) {
     const inRange = all.filter(f => inWindow(f, t));
     const candidates = [...inRange];
-    if (t.period !== 'daily') {
+    // The stand-in is a last resort for a week with no dated game worth a
+    // challenge (August, Europe holding the schedule) — never a rival to one.
+    if (t.period !== 'daily' && !pickBest(inRange, t.period)) {
       const pair = undatedPair(inRange, all);
       if (pair) candidates.push(pair);
     }

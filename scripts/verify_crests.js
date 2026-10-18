@@ -24,7 +24,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     let team = null;
     for (const q of names) {
       try {
-        const r = await fetch(`https://www.thesportsdb.com/api/v1/json/3/searchteams.php?t=${encodeURIComponent(q)}`);
+        const r = await fetch(`https://www.thesportsdb.com/api/v1/json/123/searchteams.php?t=${encodeURIComponent(q)}`);
         const d = await r.json();
         const cands = (d.teams || []).filter(t => /Soccer/i.test(t.strSport || ''));
         team = cands.find(t => /Israel/i.test(t.strCountry || '')) || cands[0];

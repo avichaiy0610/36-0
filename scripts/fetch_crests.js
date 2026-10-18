@@ -45,7 +45,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     let url = null, matched = '';
     for (const q of names) {
       try {
-        const r = await fetch(`https://www.thesportsdb.com/api/v1/json/3/searchteams.php?t=${encodeURIComponent(q)}`);
+        const r = await fetch(`https://www.thesportsdb.com/api/v1/json/123/searchteams.php?t=${encodeURIComponent(q)}`);
         const d = await r.json();
         // Must be the FOOTBALL club: "Hapoel Tel Aviv BC" is the basketball team
         // and matched first, which would have put the wrong crest on the map.
